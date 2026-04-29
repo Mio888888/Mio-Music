@@ -30,6 +30,8 @@ declare module 'vue' {
     TDialog: typeof import('tdesign-vue-next')['Dialog']
     TInput: typeof import('tdesign-vue-next')['Input']
     TInputNumber: typeof import('tdesign-vue-next')['InputNumber']
+    TitleBar: typeof import('./components/layout/TitleBar.vue')['default']
+    TitleBarControls: typeof import('./components/TitleBarControls.vue')['default']
     TLayout: typeof import('tdesign-vue-next')['Layout']
     TLoading: typeof import('tdesign-vue-next')['Loading']
     TProgress: typeof import('tdesign-vue-next')['Progress']

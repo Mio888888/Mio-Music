@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TitleBarControls from '@/components/TitleBarControls.vue'
 import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useRouter, useRoute } from 'vue-router'
@@ -250,16 +251,7 @@ const handleKeyDown = () => {
                 <template #icon><i class="iconfont icon-shengyin" style="font-size: 16px"></i></template>
               </t-button>
 
-              <t-button
-                shape="circle"
-                theme="default"
-                variant="text"
-                class="nav-btn settings-btn"
-                style="width: 32px; height: 32px; margin: 0; flex-shrink: 0"
-                @click="router.push('/settings')"
-              >
-                <template #icon><i class="iconfont icon-shezhi" style="font-size: 16px"></i></template>
-              </t-button>
+              <TitleBarControls />
             </div>
           </div>
 
@@ -331,6 +323,7 @@ const handleKeyDown = () => {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
+  -webkit-app-region: drag;
 }
 
 .logo-icon {
@@ -413,10 +406,12 @@ const handleKeyDown = () => {
   display: flex;
   align-items: center;
   padding: 1.5rem;
+  -webkit-app-region: drag;
 }
 
 .nav-btn {
   margin-right: 0.5rem;
+  -webkit-app-region: no-drag;
 }
 
 .nav-btn .iconfont {
@@ -434,6 +429,7 @@ const handleKeyDown = () => {
   position: relative;
   align-items: center;
   justify-content: space-between;
+  -webkit-app-region: no-drag;
 }
 
 .search-input {
