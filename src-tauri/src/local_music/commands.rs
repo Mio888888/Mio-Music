@@ -1,0 +1,113 @@
+#![allow(non_snake_case)]
+
+use crate::db::music_db;
+use crate::local_music::{scanner, cover_cache};
+use crate::AppDb;
+use tauri::State;
+
+#[tauri::command]
+pub fn local_music__scan(state: State<'_, AppDb>, dirs: Vec<String>) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let result = scanner::scan_directories(&conn, &dirs);
+    Ok(serde_json::to_value(serde_json::json!({
+        "success": true,
+        "data": { "scanned": result.scanned, "added": result.added, "updated": result.updated, "errors": result.errors }
+    })).unwrap())
+}
+
+#[tauri::command]
+pub fn local_music__get_cover(state: State<'_, AppDb>, track_id: String) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let track = music_db::get_track_by_id(&conn, &track_id)
+        .map_err(|e| e.to_string())?;
+    match track {
+        Some(t) => {
+            let cover = cover_cache::get_cover_base64(&t.songmid, &t.path);
+            Ok(serde_json::json!({ "success": true, "data": cover }))
+        }
+        None => Ok(serde_json::json!({ "success": true, "data": null })),
+    }
+}
+
+#[tauri::command]
+pub fn local_music__get_covers(state: State<'_, AppDb>, track_ids: Vec<String>) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let all_tracks = music_db::get_all_tracks(&conn).map_err(|e| e.to_string())?;
+    let track_paths: Vec<(String, String)> = all_tracks.iter()
+        .map(|t| (t.songmid.clone(), t.path.clone()))
+        .collect();
+    let covers = cover_cache::batch_get_covers(&track_ids, &track_paths);
+    Ok(serde_json::json!({ "success": true, "data": covers }))
+}
+
+#[tauri::command]
+pub fn local_music__write_tags(
+    _state: State<'_, AppDb>,
+    file_path: String,
+    song_info: serde_json::Value,
+    _tag_write_options: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let path = std::path::Path::new(&file_path);
+    let track = music_db::TrackRow {
+        songmid: String::new(),
+        path: file_path.clone(),
+        url: None,
+        singer: song_info["singer"].as_str().unwrap_or("").to_string(),
+        name: song_info["name"].as_str().unwrap_or("").to_string(),
+        album_name: song_info["albumName"].as_str().unwrap_or("").to_string(),
+        album_id: 0,
+        source: "local".to_string(),
+        interval: String::new(),
+        has_cover: 0,
+        cover_key: None,
+        year: song_info["year"].as_i64().unwrap_or(0),
+        lrc: None,
+        types: "[]".to_string(),
+        _types: "{}".to_string(),
+        type_url: "{}".to_string(),
+        bitrate: 0,
+        sample_rate: 0,
+        channels: 0,
+        duration: 0.0,
+        size: 0,
+        mtime_ms: 0,
+        hash: None,
+        updated_at: 0,
+    };
+    scanner::write_tags(path, &track)?;
+    Ok(serde_json::json!({ "success": true, "data": true }))
+}
+
+#[tauri::command]
+pub fn local_music__get_tags(state: State<'_, AppDb>, songmid: String, include_lyrics: Option<bool>) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let track = music_db::get_track_by_id(&conn, &songmid)
+        .map_err(|e| e.to_string())?;
+    match track {
+        Some(t) => {
+            let mut data = serde_json::to_value(&t).unwrap();
+            if !include_lyrics.unwrap_or(true) {
+                data["lrc"] = serde_json::Value::Null;
+            }
+            Ok(serde_json::json!({ "success": true, "data": data }))
+        }
+        None => Ok(serde_json::json!({ "success": true, "data": null })),
+    }
+}
+
+#[tauri::command]
+pub fn local_music__get_lyric(state: State<'_, AppDb>, songmid: String) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let track = music_db::get_track_by_id(&conn, &songmid)
+        .map_err(|e| e.to_string())?;
+    let lrc = track.and_then(|t| t.lrc).unwrap_or_default();
+    Ok(serde_json::json!({ "success": true, "data": lrc }))
+}
+
+#[tauri::command]
+pub fn local_music__clear_index(state: State<'_, AppDb>) -> Result<serde_json::Value, String> {
+    let conn = state.music.lock().map_err(|e| e.to_string())?;
+    let n = music_db::clear_tracks(&conn).map_err(|e| e.to_string())?;
+    cover_cache::clear_cache();
+    Ok(serde_json::json!({ "success": true, "data": n }))
+}

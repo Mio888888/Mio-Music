@@ -1,0 +1,51 @@
+import { storeToRefs } from 'pinia'
+import { emit } from '@tauri-apps/api/event'
+import { ControlAudioStore } from '@/store/ControlAudio'
+import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { findCurrentLine } from '@/types/lyric'
+
+let rafId: number | null = null
+let isRunning = false
+
+export function startDesktopLyricSync() {
+  if (isRunning) return
+  isRunning = true
+
+  const audioStore = ControlAudioStore()
+  const playStatus = useGlobalPlayStatusStore()
+  const { Audio } = storeToRefs(audioStore)
+  const { player } = storeToRefs(playStatus)
+
+  const tick = () => {
+    if (!isRunning) return
+
+    const lines = player.value.lyrics?.lines || []
+    const currentTimeMs = (Audio.value.currentTime || 0) * 1000
+    const currentIdx = findCurrentLine(lines, currentTimeMs)
+    const currentLine = currentIdx >= 0 ? lines[currentIdx] : null
+    const nextLine = currentIdx + 1 < lines.length ? lines[currentIdx + 1] : null
+
+    emit('desktop-lyric-update', {
+      currentLine: currentLine ? { text: currentLine.text, translation: currentLine.translation, time: currentLine.time, duration: currentLine.duration } : null,
+      nextLine: nextLine ? { text: nextLine.text, translation: nextLine.translation } : null,
+      currentIndex: currentIdx,
+      totalLines: lines.length,
+      currentTime: currentTimeMs,
+      isPlaying: Audio.value.isPlay,
+      songName: player.value.songInfo?.name || '',
+      songSinger: player.value.songInfo?.singer || ''
+    }).catch(() => {})
+
+    rafId = requestAnimationFrame(tick)
+  }
+
+  rafId = requestAnimationFrame(tick)
+}
+
+export function stopDesktopLyricSync() {
+  isRunning = false
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+}
