@@ -2,6 +2,7 @@
   <n-config-provider :theme="isDark ? darkTheme : undefined" :theme-overrides="themeOverrides">
     <n-message-provider><n-dialog-provider><nglobal-style />
       <GlobalAudio />
+      <AIChat />
       <slot />
     </n-dialog-provider></n-message-provider>
   </n-config-provider>
