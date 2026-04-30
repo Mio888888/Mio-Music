@@ -307,6 +307,7 @@ fn wy_filter_playlist(raw: &[serde_json::Value]) -> Vec<PlaylistItem> {
         desc: item.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null),
         author: item.get("creator").and_then(|c| c.get("nickname")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        total: serde_json::Value::Null,
     }).collect()
 }
 

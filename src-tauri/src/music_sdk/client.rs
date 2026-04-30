@@ -70,6 +70,8 @@ pub struct PlaylistItem {
     pub play_count: serde_json::Value,
     #[serde(default)]
     pub author: String,
+    #[serde(default)]
+    pub total: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

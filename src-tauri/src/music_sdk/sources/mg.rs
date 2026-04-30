@@ -130,6 +130,7 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
                     desc: String::new(),
                     play_count: serde_json::Value::Null,
                     author: String::new(),
+                    total: serde_json::Value::Null,
                 });
             }
         }
@@ -444,6 +445,7 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
             desc: String::new(),
             play_count: serde_json::Value::Null,
             author: String::new(),
+            total: serde_json::Value::Null,
         })
     }).collect();
 

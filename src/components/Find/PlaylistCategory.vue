@@ -330,7 +330,7 @@ onDeactivated(() => {
 }
 
 .more-category-wrapper {
-  position: relative;
+  position: static;
   display: inline-block;
 }
 
@@ -341,7 +341,9 @@ onDeactivated(() => {
   right: 0;
   z-index: 100;
   padding-top: 8px;
+  margin-top: 0;
   width: 100%;
+  min-width: unset;
   transform-origin: top center;
 }
 

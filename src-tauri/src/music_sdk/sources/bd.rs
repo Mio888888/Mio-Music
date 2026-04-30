@@ -221,6 +221,7 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
             desc: item.get("desc").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null),
             author: String::new(),
+            total: serde_json::Value::Null,
         })
     }).collect();
 

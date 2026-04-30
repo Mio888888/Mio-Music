@@ -278,8 +278,14 @@ async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value
             let resp: serde_json::Value = get_http().get(hot_tag_url)
                 .send().await.map_err(|e| e.to_string())?
                 .json().await.map_err(|e| e.to_string())?;
-            let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-            let hot: Vec<serde_json::Value> = data.iter().map(|item| {
+            // CeruMusic: body.data[0].data — hot tags are nested inside the first group
+            let raw_data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+            let hot_tags_raw = raw_data.first()
+                .and_then(|g| g.get("data"))
+                .and_then(|d| d.as_array())
+                .cloned()
+                .unwrap_or_default();
+            let hot: Vec<serde_json::Value> = hot_tags_raw.iter().map(|item| {
                 let item_id = item.get("id").map(|v| match v {
                     serde_json::Value::String(s) => s.clone(),
                     serde_json::Value::Number(n) => n.to_string(),
@@ -361,21 +367,38 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
 // --- Playlist Detail ---
 
 async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let id = args.get("id").map(|v| match v {
+    let raw_id = args.get("id").map(|v| match v {
         serde_json::Value::String(s) => s.clone(), serde_json::Value::Number(n) => n.to_string(), _ => String::new()
     }).unwrap_or_default();
     let page = get_u64(&args, "page", 1);
     let limit = get_u64(&args, "limit", 30);
 
-    let url = format!("http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid={}&pn={}&rn={}&encode=utf8&vipver=1&isbang=1", id, page - 1, limit);
+    // Handle "digest-{digest}__{id}" format from category playlists
+    let id = if raw_id.starts_with("digest-") {
+        if let Some(pos) = raw_id.find("__") {
+            raw_id[pos + 2..].to_string()
+        } else {
+            raw_id.clone()
+        }
+    } else {
+        raw_id.clone()
+    };
+
+    let url = format!("http://nplserver.kuwo.cn/pl.svc?op=getlistinfo&pid={}&pn={}&rn={}&encode=utf8&keyset=pl2012&identity=kuwo&pcmp4=1&vipver=MUSIC_9.0.5.0_W1&newver=1", id, page - 1, limit);
     let resp: serde_json::Value = get_http().get(&url).send().await.map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
 
     let total = resp.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
     let raw_list = resp.get("musiclist").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let list: Vec<MusicItem> = raw_list.iter().filter_map(|info| parse_music_item(info)).collect();
 
+    let title = resp.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let pic = resp.get("pic").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let info_desc = resp.get("info").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let author = resp.get("uname").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
     Ok(serde_json::json!({
-        "list": list, "info": resp.get("info").cloned().unwrap_or(serde_json::json!({})),
+        "list": list,
+        "info": { "name": title, "img": pic, "desc": info_desc, "author": author },
         "allPage": (total as f64 / limit as f64).ceil() as i64, "limit": limit as i64, "total": total, "source": "kw"
     }))
 }
@@ -411,6 +434,7 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
         img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         source: "kw".into(),
         desc: String::new(), play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null), author: String::new(),
+        total: serde_json::Value::Null,
     }).collect();
 
     Ok(serde_json::to_value(PlaylistResult {
@@ -425,14 +449,28 @@ fn parse_playlists(resp: &serde_json::Value, source: &str, limit: u64) -> Result
     let total = data.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
     let raw_list = data.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
-    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| PlaylistItem {
-        id: item.get("playlistid").cloned().unwrap_or(serde_json::Value::Null),
-        name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        source: source.to_string(),
-        desc: item.get("intro").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null),
-        author: String::new(),
+    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| {
+        let digest = item.get("digest").map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        }).unwrap_or_default();
+        let raw_id = item.get("id").map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        }).unwrap_or_default();
+
+        PlaylistItem {
+            id: serde_json::json!(format!("digest-{}__{}", digest, raw_id)),
+            name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            source: source.to_string(),
+            desc: item.get("desc").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            play_count: item.get("listencnt").cloned().unwrap_or(serde_json::Value::Null),
+            author: item.get("uname").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            total: item.get("total").cloned().unwrap_or(serde_json::Value::Null),
+        }
     }).collect();
 
     Ok(serde_json::to_value(PlaylistResult {
@@ -442,20 +480,38 @@ fn parse_playlists(resp: &serde_json::Value, source: &str, limit: u64) -> Result
 
 fn parse_playlists_mobile(resp: &serde_json::Value, source: &str, limit: u64) -> Result<serde_json::Value, String> {
     let raw_list = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let total = raw_list.len() as i64;
+    let _total = raw_list.len() as i64;
 
-    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| PlaylistItem {
-        id: item.get("id").cloned().unwrap_or(serde_json::Value::Null),
-        name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        img: item.get("pic").or(item.get("img")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        source: source.to_string(),
-        desc: item.get("info").or(item.get("intro")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        play_count: item.get("listencnt").cloned().unwrap_or(serde_json::Value::Null),
-        author: String::new(),
+    let list: Vec<PlaylistItem> = raw_list.iter().filter_map(|item| {
+        if item.get("label").is_none() { return None; }
+        let inner_list = item.get("list").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        Some(inner_list)
+    }).flatten().map(|item| {
+        let digest = item.get("digest").map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        }).unwrap_or_default();
+        let raw_id = item.get("id").map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        }).unwrap_or_default();
+        PlaylistItem {
+            id: serde_json::json!(format!("digest-{}__{}", digest, raw_id)),
+            name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            source: source.to_string(),
+            desc: item.get("desc").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            play_count: item.get("listencnt").cloned().unwrap_or(serde_json::Value::Null),
+            author: item.get("uname").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            total: item.get("total").cloned().unwrap_or(serde_json::Value::Null),
+        }
     }).collect();
+    let count = list.len() as i64;
 
     Ok(serde_json::to_value(PlaylistResult {
-        list, all_page: (total as f64 / limit as f64).ceil() as i64, limit: limit as i64, total, source: source.to_string(),
+        list, all_page: (count as f64 / limit as f64).ceil() as i64, limit: limit as i64, total: count, source: source.to_string(),
     }).unwrap())
 }
 

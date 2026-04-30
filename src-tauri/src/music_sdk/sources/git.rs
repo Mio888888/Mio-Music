@@ -98,6 +98,7 @@ async fn get_category_playlists(_args: serde_json::Value) -> Result<serde_json::
         desc: "来自 GitCode 仓库的音乐收藏".to_string(),
         play_count: serde_json::Value::Null,
         author: "GitCode".to_string(),
+        total: serde_json::Value::Null,
     }];
 
     Ok(serde_json::to_value(PlaylistResult {
@@ -205,6 +206,7 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
         desc: "来自 GitCode 仓库的音乐收藏".to_string(),
         play_count: serde_json::Value::Null,
         author: "GitCode".to_string(),
+        total: serde_json::Value::Null,
     }];
 
     Ok(serde_json::to_value(PlaylistResult {

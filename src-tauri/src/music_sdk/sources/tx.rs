@@ -147,6 +147,7 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
                 desc: item.get("desc").and_then(|v| v.as_str()).unwrap_or("").replace("<br>", "\n"),
                 play_count: item.get("access_num").cloned().unwrap_or(serde_json::Value::Null),
                 author: item.get("creator_info").and_then(|c| c.get("nick")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                total: serde_json::Value::Null,
             }
         }).collect();
         (list, total)
@@ -166,6 +167,7 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
                 desc: basic.get("desc").and_then(|v| v.as_str()).unwrap_or("").replace("<br>", "\n"),
                 play_count: basic.get("play_cnt").cloned().unwrap_or(serde_json::Value::Null),
                 author: basic.get("creator").and_then(|c| c.get("nick")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                total: serde_json::Value::Null,
             })
         }).collect();
         (list, total)
@@ -424,6 +426,7 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
             desc: item.get("introduction").and_then(|v| v.as_str()).unwrap_or("").replace("<br>", "\n"),
             play_count: item.get("listennum").cloned().unwrap_or(serde_json::Value::Null),
             author: item.get("creator").and_then(|c| c.get("name")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            total: serde_json::Value::Null,
         }
     }).collect();
 
