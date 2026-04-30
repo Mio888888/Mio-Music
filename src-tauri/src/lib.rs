@@ -136,6 +136,14 @@ pub fn run() {
             plugin::commands::plugin__save_config,
             plugin::commands::plugin__test_connection,
             plugin::commands::plugin__select_and_add,
+            // Directory Settings
+            commands::directory_commands::get_directories,
+            commands::directory_commands::save_directories,
+            commands::directory_commands::reset_directories,
+            commands::directory_commands::get_directory_size,
+            commands::directory_commands::open_directory,
+            commands::directory_commands::get_cache_info,
+            commands::directory_commands::clear_cache,
             // Audio Device
             audio_device::audio__enumerate_devices,
             audio_device::audio__set_output_device,
