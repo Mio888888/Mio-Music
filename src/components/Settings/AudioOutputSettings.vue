@@ -20,49 +20,103 @@
         </t-button>
       </template>
 
-      <div v-if="!store.supported" class="unsupported-msg">
+      <div v-if="!store.rustSupported && !store.supported" class="unsupported-msg">
         <InfoCircleIcon class="unsupported-icon" />
         <span>当前环境不支持音频设备枚举（MediaDevices API 不可用），将使用系统默认输出设备。</span>
       </div>
 
       <template v-else>
         <div class="device-list">
-          <t-radio-group
-            v-model="store.currentDeviceId"
-            class="device-radio-group"
-            @change="handleDeviceChange"
-          >
+          <!-- Rust backend devices (unified format) -->
+          <template v-if="store.rustSupported && store.rustDevices.length > 0">
             <div
               v-for="device in store.sortedDevices"
-              :key="device.deviceId"
+              :key="device.id"
               class="device-item"
-              :class="{ active: store.currentDeviceId === device.deviceId }"
+              :class="{ active: store.currentRustDeviceId === device.id }"
             >
-              <t-radio :value="device.deviceId" class="device-radio">
-                <div class="device-info">
-                  <span class="device-name">{{ device.label }}</span>
-                  <span v-if="device.deviceId === store.currentDeviceId" class="device-status">
+              <div class="device-row" @click="handleRustDeviceChange(device.id)">
+                <div class="device-main">
+                  <span class="device-name">{{ device.name }}</span>
+                  <span v-if="device.is_default" class="device-status">
                     <CheckCircleIcon class="status-icon" /> 当前使用
                   </span>
                 </div>
-              </t-radio>
-              <div v-if="device.deviceId === store.currentDeviceId" class="device-meta">
+                <div class="device-details">
+                  <span v-if="device.sample_rate > 0" class="device-detail-tag">
+                    {{ formatSampleRate(device.sample_rate) }}
+                  </span>
+                  <span v-if="device.channels > 0" class="device-detail-tag">
+                    {{ device.channels }}声道
+                  </span>
+                </div>
+              </div>
+              <!-- Volume control for Rust devices -->
+              <div v-if="store.currentRustDeviceId === device.id && device.volume_supported" class="device-volume">
+                <span class="volume-icon">&#128266;</span>
+                <t-slider
+                  :model-value="Math.round(device.volume * 100)"
+                  :max="100"
+                  :min="0"
+                  class="volume-slider"
+                  @change="handleVolumeChange(device.id, $event)"
+                />
+                <span class="volume-value">{{ Math.round(device.volume * 100) }}%</span>
+              </div>
+              <div v-if="store.currentRustDeviceId === device.id" class="device-actions">
                 <t-tooltip content="播放测试音">
                   <t-button
                     variant="text"
                     shape="circle"
                     size="large"
-                    @click.stop="store.playTestSound(device.deviceId)"
+                    @click.stop="store.playTestSound(String(device.id))"
                   >
                     <template #icon><PlayCircleIcon /></template>
                   </t-button>
                 </t-tooltip>
               </div>
             </div>
-          </t-radio-group>
+          </template>
+
+          <!-- Web API fallback devices -->
+          <template v-else>
+            <t-radio-group
+              v-model="store.currentDeviceId"
+              class="device-radio-group"
+              @change="handleDeviceChange"
+            >
+              <div
+                v-for="device in store.sortedDevices"
+                :key="device.id"
+                class="device-item"
+                :class="{ active: store.currentDeviceId === device.id }"
+              >
+                <t-radio :value="device.id" class="device-radio">
+                  <div class="device-info">
+                    <span class="device-name">{{ device.name }}</span>
+                    <span v-if="device.id === store.currentDeviceId" class="device-status">
+                      <CheckCircleIcon class="status-icon" /> 当前使用
+                    </span>
+                  </div>
+                </t-radio>
+                <div v-if="device.id === store.currentDeviceId" class="device-meta">
+                  <t-tooltip content="播放测试音">
+                    <t-button
+                      variant="text"
+                      shape="circle"
+                      size="large"
+                      @click.stop="store.playTestSound(String(device.id))"
+                    >
+                      <template #icon><PlayCircleIcon /></template>
+                    </t-button>
+                  </t-tooltip>
+                </div>
+              </div>
+            </t-radio-group>
+          </template>
 
           <div v-if="store.error" class="error-msg">{{ store.error }}</div>
-          <div v-if="store.devices.length === 0 && !store.isLoading" class="empty-msg">
+          <div v-if="store.sortedDevices.length === 0 && !store.isLoading" class="empty-msg">
             未检测到音频输出设备
           </div>
         </div>
@@ -200,6 +254,22 @@ const handleDeviceChange = (val: any) => {
   store.setDevice(val)
 }
 
+const handleRustDeviceChange = (deviceId: string | number) => {
+  store.setRustDevice(Number(deviceId))
+}
+
+const handleVolumeChange = (deviceId: string | number, value: number | number[]) => {
+  const vol = Array.isArray(value) ? value[0] : value
+  store.setDeviceVolume(Number(deviceId), vol / 100)
+}
+
+const formatSampleRate = (rate: number) => {
+  if (rate >= 1000) {
+    return `${(rate / 1000).toFixed(1)}kHz`
+  }
+  return `${rate}Hz`
+}
+
 const handleDlnaDeviceChange = (val: any) => {
   if (val) {
     MessagePlugin.success(`已连接投屏设备: ${val.name}`)
@@ -324,6 +394,65 @@ onUnmounted(() => {
 
 .device-radio {
   width: 100%;
+}
+
+.device-row {
+  flex: 1;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.device-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.device-details {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.device-detail-tag {
+  font-size: 11px;
+  color: var(--td-text-color-secondary);
+  background: var(--td-bg-color-component);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.device-volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: var(--td-bg-color-secondarycontainer);
+  border-radius: 6px;
+}
+
+.volume-icon {
+  font-size: 14px;
+  color: var(--td-text-color-secondary);
+  flex-shrink: 0;
+}
+
+.volume-slider {
+  flex: 1;
+}
+
+.volume-value {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  min-width: 36px;
+  text-align: right;
+}
+
+.device-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 .device-info {

@@ -108,6 +108,9 @@ class AudioManager {
   }
 
   async setAudioOutputDevice(audioElement: HTMLAudioElement, deviceId: string): Promise<void> {
+    // Rust backend devices (numeric IDs) change system default — no setSinkId needed
+    if (!Number.isNaN(Number(deviceId))) return
+
     const context = this.audioContexts.get(audioElement)
     if (context && (context as any).setSinkId) {
       try { await (context as any).setSinkId(deviceId) } catch {}

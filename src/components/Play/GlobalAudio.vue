@@ -131,6 +131,25 @@ watch(
 )
 
 watch(
+  () => audioOutputStore.currentRustDeviceId,
+  () => {
+    // Rust backend changes system default output; WebView audio follows automatically.
+    // Just refresh device stats.
+    const activeEl = audioStore.Audio.audio
+    if (activeEl) {
+      const stats = AudioManager.getAudioContextStats(activeEl)
+      if (stats) {
+        audioOutputStore.deviceStats = {
+          sampleRate: stats.sampleRate,
+          channelCount: stats.channels,
+          latency: stats.latency
+        }
+      }
+    }
+  }
+)
+
+watch(
   [() => eqStore.enabled, () => eqStore.gains],
   () => {
     applyToBoth()

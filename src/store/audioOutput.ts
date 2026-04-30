@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { MessagePlugin } from 'tdesign-vue-next'
 
 export interface AudioOutputDevice {
@@ -7,6 +9,16 @@ export interface AudioOutputDevice {
   kind: MediaDeviceKind
   label: string
   groupId: string
+}
+
+export interface RustAudioDevice {
+  id: number
+  name: string
+  is_default: boolean
+  sample_rate: number
+  channels: number
+  volume: number
+  volume_supported: boolean
 }
 
 export interface DeviceStats {
@@ -19,8 +31,11 @@ export const useAudioOutputStore = defineStore(
   'audioOutput',
   () => {
     const supported = ref(typeof navigator !== 'undefined' && !!navigator.mediaDevices?.enumerateDevices)
+    const rustSupported = ref(false)
     const devices = ref<AudioOutputDevice[]>([])
+    const rustDevices = ref<RustAudioDevice[]>([])
     const currentDeviceId = ref<string>('default')
+    const currentRustDeviceId = ref<number>(0)
     const isLoading = ref(false)
     const error = ref<string | null>(null)
     const deviceStats = ref<DeviceStats>({
@@ -34,57 +49,109 @@ export const useAudioOutputStore = defineStore(
     const secondaryDeviceId = ref<string>('')
     const activeABChannel = ref<'A' | 'B'>('A')
 
+    // Combined device list (Rust backend takes priority)
+    const allDevices = computed(() => {
+      if (rustSupported.value && rustDevices.value.length > 0) {
+        return rustDevices.value.map((d) => ({
+          id: d.id,
+          name: d.name,
+          is_default: d.is_default,
+          sample_rate: d.sample_rate,
+          channels: d.channels,
+          volume: d.volume,
+          volume_supported: d.volume_supported
+        }))
+      }
+      return devices.value.map((d) => ({
+        id: d.deviceId,
+        name: d.label,
+        is_default: d.deviceId === 'default',
+        sample_rate: 0,
+        channels: 0,
+        volume: 0,
+        volume_supported: false
+      }))
+    })
+
     const sortedDevices = computed(() => {
-      return [...devices.value].sort((a, b) => {
-        if (a.deviceId === 'default') return -1
-        if (b.deviceId === 'default') return 1
-        return a.label.localeCompare(b.label)
+      return [...allDevices.value].sort((a, b) => {
+        if (a.is_default) return -1
+        if (b.is_default) return 1
+        return a.name.localeCompare(b.name)
       })
     })
 
     const currentDeviceLabel = computed(() => {
-      const device = devices.value.find((d) => d.deviceId === currentDeviceId.value)
-      return device ? device.label : 'Default'
+      const id = rustSupported.value ? String(currentRustDeviceId.value) : currentDeviceId.value
+      const device = allDevices.value.find((d) => String(d.id) === id)
+      return device ? device.name : 'Default'
     })
 
-    const scanDevices = async () => {
-      if (!navigator.mediaDevices?.enumerateDevices) return
-      isLoading.value = true
-      error.value = null
+    const scanRustDevices = async () => {
       try {
-        const allDevices = await navigator.mediaDevices.enumerateDevices()
-        devices.value = allDevices
-          .filter((device) => device.kind === 'audiooutput')
-          .map((device) => ({
-            deviceId: device.deviceId,
-            kind: device.kind,
-            label: device.label || `Speaker (${device.deviceId.slice(0, 5)}...)`,
-            groupId: device.groupId
-          }))
+        const result = await invoke<RustAudioDevice[]>('audio__enumerate_devices')
+        rustDevices.value = result
+        rustSupported.value = true
 
-        if (
-          currentDeviceId.value !== 'default' &&
-          !devices.value.find((d) => d.deviceId === currentDeviceId.value)
-        ) {
-          console.warn(
-            `Previously selected device ${currentDeviceId.value} not found, reverting to default.`
-          )
-          currentDeviceId.value = 'default'
-          MessagePlugin.warning('上次使用的音频设备未找到，已切换回默认设备')
+        // Sync current selection
+        const defaultDevice = result.find((d) => d.is_default)
+        if (defaultDevice) {
+          currentRustDeviceId.value = defaultDevice.id
         }
       } catch (err: any) {
-        console.error('Failed to enumerate audio devices:', err)
-        if (err.name === 'NotAllowedError') {
-          error.value = '访问音频设备权限被拒绝，请检查系统设置'
-        } else if (err.name === 'NotFoundError') {
-          error.value = '未找到音频输出设备'
-        } else {
-          error.value = err.message || '无法获取音频设备列表'
-        }
-        MessagePlugin.error(error.value || '获取音频设备列表失败')
-      } finally {
-        isLoading.value = false
+        console.warn('Rust audio device enumeration not available:', err)
+        rustSupported.value = false
       }
+    }
+
+    const scanDevices = async () => {
+      isLoading.value = true
+      error.value = null
+
+      // Try Rust backend first
+      await scanRustDevices()
+
+      // Fallback to Web API if Rust not available
+      if (!rustSupported.value && navigator.mediaDevices?.enumerateDevices) {
+        try {
+          const allDevices = await navigator.mediaDevices.enumerateDevices()
+          devices.value = allDevices
+            .filter((device) => device.kind === 'audiooutput')
+            .map((device) => ({
+              deviceId: device.deviceId,
+              kind: device.kind,
+              label: device.label || `Speaker (${device.deviceId.slice(0, 5)}...)`,
+              groupId: device.groupId
+            }))
+
+          if (
+            currentDeviceId.value !== 'default' &&
+            !devices.value.find((d) => d.deviceId === currentDeviceId.value)
+          ) {
+            console.warn(
+              `Previously selected device ${currentDeviceId.value} not found, reverting to default.`
+            )
+            currentDeviceId.value = 'default'
+            MessagePlugin.warning('上次使用的音频设备未找到，已切换回默认设备')
+          }
+        } catch (err: any) {
+          console.error('Failed to enumerate audio devices:', err)
+          if (err.name === 'NotAllowedError') {
+            error.value = '访问音频设备权限被拒绝，请检查系统设置'
+          } else if (err.name === 'NotFoundError') {
+            error.value = '未找到音频输出设备'
+          } else {
+            error.value = err.message || '无法获取音频设备列表'
+          }
+          MessagePlugin.error(error.value || '获取音频设备列表失败')
+        }
+      }
+
+      if (!rustSupported.value && devices.value.length === 0 && !error.value) {
+        error.value = '未找到音频输出设备'
+      }
+
+      isLoading.value = false
     }
 
     const simulateDevices = (count: number = 100) => {
@@ -121,6 +188,56 @@ export const useAudioOutputStore = defineStore(
       }
     }
 
+    const setRustDevice = async (deviceId: number) => {
+      if (deviceId === currentRustDeviceId.value) return
+
+      try {
+        await invoke('audio__set_output_device', { deviceId })
+        currentRustDeviceId.value = deviceId
+
+        // Update A/B state
+        const device = rustDevices.value.find((d) => d.id === deviceId)
+        if (activeABChannel.value === 'A') {
+          primaryDeviceId.value = String(deviceId)
+        } else {
+          secondaryDeviceId.value = String(deviceId)
+        }
+
+        // Update is_default flags
+        rustDevices.value = rustDevices.value.map((d) => ({
+          ...d,
+          is_default: d.id === deviceId
+        }))
+
+        MessagePlugin.success(`已切换音频输出至: ${device?.name || deviceId}`)
+      } catch (err: any) {
+        console.error('Failed to set Rust audio device:', err)
+        error.value = err.message || '切换音频设备失败'
+        MessagePlugin.error('切换音频设备失败')
+      }
+    }
+
+    const setDeviceVolume = async (deviceId: number, volume: number) => {
+      try {
+        await invoke('audio__set_device_volume', { deviceId, volume })
+        // Update local state
+        rustDevices.value = rustDevices.value.map((d) =>
+          d.id === deviceId ? { ...d, volume } : d
+        )
+      } catch (err: any) {
+        console.error('Failed to set device volume:', err)
+      }
+    }
+
+    const getDeviceVolume = async (deviceId: number): Promise<number | null> => {
+      try {
+        const vol = await invoke<number>('audio__get_device_volume', { deviceId })
+        return vol
+      } catch {
+        return null
+      }
+    }
+
     const toggleAB = () => {
       if (activeABChannel.value === 'A') {
         if (secondaryDeviceId.value && secondaryDeviceId.value !== primaryDeviceId.value) {
@@ -140,11 +257,24 @@ export const useAudioOutputStore = defineStore(
       scanDevices()
     }
 
-    const init = () => {
-      if (!navigator.mediaDevices) return
-      scanDevices()
-      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
-      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    const init = async () => {
+      // Listen for Rust device change events
+      try {
+        await listen('audio-device-changed', () => {
+          console.log('Rust audio device change detected, rescanning...')
+          scanRustDevices()
+        })
+      } catch {
+        // Event system not available in non-Tauri environment
+      }
+
+      // Listen for Web API device change
+      if (navigator.mediaDevices) {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+        navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+      }
+
+      await scanDevices()
     }
 
     const playTestSound = (deviceId: string) => {
@@ -187,9 +317,13 @@ export const useAudioOutputStore = defineStore(
 
     return {
       supported,
+      rustSupported,
       devices,
+      rustDevices,
+      allDevices,
       sortedDevices,
       currentDeviceId,
+      currentRustDeviceId,
       isLoading,
       error,
       deviceStats,
@@ -199,6 +333,9 @@ export const useAudioOutputStore = defineStore(
       activeABChannel,
       scanDevices,
       setDevice,
+      setRustDevice,
+      setDeviceVolume,
+      getDeviceVolume,
       toggleAB,
       init,
       playTestSound,
@@ -207,7 +344,7 @@ export const useAudioOutputStore = defineStore(
   },
   {
     persist: {
-      paths: ['currentDeviceId', 'primaryDeviceId', 'secondaryDeviceId']
+      paths: ['currentDeviceId', 'currentRustDeviceId', 'primaryDeviceId', 'secondaryDeviceId']
     } as any
   }
 )

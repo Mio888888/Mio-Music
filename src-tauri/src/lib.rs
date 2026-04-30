@@ -1,3 +1,4 @@
+mod audio_device;
 mod db;
 mod commands;
 mod music_sdk;
@@ -24,8 +25,12 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
             let app_data_dir = db::get_app_data_dir();
-            let download_manager = DownloadManager::new(&app_data_dir, app_handle);
+            let download_manager = DownloadManager::new(&app_data_dir, app_handle.clone());
             app.manage(download_manager);
+
+            // Start audio device change listener
+            audio_device::start_device_listener(app_handle);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -107,6 +112,11 @@ pub fn run() {
             plugin::commands::plugin__get_info,
             plugin::commands::plugin__call_method,
             plugin::commands::plugin__download_and_add,
+            // Audio Device
+            audio_device::audio__enumerate_devices,
+            audio_device::audio__set_output_device,
+            audio_device::audio__get_device_volume,
+            audio_device::audio__set_device_volume,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
