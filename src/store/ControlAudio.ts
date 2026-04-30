@@ -1,8 +1,17 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
+import { transitionVolume } from '@/utils/audio/volume'
 import { LocalUserDetailStore } from './LocalUserDetail'
+import { playSetting as usePlaySettingStore } from './playSetting'
 
-import type { AudioEventCallback, AudioEventType, AudioSlot, AudioSubscriber, UnsubscribeFunction, ControlAudioState } from '../types/audio'
+import type {
+  AudioEventCallback,
+  AudioEventType,
+  AudioSlot,
+  AudioSubscriber,
+  UnsubscribeFunction,
+  ControlAudioState
+} from '../types/audio'
 
 let userInfo: any
 export const ControlAudioStore = defineStore('controlAudio', () => {
@@ -51,6 +60,7 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
 
   const init = (elA: HTMLAudioElement | null, elB: HTMLAudioElement | null) => {
     userInfo = LocalUserDetailStore()
+    console.log(elA, elB, '全局音频双槽挂载初始化success')
     Audio.audioA = elA
     Audio.audioB = elB
     Audio.audio = Audio.primarySlot === 'A' ? elA : elB
@@ -67,8 +77,21 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     publish('slotSwap')
   }
 
-  const setCurrentTime = (time: number) => { if (typeof time === 'number') Audio.currentTime = time }
-  const setDuration = (duration: number) => { if (typeof duration === 'number') Audio.duration = duration }
+  const setCurrentTime = (time: number) => {
+    if (typeof time === 'number') {
+      Audio.currentTime = time
+      return
+    }
+    throw new Error('时间必须是数字类型')
+  }
+
+  const setDuration = (duration: number) => {
+    if (typeof duration === 'number') {
+      Audio.duration = duration
+      return
+    }
+    throw new Error('时间必须是数字类型')
+  }
 
   const setVolume = (volume: number, transition: boolean = false) => {
     const syncSecondary = (target: number) => {
@@ -78,28 +101,55 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     if (typeof volume === 'number' && volume >= 0 && volume <= 100) {
       if (Audio.audio) {
         const v = volume / 100
-        Audio.audio.volume = Number(v.toFixed(2))
+        if (Audio.isPlay && transition) {
+          transitionVolume(Audio.audio, v, Audio.volume <= volume)
+        } else {
+          Audio.audio.volume = Number(v.toFixed(2))
+        }
         syncSecondary(v)
         Audio.volume = volume
         userInfo.userInfo.volume = volume
+      }
+    } else {
+      if (typeof volume === 'number' && Audio.audio) {
+        if (volume <= 0) {
+          Audio.volume = 0
+          Audio.audio.volume = 0
+          syncSecondary(0)
+          userInfo.userInfo.volume = 0
+        } else {
+          Audio.volume = 100
+          Audio.audio.volume = 100
+          syncSecondary(1)
+          userInfo.userInfo.volume = 100
+        }
+      } else {
+        throw new Error('音量必须是0-100之间的数字')
       }
     }
   }
 
   const setUrl = (url: string) => {
-    if (typeof url !== 'string' || url.trim() === '') return
+    if (typeof url !== 'string' || url.trim() === '') {
+      throw new Error('音频URL不能为空')
+    }
     if (Audio.isPlay) stop()
     const trimmed = url.trim()
     if (Audio.primarySlot === 'A') Audio.srcA = trimmed
     else Audio.srcB = trimmed
     Audio.url = trimmed
+    console.log('音频URL已设置(slot', Audio.primarySlot, '):', Audio.url)
   }
 
   const setSecondaryUrl = (url: string) => {
+    if (typeof url !== 'string' || url.trim() === '') {
+      throw new Error('次要音频URL不能为空')
+    }
     const trimmed = url.trim()
     if (Audio.primarySlot === 'A') Audio.srcB = trimmed
     else Audio.srcA = trimmed
     Audio.secondaryUrl = trimmed
+    console.log('次要音频URL已设置(slot', Audio.primarySlot === 'A' ? 'B' : 'A', '):', trimmed)
   }
 
   const clearSecondarySrc = () => {
@@ -109,25 +159,48 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
   }
 
   const start = async () => {
+    const playSetting = usePlaySettingStore()
+    const volume = Audio.volume
     if (Audio.audio) {
+      if (!playSetting.getIsPauseTransition) {
+        try {
+          Audio.audio.volume = volume / 100
+          await Audio.audio.play()
+          Audio.isPlay = true
+          return Promise.resolve()
+        } catch (error) {
+          console.error('音频播放失败:', error)
+          Audio.isPlay = false
+          throw new Error('音频播放失败，请检查音频URL是否有效')
+        }
+      }
+
+      Audio.audio.volume = 0
       try {
-        Audio.audio.volume = Audio.volume / 100
         await Audio.audio.play()
         Audio.isPlay = true
-        return Promise.resolve()
+        return transitionVolume(Audio.audio, volume / 100, true, true)
       } catch (error) {
+        Audio.audio.volume = volume / 100
+        console.error('音频播放失败:', error)
         Audio.isPlay = false
-        throw new Error('音频播放失败')
+        throw new Error('音频播放失败，请检查音频URL是否有效')
       }
     }
     return false
   }
 
   const stop = () => {
+    const playSetting = usePlaySettingStore()
     if (Audio.audio) {
       Audio.isPlay = false
-      Audio.audio.pause()
-      return Promise.resolve()
+      if (!playSetting.getIsPauseTransition) {
+        Audio.audio.pause()
+        return Promise.resolve()
+      }
+      return transitionVolume(Audio.audio, Audio.volume / 100, false, true).then(() => {
+        Audio.audio?.pause()
+      })
     }
     return false
   }

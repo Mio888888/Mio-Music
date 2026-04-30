@@ -2,98 +2,212 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 
-export interface AudioOutputDevice { deviceId: string; kind: MediaDeviceKind; label: string; groupId: string }
-export interface DeviceStats { sampleRate: number; channelCount: number; latency: number }
+export interface AudioOutputDevice {
+  deviceId: string
+  kind: MediaDeviceKind
+  label: string
+  groupId: string
+}
 
-export const useAudioOutputStore = defineStore('audioOutput', () => {
-  const devices = ref<AudioOutputDevice[]>([])
-  const currentDeviceId = ref<string>('default')
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  const deviceStats = ref<DeviceStats>({ sampleRate: 0, channelCount: 0, latency: 0 })
-  const primaryDeviceId = ref<string>('default')
-  const secondaryDeviceId = ref<string>('')
-  const activeABChannel = ref<'A' | 'B'>('A')
+export interface DeviceStats {
+  sampleRate: number
+  channelCount: number
+  latency: number
+}
 
-  const sortedDevices = computed(() => [...devices.value].sort((a, b) => {
-    if (a.deviceId === 'default') return -1
-    if (b.deviceId === 'default') return 1
-    return a.label.localeCompare(b.label)
-  }))
+export const useAudioOutputStore = defineStore(
+  'audioOutput',
+  () => {
+    const supported = ref(typeof navigator !== 'undefined' && !!navigator.mediaDevices?.enumerateDevices)
+    const devices = ref<AudioOutputDevice[]>([])
+    const currentDeviceId = ref<string>('default')
+    const isLoading = ref(false)
+    const error = ref<string | null>(null)
+    const deviceStats = ref<DeviceStats>({
+      sampleRate: 0,
+      channelCount: 0,
+      latency: 0
+    })
 
-  const currentDeviceLabel = computed(() => {
-    const device = devices.value.find((d) => d.deviceId === currentDeviceId.value)
-    return device ? device.label : 'Default'
-  })
+    // For A/B testing
+    const primaryDeviceId = ref<string>('default')
+    const secondaryDeviceId = ref<string>('')
+    const activeABChannel = ref<'A' | 'B'>('A')
 
-  const scanDevices = async () => {
-    if (!navigator.mediaDevices?.enumerateDevices) return
-    isLoading.value = true
-    error.value = null
-    try {
-      const allDevices = await navigator.mediaDevices.enumerateDevices()
-      devices.value = allDevices.filter((d) => d.kind === 'audiooutput').map((d) => ({
-        deviceId: d.deviceId, kind: d.kind, label: d.label || `Speaker (${d.deviceId.slice(0, 5)}...)`, groupId: d.groupId
-      }))
-      if (currentDeviceId.value !== 'default' && !devices.value.find((d) => d.deviceId === currentDeviceId.value)) {
-        currentDeviceId.value = 'default'
-        MessagePlugin.warning('上次使用的音频设备未找到，已切换回默认设备')
+    const sortedDevices = computed(() => {
+      return [...devices.value].sort((a, b) => {
+        if (a.deviceId === 'default') return -1
+        if (b.deviceId === 'default') return 1
+        return a.label.localeCompare(b.label)
+      })
+    })
+
+    const currentDeviceLabel = computed(() => {
+      const device = devices.value.find((d) => d.deviceId === currentDeviceId.value)
+      return device ? device.label : 'Default'
+    })
+
+    const scanDevices = async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) return
+      isLoading.value = true
+      error.value = null
+      try {
+        const allDevices = await navigator.mediaDevices.enumerateDevices()
+        devices.value = allDevices
+          .filter((device) => device.kind === 'audiooutput')
+          .map((device) => ({
+            deviceId: device.deviceId,
+            kind: device.kind,
+            label: device.label || `Speaker (${device.deviceId.slice(0, 5)}...)`,
+            groupId: device.groupId
+          }))
+
+        if (
+          currentDeviceId.value !== 'default' &&
+          !devices.value.find((d) => d.deviceId === currentDeviceId.value)
+        ) {
+          console.warn(
+            `Previously selected device ${currentDeviceId.value} not found, reverting to default.`
+          )
+          currentDeviceId.value = 'default'
+          MessagePlugin.warning('上次使用的音频设备未找到，已切换回默认设备')
+        }
+      } catch (err: any) {
+        console.error('Failed to enumerate audio devices:', err)
+        if (err.name === 'NotAllowedError') {
+          error.value = '访问音频设备权限被拒绝，请检查系统设置'
+        } else if (err.name === 'NotFoundError') {
+          error.value = '未找到音频输出设备'
+        } else {
+          error.value = err.message || '无法获取音频设备列表'
+        }
+        MessagePlugin.error(error.value || '获取音频设备列表失败')
+      } finally {
+        isLoading.value = false
       }
-    } catch (err: any) {
-      error.value = err.message || '无法获取音频设备列表'
-      MessagePlugin.error(error.value || '获取音频设备列表失败')
-    } finally { isLoading.value = false }
-  }
-
-  const setDevice = async (deviceId: string) => {
-    if (deviceId === currentDeviceId.value) return
-    try {
-      currentDeviceId.value = deviceId
-      if (activeABChannel.value === 'A') primaryDeviceId.value = deviceId
-      else secondaryDeviceId.value = deviceId
-      MessagePlugin.success(`已切换音频输出至: ${currentDeviceLabel.value}`)
-    } catch (err: any) {
-      error.value = err.message
-      MessagePlugin.error('切换音频设备失败')
     }
-  }
 
-  const toggleAB = () => {
-    if (activeABChannel.value === 'A') {
-      if (secondaryDeviceId.value && secondaryDeviceId.value !== primaryDeviceId.value) {
-        activeABChannel.value = 'B'
-        setDevice(secondaryDeviceId.value)
-      } else MessagePlugin.info('请先设置对比设备 (设备 B)')
-    } else {
-      activeABChannel.value = 'A'
-      setDevice(primaryDeviceId.value)
+    const simulateDevices = (count: number = 100) => {
+      const fakeDevices: AudioOutputDevice[] = []
+      for (let i = 0; i < count; i++) {
+        fakeDevices.push({
+          deviceId: `fake-device-${i}`,
+          kind: 'audiooutput',
+          label: `Simulated Speaker ${i + 1} - High Definition Audio Device`,
+          groupId: `fake-group-${i}`
+        })
+      }
+      devices.value = [...devices.value, ...fakeDevices]
+      MessagePlugin.info(`已生成 ${count} 个虚拟设备用于性能测试`)
     }
-  }
 
-  const handleDeviceChange = () => { scanDevices() }
-  const init = () => {
-    if (!navigator.mediaDevices) return
-    scanDevices()
-    navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
-    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
-  }
+    const setDevice = async (deviceId: string) => {
+      if (deviceId === currentDeviceId.value) return
 
-  const playTestSound = (deviceId: string) => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-      const ctx = new AudioContextClass()
-      if ((ctx as any).setSinkId && deviceId !== 'default') { try { (ctx as any).setSinkId(deviceId) } catch (e) {} }
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain); gain.connect(ctx.destination)
-      osc.type = 'sine'; osc.frequency.setValueAtTime(440, ctx.currentTime)
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1)
-      gain.gain.setValueAtTime(0.1, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-      osc.start(); osc.stop(ctx.currentTime + 0.5)
-      setTimeout(() => ctx.close(), 600)
-    } catch { MessagePlugin.error('测试音播放失败') }
-  }
+      try {
+        currentDeviceId.value = deviceId
 
-  return { devices, sortedDevices, currentDeviceId, isLoading, error, deviceStats, currentDeviceLabel, primaryDeviceId, secondaryDeviceId, activeABChannel, scanDevices, setDevice, toggleAB, init, playTestSound }
-}, { persist: { paths: ['currentDeviceId', 'primaryDeviceId', 'secondaryDeviceId'] } as any })
+        if (activeABChannel.value === 'A') {
+          primaryDeviceId.value = deviceId
+        } else {
+          secondaryDeviceId.value = deviceId
+        }
+
+        MessagePlugin.success(`已切换音频输出至: ${currentDeviceLabel.value}`)
+      } catch (err: any) {
+        console.error('Failed to set audio device:', err)
+        error.value = err.message
+        MessagePlugin.error('切换音频设备失败')
+      }
+    }
+
+    const toggleAB = () => {
+      if (activeABChannel.value === 'A') {
+        if (secondaryDeviceId.value && secondaryDeviceId.value !== primaryDeviceId.value) {
+          activeABChannel.value = 'B'
+          setDevice(secondaryDeviceId.value)
+        } else {
+          MessagePlugin.info('请先设置对比设备 (设备 B)')
+        }
+      } else {
+        activeABChannel.value = 'A'
+        setDevice(primaryDeviceId.value)
+      }
+    }
+
+    const handleDeviceChange = () => {
+      console.log('Audio devices changed, rescanning...')
+      scanDevices()
+    }
+
+    const init = () => {
+      if (!navigator.mediaDevices) return
+      scanDevices()
+      navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    }
+
+    const playTestSound = (deviceId: string) => {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+        const ctx = new AudioContextClass()
+
+        if ((ctx as any).setSinkId && deviceId !== 'default') {
+          try {
+            ;(ctx as any).setSinkId(deviceId)
+          } catch (e) {
+            console.warn('Test sound routing failed', e)
+          }
+        }
+
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(440, ctx.currentTime)
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1)
+
+        gain.gain.setValueAtTime(0.1, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+
+        osc.start()
+        osc.stop(ctx.currentTime + 0.5)
+
+        setTimeout(() => {
+          ctx.close()
+        }, 600)
+      } catch (err: any) {
+        console.error('Test sound failed', err)
+        MessagePlugin.error('测试音播放失败')
+      }
+    }
+
+    return {
+      supported,
+      devices,
+      sortedDevices,
+      currentDeviceId,
+      isLoading,
+      error,
+      deviceStats,
+      currentDeviceLabel,
+      primaryDeviceId,
+      secondaryDeviceId,
+      activeABChannel,
+      scanDevices,
+      setDevice,
+      toggleAB,
+      init,
+      playTestSound,
+      simulateDevices
+    }
+  },
+  {
+    persist: {
+      paths: ['currentDeviceId', 'primaryDeviceId', 'secondaryDeviceId']
+    } as any
+  }
+)

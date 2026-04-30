@@ -66,7 +66,17 @@ export const useSettingsStore = defineStore('settings', () => {
       const saved = localStorage.getItem('appSettings')
       if (saved) {
         const parsed = JSON.parse(saved) as SettingsState
-        return { ...defaultSettings, ...parsed }
+        return {
+          ...defaultSettings,
+          ...parsed,
+          tagWriteOptions: {
+            basicInfo: parsed.tagWriteOptions?.basicInfo ?? (defaultSettings.tagWriteOptions as TagWriteOptions).basicInfo,
+            cover: parsed.tagWriteOptions?.cover ?? (defaultSettings.tagWriteOptions as TagWriteOptions).cover,
+            lyrics: parsed.tagWriteOptions?.lyrics ?? (defaultSettings.tagWriteOptions as TagWriteOptions).lyrics,
+            downloadLyrics: parsed.tagWriteOptions?.downloadLyrics ?? (defaultSettings.tagWriteOptions as TagWriteOptions).downloadLyrics,
+            lyricFormat: parsed.tagWriteOptions?.lyricFormat ?? (defaultSettings.tagWriteOptions as TagWriteOptions).lyricFormat
+          }
+        }
       }
     } catch (error) {
       console.error('加载设置失败:', error)
@@ -77,11 +87,34 @@ export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<SettingsState>(loadSettings())
 
   const saveSettings = () => {
+    if (typeof settings.value.autoCacheMusic === 'undefined') settings.value.autoCacheMusic = true
+    if (!settings.value.lyricFontFamily) settings.value.lyricFontFamily = 'PingFangSC-Semibold'
+    if (!settings.value.lyricFontSize) settings.value.lyricFontSize = 36
+    if (!settings.value.FullPlayLyricFontRate) settings.value.FullPlayLyricFontRate = 1
+    if (!settings.value.lyricFontWeight) settings.value.lyricFontWeight = 700
+    if (typeof settings.value.closeToTray === 'undefined') settings.value.closeToTray = true
+    if (typeof settings.value.hasConfiguredCloseBehavior === 'undefined') settings.value.hasConfiguredCloseBehavior = false
+    if (!settings.value.theme) settings.value.theme = 'default'
+    if (typeof settings.value.isDarkMode === 'undefined') settings.value.isDarkMode = false
+    if (typeof settings.value.springFestivalDisabled === 'undefined') settings.value.springFestivalDisabled = false
+    if (typeof settings.value.routePreloadEnabled === 'undefined') settings.value.routePreloadEnabled = true
+    if (!settings.value.globalBackground) {
+      settings.value.globalBackground = { enable: false, type: 'none', url: '', opacity: 0.5, blur: 10, brightness: 0.8 }
+    }
+    if (!settings.value.tagWriteOptions) {
+      settings.value.tagWriteOptions = { basicInfo: true, cover: true, lyrics: true, downloadLyrics: false, lyricFormat: 'word-by-word' }
+    }
     localStorage.setItem('appSettings', JSON.stringify(settings.value))
   }
 
   const updateSettings = (newSettings: Partial<SettingsState>) => {
     settings.value = { ...settings.value, ...newSettings }
+    if (
+      settings.value.FullPlayLyricFontRate &&
+      (settings.value.FullPlayLyricFontRate < 0.1 || settings.value.FullPlayLyricFontRate > 2)
+    ) {
+      settings.value.FullPlayLyricFontRate = 1
+    }
     saveSettings()
   }
 

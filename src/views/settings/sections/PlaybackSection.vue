@@ -35,8 +35,10 @@ const { settings } = storeToRefs(settingsStore)
       <AudioEffectSettings />
     </div>
 
+    <!-- 播放显示 -->
     <div id="playback-performance" class="setting-group">
       <h3>全屏播放-性能优化</h3>
+
       <div class="setting-item">
         <div class="item-info">
           <div class="item-title">跳动歌词</div>
@@ -44,6 +46,7 @@ const { settings } = storeToRefs(settingsStore)
         </div>
         <t-switch v-model="isJumpLyric" @change="playSettingStore.setIsDumpLyric(isJumpLyric)" />
       </div>
+
       <div class="setting-item">
         <div class="item-info">
           <div class="item-title">背景动画</div>
@@ -51,19 +54,27 @@ const { settings } = storeToRefs(settingsStore)
         </div>
         <t-switch v-model="bgPlaying" @change="playSettingStore.setBgPlaying(bgPlaying)" />
       </div>
+
       <div class="setting-item">
         <div class="item-info">
           <div class="item-title">音频可视化</div>
           <div class="item-desc">显示实时频谱/波形可视化、占用更高的性能</div>
         </div>
-        <t-switch v-model="isAudioVisualizer" @change="playSettingStore.setIsAudioVisualizer(isAudioVisualizer)" />
+        <t-switch
+          v-model="isAudioVisualizer"
+          @change="playSettingStore.setIsAudioVisualizer(isAudioVisualizer)"
+        />
       </div>
+
       <div id="playback-route-preload" class="setting-item">
         <div class="item-info">
           <div class="item-title">路由预加载</div>
           <div class="item-desc">空闲时预加载页面组件，提升页面切换速度</div>
         </div>
-        <t-switch :value="settings.routePreloadEnabled" @change="(val: any) => settingsStore.updateSettings({ routePreloadEnabled: Boolean(val) })" />
+        <t-switch
+          :value="settings.routePreloadEnabled"
+          @change="(val) => settingsStore.updateSettings({ routePreloadEnabled: Boolean(val) })"
+        />
       </div>
     </div>
   </div>
@@ -74,33 +85,69 @@ const { settings } = storeToRefs(settingsStore)
   animation: fadeInUp 0.4s ease-out;
   animation-fill-mode: both;
 }
+
 .setting-group {
-  background: var(--settings-group-bg, var(--td-bg-color-container));
+  background: var(--settings-group-bg);
   border-radius: 0.75rem;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid var(--settings-group-border);
+  box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out;
   animation-fill-mode: both;
+
   @for $i from 1 through 5 {
-    &:nth-child(#{$i}) { animation-delay: #{$i * 0.1}s; }
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * 0.1}s;
+    }
   }
-  h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--td-text-color-primary); }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--settings-text-primary);
+  }
 }
+
 .setting-item {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.875rem 1rem;
-  border: 1px solid var(--td-border-level-1-color);
-  background: var(--td-bg-color-page);
-  border-radius: 0.5rem; margin-top: 0.75rem;
-  .item-info { display: flex; flex-direction: column; gap: 0.25rem;
-    .item-title { font-weight: 600; color: var(--td-text-color-primary); font-size: 0.95rem; line-height: 1.2; }
-    .item-desc { color: var(--td-text-color-secondary); font-size: 0.8rem; line-height: 1.2; }
+  border: 1px solid var(--settings-feature-border);
+  background: var(--settings-feature-bg);
+  border-radius: 0.5rem;
+  margin-top: 0.75rem;
+
+  .item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    .item-title {
+      font-weight: 600;
+      color: var(--settings-text-primary);
+      font-size: 0.95rem;
+      line-height: 1.2;
+    }
+
+    .item-desc {
+      color: var(--settings-text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.2;
+    }
   }
 }
+
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
