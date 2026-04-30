@@ -242,6 +242,7 @@ impl PluginManager {
     }
 
     /// Add a log entry for a plugin.
+    #[allow(dead_code)]
     pub async fn add_log(&self, plugin_id: &str, message: &str) {
         let mut logs = self.logs.write().await;
         let entry = logs.entry(plugin_id.to_string()).or_insert_with(Vec::new);
@@ -254,6 +255,7 @@ impl PluginManager {
     }
 
     /// Get logs for a plugin.
+    #[allow(dead_code)]
     pub async fn get_logs(&self, plugin_id: &str) -> Vec<String> {
         let logs = self.logs.read().await;
         logs.get(plugin_id).cloned().unwrap_or_default()

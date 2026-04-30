@@ -251,6 +251,7 @@ impl PluginEngine {
             if code.contains(&format!("\"{}\"", id)) || code.contains(&format!("'{}'", id)) {
                 let qualities = Self::extract_qualities_for_source(code, id);
                 sources.push(PluginSource {
+                    source_id: id.to_string(),
                     name: default_name.to_string(),
                     qualities,
                 });

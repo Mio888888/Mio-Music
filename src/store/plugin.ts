@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { LocalUserDetailStore } from './LocalUserDetail'
 
 export interface PluginInfo {
   name: string
@@ -9,6 +10,7 @@ export interface PluginInfo {
 }
 
 export interface PluginSource {
+  source_id: string
   name: string
   qualities: string[]
 }
@@ -63,6 +65,32 @@ export const usePluginStore = defineStore('plugin', () => {
         plugins.value = res.data || []
       }
       _loadPersistedSelection()
+
+      // Auto-restore userInfo if plugin was previously selected but userInfo lacks data
+      const userStore = LocalUserDetailStore()
+      if (currentPluginId.value && !userStore.userInfo.pluginId) {
+        const plugin = plugins.value.find(p => p.plugin_id === currentPluginId.value)
+        if (plugin && plugin.supported_sources && plugin.supported_sources.length > 0) {
+          const supportedSourcesForStore: Record<string, any> = {}
+          for (const src of plugin.supported_sources) {
+            const key = src.source_id || src.name
+            supportedSourcesForStore[key] = {
+              name: src.name,
+              type: '音乐源',
+              qualitys: src.qualities,
+            }
+          }
+          const selectSources = Object.keys(supportedSourcesForStore)[0]
+          const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
+          const selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
+
+          userStore.userInfo.pluginId = plugin.plugin_id
+          userStore.userInfo.pluginName = plugin.plugin_info.name
+          userStore.userInfo.supportedSources = supportedSourcesForStore
+          userStore.userInfo.selectSources = selectSources
+          userStore.userInfo.selectQuality = selectQuality
+        }
+      }
     } catch (e) {
       console.error('[PluginStore] initialize failed:', e)
     } finally {

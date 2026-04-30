@@ -12,6 +12,8 @@ pub struct PluginInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginSource {
+    #[serde(default)]
+    pub source_id: String,
     pub name: String,
     #[serde(default)]
     pub qualities: Vec<String>,
@@ -54,6 +56,7 @@ fn default_plugin_type() -> String {
     "music-source".to_string()
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServicePlaylist {
     pub id: String,

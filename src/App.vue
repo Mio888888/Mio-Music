@@ -21,11 +21,13 @@ import Provider from '@/components/layout/Provider.vue'
 import GlobalBackground from '@/components/GlobalBackground.vue'
 import GlobalContextMenu from '@/components/ContextMenu/GlobalContextMenu.vue'
 import { useAuthStore } from '@/store/Auth'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 onMounted(async () => {
+  LocalUserDetailStore().init()
   const url = new URL(window.location.href)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')

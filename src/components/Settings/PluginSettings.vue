@@ -286,9 +286,11 @@ import { ref, onMounted, nextTick } from 'vue'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { usePluginStore } from '@/store/plugin'
 import type { LoadedPlugin, PluginConfigField } from '@/store/plugin'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import ImportPlaylist from '@/components/ServicePlugin/ImportPlaylist.vue'
 
 const store = usePluginStore()
+const userStore = LocalUserDetailStore()
 const error = ref<string | null>(null)
 
 // Add plugin flow
@@ -379,7 +381,56 @@ async function doImport() {
 
 function doSelect(plugin: LoadedPlugin) {
   store.selectPlugin(plugin)
-  MessagePlugin.success(`已选择插件: ${plugin.plugin_info.name}`)
+
+  const { plugin_id, plugin_info, supported_sources } = plugin
+
+  if (!supported_sources || supported_sources.length === 0) {
+    userStore.userInfo.pluginId = plugin_id
+    userStore.userInfo.pluginName = plugin_info.name
+    userStore.userInfo.supportedSources = {}
+    userStore.userInfo.selectSources = ''
+    userStore.userInfo.selectQuality = ''
+    MessagePlugin.success(`已选择插件: ${plugin_info.name}（无可用音源）`)
+    return
+  }
+
+  // Convert supported_sources array to object keyed by source_id
+  const supportedSourcesForStore: Record<string, any> = {}
+  for (const src of supported_sources) {
+    const key = src.source_id || src.name
+    supportedSourcesForStore[key] = {
+      name: src.name,
+      type: '音乐源',
+      qualitys: src.qualities,
+    }
+  }
+
+  // Preserve previous source selection or use first available
+  let selectSources: string
+  const prevSource = userStore.userInfo.selectSources as string
+  if (prevSource && supportedSourcesForStore[prevSource]) {
+    selectSources = prevSource
+  } else {
+    selectSources = Object.keys(supportedSourcesForStore)[0]
+  }
+
+  // Preserve previous quality or use highest available
+  let selectQuality: string
+  const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
+  const prevQuality = userStore.userInfo.selectQuality as string
+  if (prevQuality && qualitys.includes(prevQuality)) {
+    selectQuality = prevQuality
+  } else {
+    selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
+  }
+
+  userStore.userInfo.pluginId = plugin_id
+  userStore.userInfo.pluginName = plugin_info.name
+  userStore.userInfo.supportedSources = supportedSourcesForStore
+  userStore.userInfo.selectSources = selectSources
+  userStore.userInfo.selectQuality = selectQuality
+
+  MessagePlugin.success(`已选择插件: ${plugin_info.name}`)
 }
 
 function confirmUninstall(plugin: LoadedPlugin) {
@@ -391,6 +442,13 @@ function confirmUninstall(plugin: LoadedPlugin) {
     onConfirm: async () => {
       try {
         await store.uninstallPlugin(plugin.plugin_id)
+        if (userStore.userInfo.pluginId === plugin.plugin_id) {
+          userStore.userInfo.pluginId = ''
+          userStore.userInfo.pluginName = ''
+          userStore.userInfo.supportedSources = {}
+          userStore.userInfo.selectSources = ''
+          userStore.userInfo.selectQuality = ''
+        }
         MessagePlugin.success(`插件 "${plugin.plugin_info.name}" 卸载成功！`)
       } catch (e: any) {
         MessagePlugin.error(`卸载失败: ${e.message}`)
