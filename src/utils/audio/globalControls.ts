@@ -1,10 +1,12 @@
 import { ControlAudioStore } from '@/store/ControlAudio'
 import mediaSessionController from './useSmtc'
+import { listen } from '@tauri-apps/api/event'
 
 let installed = false
 let smtcTimer: any = null
 let globalKeyDownHandler: ((e: KeyboardEvent) => void) | null = null
 let removeMusicCtrlListener: (() => void) | null = null
+let removeHotkeyListener: (() => void) | null = null
 
 function dispatch(name: string, val?: any) {
   window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name, val } }))
@@ -58,6 +60,33 @@ export function installGlobalMusicControls() {
   document.addEventListener('keydown', globalKeyDownHandler)
 
   try { removeMusicCtrlListener = (window as any).api?.onMusicCtrl?.(() => dispatch('toggle')) } catch {}
+
+  // Listen for OS-level global shortcut triggers from Tauri backend
+  listen<string>('hotkey-triggered', (event) => {
+    const action = event.payload
+    if (!action) return
+    // Map hotkey action names to the same dispatch names used by in-app shortcuts
+    const actionMap: Record<string, string> = {
+      toggle: 'toggle',
+      playPrev: 'playPrev',
+      playNext: 'playNext',
+      seekBackward: 'seekDelta',
+      seekForward: 'seekDelta',
+      volumeDown: 'volumeDelta',
+      volumeUp: 'volumeDelta',
+      toggleDesktopLyric: 'toggleDesktopLyric',
+      setPlayModeSequence: 'setPlayModeSequence',
+      setPlayModeRandom: 'setPlayModeRandom',
+      togglePlayModeSingle: 'togglePlayModeSingle',
+    }
+    const mapped = actionMap[action]
+    if (!mapped) return
+    if (action === 'seekBackward') dispatch('seekDelta', -5)
+    else if (action === 'seekForward') dispatch('seekDelta', 5)
+    else if (action === 'volumeDown') dispatch('volumeDelta', -5)
+    else if (action === 'volumeUp') dispatch('volumeDelta', 5)
+    else dispatch(mapped)
+  }).then((unlisten) => { removeHotkeyListener = unlisten })
 }
 
 export function uninstallGlobalMusicControls() {
@@ -66,5 +95,6 @@ export function uninstallGlobalMusicControls() {
   if (smtcTimer) { clearInterval(smtcTimer); smtcTimer = null }
   if (globalKeyDownHandler) { document.removeEventListener('keydown', globalKeyDownHandler); globalKeyDownHandler = null }
   if (removeMusicCtrlListener) { removeMusicCtrlListener(); removeMusicCtrlListener = null }
+  if (removeHotkeyListener) { removeHotkeyListener(); removeHotkeyListener = null }
   mediaSessionController.cleanup()
 }

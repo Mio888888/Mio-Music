@@ -10,6 +10,7 @@ use db::AppDb;
 use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 use tauri::Manager;
+use commands::hotkey_commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,6 +21,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(app_db)
         .manage(plugin_manager)
         .setup(|app| {
@@ -29,7 +31,19 @@ pub fn run() {
             app.manage(download_manager);
 
             // Start audio device change listener
-            audio_device::start_device_listener(app_handle);
+            audio_device::start_device_listener(app_handle.clone());
+
+            // Store AppHandle for hotkey re-registration
+            hotkey_commands::set_app_handle(app_handle.clone());
+
+            // Register OS-level shortcuts from saved config
+            {
+                let db_ref = app_handle.state::<AppDb>();
+                let conn = db_ref.playlist.lock().expect("DB lock poisoned");
+                let config = hotkey_commands::load_config_from_db(&conn);
+                drop(conn);
+                hotkey_commands::re_register_shortcuts(&app_handle, &config);
+            }
 
             Ok(())
         })
@@ -78,6 +92,9 @@ pub fn run() {
             commands::config_commands::config__set,
             commands::config_commands::config__get_all,
             commands::config_commands::config__delete,
+            // Hotkeys
+            hotkey_commands::hotkeys__get,
+            hotkey_commands::hotkeys__set,
             // Music SDK
             music_sdk::commands::service_music_sdk_request,
             music_sdk::commands::service_music_tip_search,
