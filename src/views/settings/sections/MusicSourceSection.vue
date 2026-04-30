@@ -8,6 +8,16 @@ import type { MusicSource } from '@/types/userInfo'
 
 const emit = defineEmits(['switch-category'])
 
+const QUALITY_ORDER: Record<string, number> = {
+  low: 1, standard: 2, high: 3,
+  '128k': 4, '192k': 5, '320k': 6,
+  lossless: 7, flac: 8,
+  hires: 9, flac24bit: 10, atmos: 11, master: 12,
+}
+
+const sortQualities = (qualities: string[]): string[] =>
+  [...qualities].sort((a, b) => (QUALITY_ORDER[a] ?? 999) - (QUALITY_ORDER[b] ?? 999))
+
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
 
@@ -23,7 +33,7 @@ const currentPluginName = computed(() => {
 const currentSourceQualities = computed(() => {
   if (!hasPluginData.value || !userInfo.value.selectSources) return []
   const selectedSource = userInfo.value.supportedSources?.[userInfo.value.selectSources]
-  return selectedSource?.qualitys || []
+  return sortQualities(selectedSource?.qualitys || [])
 })
 
 const qualitySliderValue = ref(0)
@@ -47,7 +57,7 @@ const globalQualityOptions = computed(() => {
       if (!arrays[i].includes(q)) set.delete(q)
     }
   }
-  return Array.from(set)
+  return sortQualities(Array.from(set))
 })
 
 const globalQualitySelected = ref<string>('')
