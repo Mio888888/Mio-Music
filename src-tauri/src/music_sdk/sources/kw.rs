@@ -44,22 +44,29 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
 }
 
 fn parse_music_item(info: &serde_json::Value) -> Option<MusicItem> {
-    let rid = info.get("MUSICRID")?.as_str()?;
+    let rid = info.get("MUSICRID").and_then(|v| v.as_str()).map(|s| s.to_string())
+        .or_else(|| info.get("rid").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .or_else(|| info.get("rid").and_then(|v| v.as_i64()).map(|n| n.to_string()))
+        .or_else(|| info.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        .or_else(|| info.get("id").and_then(|v| v.as_i64()).map(|n| n.to_string()))?;
     let songmid = rid.replace("MUSIC_", "");
-    let name = decode_html(info.get("SONGNAME").and_then(|v| v.as_str()).unwrap_or(""));
-    let singer = format_singer(decode_html(info.get("ARTIST").and_then(|v| v.as_str()).unwrap_or("")));
-    let album = decode_html(info.get("ALBUM").and_then(|v| v.as_str()).unwrap_or(""));
-    let album_id = info.get("ALBUMID").cloned().unwrap_or(serde_json::Value::String(String::new()));
-    let duration: i64 = info.get("DURATION").and_then(|v| v.as_str()).unwrap_or("0").parse().unwrap_or(0);
+    let name = decode_html(info.get("SONGNAME").or_else(|| info.get("name")).and_then(|v| v.as_str()).unwrap_or(""));
+    let singer = format_singer(decode_html(info.get("ARTIST").or_else(|| info.get("artist")).and_then(|v| v.as_str()).unwrap_or("")));
+    let album = decode_html(info.get("ALBUM").or_else(|| info.get("album")).and_then(|v| v.as_str()).unwrap_or(""));
+    let album_id = info.get("ALBUMID").or_else(|| info.get("albumid")).cloned().unwrap_or(serde_json::Value::String(String::new()));
+    let duration: i64 = info.get("DURATION").or_else(|| info.get("duration"))
+        .and_then(|v| v.as_str().map(|s| s.to_string()).or_else(|| v.as_i64().map(|n| n.to_string())))
+        .unwrap_or_default().parse().unwrap_or(0);
     let interval = format_play_time(duration);
 
-    let minfo = info.get("N_MINFO").and_then(|v| v.as_str()).unwrap_or("");
+    let minfo = info.get("N_MINFO").or_else(|| info.get("formats")).and_then(|v| v.as_str()).unwrap_or("");
     let types = parse_quality_types(minfo);
+    let img = info.get("albumpic").or_else(|| info.get("albpic")).or_else(|| info.get("pic")).and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     Some(MusicItem {
         songmid: serde_json::Value::String(songmid),
         singer, name, album_name: album, album_id, source: "kw".into(), interval,
-        img: String::new(), lrc: None, types: Some(types), type_url: Some(serde_json::json!({})), hash: None,
+        img, lrc: None, types: Some(types), type_url: Some(serde_json::json!({})), hash: None,
     })
 }
 
