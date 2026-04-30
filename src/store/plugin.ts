@@ -66,9 +66,9 @@ export const usePluginStore = defineStore('plugin', () => {
       }
       _loadPersistedSelection()
 
-      // Auto-restore userInfo if plugin was previously selected but userInfo lacks data
+      // Sync userInfo with latest plugin data
       const userStore = LocalUserDetailStore()
-      if (currentPluginId.value && !userStore.userInfo.pluginId) {
+      if (currentPluginId.value) {
         const plugin = plugins.value.find(p => p.plugin_id === currentPluginId.value)
         if (plugin && plugin.supported_sources && plugin.supported_sources.length > 0) {
           const supportedSourcesForStore: Record<string, any> = {}
@@ -80,15 +80,34 @@ export const usePluginStore = defineStore('plugin', () => {
               qualitys: src.qualities,
             }
           }
-          const selectSources = Object.keys(supportedSourcesForStore)[0]
-          const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
-          const selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
 
-          userStore.userInfo.pluginId = plugin.plugin_id
-          userStore.userInfo.pluginName = plugin.plugin_info.name
-          userStore.userInfo.supportedSources = supportedSourcesForStore
-          userStore.userInfo.selectSources = selectSources
-          userStore.userInfo.selectQuality = selectQuality
+          if (!userStore.userInfo.pluginId) {
+            // Full restore: no plugin data exists yet
+            const selectSources = Object.keys(supportedSourcesForStore)[0]
+            const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
+            const selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
+            userStore.userInfo.pluginId = plugin.plugin_id
+            userStore.userInfo.pluginName = plugin.plugin_info.name
+            userStore.userInfo.supportedSources = supportedSourcesForStore
+            userStore.userInfo.selectSources = selectSources
+            userStore.userInfo.selectQuality = selectQuality
+          } else {
+            // Sync: update supportedSources with latest plugin data, preserve user selections
+            const prevSources = userStore.userInfo.supportedSources || {}
+            userStore.userInfo.supportedSources = supportedSourcesForStore
+            userStore.userInfo.pluginName = plugin.plugin_info.name
+
+            // Validate current selections still exist in new data
+            const currentSource = userStore.userInfo.selectSources as string
+            if (currentSource && !supportedSourcesForStore[currentSource]) {
+              userStore.userInfo.selectSources = Object.keys(supportedSourcesForStore)[0]
+            }
+            const currentQuality = userStore.userInfo.selectQuality as string
+            const sourceQualities = supportedSourcesForStore[userStore.userInfo.selectSources as string]?.qualitys || []
+            if (currentQuality && !sourceQualities.includes(currentQuality)) {
+              userStore.userInfo.selectQuality = sourceQualities.length > 0 ? sourceQualities[sourceQualities.length - 1] : ''
+            }
+          }
         }
       }
     } catch (e) {

@@ -1,3 +1,9 @@
+export interface MusicSource {
+  name: string
+  type: string
+  qualitys: string[]
+}
+
 export interface UserInfo {
   lastPlaySongId?: string | number | null
   topBarStyle?: boolean
@@ -7,6 +13,8 @@ export interface UserInfo {
   selectSources?: string
   selectQuality?: string
   pluginId?: string
+  pluginName?: string
+  supportedSources?: Record<string, MusicSource>
   sourceQualityMap?: Record<string, string>
   hasGuide?: boolean
   deepseekAPIkey?: string

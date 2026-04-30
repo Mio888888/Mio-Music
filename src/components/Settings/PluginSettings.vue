@@ -434,7 +434,7 @@ function doSelect(plugin: LoadedPlugin) {
 }
 
 function confirmUninstall(plugin: LoadedPlugin) {
-  DialogPlugin.confirm({
+  const dialog = DialogPlugin.confirm({
     header: '确认卸载',
     body: `确定要卸载插件 "${plugin.plugin_info.name}" 吗？`,
     confirmBtn: { content: '确认卸载', theme: 'danger' },
@@ -450,6 +450,7 @@ function confirmUninstall(plugin: LoadedPlugin) {
           userStore.userInfo.selectQuality = ''
         }
         MessagePlugin.success(`插件 "${plugin.plugin_info.name}" 卸载成功！`)
+        dialog.destroy()
       } catch (e: any) {
         MessagePlugin.error(`卸载失败: ${e.message}`)
       }

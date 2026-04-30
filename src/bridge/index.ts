@@ -103,8 +103,8 @@ const api = {
     getList: () => ipcInvoke('plugin__get_list'),
     add: (pluginCode: string, pluginName: string, targetPluginId?: string) =>
       ipcInvoke('plugin__add', { pluginCode, pluginName, targetPluginId }),
-    uninstall: (pluginId: string) => ipcInvoke('plugin__uninstall', pluginId),
-    getInfo: (pluginId: string) => ipcInvoke('plugin__get_info', pluginId),
+    uninstall: (pluginId: string) => ipcInvoke('plugin__uninstall', { pluginId }),
+    getInfo: (pluginId: string) => ipcInvoke('plugin__get_info', { pluginId }),
     callMethod: (pluginId: string, method: string, argsJson: string) =>
       ipcInvoke('plugin__call_method', { pluginId, method, argsJson }),
     downloadAndAdd: (url: string, pluginType: string, targetPluginId?: string) =>

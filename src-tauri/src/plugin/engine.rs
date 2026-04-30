@@ -265,22 +265,38 @@ impl PluginEngine {
     fn extract_qualities_for_source(code: &str, source_id: &str) -> Vec<String> {
         let default_qualities = vec![
             "128k".to_string(), "320k".to_string(), "flac".to_string(),
+            "flac24bit".to_string(), "hires".to_string(),
         ];
 
-        if let Ok(re) = regex_lite::Regex::new(&format!(
-            r#"'{}'\s*:\s*\[([^\]]*)\]"#, source_id
-        )) {
-            if let Some(caps) = re.captures(code) {
-                if let Some(m) = caps.get(1) {
-                    let quals: Vec<String> = m.as_str()
-                        .split(',')
-                        .filter_map(|q| {
-                            let q = q.trim().trim_matches(|c| c == '\'' || c == '"');
-                            if q.is_empty() { None } else { Some(q.to_string()) }
-                        })
-                        .collect();
-                    if !quals.is_empty() {
-                        return quals;
+        let sid = regex_lite::escape(source_id);
+
+        let patterns = [
+            // Converted LX format: source_id: { ..., qualitys: [...] }
+            format!(r#"{sid}\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            // Quoted key: 'source_id': { ..., qualitys: [...] }
+            format!(r#"'{sid}'\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            // Double-quoted key: "source_id": { ..., qualitys: [...] }
+            format!(r#""{sid}"\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            // Direct array: 'source_id': [...]
+            format!(r#"'{sid}'\s*:\s*\[([^\]]*)\]"#),
+            // Direct array: "source_id": [...]
+            format!(r#""{sid}"\s*:\s*\[([^\]]*)\]"#),
+        ];
+
+        for pattern in &patterns {
+            if let Ok(re) = regex_lite::Regex::new(pattern) {
+                if let Some(caps) = re.captures(code) {
+                    if let Some(m) = caps.get(1) {
+                        let quals: Vec<String> = m.as_str()
+                            .split(',')
+                            .filter_map(|q| {
+                                let q = q.trim().trim_matches(|c| c == '\'' || c == '"');
+                                if q.is_empty() { None } else { Some(q.to_string()) }
+                            })
+                            .collect();
+                        if !quals.is_empty() {
+                            return quals;
+                        }
                     }
                 }
             }
