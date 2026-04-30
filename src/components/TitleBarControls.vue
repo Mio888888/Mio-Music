@@ -1,8 +1,37 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSettingsStore } from '@/store/Settings'
+
+interface Props {
+  controlStyle?: 'traffic-light' | 'windows' | boolean
+  showSettings?: boolean
+  showBack?: boolean
+  showAccount?: boolean
+  title?: string
+  color?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  controlStyle: false,
+  showSettings: true,
+  showBack: false,
+  showAccount: false,
+  title: '',
+  color: ''
+})
 
 const router = useRouter()
+
+const settingsStore = useSettingsStore()
+
+const controlsClass = computed(() => {
+  const topBarStyle = localStorage.getItem('topBarStyle')
+  const isTrafficLight = props.controlStyle !== false
+    ? props.controlStyle === 'traffic-light'
+    : topBarStyle === 'traffic-light'
+  return isTrafficLight ? 'title-controls traffic-light' : 'title-controls windows'
+})
 
 const handleMinimize = async () => {
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -15,114 +44,308 @@ const handleMaximize = async () => {
 }
 
 const handleClose = async () => {
+  const hasConfigured = localStorage.getItem('hasConfiguredCloseBehavior')
+  if (!hasConfigured) {
+    showCloseDialog.value = true
+    return
+  }
+
+  const closeToTray = localStorage.getItem('closeToTray') === 'true'
+  if (closeToTray) {
+    handleMiniMode()
+  } else {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().close()
+  }
+}
+
+const showCloseDialog = ref(false)
+const rememberChoice = ref(true)
+
+const handleCloseChoice = async (toTray: boolean) => {
+  if (rememberChoice.value) {
+    localStorage.setItem('closeToTray', String(toTray))
+    localStorage.setItem('hasConfiguredCloseBehavior', 'true')
+  }
+  showCloseDialog.value = false
+  if (toTray) {
+    handleMiniMode()
+  } else {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    await getCurrentWindow().close()
+  }
+}
+
+const handleMiniMode = async () => {
   const { getCurrentWindow } = await import('@tauri-apps/api/window')
-  await getCurrentWindow().close()
+  await getCurrentWindow().hide()
 }
 
 const handleSettings = () => {
   router.push('/settings')
 }
+
+const handleBack = () => {
+  router.back()
+}
 </script>
 
 <template>
-  <div class="window-controls">
-    <t-button
-      shape="circle"
-      theme="default"
-      variant="text"
-      class="control-btn settings-btn"
-      title="设置"
-      @click="handleSettings"
-    >
-      <i class="iconfont icon-shezhi"></i>
-    </t-button>
+  <div :class="controlsClass">
+    <div class="left">
+      <div class="back-box">
+        <t-button
+          v-if="showBack"
+          shape="circle"
+          theme="default"
+          variant="text"
+          class="control-btn back-btn"
+          title="返回"
+          @click="handleBack"
+        >
+          <i class="iconfont icon-xiangzuo"></i>
+        </t-button>
+      </div>
+      <div class="title-box">
+        <p>{{ title }}</p>
+      </div>
+    </div>
 
-    <div class="separator"></div>
+    <div class="window-controls">
+      <slot name="extra" />
 
-    <t-button
-      shape="circle"
-      theme="default"
-      variant="text"
-      class="control-btn minimize-btn"
-      title="最小化"
-      @click="handleMinimize"
-    >
-      <i class="iconfont icon-zuixiaohua"></i>
-    </t-button>
+      <t-button
+        v-if="showSettings"
+        shape="circle"
+        theme="default"
+        variant="text"
+        class="control-btn settings-btn"
+        title="设置"
+        @click="handleSettings"
+      >
+        <i class="iconfont icon-shezhi"></i>
+      </t-button>
 
-    <t-button
-      shape="circle"
-      theme="default"
-      variant="text"
-      class="control-btn maximize-btn"
-      title="最大化"
-      @click="handleMaximize"
-    >
-      <i class="iconfont icon-a-tingzhiwukuang"></i>
-    </t-button>
+      <div
+        class="separator"
+        :style="color ? 'background: ' + color : ''"
+      ></div>
 
-    <t-button
-      shape="circle"
-      theme="default"
-      variant="text"
-      class="control-btn close-btn"
-      title="关闭"
-      @click="handleClose"
-    >
-      <i class="iconfont icon-a-quxiaoguanbi"></i>
-    </t-button>
+      <t-button
+        shape="circle"
+        theme="default"
+        variant="text"
+        class="control-btn minimize-btn"
+        title="最小化"
+        @click="handleMinimize"
+      >
+        <i
+          v-if="controlsClass.includes('windows')"
+          class="iconfont icon-zuixiaohua"
+        ></i>
+        <div v-else class="traffic-light minimize"></div>
+      </t-button>
+
+      <t-button
+        shape="circle"
+        theme="default"
+        variant="text"
+        class="control-btn maximize-btn"
+        title="最大化"
+        @click="handleMaximize"
+      >
+        <i
+          v-if="controlsClass.includes('windows')"
+          class="iconfont icon-a-tingzhiwukuang"
+        ></i>
+        <div v-else class="traffic-light maximize"></div>
+      </t-button>
+
+      <t-button
+        shape="circle"
+        theme="default"
+        variant="text"
+        class="control-btn close-btn"
+        title="关闭"
+        @click="handleClose"
+      >
+        <i
+          v-if="controlsClass.includes('windows')"
+          class="iconfont icon-a-quxiaoguanbi"
+        ></i>
+        <div v-else class="traffic-light close"></div>
+      </t-button>
+    </div>
+
+    <t-dialog v-model:visible="showCloseDialog" header="关闭提示" :close-btn="true" placement="top">
+      <div>您希望如何处理关闭操作？</div>
+      <div style="margin-top: 10px">
+        <t-checkbox v-model="rememberChoice">记住我的选择，下次不再询问</t-checkbox>
+      </div>
+      <template #footer>
+        <t-button theme="default" @click="handleCloseChoice(false)">
+          直接退出
+        </t-button>
+        <t-button theme="primary" @click="handleCloseChoice(true)">
+          最小化到托盘
+        </t-button>
+      </template>
+    </t-dialog>
   </div>
 </template>
 
-<style scoped>
-.window-controls {
+<style lang="scss" scoped>
+.title-controls {
   display: flex;
   align-items: center;
-  gap: 0.125rem;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
+  width: 100%;
+  gap: 0.25rem;
+  -webkit-app-region: drag;
+
+  .control-btn {
+    -webkit-app-region: no-drag;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+    padding: 0;
+    border: none;
+    background: transparent;
+
+    .iconfont {
+      font-size: 1.125rem;
+      color: var(--td-text-color-secondary);
+    }
+
+    &:hover .iconfont {
+      color: var(--td-text-color-primary);
+    }
+  }
+
+  .left {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+    -webkit-app-region: drag;
+    min-height: 20px;
+
+    .back-box {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+
+      .back-btn {
+        -webkit-app-region: no-drag;
+        margin-right: 0.5rem;
+
+        &:hover {
+          background-color: var(--td-bg-color-component-hover);
+        }
+      }
+    }
+
+    .title-box {
+      flex: 1;
+
+      p {
+        margin: 0;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--td-text-color-primary);
+        line-height: 1.2;
+      }
+    }
+  }
+
+  .settings-btn {
+    &:hover {
+      background-color: var(--td-bg-color-component-hover);
+    }
+  }
+
+  .window-controls {
+    -webkit-app-region: no-drag;
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+    flex-shrink: 0;
+  }
+
+  .separator {
+    width: 1px;
+    height: 1rem;
+    background: var(--td-border-level-1-color);
+    margin: 0 3px;
+    border-radius: 2px;
+  }
+
+  .minimize-btn:hover,
+  .maximize-btn:hover {
+    background-color: var(--td-bg-color-component-hover);
+  }
+
+  .close-btn:hover {
+    background-color: #e81123;
+
+    .iconfont {
+      color: #fff !important;
+    }
+  }
 }
 
-.control-btn {
-  width: 2.25rem;
-  height: 2.25rem;
-  min-width: 2.25rem;
-  padding: 0;
-  border: none;
-  background: transparent;
+// Windows style
+.title-controls.windows {
+  .control-btn {
+    border-radius: 0.25rem;
+  }
 }
 
-.control-btn .iconfont {
-  font-size: 1.125rem;
-  color: var(--td-text-color-secondary);
-}
+// Traffic light style (macOS)
+.title-controls.traffic-light {
+  .control-btn {
+    border-radius: 50%;
+    width: 2.25rem;
+    height: 2.25rem;
+    min-width: 2.25rem;
+  }
 
-.control-btn:hover .iconfont {
-  color: var(--td-text-color-primary);
-}
+  .traffic-light {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
 
-.separator {
-  width: 1px;
-  height: 1rem;
-  background: var(--td-border-level-1-color);
-  margin: 0 3px;
-  border-radius: 2px;
-}
+    &.close {
+      background-color: #ff5f57;
 
-.settings-btn:hover {
-  background-color: var(--td-bg-color-component-hover);
-}
+      &:hover {
+        background-color: #ff3b30;
+      }
+    }
 
-.minimize-btn:hover,
-.maximize-btn:hover {
-  background-color: var(--td-bg-color-component-hover);
-}
+    &.minimize {
+      background-color: #ffbd2e;
 
-.close-btn:hover {
-  background-color: #e81123;
-}
+      &:hover {
+        background-color: #ff9500;
+      }
+    }
 
-.close-btn:hover .iconfont {
-  color: #fff !important;
+    &.maximize {
+      background-color: #28ca42;
+
+      &:hover {
+        background-color: #30d158;
+      }
+    }
+  }
+
+  .close-btn:hover {
+    background-color: transparent;
+  }
+
+  .minimize-btn:hover,
+  .maximize-btn:hover {
+    background-color: transparent;
+  }
 }
 </style>

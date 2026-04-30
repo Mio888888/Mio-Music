@@ -33,13 +33,31 @@ export const useEqualizerStore = defineStore(
       if (logs.value.length > 100) logs.value.pop()
     }
 
+    function setGains(newGains: number[]) {
+      gains.value = newGains
+      addLog(`增益已更新: [${newGains.map(g => g.toFixed(1)).join(', ')}]`)
+    }
+
+    function setCurrentPreset(preset: string) {
+      currentPreset.value = preset
+      addLog(`预设已切换: ${preset}`)
+    }
+
+    function setEnabled(val: boolean) {
+      enabled.value = val
+      addLog(`均衡器${val ? '已启用' : '已关闭'}`)
+    }
+
     return {
       enabled,
       currentPreset,
       gains,
       presets,
       logs,
-      addLog
+      addLog,
+      setGains,
+      setCurrentPreset,
+      setEnabled
     }
   },
   {

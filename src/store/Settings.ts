@@ -90,7 +90,38 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
   }
 
-  return { settings, updateSettings, toggleFloatBall, saveSettings }
+  const isSpringFestivalWindow = () => {
+    const now = new Date()
+    const today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()
+    return today >= 20260217 && today <= 20260223
+  }
+
+  const shouldUseSpringFestivalTheme = () => {
+    const preview = localStorage.getItem('ceru_welcome_newyear_preview')
+    if (preview === '1') return true
+    return isSpringFestivalWindow()
+  }
+
+  const disableSpringFestivalTheme = () => {
+    settings.value.springFestivalDisabled = true
+    saveSettings()
+  }
+
+  const enableSpringFestivalTheme = () => {
+    settings.value.springFestivalDisabled = false
+    saveSettings()
+  }
+
+  return {
+    settings,
+    updateSettings,
+    toggleFloatBall,
+    saveSettings,
+    isSpringFestivalWindow,
+    shouldUseSpringFestivalTheme,
+    disableSpringFestivalTheme,
+    enableSpringFestivalTheme
+  }
 }, {
   persist: true
 })
