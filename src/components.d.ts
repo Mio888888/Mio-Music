@@ -11,9 +11,11 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AIChat: typeof import('./components/AI/AIChat.vue')['default']
     AIFloatBallSettings: typeof import('./components/Settings/AIFloatBallSettings.vue')['default']
     AudioEffectSettings: typeof import('./components/Settings/AudioEffectSettings.vue')['default']
     AudioOutputSettings: typeof import('./components/Settings/AudioOutputSettings.vue')['default']
+    AudioVisualizer: typeof import('./components/Play/AudioVisualizer.vue')['default']
     ContextMenu: typeof import('./components/ContextMenu/ContextMenu.vue')['default']
     DesktopLyricStyle: typeof import('./components/Settings/DesktopLyricStyle.vue')['default']
     DirectorySettings: typeof import('./components/Settings/DirectorySettings.vue')['default']
@@ -28,6 +30,7 @@ declare module 'vue' {
     LyricFontSettings: typeof import('./components/Settings/LyricFontSettings.vue')['default']
     MusicCache: typeof import('./components/Settings/MusicCache.vue')['default']
     NBadge: typeof import('naive-ui')['NBadge']
+    NDropdown: typeof import('naive-ui')['NDropdown']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
     PlaylistSettings: typeof import('./components/Settings/PlaylistSettings.vue')['default']
@@ -38,6 +41,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     SettingsSearch: typeof import('./components/SettingsSearch.vue')['default']
     TAside: typeof import('tdesign-vue-next')['Aside']
+    TAvatar: typeof import('tdesign-vue-next')['Avatar']
     TButton: typeof import('tdesign-vue-next')['Button']
     TCard: typeof import('tdesign-vue-next')['Card']
     TCheckbox: typeof import('tdesign-vue-next')['Checkbox']
@@ -64,5 +68,6 @@ declare module 'vue' {
     TTabs: typeof import('tdesign-vue-next')['Tabs']
     TTag: typeof import('tdesign-vue-next')['Tag']
     TTooltip: typeof import('tdesign-vue-next')['Tooltip']
+    UserCapsule: typeof import('./components/Auth/UserCapsule.vue')['default']
   }
 }

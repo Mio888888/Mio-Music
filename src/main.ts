@@ -9,9 +9,17 @@ import { createApp } from 'vue'
 import router from './router'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import LogtoClient from '@logto/browser'
 
 // IPC adapter layer
 import './bridge'
+
+// Initialize Logto client
+import config from './config'
+config.instance = new LogtoClient({
+  appId: config.appId,
+  endpoint: config.endpoint,
+})
 
 const app = createApp(App)
 const pinia = createPinia()

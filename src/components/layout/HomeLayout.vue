@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TitleBarControls from '@/components/TitleBarControls.vue'
+import UserCapsule from '@/components/Auth/UserCapsule.vue'
 import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useRouter, useRoute } from 'vue-router'
@@ -251,6 +252,7 @@ const handleKeyDown = () => {
                 <template #icon><i class="iconfont icon-shengyin" style="font-size: 16px"></i></template>
               </t-button>
 
+              <UserCapsule />
               <TitleBarControls />
             </div>
           </div>
