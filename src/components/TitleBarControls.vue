@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useSettingsStore } from '@/store/Settings'
 
 interface Props {
@@ -22,15 +24,16 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const router = useRouter()
-
+const userStore = LocalUserDetailStore()
+const { userInfo } = storeToRefs(userStore)
 const settingsStore = useSettingsStore()
 
 const controlsClass = computed(() => {
-  const topBarStyle = localStorage.getItem('topBarStyle')
-  const isTrafficLight = props.controlStyle !== false
-    ? props.controlStyle === 'traffic-light'
-    : topBarStyle === 'traffic-light'
-  return isTrafficLight ? 'title-controls traffic-light' : 'title-controls windows'
+  if (props.controlStyle !== false) {
+    return `title-controls ${props.controlStyle}`
+  } else {
+    return userInfo.value.topBarStyle ? 'title-controls traffic-light' : 'title-controls windows'
+  }
 })
 
 const handleMinimize = async () => {

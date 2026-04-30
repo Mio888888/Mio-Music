@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useSettingsStore } from '@/store/Settings'
+import TitleBarControls from '@/components/TitleBarControls.vue'
 import ThemeSelector from '@/components/ThemeSelector.vue'
 import LyricFontSettings from '@/components/Settings/LyricFontSettings.vue'
 import DesktopLyricStyle from '@/components/Settings/DesktopLyricStyle.vue'
@@ -44,17 +45,14 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
             <h4>Windows 风格</h4>
             <div class="mock-titlebar">
               <div class="mock-title">Windows 风格标题栏</div>
+              <TitleBarControls control-style="windows" />
             </div>
           </div>
           <div class="preview-item">
             <h4>红绿灯风格 (macOS)</h4>
-            <div class="mock-titlebar mac-style">
+            <div class="mock-titlebar">
               <div class="mock-title">红绿灯风格标题栏</div>
-              <div class="traffic-lights">
-                <span class="light close"></span>
-                <span class="light minimize"></span>
-                <span class="light maximize"></span>
-              </div>
+              <TitleBarControls control-style="traffic-light" />
             </div>
           </div>
         </div>
@@ -171,18 +169,6 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
   border-radius: 0.375rem;
   border: 1px solid var(--td-border-level-1-color);
   .mock-title { font-weight: 500; color: var(--td-text-color-primary); font-size: 0.875rem; }
-}
-
-.mac-style { position: relative; }
-.traffic-lights {
-  display: flex;
-  gap: 6px;
-  .light {
-    width: 12px; height: 12px; border-radius: 50%;
-    &.close { background: #ff5f57; }
-    &.minimize { background: #ffbd2e; }
-    &.maximize { background: #28c840; }
-  }
 }
 
 .setting-spacer { height: 24px; }
