@@ -40,6 +40,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SettingsSearch: typeof import('./components/SettingsSearch.vue')['default']
+    SkeletonLoader: typeof import('./components/SkeletonLoader.vue')['default']
     TAside: typeof import('tdesign-vue-next')['Aside']
     TAvatar: typeof import('tdesign-vue-next')['Avatar']
     TButton: typeof import('tdesign-vue-next')['Button']
