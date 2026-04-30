@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 export enum DownloadStatus {
   Queued = 'queued',
@@ -31,7 +32,7 @@ export const useDownloadStore = defineStore('download', {
   state: () => ({
     tasks: [] as DownloadTask[],
     isInitialized: false,
-    pollTimer: null as ReturnType<typeof setInterval> | null
+    unlisteners: [] as UnlistenFn[]
   }),
   getters: {
     activeTasks: (state) => state.tasks.filter((t) =>
@@ -49,6 +50,7 @@ export const useDownloadStore = defineStore('download', {
       if (this.isInitialized) return
       this.isInitialized = true
 
+      // Load initial tasks
       try {
         const res = await (window as any).api?.download?.getTasks?.()
         if (res?.success && Array.isArray(res.data)) {
@@ -58,21 +60,52 @@ export const useDownloadStore = defineStore('download', {
         console.error('Failed to load download tasks:', error)
       }
 
-      // Poll for task updates since we don't have backend events yet
-      this.pollTimer = setInterval(async () => {
-        try {
-          const res = await (window as any).api?.download?.getTasks?.()
-          if (res?.success && Array.isArray(res.data)) {
-            this.tasks = res.data
-          }
-        } catch {}
-      }, 2000)
+      // Register event listeners for real-time updates
+      try {
+        const unlisteners = await Promise.all([
+          listen<DownloadTask>('download:task-added', (e) => {
+            const task = e.payload
+            if (!this.tasks.find(t => t.id === task.id)) {
+              this.tasks.push(task)
+            }
+          }),
+          listen<DownloadTask>('download:task-progress', (e) => {
+            this.updateTask(e.payload)
+          }),
+          listen<DownloadTask>('download:task-status-changed', (e) => {
+            this.updateTask(e.payload)
+          }),
+          listen<DownloadTask>('download:task-completed', (e) => {
+            this.updateTask(e.payload)
+          }),
+          listen<DownloadTask>('download:task-error', (e) => {
+            this.updateTask(e.payload)
+          }),
+          listen<string>('download:task-deleted', (e) => {
+            this.tasks = this.tasks.filter(t => t.id !== e.payload)
+          }),
+          listen<DownloadTask[]>('download:tasks-reset', (e) => {
+            this.tasks = e.payload
+          }),
+        ])
+        this.unlisteners = unlisteners
+      } catch (e) {
+        console.warn('[DownloadStore] Event listeners failed, falling back to polling:', e)
+        // Fallback: polling is handled by periodic refresh in components
+      }
     },
 
     destroy() {
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer)
-        this.pollTimer = null
+      for (const un of this.unlisteners) { un() }
+      this.unlisteners = []
+    },
+
+    updateTask(task: DownloadTask) {
+      const idx = this.tasks.findIndex(t => t.id === task.id)
+      if (idx !== -1) {
+        this.tasks[idx] = task
+      } else {
+        this.tasks.push(task)
       }
     },
 

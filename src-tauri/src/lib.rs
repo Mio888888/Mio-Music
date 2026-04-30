@@ -8,19 +8,25 @@ mod plugin;
 use db::AppDb;
 use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_data_dir = db::get_app_data_dir();
     let app_db = AppDb::new(&app_data_dir).expect("Failed to initialize databases");
-    let download_manager = DownloadManager::new(&app_data_dir);
     let plugin_manager = PluginManager::new(&app_data_dir);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(app_db)
-        .manage(download_manager)
         .manage(plugin_manager)
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            let app_data_dir = db::get_app_data_dir();
+            let download_manager = DownloadManager::new(&app_data_dir, app_handle);
+            app.manage(download_manager);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // Track commands
             commands::music_commands::track__get_all,
@@ -55,9 +61,17 @@ pub fn run() {
             commands::playlist_commands::songlist__remove_batch,
             commands::playlist_commands::songlist__clear_songs,
             commands::playlist_commands::songlist__search_songs,
+            // Batch delete & reorder
+            commands::playlist_commands::songlist__batch_delete,
+            commands::playlist_commands::songlist__move_song,
             // Favorites
             commands::playlist_commands::songlist__get_favorites_id,
             commands::playlist_commands::songlist__set_favorites_id,
+            // Config (KV store)
+            commands::config_commands::config__get,
+            commands::config_commands::config__set,
+            commands::config_commands::config__get_all,
+            commands::config_commands::config__delete,
             // Music SDK
             music_sdk::commands::service_music_sdk_request,
             music_sdk::commands::service_music_tip_search,

@@ -7,4 +7,5 @@ export { useAudioOutputStore } from './audioOutput'
 export { useEqualizerStore } from './Equalizer'
 export { useAudioEffectsStore } from './AudioEffects'
 export { useGlobalPlayStatusStore } from './GlobalPlayStatus'
+export { useDownloadStore } from './download'
 export { useSearchStore }

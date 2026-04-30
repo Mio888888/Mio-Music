@@ -265,6 +265,44 @@ pub fn search_songs(conn: &Connection, playlist_id: &str, keyword: &str) -> Resu
     rows.collect()
 }
 
+// --- Batch delete & reorder ---
+
+pub fn batch_delete_playlists(conn: &Connection, ids: &[String]) -> Result<usize> {
+    if ids.is_empty() { return Ok(0); }
+    let placeholders: Vec<String> = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+    let sql = format!("DELETE FROM playlists WHERE id IN ({})", placeholders.join(","));
+    let params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = ids.iter().map(|id| Box::new(id.clone()) as Box<dyn rusqlite::types::ToSql>).collect();
+    let params: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&sql, params.as_slice())
+}
+
+pub fn move_song(conn: &Connection, playlist_id: &str, songmid: &str, to_position: i64) -> Result<()> {
+    let current_pos: i64 = conn.query_row(
+        "SELECT position FROM playlist_songs WHERE playlist_id = ?1 AND songmid = ?2",
+        params![playlist_id, songmid],
+        |row| row.get(0),
+    )?;
+    if current_pos == to_position { return Ok(()); }
+    let tx = conn.unchecked_transaction()?;
+    if to_position > current_pos {
+        tx.execute(
+            "UPDATE playlist_songs SET position = position - 1 WHERE playlist_id = ?1 AND position > ?2 AND position <= ?3",
+            params![playlist_id, current_pos, to_position],
+        )?;
+    } else {
+        tx.execute(
+            "UPDATE playlist_songs SET position = position + 1 WHERE playlist_id = ?1 AND position >= ?2 AND position < ?3",
+            params![playlist_id, to_position, current_pos],
+        )?;
+    }
+    tx.execute(
+        "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND songmid = ?3",
+        params![to_position, playlist_id, songmid],
+    )?;
+    tx.commit()?;
+    Ok(())
+}
+
 // --- Favorites ID persistence (stored in a key-value table) ---
 
 pub fn ensure_kv_table(conn: &Connection) -> Result<()> {

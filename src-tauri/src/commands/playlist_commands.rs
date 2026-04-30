@@ -179,6 +179,26 @@ pub fn songlist__search_songs(state: DbState<'_>, playlist_id: String, keyword: 
     }
 }
 
+// --- Batch delete & reorder ---
+
+#[tauri::command]
+pub fn songlist__batch_delete(state: DbState<'_>, ids: Vec<String>) -> Result<serde_json::Value, String> {
+    let conn = state.playlist.lock().map_err(|e| e.to_string())?;
+    match playlist_db::batch_delete_playlists(&conn, &ids) {
+        Ok(n) => Ok(serde_json::to_value(ApiResponse::ok(n)).unwrap()),
+        Err(e) => Ok(serde_json::to_value(ApiResponse::<usize>::err(e.to_string())).unwrap()),
+    }
+}
+
+#[tauri::command]
+pub fn songlist__move_song(state: DbState<'_>, playlist_id: String, songmid: String, to_index: i64) -> Result<serde_json::Value, String> {
+    let conn = state.playlist.lock().map_err(|e| e.to_string())?;
+    match playlist_db::move_song(&conn, &playlist_id, &songmid, to_index) {
+        Ok(_) => Ok(serde_json::to_value(ApiResponse::ok(true)).unwrap()),
+        Err(e) => Ok(serde_json::to_value(ApiResponse::<bool>::err(e.to_string())).unwrap()),
+    }
+}
+
 // --- Favorites KV ---
 
 #[tauri::command]

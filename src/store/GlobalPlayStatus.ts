@@ -7,6 +7,35 @@ import { analyzeImageColors, type Color } from '@/utils/color/colorExtractor'
 import { parseLrc, type LyricLine } from '@/types/lyric'
 import { convertLrcFormat } from '@/utils/lyrics/lrcParser'
 
+export interface Comment {
+  id: number | string
+  text: string
+  time: number
+  timeStr: string
+  location: string
+  userName: string
+  avatar: string
+  userId: number | string
+  likedCount: number
+  images: string[]
+  reply: Comment[]
+}
+
+interface CommentsState {
+  hotList: Comment[]
+  latestList: Comment[]
+  hotTotal: number
+  hotPage: number
+  hotMaxPage: number
+  latestTotal: number
+  latestPage: number
+  latestMaxPage: number
+  limit: number
+  type: 'hot' | 'latest'
+  hotIsLoading: boolean
+  latestIsLoading: boolean
+}
+
 interface PlayerState {
   songId?: string
   songInfo?: Omit<SongList, 'songmid'> & { songmid: null | number | string }
@@ -20,7 +49,7 @@ interface PlayerState {
   }
   lyrics: { lines: LyricLine[]; trans?: string; source?: string }
   isLoading: boolean
-  comments: any
+  comments: CommentsState
 }
 
 const DEFAULT_SONG_INFO = {
@@ -129,7 +158,71 @@ export const useGlobalPlayStatusStore = defineStore('globalPlayStatus', () => {
     player.songInfo = songInfo
     player.songName = songInfo.name || ''
     player.singer = songInfo.singer || ''
+    updateComments(songInfo)
   }
 
-  return { player, updatePlayerInfo }
+  async function fetchComments(page = 1, type: 'hot' | 'latest' = 'hot') {
+    const currentSongInfo = toRaw(player.songInfo)
+    if (!currentSongInfo || !currentSongInfo.songmid) return
+
+    if (type === 'hot') {
+      player.comments.hotIsLoading = true
+    } else {
+      player.comments.latestIsLoading = true
+    }
+    try {
+      const method = type === 'hot' ? 'getHotComment' : 'getComment'
+      const res = await (window as any).api?.music?.requestSdk?.(method, {
+        source: (currentSongInfo as any).source || 'wy',
+        songInfo: JSON.parse(JSON.stringify(currentSongInfo)),
+        page,
+        limit: player.comments.limit
+      })
+      if (type === 'hot') {
+        if (page === 1) {
+          player.comments.hotList = res?.comments || []
+        } else {
+          player.comments.hotList.push(...(res?.comments || []))
+        }
+        player.comments.hotTotal = res?.total || 0
+        player.comments.hotPage = page
+        player.comments.hotMaxPage = res?.maxPage || 1
+      } else {
+        if (page === 1) {
+          player.comments.latestList = res?.comments || []
+        } else {
+          player.comments.latestList.push(...(res?.comments || []))
+        }
+        player.comments.latestTotal = res?.total || 0
+        player.comments.latestPage = page
+        player.comments.latestMaxPage = res?.maxPage || 1
+      }
+      player.comments.type = type
+    } catch (err) {
+      console.warn('[Comments] fetch failed:', err)
+    } finally {
+      if (type === 'hot') {
+        player.comments.hotIsLoading = false
+      } else {
+        player.comments.latestIsLoading = false
+      }
+    }
+  }
+
+  function updateComments(songInfo: SongList) {
+    const knownSources = ['wy', 'tx', 'mg', 'kg', 'kw', 'bd']
+    if ((songInfo as any).source === 'local' || !knownSources.includes((songInfo as any).source)) return
+    player.comments.hotList = []
+    player.comments.latestList = []
+    player.comments.hotPage = 0
+    player.comments.hotTotal = 0
+    player.comments.hotMaxPage = 0
+    player.comments.latestPage = 0
+    player.comments.latestTotal = 0
+    player.comments.latestMaxPage = 0
+    fetchComments(1, 'hot')
+    fetchComments(1, 'latest')
+  }
+
+  return { player, updatePlayerInfo, fetchComments }
 }, { persist: true })

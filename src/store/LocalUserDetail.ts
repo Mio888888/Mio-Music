@@ -4,11 +4,37 @@ import { ControlAudioStore } from './ControlAudio'
 import type { SongList } from '../types/audio'
 import type { UserInfo } from '../types/userInfo'
 
+export interface PlaylistRow {
+  id: string
+  name: string
+  description: string
+  coverImgUrl: string
+  source: string
+  meta: string
+  createTime: string
+  updateTime: string
+}
+
+export interface PlaylistSongRow {
+  playlist_id: string
+  songmid: string
+  position: number
+  data: string
+  name: string
+  singer: string
+  albumName: string
+  img: string
+}
+
 export const LocalUserDetailStore = defineStore('Local', () => {
   const list = ref<SongList[]>([])
   const userInfo = ref<UserInfo>({})
   const initialization = ref(false)
   const isWatchStarted = ref(false)
+
+  // Persisted playlists from Rust SQLite
+  const playlists = ref<PlaylistRow[]>([])
+  const playlistsLoaded = ref(false)
 
   function init(): void {
     const UserInfoLocal = localStorage.getItem('userInfo')
@@ -33,6 +59,7 @@ export const LocalUserDetailStore = defineStore('Local', () => {
     const Audio = ControlAudioStore()
     startWatch()
     Audio.setVolume(userInfo.value.volume as number)
+    loadPlaylists()
   }
 
   function startWatch() {
@@ -86,5 +113,182 @@ export const LocalUserDetailStore = defineStore('Local', () => {
     quality: (userInfo.value.sourceQualityMap || {})[userInfo.value.selectSources as string] || userInfo.value.selectQuality
   }))
 
-  return { list, userInfo, initialization, init, addSong, addSongToFirst, removeSong, clearList, replaceSongList, userSource }
+  // --- Playlist IPC (Rust SQLite backend) ---
+
+  async function loadPlaylists(): Promise<void> {
+    try {
+      const res = await (window as any).api?.songList?.getAll?.()
+      if (res?.success && Array.isArray(res.data)) {
+        playlists.value = res.data
+      }
+    } catch (e) {
+      console.warn('[Playlist] loadPlaylists failed:', e)
+    }
+    playlistsLoaded.value = true
+  }
+
+  async function createPlaylist(name: string, description?: string, source?: string): Promise<PlaylistRow | null> {
+    try {
+      const res = await (window as any).api?.songList?.create?.(name, description, source)
+      if (res?.success && res.data) {
+        playlists.value.push(res.data)
+        return res.data
+      }
+    } catch (e) {
+      console.warn('[Playlist] createPlaylist failed:', e)
+    }
+    return null
+  }
+
+  async function deletePlaylist(id: string): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.delete?.(id)
+      if (res?.success) {
+        playlists.value = playlists.value.filter(p => p.id !== id)
+        return true
+      }
+    } catch (e) {
+      console.warn('[Playlist] deletePlaylist failed:', e)
+    }
+    return false
+  }
+
+  async function batchDeletePlaylists(ids: string[]): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.batchDelete?.(ids)
+      if (res?.success) {
+        const idSet = new Set(ids)
+        playlists.value = playlists.value.filter(p => !idSet.has(p.id))
+        return true
+      }
+    } catch (e) {
+      console.warn('[Playlist] batchDeletePlaylists failed:', e)
+    }
+    return false
+  }
+
+  async function updatePlaylist(id: string, name: string, description: string): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.edit?.(id, { name, description })
+      if (res?.success) {
+        const pl = playlists.value.find(p => p.id === id)
+        if (pl) { pl.name = name; pl.description = description }
+        return true
+      }
+    } catch (e) {
+      console.warn('[Playlist] updatePlaylist failed:', e)
+    }
+    return false
+  }
+
+  async function updatePlaylistCover(id: string, coverUrl: string): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.updateCover?.(id, coverUrl)
+      if (res?.success) {
+        const pl = playlists.value.find(p => p.id === id)
+        if (pl) pl.coverImgUrl = coverUrl
+        return true
+      }
+    } catch (e) {
+      console.warn('[Playlist] updatePlaylistCover failed:', e)
+    }
+    return false
+  }
+
+  function songToPlaylistSong(playlistId: string, song: SongList, position: number): PlaylistSongRow {
+    return {
+      playlist_id: playlistId,
+      songmid: String(song.songmid),
+      position,
+      data: JSON.stringify(song),
+      name: song.name || '',
+      singer: song.singer || '',
+      albumName: song.albumName || '',
+      img: song.img || '',
+    }
+  }
+
+  async function addSongsToPlaylist(playlistId: string, songs: SongList[]): Promise<number> {
+    try {
+      const rows = songs.map((s, i) => songToPlaylistSong(playlistId, s, i))
+      const res = await (window as any).api?.songList?.addSongs?.(playlistId, rows)
+      return res?.success ? res.data : 0
+    } catch (e) {
+      console.warn('[Playlist] addSongsToPlaylist failed:', e)
+      return 0
+    }
+  }
+
+  async function removeSongFromPlaylist(playlistId: string, songmid: string): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.removeSong?.(playlistId, songmid)
+      return res?.success ?? false
+    } catch (e) {
+      console.warn('[Playlist] removeSongFromPlaylist failed:', e)
+      return false
+    }
+  }
+
+  async function removeSongsFromPlaylist(playlistId: string, songmids: string[]): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.removeSongs?.(playlistId, songmids)
+      return res?.success ?? false
+    } catch (e) {
+      console.warn('[Playlist] removeSongsFromPlaylist failed:', e)
+      return false
+    }
+  }
+
+  async function getSongsForPlaylist(playlistId: string): Promise<PlaylistSongRow[]> {
+    try {
+      const res = await (window as any).api?.songList?.getSongs?.(playlistId)
+      return res?.success ? (res.data ?? []) : []
+    } catch (e) {
+      console.warn('[Playlist] getSongsForPlaylist failed:', e)
+      return []
+    }
+  }
+
+  async function searchSongsInPlaylist(playlistId: string, keyword: string): Promise<PlaylistSongRow[]> {
+    try {
+      const res = await (window as any).api?.songList?.search?.(playlistId, keyword)
+      return res?.success ? (res.data ?? []) : []
+    } catch (e) {
+      console.warn('[Playlist] searchSongsInPlaylist failed:', e)
+      return []
+    }
+  }
+
+  async function moveSongInPlaylist(playlistId: string, songmid: string, toIndex: number): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.moveSong?.(playlistId, songmid, toIndex)
+      return res?.success ?? false
+    } catch (e) {
+      console.warn('[Playlist] moveSongInPlaylist failed:', e)
+      return false
+    }
+  }
+
+  async function getFavoritesId(): Promise<string | null> {
+    try {
+      const res = await (window as any).api?.songList?.getFavoritesId?.()
+      return res?.success ? res.data : null
+    } catch { return null }
+  }
+
+  async function setFavoritesId(id: string): Promise<boolean> {
+    try {
+      const res = await (window as any).api?.songList?.setFavoritesId?.(id)
+      return res?.success ?? false
+    } catch { return false }
+  }
+
+  return {
+    list, userInfo, initialization, playlists, playlistsLoaded,
+    init, addSong, addSongToFirst, removeSong, clearList, replaceSongList, userSource,
+    loadPlaylists, createPlaylist, deletePlaylist, batchDeletePlaylists,
+    updatePlaylist, updatePlaylistCover, addSongsToPlaylist, removeSongFromPlaylist,
+    removeSongsFromPlaylist, getSongsForPlaylist, searchSongsInPlaylist,
+    moveSongInPlaylist, getFavoritesId, setFavoritesId
+  }
 }, { persist: false })
