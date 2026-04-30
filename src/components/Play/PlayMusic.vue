@@ -12,6 +12,7 @@ import {
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
 import { PlayMode } from '@/types/audio'
 import {
@@ -30,6 +31,7 @@ import { crossfadeState } from '@/utils/audio/crossfade'
 const controlAudio = ControlAudioStore()
 const localUserStore = LocalUserDetailStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
+const settingsStore = useSettingsStore()
 const { Audio } = storeToRefs(controlAudio)
 const { list, userInfo } = storeToRefs(localUserStore)
 const { player } = storeToRefs(globalPlayStatus)
@@ -191,6 +193,142 @@ const handleProgressDragEnd = (event: MouseEvent) => {
   window.removeEventListener('mouseup', handleProgressDragEnd)
 }
 
+// 春节烟花效果
+const { settings } = storeToRefs(settingsStore)
+const showFestivalEffects = computed(
+  () => settingsStore.shouldUseSpringFestivalTheme() && !settings.value.springFestivalDisabled
+)
+const festivalOverlay = ref<HTMLDivElement | null>(null)
+let fwCanvas: HTMLCanvasElement | null = null
+let fwCtx: CanvasRenderingContext2D | null = null
+let fwRafId: number | null = null
+let fwLoopId: number | null = null
+let fwBursts: any[] = []
+let fwParticles: any[] = []
+let fwLastTime = 0
+let fwRunning = false
+
+const fwRnd = (min: number, max: number) => Math.random() * (max - min) + min
+const fwPick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
+const fwColors = ['#ff3b3b', '#ffd65a', '#ff7a00', '#ff2d55', '#ffe08a', '#fa383e', '#ff9f0a']
+
+const resizeFwCanvas = () => {
+  if (!fwCanvas || !festivalOverlay.value) return
+  const rect = festivalOverlay.value.getBoundingClientRect()
+  fwCanvas.width = Math.floor(rect.width * window.devicePixelRatio)
+  fwCanvas.height = Math.floor(rect.height * window.devicePixelRatio)
+}
+
+const addFwBurst = (x: number, y: number) => {
+  const c = fwPick(fwColors)
+  const count = Math.floor(fwRnd(40, 80))
+  for (let i = 0; i < count; i++) {
+    const angle = fwRnd(0, Math.PI * 2)
+    const speed = fwRnd(2, 6)
+    fwParticles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: fwRnd(60, 120),
+      color: c,
+      alpha: 1,
+      size: fwRnd(1, 2.8)
+    })
+  }
+  if (fwParticles.length > 2000) fwParticles.splice(0, fwParticles.length - 2000)
+}
+
+const scheduleFwBursts = (w: number, h: number) => {
+  fwBursts.push({ t: 0, x: fwRnd(w * 0.15, w * 0.85), y: fwRnd(h * 0.15, h * 0.5) })
+  fwBursts.push({ t: 400, x: fwRnd(w * 0.1, w * 0.9), y: fwRnd(h * 0.2, h * 0.6) })
+  fwBursts.push({ t: 800, x: fwRnd(w * 0.2, w * 0.8), y: fwRnd(h * 0.15, h * 0.55) })
+  fwBursts.push({ t: 1200, x: fwRnd(w * 0.25, w * 0.75), y: fwRnd(h * 0.1, h * 0.5) })
+  fwBursts.push({ t: 1600, x: fwRnd(w * 0.2, w * 0.8), y: fwRnd(h * 0.15, h * 0.6) })
+}
+
+const fwStep = (ts: number) => {
+  if (!fwCtx || !fwCanvas) return
+  const dt = ts - fwLastTime
+  fwLastTime = ts
+  fwCtx.globalCompositeOperation = 'source-over'
+  fwCtx.fillStyle = 'rgba(0,0,0,0)'
+  fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height)
+  const g = 0.05
+  const f = 0.985
+  fwCtx.globalCompositeOperation = 'lighter'
+  for (let i = fwParticles.length - 1; i >= 0; i--) {
+    const p = fwParticles[i]
+    p.vx *= f
+    p.vy = p.vy * f + g
+    p.x += p.vx
+    p.y += p.vy
+    p.life -= 1
+    p.alpha = Math.max(0, p.life / 120)
+    fwCtx.beginPath()
+    fwCtx.fillStyle = p.color
+    fwCtx.globalAlpha = p.alpha
+    fwCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+    fwCtx.fill()
+    if (p.life <= 0) fwParticles.splice(i, 1)
+  }
+  for (let i = fwBursts.length - 1; i >= 0; i--) {
+    const b = fwBursts[i]
+    b.t -= dt
+    if (b.t <= 0) {
+      addFwBurst(b.x, b.y)
+      fwBursts.splice(i, 1)
+    }
+  }
+  if (fwRunning) fwRafId = requestAnimationFrame(fwStep)
+}
+
+const startFireworks = () => {
+  if (fwRunning || !festivalOverlay.value) return
+  fwCanvas = document.createElement('canvas')
+  fwCanvas.style.position = 'absolute'
+  fwCanvas.style.top = '0'
+  fwCanvas.style.left = '0'
+  fwCanvas.style.width = '100%'
+  fwCanvas.style.height = '100%'
+  fwCanvas.style.zIndex = '0'
+  fwCanvas.style.pointerEvents = 'none'
+  festivalOverlay.value.appendChild(fwCanvas)
+  fwCtx = fwCanvas.getContext('2d')
+  resizeFwCanvas()
+  fwParticles = []
+  fwBursts = []
+  const w = fwCanvas.width
+  const h = fwCanvas.height
+  scheduleFwBursts(w, h)
+  scheduleFwBursts(w, h)
+  fwLastTime = performance.now()
+  fwRunning = true
+  fwRafId = requestAnimationFrame(fwStep)
+  fwLoopId = window.setInterval(() => {
+    if (!fwRunning || !fwCanvas) return
+    scheduleFwBursts(fwCanvas.width, fwCanvas.height)
+  }, 2200)
+  window.setTimeout(() => stopFireworks(), 14000)
+}
+
+const stopFireworks = () => {
+  fwRunning = false
+  if (fwRafId) { cancelAnimationFrame(fwRafId); fwRafId = null }
+  if (fwLoopId) { clearInterval(fwLoopId); fwLoopId = null }
+  fwParticles = []
+  fwBursts = []
+  if (fwCanvas && festivalOverlay.value) {
+    festivalOverlay.value.removeChild(fwCanvas)
+  }
+  fwCanvas = null
+  fwCtx = null
+}
+
+watch(showFestivalEffects, (val) => {
+  if (val) startFireworks()
+  else stopFireworks()
+})
+
 // 全屏播放
 const showFullPlay = ref(false)
 let isFull = false
@@ -265,6 +403,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopFireworks()
   window.removeEventListener('global-music-control', globalControls)
   try {
     const h = (window as any).__open_playlist_handler__
@@ -296,6 +435,9 @@ onDeactivated(() => {
     :class="{ 'full-play-idle': isFullPlayIdle && showFullPlay }"
     @click.stop="toggleFullPlay"
   >
+    <!-- 春节烟花 -->
+    <div v-if="showFestivalEffects" ref="festivalOverlay" class="festival-overlay"></div>
+
     <!-- 进度条 -->
     <div class="progress-bar-container">
       <div
@@ -895,6 +1037,18 @@ onDeactivated(() => {
 .playlist-leave-to {
   opacity: 0;
   transform: translateX(20px);
+}
+
+/* 春节烟花覆盖层 */
+.festival-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
 /* 响应式 */

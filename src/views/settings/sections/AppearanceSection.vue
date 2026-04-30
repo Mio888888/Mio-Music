@@ -86,7 +86,7 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
 
       <t-divider />
 
-      <div v-if="settingsStore.settings.springFestivalDisabled !== undefined" id="appearance-festival-theme" class="setting-group-item">
+      <div v-if="settingsStore.shouldUseSpringFestivalTheme()" id="appearance-festival-theme" class="setting-group-item">
         <div class="setting-label">
           <h4>节日主题(限时体验)</h4>
           <p>当前为春节主题，您可以选择关闭</p>

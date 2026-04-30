@@ -2,7 +2,9 @@
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import UserCapsule from '@/components/Auth/UserCapsule.vue'
 import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { useSettingsStore } from '@/store/Settings'
 import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
 
@@ -49,6 +51,12 @@ const menuActive = ref(0)
 const router = useRouter()
 const route = useRoute()
 const source_list_show = ref(false)
+
+const settingsStore = useSettingsStore()
+const { settings } = storeToRefs(settingsStore)
+const showNewYear = computed(
+  () => settingsStore.shouldUseSpringFestivalTheme() && !settings.value.springFestivalDisabled
+)
 
 watch(
   () => route.path,
@@ -155,12 +163,18 @@ const handleKeyDown = () => {
     <t-aside class="sidebar">
       <div class="sidebar-content">
         <div class="logo-section">
-          <div class="logo-icon">
+          <div class="logo-icon" :class="{ 'spring-logo': showNewYear }">
             <i class="iconfont icon-music"></i>
           </div>
           <p class="app-title">
             <span style="font-weight: 800">澜音 Music</span>
           </p>
+        </div>
+
+        <!-- 春节装饰横幅 -->
+        <div v-if="showNewYear" class="spring-banner">
+          <span class="spring-banner-text">新年快乐</span>
+          <span class="spring-banner-year">2026</span>
         </div>
 
         <nav class="nav-section">
@@ -557,5 +571,57 @@ const handleKeyDown = () => {
 
 .settings-btn:hover .iconfont {
   color: var(--td-text-color-primary);
+}
+
+/* 春节装饰 */
+.spring-logo {
+  background: linear-gradient(135deg, #ff4d4d, #ffd700) !important;
+}
+
+.spring-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 77, 77, 0.1), rgba(255, 215, 0, 0.1));
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.spring-banner::after {
+  content: '';
+  position: absolute;
+  inset: -40% -60%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0 1px, transparent 2px);
+  opacity: 0.3;
+  animation: bannerSparkle 2.5s linear infinite;
+}
+
+.spring-banner-text {
+  position: relative;
+  z-index: 1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 50, 50, 0.85);
+  letter-spacing: 1px;
+}
+
+.spring-banner-year {
+  position: relative;
+  z-index: 1;
+  font-size: 0.8rem;
+  font-weight: 900;
+  background: linear-gradient(180deg, #fff0b3, #ffd65a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@keyframes bannerSparkle {
+  0% { transform: translateX(-10%) rotate(0deg); }
+  100% { transform: translateX(10%) rotate(180deg); }
 }
 </style>
