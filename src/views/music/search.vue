@@ -3,6 +3,7 @@ import { ref, watch, onActivated } from 'vue'
 import { searchValue as useSearchStore } from '@/store/search'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { musicSdk, type MusicItem } from '@/services/musicSdk'
+import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter } from 'vue-router'
@@ -164,7 +165,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
           </div>
         </div>
         <div v-else-if="!loading" class="empty-state"><div class="empty-content"><h3>未找到相关歌曲</h3><p>请尝试其他关键词</p></div></div>
-        <div v-if="loading" class="loading-state"><div class="loading-spinner"></div><p>搜索中...</p></div>
+        <SkeletonLoader v-if="loading && searchResults.length === 0" type="song-list" :rows="10" />
       </div>
 
       <div v-show="activeTab === 'playlists'" class="playlist-tab">

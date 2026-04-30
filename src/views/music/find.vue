@@ -3,6 +3,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { musicSdk, type PlaylistItem } from '@/services/musicSdk'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import SkeletonLoader from '@/components/SkeletonLoader.vue'
 
 const router = useRouter()
 const activeTab = ref<'playlists' | 'leaderboard'>('playlists')
@@ -69,10 +70,7 @@ const formatCount = (count: any) => {
 
     <div class="find-content">
       <div v-if="activeTab === 'playlists'" class="playlist-section">
-        <div v-if="loading" class="loading-state">
-          <div class="loading-spinner"></div>
-          <p>加载中...</p>
-        </div>
+        <SkeletonLoader v-if="loading" type="playlist-grid" :rows="8" />
         <div v-else-if="playlists.length > 0" class="playlist-grid">
           <div v-for="item in playlists" :key="item.id" class="playlist-card" @click="goToPlaylist(item)">
             <div class="card-cover">
@@ -92,10 +90,7 @@ const formatCount = (count: any) => {
       </div>
 
       <div v-if="activeTab === 'leaderboard'" class="leaderboard-section">
-        <div v-if="loading" class="loading-state">
-          <div class="loading-spinner"></div>
-          <p>加载中...</p>
-        </div>
+        <SkeletonLoader v-if="loading" type="playlist-grid" :rows="8" />
         <div v-else-if="leaderboards.length > 0" class="leaderboard-grid">
           <div v-for="board in leaderboards" :key="board.id" class="leaderboard-card" @click="goToPlaylist(board)">
             <div class="board-cover">
