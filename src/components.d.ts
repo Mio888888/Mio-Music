@@ -27,6 +27,7 @@ declare module 'vue' {
     GlobalContextMenu: typeof import('./components/ContextMenu/GlobalContextMenu.vue')['default']
     HomeLayout: typeof import('./components/layout/HomeLayout.vue')['default']
     HotkeySettings: typeof import('./components/Settings/HotkeySettings.vue')['default']
+    ImportPlaylist: typeof import('./components/ServicePlugin/ImportPlaylist.vue')['default']
     LyricDisplay: typeof import('./components/Play/Lyric/LyricDisplay.vue')['default']
     LyricFontSettings: typeof import('./components/Settings/LyricFontSettings.vue')['default']
     MusicCache: typeof import('./components/Settings/MusicCache.vue')['default']

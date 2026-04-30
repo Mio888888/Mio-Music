@@ -109,6 +109,14 @@ const api = {
       ipcInvoke('plugin__call_method', { pluginId, method, argsJson }),
     downloadAndAdd: (url: string, pluginType: string, targetPluginId?: string) =>
       ipcInvoke('plugin__download_and_add', { url, pluginType, targetPluginId }),
+    getPluginType: (pluginId: string) => ipcInvoke('plugin__get_type', { pluginId }),
+    getPluginLog: (pluginId: string) => ipcInvoke('plugin__get_log', { pluginId }),
+    getConfigSchema: (pluginId: string) => ipcInvoke('plugin__get_config_schema', { pluginId }),
+    getConfig: (pluginId: string) => ipcInvoke('plugin__get_config', { pluginId }),
+    saveConfig: (pluginId: string, config: Record<string, any>) =>
+      ipcInvoke('plugin__save_config', { pluginId, config }),
+    testConnection: (pluginId: string) => ipcInvoke('plugin__test_connection', { pluginId }),
+    selectAndAdd: (pluginType: string) => ipcInvoke('plugin__select_and_add', { pluginType }),
     onDeepLinkAdd: (
       callback: (payload: { url: string; type: 'lx' | 'cr'; targetPluginId?: string }) => void
     ) => {

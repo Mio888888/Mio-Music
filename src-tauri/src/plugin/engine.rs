@@ -1,4 +1,4 @@
-use super::types::{PluginInfo, PluginSource};
+use super::types::{PluginConfigField, PluginInfo, PluginSource};
 use std::path::Path;
 
 /// Plugin code validator and metadata extractor.
@@ -7,6 +7,8 @@ use std::path::Path;
 pub struct PluginEngine {
     info: PluginInfo,
     sources: Vec<PluginSource>,
+    plugin_type: String,
+    config_schema: Vec<PluginConfigField>,
     code: String,
 }
 
@@ -15,10 +17,18 @@ impl PluginEngine {
     pub fn new(plugin_code: &str) -> Result<Self, String> {
         let info = Self::extract_plugin_info(plugin_code)?;
         let sources = Self::extract_sources(plugin_code);
+        let plugin_type = Self::extract_plugin_type(plugin_code);
+        let config_schema = if plugin_type == "service" {
+            Self::extract_config_schema(plugin_code)
+        } else {
+            Vec::new()
+        };
 
         Ok(Self {
             info,
             sources,
+            plugin_type,
+            config_schema,
             code: plugin_code.to_string(),
         })
     }
@@ -32,19 +42,177 @@ impl PluginEngine {
 
     pub fn info(&self) -> &PluginInfo { &self.info }
     pub fn sources(&self) -> &[PluginSource] { &self.sources }
+    pub fn plugin_type(&self) -> &str { &self.plugin_type }
+    pub fn config_schema(&self) -> &[PluginConfigField] { &self.config_schema }
     #[allow(dead_code)]
     pub fn code(&self) -> &str { &self.code }
 
+    fn extract_plugin_type(code: &str) -> String {
+        if let Some(val) = Self::extract_string_field(code, "pluginType") {
+            return val;
+        }
+        // Heuristic: service plugins typically have configSchema or getPlaylists
+        if code.contains("configSchema") || code.contains("getPlaylists") {
+            return "service".to_string();
+        }
+        // Heuristic: music source plugins have source/quality definitions
+        if code.contains("music-search") || code.contains("getMusicUrl") {
+            return "music-source".to_string();
+        }
+        "music-source".to_string()
+    }
+
+    /// Extract configSchema array from service plugin JS code.
+    fn extract_config_schema(code: &str) -> Vec<PluginConfigField> {
+        let mut fields = Vec::new();
+
+        // Find configSchema = [ ... ] block
+        let schema_start = match code.find("configSchema") {
+            Some(pos) => {
+                let rest = &code[pos + "configSchema".len()..];
+                let rest = rest.trim_start();
+                if rest.starts_with('=') || rest.starts_with(':') {
+                    let after_eq = rest[1..].trim_start();
+                    match after_eq.find('[') {
+                        Some(i) => pos + "configSchema".len() + 1 + i + 1,
+                        None => return fields,
+                    }
+                } else {
+                    return fields;
+                }
+            }
+            None => return fields,
+        };
+
+        // Find matching closing bracket
+        let schema_code = &code[schema_start.saturating_sub(1)..];
+        let end = match Self::find_matching_bracket(schema_code, '[', ']') {
+            Some(e) => e,
+            None => return fields,
+        };
+
+        let inner = &schema_code[1..end];
+
+        // Split by top-level objects (delimiter: }, {)
+        let obj_strings = Self::split_top_level_objects(inner);
+
+        for obj_str in obj_strings {
+            if let Some(field) = Self::parse_config_field(obj_str) {
+                fields.push(field);
+            }
+        }
+
+        fields
+    }
+
+    fn find_matching_bracket(code: &str, open: char, close: char) -> Option<usize> {
+        let mut depth = 0;
+        let start = code.find(open)?;
+        for (i, c) in code[start..].char_indices() {
+            match c {
+                '"' | '\'' => {
+                    // Skip string content
+                    let mut j = i + 1;
+                    while j < code[start..].len() {
+                        let cc = code[start + j..].chars().next()?;
+                        j += cc.len_utf8();
+                        if cc == c { break; }
+                        if cc == '\\' { j += 1; }
+                    }
+                }
+                _ if c == open => depth += 1,
+                _ if c == close => {
+                    depth -= 1;
+                    if depth == 0 { return Some(start + i); }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    fn split_top_level_objects(inner: &str) -> Vec<&str> {
+        let mut result = Vec::new();
+        let mut depth = 0;
+        let mut start = None;
+
+        for (i, c) in inner.char_indices() {
+            match c {
+                '{' => {
+                    if depth == 0 { start = Some(i); }
+                    depth += 1;
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        if let Some(s) = start {
+                            result.push(&inner[s..=i]);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        result
+    }
+
+    fn parse_config_field(obj_str: &str) -> Option<PluginConfigField> {
+        let key = Self::extract_string_field(obj_str, "key")?;
+        let label = Self::extract_string_field(obj_str, "label").unwrap_or_else(|| key.clone());
+        let field_type = Self::extract_string_field(obj_str, "type").unwrap_or_else(|| "text".to_string());
+        let required = Self::extract_bool_field(obj_str, "required");
+        let placeholder = Self::extract_string_field(obj_str, "placeholder");
+        let default = Self::extract_string_field(obj_str, "default")
+            .map(|v| serde_json::Value::String(v));
+
+        Some(PluginConfigField {
+            key,
+            label,
+            field_type,
+            required,
+            default,
+            placeholder,
+            options: None,
+        })
+    }
+
+    fn extract_bool_field(code: &str, field: &str) -> bool {
+        let patterns = [
+            format!(r"{}\s*:\s*true", field),
+            format!(r#""{}"\s*:\s*true"#, field),
+        ];
+        for p in &patterns {
+            if regex_lite::Regex::new(p).map(|re| re.is_match(code)).unwrap_or(false) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn extract_string_field(code: &str, field: &str) -> Option<String> {
+        Self::extract_object_field(code, field)
+            .or_else(|| Self::extract_comment_field(code, field))
+    }
+
+    /// Extract a field value from @field comment format (e.g. @name PluginName).
+    fn extract_comment_field(code: &str, field: &str) -> Option<String> {
+        let pattern = format!(r"@{}\s+(.+)", field);
+        regex_lite::Regex::new(&pattern)
+            .ok()?
+            .captures(code)
+            .and_then(|c| c.get(1))
+            .map(|m| m.as_str().trim().to_string())
+    }
+
     /// Extract pluginInfo from JS code by parsing the object literal.
     fn extract_plugin_info(code: &str) -> Result<PluginInfo, String> {
-        // Look for pluginInfo = { ... } or module.exports = { pluginInfo: { ... } }
-        let name = Self::extract_object_field(code, "name")
+        let name = Self::extract_string_field(code, "name")
             .unwrap_or_else(|| "未知插件".to_string());
-        let version = Self::extract_object_field(code, "version")
+        let version = Self::extract_string_field(code, "version")
             .unwrap_or_else(|| "1.0.0".to_string());
-        let author = Self::extract_object_field(code, "author")
+        let author = Self::extract_string_field(code, "author")
             .unwrap_or_else(|| "未知作者".to_string());
-        let description = Self::extract_object_field(code, "description")
+        let description = Self::extract_string_field(code, "description")
             .unwrap_or_default();
 
         if name == "未知插件" {
@@ -56,7 +224,6 @@ impl PluginEngine {
 
     /// Extract a string field value from JS code.
     fn extract_object_field(code: &str, field: &str) -> Option<String> {
-        // Match patterns like: name: "value" or name: 'value' or name: `value`
         let patterns = [
             format!(r#"{}\s*:\s*"([^"]*)""#, field),
             format!(r"{}\s*:\s*'([^']*)'", field),
@@ -77,7 +244,6 @@ impl PluginEngine {
     fn extract_sources(code: &str) -> Vec<PluginSource> {
         let mut sources = Vec::new();
 
-        // Look for source definitions like: kw: { name: "酷我", qualities: [...] }
         let source_ids = ["kw", "kg", "tx", "wy", "mg", "mgt", "bd", "local"];
         let source_names = ["酷我音乐", "酷狗音乐", "QQ音乐", "网易云音乐", "咪咕音乐", "咪咕音乐", "百度音乐", "本地"];
 
@@ -100,7 +266,6 @@ impl PluginEngine {
             "128k".to_string(), "320k".to_string(), "flac".to_string(),
         ];
 
-        // Try to find quality definitions near the source id
         if let Ok(re) = regex_lite::Regex::new(&format!(
             r#"'{}'\s*:\s*\[([^\]]*)\]"#, source_id
         )) {

@@ -129,6 +129,13 @@ pub fn run() {
             plugin::commands::plugin__get_info,
             plugin::commands::plugin__call_method,
             plugin::commands::plugin__download_and_add,
+            plugin::commands::plugin__get_type,
+            plugin::commands::plugin__get_log,
+            plugin::commands::plugin__get_config_schema,
+            plugin::commands::plugin__get_config,
+            plugin::commands::plugin__save_config,
+            plugin::commands::plugin__test_connection,
+            plugin::commands::plugin__select_and_add,
             // Audio Device
             audio_device::audio__enumerate_devices,
             audio_device::audio__set_output_device,

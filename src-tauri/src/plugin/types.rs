@@ -17,6 +17,12 @@ pub struct PluginSource {
     pub qualities: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PluginConfigFieldOption {
+    pub label: String,
+    pub value: serde_json::Value,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginConfigField {
@@ -30,21 +36,31 @@ pub struct PluginConfigField {
     pub default: Option<serde_json::Value>,
     #[serde(default)]
     pub placeholder: Option<String>,
+    #[serde(default)]
+    pub options: Option<Vec<PluginConfigFieldOption>>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadedPlugin {
     pub plugin_id: String,
     pub plugin_name: String,
     pub plugin_info: PluginInfo,
     pub supported_sources: Vec<PluginSource>,
+    #[serde(default = "default_plugin_type")]
+    pub plugin_type: String,
 }
 
-#[allow(dead_code)]
+fn default_plugin_type() -> String {
+    "music-source".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PluginType {
-    MusicSource,
-    Service,
+pub struct ServicePlaylist {
+    pub id: String,
+    pub name: String,
+    pub song_count: u32,
+    #[serde(default)]
+    pub cover_img: String,
+    #[serde(default)]
+    pub description: String,
 }
