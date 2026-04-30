@@ -13,6 +13,7 @@ const playStatus = useGlobalPlayStatusStore()
 const localUserStore = LocalUserDetailStore()
 const { list } = storeToRefs(localUserStore)
 
+const isLeaderboard = computed(() => route.query.isLeaderboard === 'true')
 const playlistId = computed(() => route.params.id as string)
 const playlistTitle = computed(() => (route.query.title as string) || '歌单')
 const playlistCover = computed(() => (route.query.cover as string) || '/default-cover.png')
@@ -31,7 +32,9 @@ const fetchSongs = async (reset = false) => {
 
   loading.value = true
   try {
-    const res = await musicSdk.getPlaylistDetail(playlistId.value, currentPage.value)
+    const res = isLeaderboard.value
+      ? await musicSdk.getLeaderboardDetail(playlistId.value, currentPage.value)
+      : await musicSdk.getPlaylistDetail(playlistId.value, currentPage.value)
     const newSongs = res?.list || []
     songs.value = reset ? newSongs : [...songs.value, ...newSongs]
     if (res?.info) playlistInfo.value = res.info

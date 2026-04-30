@@ -232,23 +232,113 @@ async fn get_hot_songlist(args: serde_json::Value) -> Result<serde_json::Value, 
 
     let url = format!("http://wapi.kuwo.cn/api/pc/classify/playlist/getRcmPlayList?pn={}&rn={}&order=hot&vipver=1", page - 1, limit);
     let resp: serde_json::Value = get_http().get(&url).send().await.map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
+    parse_playlists(&resp, "kw", limit)
+}
 
-    let total = resp.get("data").and_then(|d| d.get("total")).and_then(|v| v.as_i64()).unwrap_or(0);
-    let raw_list = resp.get("data").and_then(|d| d.get("data")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+// --- Playlist Tags ---
 
-    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| PlaylistItem {
-        id: item.get("playlistid").cloned().unwrap_or(serde_json::Value::Null),
-        name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        source: "kw".into(),
-        desc: item.get("intro").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-        play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null),
-        author: String::new(),
-    }).collect();
+fn filter_tag_info(raw_list: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    raw_list.iter().map(|type_obj| {
+        let name = type_obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let data = type_obj.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let list: Vec<serde_json::Value> = data.iter().map(|item| {
+            let item_id = item.get("id").map(|v| match v {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Number(n) => n.to_string(),
+                _ => String::new(),
+            }).unwrap_or_default();
+            let digest = item.get("digest").map(|v| match v {
+                serde_json::Value::String(s) => s.clone(),
+                serde_json::Value::Number(n) => n.to_string(),
+                _ => String::new(),
+            }).unwrap_or_default();
+            serde_json::json!({
+                "id": format!("{}-{}", item_id, digest),
+                "name": item.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                "source": "kw"
+            })
+        }).collect();
+        serde_json::json!({ "name": name, "list": list })
+    }).collect()
+}
 
-    Ok(serde_json::to_value(PlaylistResult {
-        list, all_page: (total as f64 / limit as f64).ceil() as i64, limit: limit as i64, total, source: "kw".into(),
-    }).unwrap())
+async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
+    let tags_url = "http://wapi.kuwo.cn/api/pc/classify/playlist/getTagList?cmd=rcm_keyword_playlist&user=0&prod=kwplayer_pc_9.0.5.0&vipver=9.0.5.0&source=kwplayer_pc_9.0.5.0&loginUid=0&loginSid=0&appUid=76039576";
+    let hot_tag_url = "http://wapi.kuwo.cn/api/pc/classify/playlist/getRcmTagList?loginUid=0&loginSid=0&appUid=76039576";
+
+    let (tags_result, hot_result) = tokio::join!(
+        async {
+            let resp: serde_json::Value = get_http().get(tags_url)
+                .send().await.map_err(|e| e.to_string())?
+                .json().await.map_err(|e| e.to_string())?;
+            let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+            Ok::<_, String>(filter_tag_info(&data))
+        },
+        async {
+            let resp: serde_json::Value = get_http().get(hot_tag_url)
+                .send().await.map_err(|e| e.to_string())?
+                .json().await.map_err(|e| e.to_string())?;
+            let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+            let hot: Vec<serde_json::Value> = data.iter().map(|item| {
+                let item_id = item.get("id").map(|v| match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    _ => String::new(),
+                }).unwrap_or_default();
+                let digest = item.get("digest").map(|v| match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    _ => String::new(),
+                }).unwrap_or_default();
+                serde_json::json!({
+                    "id": format!("{}-{}", item_id, digest),
+                    "name": item.get("name").and_then(|v| v.as_str()).unwrap_or(""),
+                    "source": "kw"
+                })
+            }).collect();
+            Ok::<_, String>(hot)
+        }
+    );
+
+    let tags = tags_result.unwrap_or_default();
+    let hot_tag = hot_result.unwrap_or_default();
+
+    Ok(serde_json::json!({ "tags": tags, "hotTag": hot_tag, "source": "kw" }))
+}
+
+// --- Category Playlists ---
+
+async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::Value, String> {
+    let tag_id = get_str(&args, "tagId").to_string();
+    let page = get_u64(&args, "page", 1);
+    let limit = get_u64(&args, "limit", 36);
+
+    if tag_id.is_empty() {
+        // 推荐歌单
+        let url = format!("http://wapi.kuwo.cn/api/pc/classify/playlist/getRcmPlayList?loginUid=0&loginSid=0&appUid=76039576&pn={}&rn={}&order=hot", page - 1, limit);
+        let resp: serde_json::Value = get_http().get(&url).send().await.map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
+        return parse_playlists(&resp, "kw", limit);
+    }
+
+    // 解析 tagId 格式: "id-digest"
+    let parts: Vec<&str> = tag_id.splitn(2, '-').collect();
+    let numeric_id = parts[0];
+    let digest = if parts.len() > 1 { parts[1] } else { "10000" };
+
+    match digest {
+        "43" => {
+            // 特殊分类
+            let url = format!("http://mobileinterfaces.kuwo.cn/er.s?type=get_pc_qz_data&f=web&id={}&prod=pc", numeric_id);
+            let resp: serde_json::Value = get_http().get(&url).send().await.map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
+            parse_playlists_mobile(&resp, "kw", limit)
+        }
+        _ => {
+            // 默认: 普通分类标签 (type 10000)
+            let url = format!("http://wapi.kuwo.cn/api/pc/classify/playlist/getTagPlayList?loginUid=0&loginSid=0&appUid=76039576&pn={}&id={}&rn={}", page - 1, numeric_id, limit);
+            let resp: serde_json::Value = get_http().get(&url).send().await.map_err(|e| e.to_string())?.json().await.map_err(|e| e.to_string())?;
+            parse_playlists(&resp, "kw", limit)
+        }
+    }
 }
 
 // --- Leaderboards ---
@@ -290,6 +380,12 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
     }))
 }
 
+// --- Leaderboard Detail (reuses playlist detail API) ---
+
+async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
+    get_playlist_detail(args).await
+}
+
 // --- Search Playlist ---
 
 async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -324,6 +420,45 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
 
 // --- Helpers ---
 
+fn parse_playlists(resp: &serde_json::Value, source: &str, limit: u64) -> Result<serde_json::Value, String> {
+    let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
+    let total = data.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
+    let raw_list = data.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| PlaylistItem {
+        id: item.get("playlistid").cloned().unwrap_or(serde_json::Value::Null),
+        name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        img: item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        source: source.to_string(),
+        desc: item.get("intro").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        play_count: item.get("playCount").cloned().unwrap_or(serde_json::Value::Null),
+        author: String::new(),
+    }).collect();
+
+    Ok(serde_json::to_value(PlaylistResult {
+        list, all_page: (total as f64 / limit as f64).ceil() as i64, limit: limit as i64, total, source: source.to_string(),
+    }).unwrap())
+}
+
+fn parse_playlists_mobile(resp: &serde_json::Value, source: &str, limit: u64) -> Result<serde_json::Value, String> {
+    let raw_list = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let total = raw_list.len() as i64;
+
+    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| PlaylistItem {
+        id: item.get("id").cloned().unwrap_or(serde_json::Value::Null),
+        name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        img: item.get("pic").or(item.get("img")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        source: source.to_string(),
+        desc: item.get("info").or(item.get("intro")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        play_count: item.get("listencnt").cloned().unwrap_or(serde_json::Value::Null),
+        author: String::new(),
+    }).collect();
+
+    Ok(serde_json::to_value(PlaylistResult {
+        list, all_page: (total as f64 / limit as f64).ceil() as i64, limit: limit as i64, total, source: source.to_string(),
+    }).unwrap())
+}
+
 fn empty_search(source: &str) -> Result<serde_json::Value, String> {
     Ok(serde_json::to_value(SearchResult { list: vec![], all_page: 0, limit: 30, total: 0, source: source.into() }).unwrap())
 }
@@ -353,8 +488,11 @@ pub async fn handle(method: &str, args: serde_json::Value) -> Result<serde_json:
         "getComment" => get_comment(args).await,
         "getHotComment" => get_hot_comment(args).await,
         "getHotSonglist" | "getHotPlaylists" => get_hot_songlist(args).await,
+        "getPlaylistTags" | "getSongboardTags" => get_playlist_tags(args).await,
+        "getCategoryPlaylists" => get_category_playlists(args).await,
         "getLeaderboards" => get_leaderboards(args).await,
         "getPlaylistDetail" | "getPlaylistDetailById" => get_playlist_detail(args).await,
+        "getLeaderboardDetail" => get_leaderboard_detail(args).await,
         "searchPlaylist" => search_playlist(args).await,
         _ => Err(format!("Unknown SDK method for kw: {}", method)),
     }

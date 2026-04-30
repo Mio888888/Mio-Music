@@ -30,6 +30,8 @@ const sourceicon: Record<string, string> = {
   mg: 'mg',
   tx: 'tx',
   kw: 'kw',
+  bd: 'kw',
+  xm: 'xm',
   git: 'git'
 }
 const source = ref('kugouyinle')
@@ -82,6 +84,8 @@ const sourceNames: Record<string, string> = {
   mg: '咪咕音乐',
   tx: 'QQ音乐',
   kw: '酷我音乐',
+  bd: '波点音乐',
+  xm: '虾米音乐',
   git: 'GitCode'
 }
 
