@@ -74,11 +74,7 @@ export const useAudioOutputStore = defineStore(
     })
 
     const sortedDevices = computed(() => {
-      return [...allDevices.value].sort((a, b) => {
-        if (a.is_default) return -1
-        if (b.is_default) return 1
-        return a.name.localeCompare(b.name)
-      })
+      return [...allDevices.value].sort((a, b) => a.name.localeCompare(b.name))
     })
 
     const currentDeviceLabel = computed(() => {

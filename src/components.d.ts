@@ -19,6 +19,7 @@ declare module 'vue' {
     ContextMenu: typeof import('./components/ContextMenu/ContextMenu.vue')['default']
     DesktopLyricStyle: typeof import('./components/Settings/DesktopLyricStyle.vue')['default']
     DirectorySettings: typeof import('./components/Settings/DirectorySettings.vue')['default']
+    DlnaDeviceSettings: typeof import('./components/Settings/DlnaDeviceSettings.vue')['default']
     EqualizerSettings: typeof import('./components/Settings/EqualizerSettings.vue')['default']
     GlobalAudio: typeof import('./components/Play/GlobalAudio.vue')['default']
     GlobalBackground: typeof import('./components/GlobalBackground.vue')['default']

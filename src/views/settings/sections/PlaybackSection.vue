@@ -4,6 +4,7 @@ import { playSetting as usePlaySetting } from '@/store/playSetting'
 import { useSettingsStore } from '@/store/Settings'
 import PlaylistSettings from '@/components/Settings/PlaylistSettings.vue'
 import AudioOutputSettings from '@/components/Settings/AudioOutputSettings.vue'
+import DlnaDeviceSettings from '@/components/Settings/DlnaDeviceSettings.vue'
 import EqualizerSettings from '@/components/Settings/EqualizerSettings.vue'
 import AudioEffectSettings from '@/components/Settings/AudioEffectSettings.vue'
 
@@ -23,6 +24,10 @@ const { settings } = storeToRefs(settingsStore)
     <div id="playback-audio-output" class="setting-group">
       <h3>音频输出</h3>
       <AudioOutputSettings />
+    </div>
+
+    <div id="playback-dlna" class="setting-group">
+      <DlnaDeviceSettings />
     </div>
 
     <div id="playback-equalizer" class="setting-group">

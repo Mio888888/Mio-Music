@@ -123,53 +123,6 @@
 
         <t-divider />
 
-        <div class="dlna-section">
-          <div class="section-title">
-            <span>DLNA 投屏设备</span>
-            <t-button
-              variant="text"
-              shape="circle"
-              :loading="dlnaStore.isSearching"
-              @click="dlnaStore.startSearch"
-            >
-              <template #icon><RefreshIcon /></template>
-            </t-button>
-          </div>
-          <div class="device-list dlna-device-list">
-            <t-radio-group
-              v-model="dlnaStore.currentDevice"
-              class="device-radio-group"
-              @change="handleDlnaDeviceChange"
-            >
-              <div
-                v-for="device in dlnaStore.devices"
-                :key="device.usn"
-                class="device-item"
-                :class="{ active: dlnaStore.currentDevice?.usn === device.usn }"
-              >
-                <t-radio :value="device" class="device-radio">
-                  <div class="device-info">
-                    <span class="device-name">{{ device.name }}</span>
-                    <span class="device-address">{{ device.address }}</span>
-                  </div>
-                </t-radio>
-                <div v-if="dlnaStore.currentDevice?.usn === device.usn" class="device-meta">
-                  <t-tooltip content="停止投屏">
-                    <t-button variant="text" shape="circle" size="large" @click.stop="stopDlna">
-                      <template #icon><PoweroffIcon /></template>
-                    </t-button>
-                  </t-tooltip>
-                </div>
-              </div>
-            </t-radio-group>
-            <div v-if="dlnaStore.devices.length === 0 && !dlnaStore.isSearching" class="empty-msg">
-              未检测到 DLNA 投屏设备
-            </div>
-          </div>
-        </div>
-
-        <t-divider />
-
         <div class="ab-switch-section">
           <div class="section-title">
             <span>A/B 对比模式</span>
@@ -186,10 +139,10 @@
                 class="device-select"
               >
                 <t-option
-                  v-for="d in store.devices"
-                  :key="d.deviceId"
-                  :value="d.deviceId"
-                  :label="d.label"
+                  v-for="d in store.allDevices"
+                  :key="d.id"
+                  :value="String(d.id)"
+                  :label="d.name"
                 />
               </t-select>
             </div>
@@ -201,10 +154,10 @@
                 class="device-select"
               >
                 <t-option
-                  v-for="d in store.devices"
-                  :key="d.deviceId"
-                  :value="d.deviceId"
-                  :label="d.label"
+                  v-for="d in store.allDevices"
+                  :key="d.id"
+                  :value="String(d.id)"
+                  :label="d.name"
                 />
               </t-select>
             </div>
@@ -228,23 +181,15 @@ import {
   RefreshIcon,
   CheckCircleIcon,
   InfoCircleIcon,
-  PlayCircleIcon,
-  PoweroffIcon
+  PlayCircleIcon
 } from 'tdesign-icons-vue-next'
 import { useAudioOutputStore } from '@/store/audioOutput'
-import { useDlnaStore } from '@/store/dlna'
-import { ControlAudioStore } from '@/store/ControlAudio'
-import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
-import { MessagePlugin } from 'tdesign-vue-next'
 
 defineProps<{
   embedded?: boolean
 }>()
 
 const store = useAudioOutputStore()
-const dlnaStore = useDlnaStore()
-const controlAudio = ControlAudioStore()
-const globalPlayStatus = useGlobalPlayStatusStore()
 
 const handleRefresh = () => {
   store.scanDevices()
@@ -268,28 +213,6 @@ const formatSampleRate = (rate: number) => {
     return `${(rate / 1000).toFixed(1)}kHz`
   }
   return `${rate}Hz`
-}
-
-const handleDlnaDeviceChange = (val: any) => {
-  if (val) {
-    MessagePlugin.success(`已连接投屏设备: ${val.name}`)
-
-    if (controlAudio.Audio?.url) {
-      const url = controlAudio.Audio.url
-      const title = globalPlayStatus.player?.songInfo?.name || 'CeruMusic'
-      dlnaStore.play(url, title).then(() => {
-        if (controlAudio.Audio.isPlay) {
-          dlnaStore.resume()
-        }
-      })
-    }
-  }
-}
-
-const stopDlna = () => {
-  dlnaStore.stop()
-  dlnaStore.currentDevice = null
-  MessagePlugin.success('已断开投屏设备')
 }
 
 // Keyboard shortcut listener
@@ -481,20 +404,6 @@ onUnmounted(() => {
   gap: 2px;
   align-items: flex-end;
   min-width: 120px;
-}
-
-.dlna-section {
-  margin-top: 16px;
-}
-
-.dlna-device-list {
-  max-height: 200px;
-}
-
-.device-address {
-  font-size: 12px;
-  color: var(--td-text-color-secondary);
-  margin-left: 8px;
 }
 
 .meta-tag {
