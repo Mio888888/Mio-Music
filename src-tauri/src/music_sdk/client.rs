@@ -117,60 +117,6 @@ fn get_handlers() -> &'static HashMap<String, SdkHandler> {
 /// Main entry point for SDK requests.
 /// Routes to the appropriate source handler based on the current source.
 pub async fn handle_request(method: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
-    // For now, return empty results for unimplemented sources
-    // The plugin system (Phase 8) will provide actual implementations
-    match method {
-        "search" => Ok(serde_json::to_value(SearchResult {
-            list: vec![],
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        "tipSearch" => Ok(serde_json::json!({ "list": [] })),
-        "getHotSonglist" | "getHotPlaylists" => Ok(serde_json::to_value(PlaylistResult {
-            list: vec![],
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        "getPlaylistTags" | "getSongboardTags" => Ok(serde_json::json!({ "list": [] })),
-        "getCategoryPlaylists" => Ok(serde_json::to_value(PlaylistResult {
-            list: vec![],
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        "getPlaylistDetail" | "getPlaylistDetailById" => Ok(serde_json::to_value(PlaylistDetailResult {
-            list: vec![],
-            info: serde_json::json!({}),
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        "getLeaderboards" => Ok(serde_json::json!({ "list": [] })),
-        "getLeaderboardDetail" => Ok(serde_json::to_value(PlaylistDetailResult {
-            list: vec![],
-            info: serde_json::json!({}),
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        "getMusicUrl" => Ok(serde_json::json!({ "url": "" })),
-        "getPic" => Ok(serde_json::json!({ "url": "" })),
-        "getLyric" => Ok(serde_json::json!({ "lrc": "" })),
-        "getHotComment" | "getComment" => Ok(serde_json::json!({ "list": [], "total": 0 })),
-        "searchPlaylist" => Ok(serde_json::to_value(PlaylistResult {
-            list: vec![],
-            all_page: 0,
-            limit: 30,
-            total: 0,
-            source: args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string(),
-        }).unwrap()),
-        _ => Err(format!("Unknown SDK method: {}", method)),
-    }
+    let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string();
+    crate::music_sdk::sources::dispatch(&source, method, args).await
 }
