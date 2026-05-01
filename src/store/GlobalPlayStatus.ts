@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import type { SongList } from '@/types/audio'
 import { LocalUserDetailStore } from './LocalUserDetail'
+import PluginRunner from '@/utils/plugin/PluginRunner'
 import { playSetting } from './playSetting'
 import { reactive, watch, toRaw } from 'vue'
 import { analyzeImageColors, type Color } from '@/utils/color/colorExtractor'
@@ -120,8 +121,13 @@ const extractServiceLyricText = (serviceResult: any): string => {
   if (!serviceResult) return ''
   if (typeof serviceResult === 'string') return serviceResult
   if (typeof serviceResult?.data === 'string') return serviceResult.data
-  if (typeof serviceResult?.data?.lyric === 'string') return serviceResult.data.lyric
-  if (typeof serviceResult?.lyric === 'string') return serviceResult.lyric
+  const obj = typeof serviceResult === 'object' ? serviceResult : typeof serviceResult?.data === 'object' ? serviceResult.data : null
+  if (obj) {
+    if (typeof obj.lxlyric === 'string' && obj.lxlyric) return obj.lxlyric
+    if (typeof obj.lyric === 'string' && obj.lyric) return obj.lyric
+    if (typeof obj.tlyric === 'string' && obj.tlyric) return obj.tlyric
+    if (typeof obj.rlyric === 'string' && obj.rlyric) return obj.rlyric
+  }
   return ''
 }
 
@@ -182,16 +188,17 @@ const fetchSdkLyrics = async (
 }
 
 const fetchServicePluginLyrics = async (songInfo: any): Promise<LyricLine[] | null> => {
-  const pluginId = getLikelyServicePluginId(songInfo)
+  const pluginId = getLikelyServicePluginId(songInfo) || LocalUserDetailStore().userSource.pluginId
   if (!pluginId) return null
-  const response = await (window as any).api?.plugins?.callMethod?.(
-    pluginId,
-    'getLyric',
-    JSON.stringify({ songInfo: getCleanSongInfo(songInfo) })
-  )
-  const text = extractServiceLyricText(response)
-  if (!text) return null
-  return parseLyricByFormat(text)
+  try {
+    const source = songInfo?.source || 'kw'
+    const result = await PluginRunner.getLyric(pluginId, source, getCleanSongInfo(songInfo))
+    const text = extractServiceLyricText(result)
+    if (!text) return null
+    return parseLyricByFormat(text)
+  } catch {
+    return null
+  }
 }
 
 const fetchLocalLyrics = async (songInfo: any): Promise<LyricLine[] | null> => {
@@ -379,6 +386,17 @@ export const useGlobalPlayStatusStore = defineStore(
               player.songInfo.img = data
             }
           } catch {}
+        }
+        if (!newImg && info?.source && info?.source !== 'local') {
+          const pluginId = getLikelyServicePluginId(info) || LocalUserDetailStore().userSource.pluginId
+          if (pluginId) {
+            try {
+              const picUrl = await PluginRunner.getPic(pluginId, info.source, getCleanSongInfo(info))
+              if (picUrl && player.songInfo && !player.songInfo.img) {
+                newImg = picUrl
+              }
+            } catch {}
+          }
         }
         const coverUrl = newImg || '/default-cover.png'
         if (coverUrl.startsWith('http')) {

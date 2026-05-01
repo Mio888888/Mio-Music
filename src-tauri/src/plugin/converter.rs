@@ -230,10 +230,80 @@ async function musicUrl(source, musicInfo, quality) {{
   }}
 }}
 
+async function getPic(source, musicInfo) {{
+  initializePlugin();
+
+  if (!requestHandler) {{
+    throw new Error('插件请求处理器未初始化');
+  }}
+
+  try {{
+    const result = await requestHandler({{
+      source: source,
+      action: 'pic',
+      info: {{
+        musicInfo: musicInfo
+      }}
+    }});
+
+    if (!result) return '';
+
+    if (typeof result === 'string') return result;
+    if (result.url) return result.url;
+    if (result.picUrl) return result.picUrl;
+
+    return '';
+  }} catch (error) {{
+    console.error('[LX插件] getPic error:', error.message);
+    return '';
+  }}
+}}
+
+async function getLyric(source, musicInfo) {{
+  initializePlugin();
+
+  if (!requestHandler) {{
+    throw new Error('插件请求处理器未初始化');
+  }}
+
+  try {{
+    const result = await requestHandler({{
+      source: source,
+      action: 'lyric',
+      info: {{
+        musicInfo: musicInfo
+      }}
+    }});
+
+    if (!result) return '';
+
+    if (typeof result === 'string') return result;
+
+    if (typeof result === 'object') {{
+      if (result.lyric || result.tlyric || result.rlyric || result.lxlyric) {{
+        return {{
+          lyric: result.lyric || '',
+          tlyric: result.tlyric || '',
+          rlyric: result.rlyric || '',
+          lxlyric: result.lxlyric || ''
+        }};
+      }}
+      if (result.lrc) return result.lrc;
+    }}
+
+    return typeof result === 'string' ? result : '';
+  }} catch (error) {{
+    console.error('[LX插件] getLyric error:', error.message);
+    return '';
+  }}
+}}
+
 module.exports = {{
   pluginInfo,
   sources,
-  musicUrl
+  musicUrl,
+  getPic,
+  getLyric
 }};
 "##,
         name = meta.name,

@@ -150,7 +150,6 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .header("Accept", "*/*")
             .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            .header("Accept-Encoding", "gzip, deflate, br")
             .header("Referer", &referer_origin)
             .header("Origin", &referer_origin)
             .header("Sec-Fetch-Dest", "empty")

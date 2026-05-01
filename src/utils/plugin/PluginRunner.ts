@@ -749,6 +749,44 @@ async function getMusicUrl(
   }
 }
 
+async function getPic(
+  pluginId: string,
+  source: string,
+  songInfo: any
+): Promise<string> {
+  const plugin = await loadPlugin(pluginId)
+  if (typeof plugin.exports.getPic !== 'function') {
+    throw new Error('插件未导出 getPic 方法')
+  }
+  try {
+    const result = await plugin.exports.getPic(source, songInfo)
+    if (typeof result === 'string') return result
+    if (result?.url) return result.url
+    if (result?.picUrl) return result.picUrl
+    return ''
+  } catch (e: any) {
+    const detail = e.message || String(e)
+    throw new Error(`[plugin=${pluginId}][${source}] getPic: ${detail}`)
+  }
+}
+
+async function getLyric(
+  pluginId: string,
+  source: string,
+  songInfo: any
+): Promise<string | { lyric?: string; tlyric?: string; rlyric?: string; lxlyric?: string }> {
+  const plugin = await loadPlugin(pluginId)
+  if (typeof plugin.exports.getLyric !== 'function') {
+    throw new Error('插件未导出 getLyric 方法')
+  }
+  try {
+    return await plugin.exports.getLyric(source, songInfo)
+  } catch (e: any) {
+    const detail = e.message || String(e)
+    throw new Error(`[plugin=${pluginId}][${source}] getLyric: ${detail}`)
+  }
+}
+
 function clearCache(pluginId?: string) {
   if (pluginId) {
     pluginCache.delete(pluginId)
@@ -757,4 +795,4 @@ function clearCache(pluginId?: string) {
   }
 }
 
-export default { getMusicUrl, callMethod, testConnection, clearCache, loadPlugin }
+export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, loadPlugin }
