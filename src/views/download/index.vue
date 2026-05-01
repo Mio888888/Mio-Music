@@ -8,6 +8,7 @@ const store = useDownloadStore()
 const { tasks } = storeToRefs(store)
 const maxConcurrent = ref(3)
 const activeTab = ref('downloading')
+const searchKeyword = ref('')
 
 onMounted(async () => {
   store.init()
@@ -37,9 +38,17 @@ const failedTasks = computed(() =>
 )
 
 const filteredTasks = computed(() => {
-  const list = activeTab.value === 'downloading' ? downloadingTasks.value
+  let list = activeTab.value === 'downloading' ? downloadingTasks.value
     : activeTab.value === 'completed' ? completedTasks.value
     : failedTasks.value
+
+  if (searchKeyword.value.trim()) {
+    const kw = searchKeyword.value.toLowerCase()
+    list = list.filter(t =>
+      t.song_info?.name?.toLowerCase().includes(kw) ||
+      t.song_info?.singer?.toLowerCase().includes(kw)
+    )
+  }
 
   return [...list].sort((a, b) => {
     if (activeTab.value === 'completed' || activeTab.value === 'failed') {
@@ -109,6 +118,16 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
     <div class="header">
       <h2>下载管理</h2>
       <div class="settings">
+        <t-input
+          v-model="searchKeyword"
+          placeholder="搜索任务"
+          clearable
+          size="small"
+          style="width: 180px"
+        >
+          <template #prefix-icon><i class="iconfont icon-sousuo"></i></template>
+        </t-input>
+        <div class="divider"></div>
         <div v-if="activeTab === 'downloading'" class="batch-actions">
           <t-button theme="primary" variant="text" size="small" @click="store.resumeAllTasks()">全部开始</t-button>
           <t-button theme="warning" variant="text" size="small" @click="store.pauseAllTasks()">全部暂停</t-button>
@@ -138,7 +157,7 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
     <div class="task-list">
       <div v-if="filteredTasks.length === 0" class="empty-state">
-        <p>暂无任务</p>
+        <p>{{ searchKeyword ? '没有匹配的任务' : '暂无任务' }}</p>
       </div>
       <div v-else class="tasks">
         <div v-for="task in filteredTasks" :key="task.id" class="task-item">
@@ -167,17 +186,29 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
           <div class="task-actions">
             <t-button v-if="task.status === DownloadStatus.Downloading || task.status === DownloadStatus.Queued"
-              shape="circle" variant="text" @click="store.pauseTask(task.id)">⏸</t-button>
+              shape="circle" variant="text" size="small" @click="store.pauseTask(task.id)" title="暂停">
+              <template #icon><i class="iconfont icon-zanting"></i></template>
+            </t-button>
             <t-button v-if="task.status === DownloadStatus.Paused"
-              shape="circle" variant="text" @click="store.resumeTask(task.id)">▶</t-button>
+              shape="circle" variant="text" size="small" @click="store.resumeTask(task.id)" title="继续">
+              <template #icon><i class="iconfont icon-bofang"></i></template>
+            </t-button>
             <t-button v-if="task.status === DownloadStatus.Error"
-              shape="circle" variant="text" @click="store.retryTask(task.id)">↻</t-button>
+              shape="circle" variant="text" size="small" @click="store.retryTask(task.id)" title="重试">
+              <template #icon><i class="iconfont icon-shuaxin"></i></template>
+            </t-button>
             <t-button v-if="task.status !== DownloadStatus.Completed && task.status !== DownloadStatus.Cancelled"
-              shape="circle" variant="text" theme="danger" @click="store.cancelTask(task.id)">✕</t-button>
+              shape="circle" variant="text" size="small" theme="danger" @click="store.cancelTask(task.id)" title="取消">
+              <template #icon><i class="iconfont icon-guanbi"></i></template>
+            </t-button>
             <t-button v-if="task.status === DownloadStatus.Completed"
-              shape="circle" variant="text" @click="store.openFileLocation(task.file_path)">📂</t-button>
+              shape="circle" variant="text" size="small" @click="store.openFileLocation(task.file_path)" title="打开位置">
+              <template #icon><i class="iconfont icon-wenjianjia"></i></template>
+            </t-button>
             <t-button v-if="task.status === DownloadStatus.Completed || task.status === DownloadStatus.Cancelled || task.status === DownloadStatus.Error"
-              shape="circle" variant="text" theme="danger" @click="store.deleteTask(task.id)">🗑</t-button>
+              shape="circle" variant="text" size="small" theme="danger" @click="store.deleteTask(task.id)" title="删除">
+              <template #icon><i class="iconfont icon-shanchu"></i></template>
+            </t-button>
           </div>
         </div>
       </div>

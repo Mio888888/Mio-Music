@@ -5,6 +5,9 @@ import { musicSdk, type MusicItem } from '@/services/musicSdk'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { downloadSong } from '@/utils/downloadHelper'
+import { MessagePlugin } from 'tdesign-vue-next'
+import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 
 const route = useRoute()
@@ -91,10 +94,39 @@ const toggleMenu = (event: MouseEvent, index: number) => {
   activeMenuIndex.value = index
 }
 
+const showAddToPlaylist = ref(false)
+const songsToAdd = ref<any[]>([])
+
+const favoriteSong = async (song: MusicItem) => {
+  try {
+    let favId = await localUserStore.getFavoritesId()
+    if (!favId) {
+      const pl = await localUserStore.createPlaylist('我喜欢的音乐', '收藏的歌曲')
+      if (!pl) { MessagePlugin.warning('创建收藏夹失败'); return }
+      await localUserStore.setFavoritesId(pl.id)
+      favId = pl.id
+    }
+    await localUserStore.addSongsToPlaylist(favId, [song as any])
+    MessagePlugin.success('已收藏')
+  } catch (e) {
+    console.error('收藏失败:', e)
+    MessagePlugin.error('收藏失败')
+  }
+}
+
+const handleDownloadAll = () => {
+  if (songs.value.length === 0) return
+  MessagePlugin.info(`开始下载 ${songs.value.length} 首歌曲`)
+  songs.value.forEach(song => downloadSong(song))
+}
+
 const handleMenuAction = (action: string, index: number) => {
   const song = songs.value[index]
   activeMenuIndex.value = -1
   if (action === 'play') handlePlay(song)
+  else if (action === 'download') downloadSong(song)
+  else if (action === 'favorite') favoriteSong(song)
+  else if (action === 'add') { songsToAdd.value = [song as any]; showAddToPlaylist.value = true }
 }
 
 const closeMenu = () => { activeMenuIndex.value = -1 }
@@ -140,7 +172,7 @@ onBeforeUnmount(() => {
             <template #icon><i class="iconfont icon-bofang"></i></template>
             播放全部
           </t-button>
-          <t-button variant="outline" shape="round">
+          <t-button variant="outline" shape="round" @click="handleDownloadAll" :disabled="songs.length === 0">
             <template #icon><i class="iconfont icon-xiazai"></i></template>
             下载
           </t-button>
@@ -184,7 +216,7 @@ onBeforeUnmount(() => {
               <button class="action-btn" @click.stop="handlePlay(song)" title="播放">
                 <i class="iconfont icon-bofang"></i>
               </button>
-              <button class="action-btn" title="收藏">
+              <button class="action-btn" @click.stop="favoriteSong(song)" title="收藏">
                 <i class="iconfont icon-xinxi"></i>
               </button>
               <button class="action-btn" @click.stop="toggleMenu($event, index)" title="更多">
@@ -222,6 +254,11 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </Teleport>
+
+    <AddToPlaylistDialog
+      v-model:visible="showAddToPlaylist"
+      :songs="songsToAdd"
+    />
   </div>
 </template>
 

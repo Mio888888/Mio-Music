@@ -5,6 +5,7 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
+import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
@@ -15,6 +16,17 @@ const scanning = ref(false)
 const tracks = ref<any[]>([])
 const searchKeyword = ref('')
 const coverCache = ref<Record<string, string>>({})
+
+// Multi-select
+const selectedIds = ref<Set<string>>(new Set())
+const showAddToPlaylist = ref(false)
+const songsToAdd = ref<any[]>([])
+
+const hasSelection = computed(() => selectedIds.value.size > 0)
+
+const isAllSelected = computed(() =>
+  filteredTracks.value.length > 0 && filteredTracks.value.every(t => selectedIds.value.has(t.songmid))
+)
 
 const filteredTracks = computed(() => {
   if (!searchKeyword.value.trim()) return tracks.value
@@ -30,7 +42,6 @@ const fetchTracks = async () => {
     const res = await (window as any).api?.localMusic?.getList?.()
     if (res?.success) {
       tracks.value = res.data || []
-      // Batch load covers for first 50 tracks
       const ids = tracks.value.slice(0, 50).map((t: any) => t.songmid)
       if (ids.length) loadCovers(ids)
     }
@@ -91,6 +102,48 @@ const formatSize = (bytes: number) => {
   return (bytes / 1048576).toFixed(1) + ' MB'
 }
 
+// Selection
+const toggleSelect = (songmid: string) => {
+  const s = new Set(selectedIds.value)
+  if (s.has(songmid)) s.delete(songmid)
+  else s.add(songmid)
+  selectedIds.value = s
+}
+
+const toggleSelectAll = () => {
+  if (isAllSelected.value) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(filteredTracks.value.map(t => t.songmid))
+  }
+}
+
+const clearSelection = () => { selectedIds.value = new Set() }
+
+const batchPlay = () => {
+  const selected = filteredTracks.value.filter(t => selectedIds.value.has(t.songmid))
+  if (selected.length === 0) return
+  const songList = selected.map(track => ({
+    songmid: track.songmid, name: track.name, singer: track.singer,
+    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+    source: 'local', url: track.url || '', interval: track.interval
+  }))
+  localUserStore.replaceSongList(songList as any)
+  playSong(songList[0] as any)
+  playStatus.updatePlayerInfo(songList[0] as any)
+}
+
+const batchAddToPlaylist = () => {
+  const selected = filteredTracks.value.filter(t => selectedIds.value.has(t.songmid))
+  if (selected.length === 0) return
+  songsToAdd.value = selected.map(track => ({
+    songmid: track.songmid, name: track.name, singer: track.singer,
+    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+    source: 'local', url: track.url || '', interval: track.interval
+  }))
+  showAddToPlaylist.value = true
+}
+
 onMounted(() => fetchTracks())
 </script>
 
@@ -104,18 +157,37 @@ onMounted(() => fetchTracks())
       </div>
     </div>
 
+    <!-- Batch toolbar -->
+    <div v-if="hasSelection" class="batch-toolbar">
+      <span class="batch-info">已选择 {{ selectedIds.size }} 首</span>
+      <t-button size="small" @click="batchPlay">播放选中</t-button>
+      <t-button size="small" @click="batchAddToPlaylist">添加到歌单</t-button>
+      <t-button size="small" variant="text" @click="clearSelection">取消选择</t-button>
+    </div>
+
     <div v-if="loading" class="loading-state">
       <div class="loading-spinner"></div><p>加载中...</p>
     </div>
     <div v-else-if="filteredTracks.length > 0" class="track-list">
       <div class="list-header">
+        <span class="col-check">
+          <t-checkbox :checked="isAllSelected" @change="toggleSelectAll" />
+        </span>
         <span class="col-name">歌曲</span>
         <span class="col-singer">歌手</span>
         <span class="col-album">专辑</span>
         <span class="col-duration">时长</span>
         <span class="col-size">大小</span>
+        <span class="col-actions-header">操作</span>
       </div>
-      <div v-for="track in filteredTracks" :key="track.songmid" class="track-row" @click="handlePlay(track)">
+      <div v-for="track in filteredTracks" :key="track.songmid"
+        class="track-row"
+        :class="{ 'is-selected': selectedIds.has(track.songmid) }"
+        @click="handlePlay(track)"
+      >
+        <div class="col-check" @click.stop>
+          <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
+        </div>
         <div class="col-name">
           <img v-if="coverCache[track.songmid]" :src="coverCache[track.songmid]" class="track-cover" />
           <img v-else src="/default-cover.png" class="track-cover" />
@@ -133,31 +205,59 @@ onMounted(() => fetchTracks())
     <div v-else class="empty-state">
       <p>{{ searchKeyword ? '没有匹配的音乐' : '还没有本地音乐，点击"扫描音乐"开始' }}</p>
     </div>
+
+    <AddToPlaylistDialog
+      v-model:visible="showAddToPlaylist"
+      :songs="songsToAdd"
+    />
   </div>
 </template>
 
 <style scoped>
 .local-container { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; padding: 20px; }
 .local-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 16px; }
-.local-header h2 { font-size: 20px; font-weight: 600; color: var(--td-text-color-primary); margin: 0; }
+.local-header h2 {
+  border-left: 8px solid var(--td-brand-color-3);
+  padding-left: 12px;
+  border-radius: 8px;
+  line-height: 1.5em;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  margin: 0;
+}
 .count { font-size: 14px; font-weight: 400; color: var(--td-text-color-secondary); }
 .header-actions { display: flex; gap: 8px; }
+.batch-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--td-brand-color-light);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.batch-info { font-size: 13px; color: var(--td-brand-color); font-weight: 500; margin-right: 4px; }
 .track-list { flex: 1; overflow-y: auto; }
 .list-header, .track-row { display: flex; align-items: center; padding: 8px 12px; }
 .list-header { font-size: 12px; color: var(--td-text-color-secondary); border-bottom: 1px solid var(--td-border-level-1-color); }
 .track-row { cursor: pointer; transition: background 0.15s; border-radius: 6px; }
 .track-row:hover { background: var(--td-bg-color-component-hover); }
+.track-row.is-selected { background: var(--td-brand-color-light); }
+.col-check { width: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 .col-name { flex: 3; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; color: var(--td-text-color-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .col-singer { flex: 2; font-size: 13px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .col-album { flex: 2; font-size: 13px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .col-duration { width: 60px; font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; }
 .col-size { width: 80px; font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; }
 .col-actions { width: 60px; flex-shrink: 0; }
+.col-actions-header { width: 60px; flex-shrink: 0; }
 .track-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
 .loading-state { display: flex; flex-direction: column; align-items: center; padding: 60px; }
 .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
 .loading-state p { color: var(--td-text-color-secondary); }
-@keyframes spin { to { transform: rotate(360deg); } }
 .empty-state { display: flex; align-items: center; justify-content: center; min-height: 300px; }
 .empty-state p { color: var(--td-text-color-secondary); }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

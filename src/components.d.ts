@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AddToPlaylistDialog: typeof import('./components/Playlist/AddToPlaylistDialog.vue')['default']
     AIChat: typeof import('./components/AI/AIChat.vue')['default']
     AIFloatBallSettings: typeof import('./components/Settings/AIFloatBallSettings.vue')['default']
     AudioEffectSettings: typeof import('./components/Settings/AudioEffectSettings.vue')['default']
