@@ -19,12 +19,16 @@ async function ipcInvoke(channel: string, ...args: any[]): Promise<any> {
   // Flatten single-object args for Tauri command style
   const params: Record<string, any> = {}
   if (args.length === 1 && typeof args[0] === 'object' && args[0] !== null) {
-    params.args = args[0]
+    if (Array.isArray(args[0])) {
+      params.args = args[0]
+    } else {
+      Object.assign(params, args[0])
+    }
   } else if (args.length > 0) {
     params.args = args
   }
   try {
-    return await invoke(channel.replace(/:/g, '__'), params)
+    return await invoke(channel.replace(/:/g, '__').replace(/-/g, '_'), params)
   } catch (e: any) {
     console.warn(`[IPC] invoke "${channel}" failed:`, e)
     throw e
@@ -33,7 +37,7 @@ async function ipcInvoke(channel: string, ...args: any[]): Promise<any> {
 
 /** Electron ipcRenderer.send equivalent */
 function ipcSend(channel: string, ...args: any[]): void {
-  invoke(channel.replace(/:/g, '__'), { args }).catch((e: any) => {
+  invoke(channel.replace(/:/g, '__').replace(/-/g, '_'), { args }).catch((e: any) => {
     console.warn(`[IPC] send "${channel}" failed:`, e)
   })
 }

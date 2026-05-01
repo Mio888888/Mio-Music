@@ -1,0 +1,624 @@
+<script setup lang="ts">
+import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { MessagePlugin, Popconfirm } from 'tdesign-vue-next'
+import { DeleteIcon } from 'tdesign-icons-vue-next'
+import { useVirtualList } from '@vueuse/core'
+import type { SongList } from '@/types/audio'
+
+interface Props {
+  show: boolean
+  currentSongId: string | number | null | undefined
+  fullScreenMode?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  fullScreenMode: false
+})
+
+const emit = defineEmits<{
+  close: []
+  playSong: [song: SongList]
+}>()
+
+const localUserStore = LocalUserDetailStore()
+const { list } = storeToRefs(localUserStore)
+
+// 虚拟滚动
+const sourceList = ref([...list.value])
+
+watch(list, (newVal) => { sourceList.value = [...newVal] }, { deep: true })
+
+const { list: visibleList, containerProps, wrapperProps } = useVirtualList(sourceList, {
+  itemHeight: 66,
+  overscan: 10
+})
+
+// 拖拽排序
+const isDragSorting = ref(false)
+const draggedIndex = ref(-1)
+const dragOverIndex = ref(-1)
+const longPressTimer = ref<number | null>(null)
+const longPressDelay = 500
+const dragStartY = ref(0)
+const dragCurrentY = ref(0)
+const dragThreshold = 10
+const draggedSong = ref<any>(null)
+const isDragStarted = ref(false)
+const wasLongPressed = ref(false)
+const autoScrollTimer = ref<number | null>(null)
+const scrollSpeed = ref(0)
+const originalList = ref<any[]>([])
+
+// 悬停提示
+const hoverTipVisible = ref(false)
+const hoverTipIndex = ref(-1)
+const hoverTimer = ref<number | null>(null)
+const hoverDelay = 1500
+
+const playlistSongsClass = computed(() => ({
+  'playlist-songs': true,
+  'drag-sorting': isDragSorting.value
+}))
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+const scrollToCurrentSong = () => {
+  if (!props.currentSongId) return
+  nextTick(() => {
+    const index = list.value.findIndex((song) => song.songmid === props.currentSongId)
+    if (index !== -1) {
+      const container = document.querySelector('.playlist-content')
+      if (container) {
+        const itemHeight = 66
+        const containerHeight = container.clientHeight
+        let targetScrollTop = index * itemHeight - containerHeight / 2 + itemHeight / 2
+        targetScrollTop = Math.max(0, targetScrollTop)
+        container.scrollTo({ top: targetScrollTop, behavior: 'smooth' })
+      }
+    }
+  })
+}
+
+const handleClose = () => { emit('close') }
+
+const handleMouseEnter = (index: number) => {
+  if (isDragSorting.value) return
+  if (hoverTimer.value) clearTimeout(hoverTimer.value)
+  hoverTimer.value = window.setTimeout(() => {
+    hoverTipVisible.value = true
+    hoverTipIndex.value = index
+  }, hoverDelay)
+}
+
+const handleMouseLeave = () => {
+  if (hoverTimer.value) { clearTimeout(hoverTimer.value); hoverTimer.value = null }
+  hoverTipVisible.value = false
+  hoverTipIndex.value = -1
+}
+
+const hideTip = () => {
+  hoverTipVisible.value = false
+  hoverTipIndex.value = -1
+  if (hoverTimer.value) { clearTimeout(hoverTimer.value); hoverTimer.value = null }
+}
+
+const currentOperatingSong = ref<any>(null)
+
+let activeDragMoveHandler: ((e: MouseEvent | TouchEvent) => void) | null = null
+let activeDragEndHandler: ((e: MouseEvent | TouchEvent) => void) | null = null
+
+const cleanupDragListeners = () => {
+  if (activeDragMoveHandler) {
+    document.removeEventListener('mousemove', activeDragMoveHandler as any)
+    document.removeEventListener('touchmove', activeDragMoveHandler as any)
+    activeDragMoveHandler = null
+  }
+  if (activeDragEndHandler) {
+    document.removeEventListener('mouseup', activeDragEndHandler as any)
+    document.removeEventListener('touchend', activeDragEndHandler as any)
+    activeDragEndHandler = null
+  }
+}
+
+const handleMouseDown = (event: MouseEvent, index: number, song: any) => {
+  const target = event.target as HTMLElement
+  if (target.closest('.song-remove')) return
+  handlePointerStart(event, index, song, false)
+}
+
+const handleTouchStart = (event: TouchEvent, index: number, song: any) => {
+  const target = event.target as HTMLElement
+  if (target.closest('.song-remove')) return
+  handlePointerStart(event, index, song, true)
+}
+
+const handlePointerStart = (event: MouseEvent | TouchEvent, index: number, song: any, isTouch: boolean) => {
+  event.preventDefault()
+  event.stopPropagation()
+  cleanupDragListeners()
+  isDragStarted.value = false
+  wasLongPressed.value = false
+  currentOperatingSong.value = song
+  if (longPressTimer.value) clearTimeout(longPressTimer.value)
+
+  const clientY = isTouch ? (event as TouchEvent).touches[0].clientY : (event as MouseEvent).clientY
+  dragStartY.value = clientY
+  dragCurrentY.value = clientY
+
+  longPressTimer.value = window.setTimeout(() => {
+    wasLongPressed.value = true
+    startDragSort(index, song)
+    isDragStarted.value = true
+  }, longPressDelay)
+
+  const handleMove = (e: MouseEvent | TouchEvent) => {
+    const currentY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY
+    const deltaY = Math.abs(currentY - dragStartY.value)
+    if (deltaY > dragThreshold && longPressTimer.value) { clearTimeout(longPressTimer.value); longPressTimer.value = null }
+    if (isDragSorting.value) { dragCurrentY.value = currentY; updateDragOverIndex(currentY) }
+  }
+
+  const handleEnd = () => {
+    const hadLongPressTimer = !!longPressTimer.value
+    const wasInDragMode = isDragSorting.value
+    if (longPressTimer.value) { clearTimeout(longPressTimer.value); longPressTimer.value = null }
+    if (isDragSorting.value) endDragSort()
+    if (!wasLongPressed.value && !wasInDragMode && hadLongPressTimer && currentOperatingSong.value) {
+      setTimeout(() => { emit('playSong', currentOperatingSong.value); wasLongPressed.value = false; isDragStarted.value = false; currentOperatingSong.value = null }, 10)
+    } else {
+      setTimeout(() => { wasLongPressed.value = false; isDragStarted.value = false; currentOperatingSong.value = null }, 200)
+    }
+    cleanupDragListeners()
+  }
+
+  activeDragMoveHandler = handleMove
+  activeDragEndHandler = handleEnd
+  document.addEventListener('mousemove', handleMove)
+  document.addEventListener('mouseup', handleEnd)
+  document.addEventListener('touchmove', handleMove, { passive: false })
+  document.addEventListener('touchend', handleEnd)
+}
+
+const startDragSort = (index: number, song: any) => {
+  hideTip()
+  isDragSorting.value = true
+  draggedIndex.value = index
+  draggedSong.value = song
+  dragOverIndex.value = index
+  originalList.value = [...list.value]
+  document.body.style.userSelect = 'none'
+  if ('vibrate' in navigator) navigator.vibrate(50)
+}
+
+const updateDragOverIndex = (clientY: number) => {
+  const playlistContainer = document.querySelector('.playlist-content')
+  if (!playlistContainer) return
+  const containerRect = playlistContainer.getBoundingClientRect()
+  const scrollThreshold = 80
+  const maxScrollSpeed = 15
+  const distanceFromTop = clientY - containerRect.top
+  const distanceFromBottom = containerRect.bottom - clientY
+  const canScrollUp = playlistContainer.scrollTop > 0
+  const canScrollDown = playlistContainer.scrollTop < playlistContainer.scrollHeight - playlistContainer.clientHeight
+
+  if (distanceFromTop < scrollThreshold && distanceFromTop > 0 && canScrollUp) {
+    scrollSpeed.value = -((scrollThreshold - distanceFromTop) / scrollThreshold) * maxScrollSpeed
+    startAutoScroll()
+  } else if (distanceFromBottom < scrollThreshold && distanceFromBottom > 0 && canScrollDown) {
+    scrollSpeed.value = ((scrollThreshold - distanceFromBottom) / scrollThreshold) * maxScrollSpeed
+    startAutoScroll()
+  } else { stopAutoScroll() }
+
+  const playlistSongs = document.querySelectorAll('.playlist-song')
+  let newOverIndex = draggedIndex.value
+  if (clientY >= containerRect.top && clientY <= containerRect.bottom) {
+    for (let i = 0; i < playlistSongs.length; i++) {
+      const songElement = playlistSongs[i] as HTMLElement
+      const rect = songElement.getBoundingClientRect()
+      const centerY = rect.top + rect.height / 2
+      if (clientY < centerY) { if (visibleList.value[i]) newOverIndex = visibleList.value[i].index; break }
+      else if (i === playlistSongs.length - 1) { if (visibleList.value[i]) newOverIndex = visibleList.value[i].index + 1 }
+    }
+  } else if (clientY < containerRect.top) { newOverIndex = 0 }
+  else if (clientY > containerRect.bottom) { newOverIndex = playlistSongs.length }
+
+  if (newOverIndex !== dragOverIndex.value && newOverIndex >= 0 && newOverIndex <= list.value.length) {
+    dragOverIndex.value = newOverIndex
+    updatePreviewList()
+  }
+}
+
+const updatePreviewList = () => {
+  if (draggedIndex.value === -1 || dragOverIndex.value === -1) return
+  const newList = [...list.value]
+  const draggedItem = newList.splice(draggedIndex.value, 1)[0]
+  let insertIndex = dragOverIndex.value
+  if (dragOverIndex.value > draggedIndex.value) insertIndex = dragOverIndex.value - 1
+  newList.splice(insertIndex, 0, draggedItem)
+  list.value = newList
+  draggedIndex.value = insertIndex
+}
+
+const startAutoScroll = () => {
+  if (autoScrollTimer.value) return
+  autoScrollTimer.value = window.setInterval(() => {
+    const playlistContainer = document.querySelector('.playlist-content')
+    if (playlistContainer && scrollSpeed.value !== 0) {
+      playlistContainer.scrollTop += scrollSpeed.value
+      if (isDragSorting.value) updateDragOverIndex(dragCurrentY.value)
+    }
+  }, 16)
+}
+
+const stopAutoScroll = () => {
+  if (autoScrollTimer.value) { clearInterval(autoScrollTimer.value); autoScrollTimer.value = null }
+  scrollSpeed.value = 0
+}
+
+const endDragSort = () => {
+  stopAutoScroll()
+  isDragSorting.value = false
+  draggedIndex.value = -1
+  dragOverIndex.value = -1
+  draggedSong.value = null
+  isDragStarted.value = false
+  wasLongPressed.value = false
+  document.body.style.userSelect = ''
+}
+
+onUnmounted(() => {
+  if (hoverTimer.value) clearTimeout(hoverTimer.value)
+  if (longPressTimer.value) clearTimeout(longPressTimer.value)
+  cleanupDragListeners()
+  stopAutoScroll()
+})
+
+const handleClearPlaylist = () => {
+  if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
+  localUserStore.clearList()
+  MessagePlugin.success('播放列表已清空')
+}
+
+const handleLocateCurrentSong = () => {
+  if (!props.currentSongId) { MessagePlugin.info('当前没有正在播放的歌曲'); return }
+  const currentSongExists = list.value.some((song) => song.songmid === props.currentSongId)
+  if (!currentSongExists) { MessagePlugin.warning('当前播放的歌曲不在播放列表中'); return }
+  scrollToCurrentSong()
+}
+
+defineExpose({ scrollToCurrentSong })
+</script>
+
+<template>
+  <div v-show="show" class="cover" @click="handleClose"></div>
+  <transition name="playlist-drawer">
+    <div
+      v-show="show"
+      class="playlist-container"
+      :class="{ 'full-screen-mode': fullScreenMode }"
+      @click.stop
+    >
+      <div class="playlist-header">
+        <div class="playlist-title">播放列表 ({{ list.length }})</div>
+        <button class="playlist-close" @click.stop="handleClose">
+          <span class="iconfont icon-guanbi"></span>
+        </button>
+      </div>
+
+      <div class="playlist-content" v-bind="containerProps">
+        <div v-if="list.length === 0" class="playlist-empty">
+          <p>播放列表为空</p>
+          <p>请添加歌曲到播放列表，也可在设置中导入歌曲列表</p>
+        </div>
+        <div v-else :class="playlistSongsClass" :style="wrapperProps.style">
+          <div
+            v-for="item in visibleList"
+            :key="item.data.songmid"
+            class="playlist-song"
+            :class="{
+              active: item.data.songmid === currentSongId,
+              dragging: isDragSorting && item.index === draggedIndex
+            }"
+            @mousedown="handleMouseDown($event, item.index, item.data)"
+            @touchstart="handleTouchStart($event, item.index, item.data)"
+            @mouseenter="handleMouseEnter(item.index)"
+            @mouseleave="handleMouseLeave"
+          >
+            <div v-if="isDragSorting && item.index === draggedIndex" class="drag-handle">
+              <span class="drag-dots">⋮⋮</span>
+            </div>
+            <div v-else class="song-index">{{ (item.index + 1).toString().padStart(2, '0') }}</div>
+
+            <div class="song-info">
+              <div class="song-name">{{ item.data.name }}</div>
+              <div class="song-artist">{{ item.data.singer }}</div>
+            </div>
+            <div class="song-actions">
+              <div class="song-duration">
+                {{
+                  (item.data.interval || '').includes(':')
+                    ? item.data.interval
+                    : formatTime(parseInt(item.data.interval || '0') / 1000)
+                }}
+              </div>
+              <button class="song-remove" @click.stop="localUserStore.removeSong(item.data.songmid)">
+                <span class="iconfont icon-xuanxiangshanchu"></span>
+              </button>
+            </div>
+
+            <transition name="hover-tip">
+              <div v-if="hoverTipVisible && hoverTipIndex === item.index" class="hover-tip" @click.stop>
+                长按可拖动排序
+              </div>
+            </transition>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="list.length > 0" class="playlist-footer">
+        <button class="playlist-action-btn locate-btn" :disabled="!currentSongId" @click="handleLocateCurrentSong">
+          <span class="iconfont icon-dingwei" style="font-size: 14px"></span>
+          <span>定位当前播放</span>
+        </button>
+        <Popconfirm
+          content="确定要清空播放列表吗？此操作不可撤销。"
+          :confirm-btn="{ content: '确认清空', theme: 'danger' }"
+          cancel-btn="取消"
+          placement="top"
+          theme="warning"
+          :popup-props="{ zIndex: 9999, overlayStyle: { zIndex: 9998 } }"
+          @confirm="handleClearPlaylist"
+        >
+          <button class="playlist-action-btn clear-btn">
+            <DeleteIcon size="16" />
+            <span>清空播放列表</span>
+          </button>
+        </Popconfirm>
+      </div>
+    </div>
+  </transition>
+</template>
+
+<style lang="scss" scoped>
+.playlist-container {
+  position: fixed;
+  border-radius: 16px 0 0 16px;
+  top: 72px;
+  right: 0;
+  width: 380px;
+  height: calc(100vh - var(--play-bottom-height) - 80px);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.15);
+  z-index: 9001;
+  display: flex;
+  flex-direction: column;
+  color: #333;
+  overflow: hidden;
+}
+
+.cover {
+  position: fixed;
+  background-color: transparent;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9000;
+  bottom: 0px;
+  right: 0;
+}
+
+.playlist-container.full-screen-mode {
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+}
+.playlist-container.full-screen-mode .song-artist,
+.playlist-container.full-screen-mode .song-duration,
+.playlist-container.full-screen-mode .playlist-close,
+.playlist-container.full-screen-mode .song-remove { color: #ccc; }
+
+.playlist-container .playlist-content {
+  scrollbar-arrow-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 91, 91, 0.3) transparent;
+}
+.playlist-container.full-screen-mode .playlist-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar { width: 8px; }
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-track { background: transparent; }
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 4px; }
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+.playlist-container.full-screen-mode .playlist-song:hover { background-color: rgba(255, 255, 255, 0.1); }
+.playlist-container.full-screen-mode .playlist-song.active { border-left: #2373ce5d 4px solid; background-color: rgba(255, 255, 255, 0.2); }
+.playlist-container .playlist-song.active { border-left: #2373ce93 4px solid; background-color: rgba(114, 231, 255, 0.183); }
+.playlist-container.full-screen-mode .playlist-header { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.playlist-container.full-screen-mode .playlist-empty { color: #ccc; }
+
+.playlist-header {
+  -webkit-app-region: no-drag;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.playlist-title { font-size: 16px; font-weight: 600; }
+.playlist-close {
+  -webkit-app-region: no-drag;
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.playlist-content { flex: 1; overflow-y: auto; margin: 10px 0; padding: 0 8px; }
+.playlist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  color: #333;
+  font-size: 14px;
+  text-align: center;
+}
+.playlist-songs { display: flex; flex-direction: column; position: relative; }
+.playlist-songs.drag-sorting .playlist-song:not(.dragging) { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.playlist-songs.drag-sorting .playlist-song.dragging { transition: none; z-index: 1000; opacity: 0.8; transform: scale(1.02); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+
+.playlist-song {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 5px 0;
+  height: 56px;
+  box-sizing: border-box;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  user-select: none;
+  transform: translateY(0);
+}
+.playlist-song:hover { background-color: rgba(123, 123, 123, 0.384); }
+.playlist-song.active { background-color: rgba(255, 255, 255, 0.15); }
+.playlist-song.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); z-index: 1000; background-color: rgba(255, 255, 255, 0.2) !important; }
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  cursor: grab;
+  color: #999;
+}
+.song-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  margin-right: 15px;
+  color: #999;
+  font-size: 13px;
+  font-family: 'DIN Alternate', 'Roboto', sans-serif;
+  font-weight: 500;
+}
+.playlist-container.full-screen-mode .song-index { color: #ccc; }
+.drag-handle:active { cursor: grabbing; }
+.drag-dots { font-size: 16px; line-height: 1; letter-spacing: -2px; transform: rotate(90deg); }
+
+.playlist-songs.drag-sorting { pointer-events: none; }
+.playlist-songs.drag-sorting .playlist-song { pointer-events: auto; }
+.playlist-songs.drag-sorting .playlist-song:not(.dragging) { cursor: default; }
+
+.playlist-song .song-info { flex: 1; min-width: 0; }
+.playlist-song .song-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.playlist-container.full-screen-mode .playlist-song .song-name { color: #fff; }
+.playlist-song .song-artist { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.playlist-song .song-duration {
+  font-size: 12px;
+  color: #888;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  filter: blur(0);
+}
+.playlist-song:hover .song-duration { opacity: 0; filter: blur(4px); transform: translate(-50%, -50%) scale(0.9); }
+.playlist-song .song-remove {
+  background: transparent;
+  border: none;
+  color: #5c5c5c;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  filter: blur(4px);
+  pointer-events: none;
+}
+.playlist-song:hover .song-remove { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+.playlist-song:hover .song-remove:hover { color: #e5484d; border-radius: 4px; }
+.song-actions { position: relative; width: 60px; height: 100%; flex-shrink: 0; }
+
+.hover-tip {
+  position: absolute;
+  top: 50%;
+  right: 70px;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.playlist-container.full-screen-mode .hover-tip { background: rgba(255, 255, 255, 0.6); color: #000000; }
+.hover-tip-enter-active, .hover-tip-leave-active { transition: all 0.2s ease; }
+.hover-tip-enter-from, .hover-tip-leave-to { opacity: 0; transform: translateY(-50%) scale(0.9); }
+
+.playlist-drawer-enter-active, .playlist-drawer-leave-active { transition: transform 0.2s cubic-bezier(0.8, 0, 0.8, 0.43); }
+.playlist-drawer-enter-from, .playlist-drawer-leave-to { transform: translateX(100%); }
+
+.playlist-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+.playlist-container.full-screen-mode .playlist-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); }
+
+.playlist-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+  -webkit-app-region: no-drag;
+}
+.locate-btn { background: rgba(35, 115, 206, 0.1); color: #2373ce; border: 1px solid rgba(35, 115, 206, 0.2); }
+.locate-btn:hover:not(:disabled) { background: rgba(35, 115, 206, 0.15); border-color: rgba(35, 115, 206, 0.3); transform: translateY(-1px); }
+.locate-btn:disabled { opacity: 0.5; cursor: not-allowed; color: #999; background: rgba(0, 0, 0, 0.05); border-color: rgba(0, 0, 0, 0.1); }
+.clear-btn { background: rgba(229, 72, 77, 0.1); color: #e5484d; border: 1px solid rgba(229, 72, 77, 0.2); }
+.clear-btn:hover { background: rgba(229, 72, 77, 0.15); border-color: rgba(229, 72, 77, 0.3); transform: translateY(-1px); }
+
+@media (max-width: 768px) {
+  .playlist-container { width: 100%; right: 0; border-radius: 8px 8px 0 0; }
+  .playlist-footer { padding: 10px 12px; gap: 6px; }
+  .playlist-action-btn { padding: 6px 10px; font-size: 12px; }
+}
+</style>

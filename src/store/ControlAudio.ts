@@ -158,10 +158,33 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     Audio.secondaryUrl = ''
   }
 
+  /** 等待 audio 元素就绪（HAVE_CURRENT_DATA 以上） */
+  const waitForReady = (el: HTMLAudioElement, timeoutMs = 5000): Promise<void> => {
+    if (el.readyState >= 2) return Promise.resolve() // HAVE_CURRENT_DATA
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        el.removeEventListener('canplay', onReady)
+        el.removeEventListener('error', onError)
+        reject(new Error('音频加载超时'))
+      }, timeoutMs)
+      const onReady = () => { clearTimeout(timer); el.removeEventListener('canplay', onReady); el.removeEventListener('error', onError); resolve() }
+      const onError = () => { clearTimeout(timer); el.removeEventListener('canplay', onReady); el.removeEventListener('error', onError); reject(new Error('音频加载失败')) }
+      el.addEventListener('canplay', onReady, { once: true })
+      el.addEventListener('error', onError, { once: true })
+    })
+  }
+
   const start = async () => {
     const playSetting = usePlaySettingStore()
     const volume = Audio.volume
     if (Audio.audio) {
+      // 等待音频数据就绪再播放，避免 NotSupportedError
+      try {
+        await waitForReady(Audio.audio)
+      } catch (e) {
+        console.warn('音频未就绪:', (e as Error).message)
+        return false
+      }
       if (!playSetting.getIsPauseTransition) {
         try {
           Audio.audio.volume = volume / 100
