@@ -101,6 +101,13 @@ const api = {
     invoke: (channel: string, ...args: any[]) => ipcInvoke(channel, ...args)
   },
 
+  // HTTP Proxy — bypasses CORS for plugin cross-origin requests
+  httpProxy: (url: string, options?: any) =>
+    ipcInvoke('http_proxy', { args: { url, ...(options || {}) } }),
+
+  // Audio Proxy — fetches remote audio via Rust backend, returns data: URI
+  audioProxy: (url: string) => ipcInvoke('audio_proxy', { url }),
+
   // Plugin system
   plugins: {
     initialize: () => ipcInvoke('plugin__initialize'),
@@ -121,6 +128,7 @@ const api = {
       ipcInvoke('plugin__save_config', { pluginId, config }),
     testConnection: (pluginId: string) => ipcInvoke('plugin__test_connection', { pluginId }),
     selectAndAdd: (pluginType: string) => ipcInvoke('plugin__select_and_add', { pluginType }),
+    getCode: (pluginId: string) => ipcInvoke('plugin__get_code', { args: { pluginId } }),
     onDeepLinkAdd: (
       callback: (payload: { url: string; type: 'lx' | 'cr'; targetPluginId?: string }) => void
     ) => {

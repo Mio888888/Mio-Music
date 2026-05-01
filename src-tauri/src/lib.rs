@@ -137,6 +137,7 @@ pub fn run() {
             plugin::commands::plugin__save_config,
             plugin::commands::plugin__test_connection,
             plugin::commands::plugin__select_and_add,
+            plugin::commands::plugin__get_code,
             // Directory Settings
             commands::directory_commands::get_directories,
             commands::directory_commands::save_directories,
@@ -150,6 +151,15 @@ pub fn run() {
             audio_device::audio__set_output_device,
             audio_device::audio__get_device_volume,
             audio_device::audio__set_device_volume,
+            // HTTP Proxy (bypass CORS for plugins)
+            commands::http_proxy,
+            // Audio Proxy (fetch remote audio → data URI, bypasses CORS for <audio>)
+            commands::audio_proxy,
+            // Desktop lyric window state stub (not yet implemented)
+            commands::get_lyric_open_state,
+            commands::get_lyric_lock_state,
+            commands::get_font_list,
+            commands::get_desktop_lyric_option,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

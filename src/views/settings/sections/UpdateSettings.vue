@@ -78,7 +78,12 @@ const checkUpdate = async () => {
     await api.autoUpdater.checkForUpdates()
   } catch (e: any) {
     updateStatus.value = 'error'
-    updateError.value = e.message || '检查失败'
+    // "Load failed" = Rust 端未注册 auto-updater 命令（tauri-plugin-updater 未安装）
+    if (e.message?.includes('Load failed') || e.message?.includes('not found')) {
+      updateError.value = '自动更新功能暂未实现，请关注项目发布页获取新版本'
+    } else {
+      updateError.value = e.message || '检查失败'
+    }
   } finally {
     setTimeout(() => { isChecking.value = false }, 1500)
   }

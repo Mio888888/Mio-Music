@@ -6,8 +6,7 @@ import {
   ref,
   onActivated,
   onDeactivated,
-  watch,
-  nextTick
+  watch
 } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { useEqualizerStore } from '@/store/Equalizer'
@@ -37,31 +36,28 @@ provide('audioSubscribe', audioStore.subscribe)
 // 判断事件是否来自当前活跃槽
 const isPrimarySlot = (slot: AudioSlot) => audioStore.Audio.primarySlot === slot
 
-// 应用均衡器设置
+// 应用均衡器设置（仅在 EQ 启用时创建 AudioContext，避免影响基础播放）
 const applyGlobalEQ = (el: HTMLAudioElement) => {
+  if (!eqStore.enabled) return
+  // 首次启用 EQ 时创建 AudioContext 路由音频
   AudioManager.getOrCreateAudioSource(el)
-  const { enabled, gains } = storeToRefs(eqStore)
-  const targetGains = enabled.value ? gains.value : new Array(10).fill(0)
-  targetGains.forEach((gain, index) => {
+  eqStore.gains.forEach((gain, index) => {
     AudioManager.setEqualizerBand(el, index, gain)
   })
 }
 
-// Apply Audio Effects
+// Apply Audio Effects（仅在对应效果启用时创建 AudioContext）
 const applyGlobalEffects = (el: HTMLAudioElement) => {
   const { bassBoost, surround, balance } = storeToRefs(effectStore)
+  const needsContext = bassBoost.value.enabled || surround.value.enabled ||
+    (balance.value.enabled && balance.value.value !== 0)
 
-  // Bass Boost
-  const targetBass = bassBoost.value.enabled ? bassBoost.value.gain : 0
-  AudioManager.setBassBoost(el, targetBass)
+  if (!needsContext) return
 
-  // Surround
-  const targetSurround = surround.value.enabled ? surround.value.mode : 'off'
-  AudioManager.setSurroundMode(el, targetSurround)
-
-  // Balance
-  const targetBalance = balance.value.enabled ? balance.value.value : 0
-  AudioManager.setBalance(el, targetBalance)
+  AudioManager.getOrCreateAudioSource(el)
+  AudioManager.setBassBoost(el, bassBoost.value.enabled ? bassBoost.value.gain : 0)
+  AudioManager.setSurroundMode(el, surround.value.enabled ? surround.value.mode : 'off')
+  AudioManager.setBalance(el, balance.value.enabled ? balance.value.value : 0)
 }
 
 // 对两个元素都应用 EQ / Effects
@@ -84,7 +80,8 @@ onMounted(() => {
   audioStore.init(audioARef.value || null, audioBRef.value || null)
   audioOutputStore.init()
 
-  applyToBoth()
+  // 不在 mount 时创建 AudioContext（避免 Web Audio API 路由阻断直接播放）
+  // AudioContext 会在用户首次启用 EQ / 音效时按需创建
 
   const activeEl = audioStore.Audio.audio
   if (activeEl) {
@@ -166,20 +163,18 @@ watch(
 )
 
 /**
- * 监听 srcA 变化：当 A 槽 URL 清空或更换时，先暂停并重置其解码状态
+ * 监听 srcA 变化：当 A 槽 URL 清空或更换时，暂停当前播放。
+ * Vue 的 :src 绑定会在 DOM 更新时自动设置 audio.src，浏览器自动触发加载，
+ * 无需手动调用 load()（否则会中断进行中的 play() 导致 AbortError）。
  */
 watch(
   () => audioStore.Audio.srcA,
-  async (newUrl) => {
+  (newUrl) => {
     const a = audioARef.value
     if (!a) return
-    // 当 src 被清空时：只在元素还带着 src 属性时才需要 removeAttribute + load 释放资源
-    // 否则（crossfade completeCrossfade 已经清理过）会触发 MEDIA_ELEMENT_ERROR: Empty src
     if (!newUrl) {
       if (a.getAttribute('src')) {
-        try {
-          a.pause()
-        } catch {}
+        try { a.pause() } catch {}
         try {
           a.removeAttribute('src')
           a.load()
@@ -187,27 +182,19 @@ watch(
       }
       return
     }
-    try {
-      a.pause()
-    } catch {}
-    // 更换 URL 时先 load 触发加载
-    await nextTick()
-    try {
-      a.load()
-    } catch {}
+    try { a.pause() } catch {}
+    // 不再手动调用 load() — 浏览器在 src 属性变更时自动加载
   }
 )
 
 watch(
   () => audioStore.Audio.srcB,
-  async (newUrl) => {
+  (newUrl) => {
     const b = audioBRef.value
     if (!b) return
     if (!newUrl) {
       if (b.getAttribute('src')) {
-        try {
-          b.pause()
-        } catch {}
+        try { b.pause() } catch {}
         try {
           b.removeAttribute('src')
           b.load()
@@ -215,13 +202,7 @@ watch(
       }
       return
     }
-    try {
-      b.pause()
-    } catch {}
-    await nextTick()
-    try {
-      b.load()
-    } catch {}
+    try { b.pause() } catch {}
   }
 )
 // 组件被激活时（从缓存中恢复）
@@ -380,7 +361,6 @@ onUnmounted(() => {
     <audio
       id="globaAudio"
       ref="audioARef"
-      crossorigin="anonymous"
       preload="auto"
       :src="audioStore.Audio.srcA"
       @seeked="handleSeeked('A')"
@@ -394,7 +374,6 @@ onUnmounted(() => {
     <audio
       id="globaAudioB"
       ref="audioBRef"
-      crossorigin="anonymous"
       preload="auto"
       :src="audioStore.Audio.srcB"
       @seeked="handleSeeked('B')"

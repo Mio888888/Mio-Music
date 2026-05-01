@@ -99,7 +99,18 @@ export const useGlobalPlayStatusStore = defineStore('globalPlayStatus', () => {
     const coverUrl = newImg || '/default-cover.png'
     if (coverUrl.startsWith('http')) {
       try {
-        const resp = await fetch(coverUrl); const blob = await resp.blob(); currentBlobUrl = URL.createObjectURL(blob); player.cover = currentBlobUrl
+        // 通过 Rust 后端代理获取图片，避免 CORS 问题
+        const res = await (window as any).api.httpProxy(coverUrl, { raw: true, timeout: 10000 })
+        if (res?.isBase64 && res?.body) {
+          // 推断 MIME 类型
+          const mime = coverUrl.includes('.png') ? 'image/png'
+            : coverUrl.includes('.webp') ? 'image/webp'
+            : coverUrl.includes('.gif') ? 'image/gif'
+            : 'image/jpeg'
+          player.cover = `data:${mime};base64,${res.body}`
+        } else {
+          player.cover = coverUrl
+        }
       } catch { player.cover = coverUrl }
     } else { player.cover = coverUrl }
   }, { immediate: true })

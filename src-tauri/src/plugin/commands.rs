@@ -214,6 +214,19 @@ pub async fn plugin__test_connection(
 }
 
 #[tauri::command]
+pub async fn plugin__get_code(
+    pm: State<'_, PluginManager>,
+    args: Value,
+) -> ApiResult {
+    let p = payload(&args);
+    let plugin_id = require_str(&p, "pluginId")?;
+    match pm.get_plugin_code(&plugin_id) {
+        Some(code) => ok(Value::String(code)),
+        None => err(&format!("插件 {} 未找到或无法读取代码", plugin_id)),
+    }
+}
+
+#[tauri::command]
 pub async fn plugin__select_and_add(
     pm: State<'_, PluginManager>,
     app: tauri::AppHandle,

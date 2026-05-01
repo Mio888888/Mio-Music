@@ -292,6 +292,20 @@ impl PluginManager {
         engines.get(plugin_id).cloned()
     }
 
+    /// Get plugin source code by ID (for frontend JS execution).
+    pub fn get_plugin_code(&self, plugin_id: &str) -> Option<String> {
+        // Find the plugin file
+        if let Ok(entries) = fs::read_dir(&self.plugins_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(&format!("{}-", plugin_id)) && !name.ends_with(".config.json") {
+                    return fs::read_to_string(entry.path()).ok();
+                }
+            }
+        }
+        None
+    }
+
     /// Call a plugin method (placeholder - requires JS engine integration).
     pub fn call_plugin_method(
         &self,

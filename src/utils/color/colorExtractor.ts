@@ -6,7 +6,7 @@ export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysi
     if (!imageSrc || imageSrc.startsWith('@')) {
       resolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }); return
     }
-    const img = new Image(); img.crossOrigin = 'Anonymous'
+    const img = new Image()
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')

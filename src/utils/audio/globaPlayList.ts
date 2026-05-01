@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/store/Settings'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality } from '@/utils/quality'
+import PluginRunner from '@/utils/plugin/PluginRunner'
 
 export const playMode = ref<PlayMode>(PlayMode.SEQUENCE)
 export const isLoadingSong = ref(false)
@@ -45,22 +46,65 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
     quality = calculateBestQuality(song.types, quality) || '128k'
 
     console.log(`使用音质: ${quality} - ${qualityMap[quality] || quality}`)
-    if (!localUserStore.userSource.pluginId) {
-      MessagePlugin.warning('请先安装并启用音乐源插件')
-      throw new Error('未配置音乐源插件')
-    }
-    const urlData = await window.api.music.requestSdk('getMusicUrl', {
-      pluginId: localUserStore.userSource.pluginId,
-      source: song.source,
-      songInfo: toRaw(song) as any,
-      quality,
-      isCache: settingsStore.settings.autoCacheMusic ?? true
-    })
 
-    if (typeof urlData === 'object' && urlData?.error) {
-      throw new Error(urlData.error)
+    const pluginId = localUserStore.userSource.pluginId
+
+    let rawUrl: string | null = null
+
+    // 优先使用前端插件执行引擎解析 URL
+    if (pluginId) {
+      try {
+        rawUrl = await PluginRunner.getMusicUrl(
+          pluginId, song.source || 'kw', toRaw(song) as any, quality
+        )
+      } catch (e: any) {
+        console.warn('插件解析 URL 失败，回退到内置 SDK:', e)
+        throw new Error(`插件解析失败: ${e?.message || e}`)
+      }
     }
-    return urlData as string
+
+    // Fallback: 使用内置 Rust SDK
+    if (!rawUrl) {
+      const urlData = await window.api.music.requestSdk('getMusicUrl', {
+        pluginId: pluginId || undefined,
+        source: song.source,
+        songInfo: toRaw(song) as any,
+        quality,
+        isCache: settingsStore.settings.autoCacheMusic ?? true
+      })
+
+      if (typeof urlData === 'object' && urlData?.error) {
+        throw new Error(urlData.error)
+      }
+      rawUrl = (typeof urlData === 'object' && urlData?.url)
+        ? urlData.url as string
+        : urlData as string
+    }
+
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      throw new Error('无法获取播放链接')
+    }
+
+    // data: URI 或本地路径直接返回
+    if (rawUrl.startsWith('data:') || rawUrl.startsWith('file:')) {
+      return rawUrl
+    }
+
+    // 通过 Rust 后端代理获取音频数据，避免 WebView CORS 302 重定向问题
+    try {
+      const dataUri = await (window as any).api.audioProxy(rawUrl)
+      if (dataUri && typeof dataUri === 'string' && dataUri.startsWith('data:')) {
+        const sizeKB = Math.round(dataUri.length / 1024)
+        console.log(`音频已通过 Rust 代理获取 (data URI, 大小: ${sizeKB} KB, 前缀: ${dataUri.substring(0, 40)}...)`)
+        return dataUri
+      }
+      console.warn('audioProxy 返回非 data URI:', typeof dataUri, String(dataUri).substring(0, 100))
+    } catch (proxyErr: any) {
+      console.warn('音频代理失败，尝试直链播放:', proxyErr?.message || proxyErr)
+    }
+
+    // 代理失败时回退到原始 URL
+    return rawUrl
   } catch (error: any) {
     console.error('获取歌曲URL失败:', error)
     throw new Error('获取歌曲播放链接失败: ' + (error.message || ''))

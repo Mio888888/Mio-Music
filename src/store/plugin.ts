@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { LocalUserDetailStore } from './LocalUserDetail'
+import PluginRunner from '@/utils/plugin/PluginRunner'
 
 export interface PluginInfo {
   name: string
@@ -154,6 +155,8 @@ export const usePluginStore = defineStore('plugin', () => {
   async function addPlugin(pluginCode: string, pluginName: string, targetPluginId?: string) {
     const res = await (window as any).api.plugins.add(pluginCode, pluginName, targetPluginId)
     if (res?.success) {
+      // 清除该插件的执行缓存，确保下次使用新代码
+      if (res.data?.plugin_id) PluginRunner.clearCache(res.data.plugin_id)
       await refresh()
       return res.data as LoadedPlugin
     }
@@ -164,6 +167,7 @@ export const usePluginStore = defineStore('plugin', () => {
     const res = await (window as any).api.plugins.uninstall(pluginId)
     if (res?.success) {
       plugins.value = plugins.value.filter(p => p.plugin_id !== pluginId)
+      PluginRunner.clearCache(pluginId)
       if (currentPluginId.value === pluginId) {
         clearSelection()
       }

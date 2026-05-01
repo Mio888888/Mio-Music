@@ -14,6 +14,9 @@ import LogtoClient from '@logto/browser'
 // IPC adapter layer
 import './bridge'
 
+// 全局 fetch 拦截器：代理跨域图片请求到 Rust 后端，绕过 WebView CORS
+import './utils/cors-proxy'
+
 // Initialize Logto client
 import config from './config'
 config.instance = new LogtoClient({
