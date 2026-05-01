@@ -287,13 +287,18 @@ const handleClearPlaylist = () => {
 
 const handleClearConfirm = () => {
   if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
-  const dialog = DialogPlugin.confirm({
-    header: '清空播放列表',
-    body: '确定要清空播放列表吗？此操作不可撤销。',
-    confirmBtn: { content: '确认清空', theme: 'danger' },
-    cancelBtn: '取消',
-    onConfirm: () => { handleClearPlaylist(); dialog.destroy() },
-    onClose: () => { dialog.destroy() }
+  emit('close')
+  nextTick(() => {
+    DialogPlugin.confirm({
+      header: '清空播放列表',
+      body: '确定要清空播放列表吗？此操作不可撤销。',
+      confirmBtn: { content: '确认清空', theme: 'danger' },
+      cancelBtn: '取消',
+      onConfirm: () => {
+        localUserStore.clearList()
+        MessagePlugin.success('播放列表已清空')
+      }
+    })
   })
 }
 
@@ -403,7 +408,6 @@ defineExpose({ scrollToCurrentSong })
   display: flex;
   flex-direction: column;
   color: #333;
-  overflow: hidden;
 }
 
 .cover {

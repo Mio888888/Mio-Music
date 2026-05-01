@@ -109,7 +109,7 @@ const mergePlaylist = (currentList: SongList[], importedList: SongList[]): SongL
 }
 
 const handleClearPlaylist = () => {
-  DialogPlugin.confirm({
+  const dialog = DialogPlugin.confirm({
     header: '确认清空',
     body: '确定要清空播放列表吗？此操作不可恢复。',
     theme: 'warning',
@@ -117,6 +117,7 @@ const handleClearPlaylist = () => {
     cancelBtn: '取消',
     onConfirm: () => {
       list.value = []
+      dialog.destroy()
       MessagePlugin.success('播放列表已清空')
     }
   })
