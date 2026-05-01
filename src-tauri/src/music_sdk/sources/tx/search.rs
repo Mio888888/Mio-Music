@@ -39,12 +39,12 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
     let body_str = serde_json::to_string(&body).unwrap_or_default();
     let sign = zzc_sign(&body_str);
 
+    let url = format!("https://u.y.qq.com/cgi-bin/musics.fcg?sign={}", sign);
     let resp: serde_json::Value = get_http()
-        .post("https://u.y.qq.com/cgi-bin/musicu.fcg")
-        .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
-        .header("Referer", "https://y.qq.com")
+        .post(&url)
+        .header("User-Agent", "QQMusic 14090508(android 12)")
+        .header("Content-Type", "application/json")
         .body(body_str)
-        .header("sign", &sign)
         .send().await.map_err(|e| e.to_string())?
         .json().await.map_err(|e| e.to_string())?;
 

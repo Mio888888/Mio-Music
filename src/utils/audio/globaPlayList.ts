@@ -77,6 +77,75 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
   }
 }
 
+// ===== 自动换源 =====
+
+interface FindMusicCandidate {
+  songmid: string | number
+  name: string
+  singer: string
+  albumName?: string
+  source?: string
+  interval?: string
+  types?: any
+  [key: string]: any
+}
+
+/**
+ * 通过 Rust 后端跨源搜索匹配候选歌曲，逐个尝试获取 URL
+ */
+export async function autoSwitchSource(song: SongList): Promise<{ url: string; song: SongList } | null> {
+  if (song.source === 'local') return null
+
+  console.warn(`[自动换源] "${song.name} - ${song.singer}" 原源(${song.source})失败，正在跨源搜索...`)
+
+  let candidates: FindMusicCandidate[] = []
+  try {
+    const result: any = await invoke('service_music_find_music', {
+      name: song.name,
+      singer: song.singer,
+      albumName: song.albumName || '',
+      interval: song.interval || '',
+      source: song.source || '',
+    })
+    console.log('[自动换源] find_music 返回:', result)
+    if (Array.isArray(result)) {
+      candidates = result
+    } else if (result?.data && Array.isArray(result.data)) {
+      candidates = result.data
+    }
+  } catch (e) {
+    console.warn('[自动换源] 跨源搜索失败:', e)
+    return null
+  }
+
+  if (candidates.length === 0) {
+    console.warn('[自动换源] 未找到其他源的匹配歌曲')
+    return null
+  }
+
+  console.log(`[自动换源] 找到 ${candidates.length} 个候选，逐个尝试...`)
+
+  for (const candidate of candidates) {
+    const newSource = candidate.source || '未知'
+    try {
+      const candidateSong: SongList = {
+        ...candidate,
+        source: candidate.source,
+      }
+      const url = await getSongRealUrl(candidateSong)
+      if (url && typeof url === 'string') {
+        console.log(`[自动换源] 成功切换到 ${newSource} 源`)
+        return { url, song: candidateSong }
+      }
+    } catch (e) {
+      console.log(`[自动换源] ${newSource} 源获取 URL 失败:`, e)
+    }
+  }
+
+  console.warn('[自动换源] 所有候选源均无法获取播放链接')
+  return null
+}
+
 export function getPlayIndex(): number {
   return _playIndex
 }
@@ -189,8 +258,21 @@ export async function playSong(song: SongList) {
     store.userInfo.lastPlaySongId = song.songmid
     globalPlayStatus.player.songInfo = toRaw(song) as any
 
-    // 解析真实播放 URL
-    const url = await getSongRealUrl(toRaw(song) as any)
+    // 解析真实播放 URL（失败时自动换源）
+    let url: string | undefined
+    let actualSong = song
+    try {
+      url = await getSongRealUrl(toRaw(song) as any)
+    } catch (originalError) {
+      // 原源失败，尝试自动换源
+      console.warn(`[playSong] 原源(${song.source})播放失败，触发自动换源`)
+      const switched = await autoSwitchSource(toRaw(song) as any)
+      if (switched) {
+        url = switched.url
+        actualSong = switched.song
+        MessagePlugin.success(`已自动切换到 ${switched.song.source || '其他'} 源播放`)
+      }
+    }
     if (currentPlayRequestId !== requestId) return
 
     if (!url || typeof url !== 'string') {
