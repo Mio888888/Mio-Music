@@ -55,12 +55,23 @@ pub fn format_play_time(seconds: i64) -> String {
 
 pub fn parse_quality_types(minfo: &str) -> Vec<String> {
     let mut types = Vec::new();
-    for part in minfo.split(';') {
-        let fields: Vec<&str> = part.split(',').collect();
-        if fields.len() < 3 {
-            continue;
-        }
-        let bitrate = fields.get(1).unwrap_or(&"").parse::<u32>().unwrap_or(0);
+    // 兼容两种分隔符：CeruMusic 用 '|'，部分 API 返回 ';'
+    for part in minfo.split(|c| c == ';' || c == '|') {
+        let part = part.trim();
+        if part.is_empty() { continue }
+        // 提取 bitrate 值：兼容 "bitrate:128" 和纯数字 "128" 两种格式
+        let bitrate = part
+            .split(',')
+            .find_map(|field| {
+                let field = field.trim();
+                // 优先尝试 "bitrate:xxx" 格式
+                if let Some(val) = field.strip_prefix("bitrate:") {
+                    return val.trim().parse::<u32>().ok()
+                }
+                // 回退：如果整个字段是纯数字
+                field.parse::<u32>().ok()
+            })
+            .unwrap_or(0);
         let quality = match bitrate {
             20900 => Some("master"),
             4000 => Some("hires"),
@@ -134,6 +145,7 @@ pub fn parse_music_item(info: &serde_json::Value) -> Option<MusicItem> {
     );
     let album_id = info
         .get("ALBUMID")
+        .or_else(|| info.get("albumId"))
         .or_else(|| info.get("albumid"))
         .cloned()
         .unwrap_or(serde_json::Value::String(String::new()));
@@ -152,14 +164,15 @@ pub fn parse_music_item(info: &serde_json::Value) -> Option<MusicItem> {
 
     let minfo = info
         .get("N_MINFO")
+        .or_else(|| info.get("n_minfo"))
         .or_else(|| info.get("formats"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
     let types = parse_quality_types(minfo);
     let img = info
-        .get("albumpic")
+        .get("pic")
+        .or_else(|| info.get("albumpic"))
         .or_else(|| info.get("albpic"))
-        .or_else(|| info.get("pic"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();

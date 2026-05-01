@@ -10,6 +10,13 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
+use symphonia::core::audio::SampleBuffer;
+use symphonia::core::codecs::DecoderOptions;
+use symphonia::core::formats::FormatOptions;
+use symphonia::core::io::MediaSourceStream;
+use symphonia::core::meta::MetadataOptions;
+use symphonia::core::probe::Hint;
+
 pub struct SlotPipeline {
     sink: Sink,
     url: String,
@@ -30,19 +37,12 @@ impl SlotPipeline {
     ) -> Result<Self, String> {
         let file_path = resolve_audio_file(url)?;
 
-        let file = std::fs::File::open(&file_path)
-            .map_err(|e| format!("打开音频文件失败: {e}"))?;
-        let reader = BufReader::new(file);
-
-        let source = Decoder::new(reader)
-            .map_err(|e| format!("解码音频失败: {e}"))?
-            .convert_samples();
-
-        let channels = source.channels();
-        let sample_rate = source.sample_rate();
-        let duration = source.total_duration()
-            .map(|d| d.as_secs_f64())
-            .unwrap_or(0.0);
+        // 先尝试 rodio 解码（MP3/WAV/FLAC/OGG），失败则回退到 symphonia（AAC 等）
+        let (channels, sample_rate, duration, source): (u16, u32, f64, PcmSource) =
+            match decode_with_rodio(&file_path) {
+                Ok(result) => result,
+                Err(_) => decode_with_symphonia(&file_path)?,
+            };
 
         let eq_state = Arc::new(Mutex::new(EqState::new(channels, sample_rate)));
         let spectrum_state = Arc::new(Mutex::new(SpectrumState::new()));
@@ -117,10 +117,30 @@ fn download_to_temp(url: &str) -> Result<PathBuf, String> {
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
 
+    // 从 URL 域名派生 Referer，酷我/QQ 等 CDN 需要此头才能正常返回音频
+    let referer = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            let host = u.host_str()?;
+            let parts: Vec<&str> = host.split('.').collect();
+            if parts.len() >= 2 {
+                Some(format!("http://{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]))
+            } else {
+                Some(format!("http://{}/", host))
+            }
+        })
+        .unwrap_or_else(|| "http://localhost/".to_string());
+
     let resp = client.get(url)
         .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
+        .header("Referer", &referer)
         .send()
         .map_err(|e| format!("下载音频失败: {e}"))?;
+
+    let status = resp.status();
+    if !status.is_success() {
+        return Err(format!("下载音频失败: HTTP {}", status));
+    }
 
     let bytes = resp.bytes()
         .map_err(|e| format!("读取音频数据失败: {e}"))?;
@@ -153,6 +173,129 @@ fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
         .map_err(|e| format!("写入临时文件失败: {e}"))?;
 
     Ok(path)
+}
+
+// ==================== 通用 PCM 源（rodio::Source 包装） ====================
+
+type DecodeResult = (u16, u32, f64, PcmSource);
+
+struct PcmSource {
+    samples: std::vec::IntoIter<f32>,
+    channels: u16,
+    sample_rate: u32,
+    duration_secs: f64,
+}
+
+impl Iterator for PcmSource {
+    type Item = f32;
+    fn next(&mut self) -> Option<f32> { self.samples.next() }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.samples.size_hint() }
+}
+
+impl rodio::Source for PcmSource {
+    fn current_frame_len(&self) -> Option<usize> { Some(self.samples.len()) }
+    fn channels(&self) -> u16 { self.channels }
+    fn sample_rate(&self) -> u32 { self.sample_rate }
+    fn total_duration(&self) -> Option<Duration> {
+        if self.duration_secs > 0.0 { Some(Duration::from_secs_f64(self.duration_secs)) } else { None }
+    }
+}
+
+// ==================== rodio 解码（MP3/WAV/FLAC/OGG） ====================
+
+fn decode_with_rodio(file_path: &std::path::Path) -> Result<DecodeResult, String> {
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+    let reader = BufReader::new(file);
+    let decoder = Decoder::new(reader)
+        .map_err(|e| format!("rodio 解码失败: {e}"))?;
+
+    let channels = decoder.channels();
+    let sample_rate = decoder.sample_rate();
+    let duration_secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
+
+    let samples: Vec<f32> = decoder.convert_samples().collect();
+
+    Ok((channels, sample_rate, duration_secs, PcmSource {
+        samples: samples.into_iter(),
+        channels,
+        sample_rate,
+        duration_secs,
+    }))
+}
+
+// ==================== symphonia 解码（AAC/M4A 等） ====================
+
+fn decode_with_symphonia(file_path: &std::path::Path) -> Result<DecodeResult, String> {
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+
+    let mut hint = Hint::new();
+    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+
+    let probed = symphonia::default::get_probe()
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
+        .map_err(|e| format!("探测音频格式失败: {e}"))?;
+
+    let mut format = probed.format;
+    let track = format.default_track()
+        .ok_or_else(|| "音频文件无默认音轨".to_string())?
+        .to_owned();
+    let channels = track.codec_params.channels
+        .map(|c| c.count() as u16)
+        .unwrap_or(2);
+    let sample_rate = track.codec_params.sample_rate
+        .unwrap_or(44100);
+
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| format!("创建 symphonia 解码器失败: {e}"))?;
+
+    let mut all_samples: Vec<f32> = Vec::new();
+
+    loop {
+        match format.next_packet() {
+            Ok(packet) => {
+                match decoder.decode(&packet) {
+                    Ok(decoded) => {
+                        let spec = *decoded.spec();
+                        let mut buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                        buf.copy_interleaved_ref(decoded);
+                        all_samples.extend_from_slice(buf.samples());
+                    }
+                    Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
+                    Err(e) => return Err(format!("symphonia 解码失败: {e}")),
+                }
+            }
+            Err(symphonia::core::errors::Error::IoError(e))
+                if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+            Err(symphonia::core::errors::Error::IoError(_)) => break,
+            Err(e) => return Err(format!("读取音频包失败: {e}")),
+        }
+    }
+
+    if all_samples.is_empty() {
+        return Err("symphonia 解码得到空音频数据".to_string());
+    }
+
+    // 从总采样数反算时长（AAC 容器中 n_frames 通常为 None）
+    let duration_secs = all_samples.len() as f64 / channels as f64 / sample_rate as f64;
+
+    Ok((channels, sample_rate, duration_secs, PcmSource {
+        samples: all_samples.into_iter(),
+        channels,
+        sample_rate,
+        duration_secs,
+    }))
 }
 
 // ==================== 交叉淡入淡出 ====================

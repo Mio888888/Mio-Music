@@ -120,8 +120,12 @@ export async function playSong(song: SongList) {
     }
 
     // 调用 Rust 原生播放器
-    const result = await invoke('player__play', { url })
+    const result: any = await invoke('player__play', { url })
     if (currentPlayRequestId !== requestId) return
+
+    if (result && !result.success) {
+      throw new Error(result.error || '播放器启动失败')
+    }
 
     // 更新 macOS 系统媒体控制
     try {
