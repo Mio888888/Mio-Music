@@ -57,6 +57,25 @@ function getSource(): string {
   return store.userSource.source || 'kw'
 }
 
+function parsePlaylistPlayCount(raw: unknown): number {
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0
+  if (typeof raw !== 'string') return 0
+
+  const text = raw.trim().replace(/,/g, '')
+  if (!text) return 0
+
+  const unit = text.endsWith('亿') ? 100000000 : text.endsWith('万') ? 10000 : 1
+  const numericText = text.replace(/[亿万]/g, '')
+  const num = Number(numericText)
+  return Number.isFinite(num) ? num * unit : 0
+}
+
+function comparePlaylistIdAsc(a: unknown, b: unknown): number {
+  const idA = String(a ?? '')
+  const idB = String(b ?? '')
+  return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: 'base' })
+}
+
 export const musicSdk = {
   async request(method: string, args: Record<string, any> = {}): Promise<any> {
     const source = args.source || getSource()
@@ -85,7 +104,19 @@ export const musicSdk = {
   },
 
   async getCategoryPlaylists(sortId?: string, tagId?: string, page = 1, limit = 30): Promise<PlaylistResult> {
-    return this.request('getCategoryPlaylists', { sortId, tagId, page, limit })
+    const source = getSource()
+    const res = await this.request('getCategoryPlaylists', { sortId, tagId, page, limit, source })
+
+    if (source !== 'kw' || !Array.isArray(res?.list)) return res
+
+    const list = [...res.list].sort((a: any, b: any) => {
+      const aCount = parsePlaylistPlayCount(a?.play_count ?? a?.playCount)
+      const bCount = parsePlaylistPlayCount(b?.play_count ?? b?.playCount)
+      if (aCount !== bCount) return bCount - aCount
+      return comparePlaylistIdAsc(a?.id, b?.id)
+    })
+
+    return { ...res, list }
   },
 
   async getPlaylistDetail(id: string | number, page = 1): Promise<PlaylistDetailResult> {
