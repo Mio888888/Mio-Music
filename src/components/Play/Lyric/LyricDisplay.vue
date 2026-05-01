@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
-import { findCurrentLine, type LyricLine } from '@/types/lyric'
+import { findCurrentLine, getLineText, type LyricLine } from '@/types/lyric'
 
 const audioStore = ControlAudioStore()
 const playStatus = useGlobalPlayStatusStore()
@@ -17,7 +17,6 @@ let scrollTimer: ReturnType<typeof setTimeout> | null = null
 
 const lyrics = computed(() => player.value.lyrics?.lines || [])
 
-// Find current line based on playback time
 watch(
   () => Audio.value.currentTime,
   (time) => {
@@ -80,8 +79,8 @@ const getLineStyle = (index: number) => {
         class="lyric-line"
         :style="getLineStyle(index)"
       >
-        <div class="lyric-text">{{ line.text }}</div>
-        <div v-if="line.translation" class="lyric-translation">{{ line.translation }}</div>
+        <div class="lyric-text">{{ getLineText(line) }}</div>
+        <div v-if="line.translatedLyric" class="lyric-translation">{{ line.translatedLyric }}</div>
       </div>
       <div class="lyric-padding"></div>
     </div>

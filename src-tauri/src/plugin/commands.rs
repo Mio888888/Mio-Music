@@ -97,7 +97,7 @@ pub async fn plugin__call_method(
     let method = require_str(&p, "method")?;
     let args_json = p.get("argsJson")
         .and_then(|v| v.as_str())
-        .unwrap_or("{}");
+        .unwrap_or("[]");
     let result = pm.call_plugin_method(&plugin_id, &method, args_json)?;
     let parsed: Value = serde_json::from_str(&result).unwrap_or(Value::String(result));
     ok(parsed)

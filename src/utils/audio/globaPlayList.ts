@@ -2,7 +2,6 @@ import { ref, toRaw } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
-import { useSettingsStore } from '@/store/Settings'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality } from '@/utils/quality'
@@ -41,45 +40,25 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
     let quality =
       (localUserStore.userInfo.sourceQualityMap || {})[song.source || ''] ||
       (localUserStore.userSource.quality as string)
-    const settingsStore = useSettingsStore()
-
     quality = calculateBestQuality(song.types, quality) || '128k'
 
     console.log(`使用音质: ${quality} - ${qualityMap[quality] || quality}`)
 
     const pluginId = localUserStore.userSource.pluginId
+    if (!pluginId) {
+      throw new Error('未选择音源插件，请先在设置中选择插件')
+    }
 
     let rawUrl: string | null = null
 
-    // 优先使用前端插件执行引擎解析 URL
-    if (pluginId) {
-      try {
-        rawUrl = await PluginRunner.getMusicUrl(
-          pluginId, song.source || 'kw', toRaw(song) as any, quality
-        )
-      } catch (e: any) {
-        console.warn('插件解析 URL 失败，回退到内置 SDK:', e)
-        throw new Error(`插件解析失败: ${e?.message || e}`)
-      }
+    try {
+      rawUrl = await PluginRunner.getMusicUrl(
+        pluginId, song.source || 'kw', toRaw(song) as any, quality
+      )
+    } catch (e: any) {
+      throw new Error(`插件解析失败: ${e?.message || e}`)
     }
 
-    // Fallback: 使用内置 Rust SDK
-    if (!rawUrl) {
-      const urlData = await window.api.music.requestSdk('getMusicUrl', {
-        pluginId: pluginId || undefined,
-        source: song.source,
-        songInfo: toRaw(song) as any,
-        quality,
-        isCache: settingsStore.settings.autoCacheMusic ?? true
-      })
-
-      if (typeof urlData === 'object' && urlData?.error) {
-        throw new Error(urlData.error)
-      }
-      rawUrl = (typeof urlData === 'object' && urlData?.url)
-        ? urlData.url as string
-        : urlData as string
-    }
 
     if (!rawUrl || typeof rawUrl !== 'string') {
       throw new Error('无法获取播放链接')

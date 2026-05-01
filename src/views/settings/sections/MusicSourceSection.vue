@@ -200,7 +200,6 @@ const getSourceIcon = (key: string) => {
             :max="currentSourceQualities.length - 1"
             :step="1"
             :marks="qualityMarks"
-            :label="qualityMarks[qualitySliderValue]"
             class="quality-slider"
             @change="onQualityChange"
           />

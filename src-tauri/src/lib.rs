@@ -11,6 +11,7 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 use tauri::Manager;
 use commands::hotkey_commands;
+use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,6 +25,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(app_db)
         .manage(plugin_manager)
+        .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
         .setup(|app| {
             let app_handle = app.handle().clone();
             let app_data_dir = db::get_app_data_dir();
@@ -160,6 +162,9 @@ pub fn run() {
             commands::get_lyric_lock_state,
             commands::get_font_list,
             commands::get_desktop_lyric_option,
+            // Power Save Blocker
+            commands::power_save::power_save_blocker__start,
+            commands::power_save::power_save_blocker__stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

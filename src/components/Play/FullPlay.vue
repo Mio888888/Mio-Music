@@ -5,8 +5,9 @@ import {
   PixiRenderer
 } from '@applemusic-like-lyrics/core'
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/vue'
+import LyricAdapter from './Lyric/LyricAdapter.vue'
 import type { SongList } from '@/types/audio'
-import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, nextTick, toRaw } from 'vue'
+import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick, toRaw } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import {
   Fullscreen1Icon,
@@ -23,6 +24,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { usePlaySettingStore } from '@/store'
 import PlaySettings from './PlaySettings.vue'
 import TitleBarControls from '@/components/TitleBarControls.vue'
+import CommentsOverlay from './CommentsOverlay.vue'
 
 const playSetting = usePlaySettingStore()
 const settingsStore = useSettingsStore()
@@ -164,7 +166,10 @@ const stopFireworks = () => {
   fwCtx = null
 }
 
-onMounted(() => { window.addEventListener('resize', resizeCanvas) })
+onMounted(() => {
+  window.addEventListener('resize', resizeCanvas)
+  if (import.meta.env.DEV) console.debug('[DEBUG] FullPlay.vue mounted, lyrics lines:', player.value.lyrics.lines.length)
+})
 onBeforeUnmount(() => { window.removeEventListener('resize', resizeCanvas); stopFireworks() })
 
 interface Props {
@@ -337,7 +342,9 @@ const jumpTime = (e: any) => {
     MessagePlugin.warning('投屏模式下不支持拖拽进度')
     return
   }
-  if (Audio.value.audio) Audio.value.audio.currentTime = e.line.getLine().startTime / 1000
+  // LyricPlayer: e.line.getLine().startTime; LyricAdapter: e.time
+  const startTime = e?.line?.getLine?.()?.startTime ?? e?.time ?? 0
+  if (Audio.value.audio) Audio.value.audio.currentTime = startTime / 1000
 }
 
 // 封面变化 → 更新背景
@@ -619,10 +626,28 @@ onUnmounted(() => {
       </div>
       <div v-if="player.lyrics.lines.length > 0" class="right">
         <LyricPlayer
+          v-if="playSetting.getUseAmlLyricRenderer"
           ref="lyricPlayerRef"
-          :lyric-lines="(toRaw(player.lyrics.lines) as any) || []"
+          :lyric-lines="player.lyrics.lines"
           :current-time="state.currentTime"
           :word-fade-width="0.5"
+          :playing="isAudioPlaying"
+          class="lyric-player"
+          :align-position="
+            playSetting.getLayoutMode === 'cd' && playSetting.getShowLeftPanel ? 0.5 : 0.34
+          "
+          :enable-blur="playSetting.getIsBlurLyric"
+          :enable-spring="playSetting.getisJumpLyric"
+          :enable-scale="playSetting.getisJumpLyric"
+          :text-align="!playSetting.getShowLeftPanel ? 'center' : 'left'"
+          :style="playSetting.getShowLeftPanel ? '' : 'text-align: center;'"
+          @line-click="jumpTime"
+        />
+        <LyricAdapter
+          v-else
+          ref="lyricPlayerRef"
+          :lyric-lines="player.lyrics.lines"
+          :current-time="state.currentTime"
           :playing="isAudioPlaying"
           class="lyric-player"
           :align-position="
@@ -669,7 +694,12 @@ onUnmounted(() => {
         </div>
       </Transition>
     </div>
-    <!-- TODO P1: CommentsOverlay 评论弹窗 -->
+    <!-- 评论弹窗 -->
+    <CommentsOverlay
+      :show="props.showComments"
+      :main-color="lightMainColor"
+      @close="emit('update:showComments', false)"
+    />
   </div>
 </template>
 

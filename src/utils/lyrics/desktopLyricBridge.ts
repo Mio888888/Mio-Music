@@ -2,7 +2,7 @@ import { storeToRefs } from 'pinia'
 import { emit } from '@tauri-apps/api/event'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
-import { findCurrentLine } from '@/types/lyric'
+import { findCurrentLine, getLineText } from '@/types/lyric'
 
 let rafId: number | null = null
 let isRunning = false
@@ -26,8 +26,13 @@ export function startDesktopLyricSync() {
     const nextLine = currentIdx + 1 < lines.length ? lines[currentIdx + 1] : null
 
     emit('desktop-lyric-update', {
-      currentLine: currentLine ? { text: currentLine.text, translation: currentLine.translation, time: currentLine.time, duration: currentLine.duration } : null,
-      nextLine: nextLine ? { text: nextLine.text, translation: nextLine.translation } : null,
+      currentLine: currentLine ? {
+        text: getLineText(currentLine),
+        translation: currentLine.translatedLyric,
+        time: currentLine.startTime,
+        duration: currentLine.endTime - currentLine.startTime
+      } : null,
+      nextLine: nextLine ? { text: getLineText(nextLine), translation: nextLine.translatedLyric } : null,
       currentIndex: currentIdx,
       totalLines: lines.length,
       currentTime: currentTimeMs,

@@ -109,7 +109,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useEqualizerStore } from '@/store/Equalizer'
 import { ControlAudioStore } from '@/store/ControlAudio'
-import AudioManager from '@/utils/audio/audioManager'
+import AudioManager from '@/utils/audio/AudioManager'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { DeleteIcon, SaveIcon } from 'tdesign-icons-vue-next'
 

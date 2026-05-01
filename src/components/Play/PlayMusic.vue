@@ -337,9 +337,9 @@ const closePlaylist = () => {
 // 全局快捷控制事件由全局播放管理器处理
 // 初始化播放器
 
-function globalControls(e) {
-  console.log('全局:', e)
-  if (e.detail.name === 'toggleFullPlay') {
+function globalControls(e: Event) {
+  const customEvent = e as CustomEvent<{ name?: string }>
+  if (customEvent.detail?.name === 'toggleFullPlay') {
     toggleFullPlay()
   }
 }

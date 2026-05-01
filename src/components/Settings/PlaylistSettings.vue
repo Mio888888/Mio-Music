@@ -189,7 +189,7 @@ const updatePlaylistStats = () => {
         stats.totalDuration += minutes * 60 + seconds
       } else {
         // 如果是数字字符串，转换为秒数
-        const duration = parseInt(song.interval)
+        const duration = parseInt(song.interval || '0', 10)
         if (!isNaN(duration)) {
           stats.totalDuration += duration / 1000
         }

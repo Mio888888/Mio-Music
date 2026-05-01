@@ -21,7 +21,7 @@
                 :max="12"
                 :step="0.5"
                 :disabled="!bassBoost.enabled"
-                :label="`${bassBoost.gain}dB`"
+                label="${value}dB"
               />
             </div>
             <div class="presets">
@@ -81,7 +81,7 @@
                 :max="1"
                 :step="0.05"
                 :disabled="!balance.enabled"
-                :tooltip-format="(val) => formatBalance(val as number)"
+                :tooltip-format="(val: number) => formatBalance(val)"
               />
             </div>
             <div class="visual-balance">
@@ -114,7 +114,7 @@ import { ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAudioEffectsStore } from '@/store/AudioEffects'
 import { ControlAudioStore } from '@/store/ControlAudio'
-import AudioManager from '@/utils/audio/audioManager'
+import AudioManager from '@/utils/audio/AudioManager'
 
 const store = useAudioEffectsStore()
 const audioStore = ControlAudioStore()

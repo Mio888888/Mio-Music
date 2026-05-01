@@ -7,6 +7,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import PluginRunner from '@/utils/plugin/PluginRunner'
 
 // ============================================================
 // IPC Core: wraps Tauri invoke / event into Electron-like API
@@ -113,20 +114,33 @@ const api = {
     initialize: () => ipcInvoke('plugin__initialize'),
     getList: () => ipcInvoke('plugin__get_list'),
     add: (pluginCode: string, pluginName: string, targetPluginId?: string) =>
-      ipcInvoke('plugin__add', { pluginCode, pluginName, targetPluginId }),
-    uninstall: (pluginId: string) => ipcInvoke('plugin__uninstall', { pluginId }),
-    getInfo: (pluginId: string) => ipcInvoke('plugin__get_info', { pluginId }),
-    callMethod: (pluginId: string, method: string, argsJson: string) =>
-      ipcInvoke('plugin__call_method', { pluginId, method, argsJson }),
+      ipcInvoke('plugin__add', { args: { pluginCode, pluginName, targetPluginId } }),
+    uninstall: (pluginId: string) => ipcInvoke('plugin__uninstall', { args: { pluginId } }),
+    getInfo: (pluginId: string) => ipcInvoke('plugin__get_info', { args: { pluginId } }),
+    callMethod: async (pluginId: string, method: string, argsJson: string) => {
+      try {
+        const data = await PluginRunner.callMethod(pluginId, method, argsJson, { injectConfig: true })
+        return { success: true, data }
+      } catch (e: any) {
+        return { success: false, error: e?.message || String(e) }
+      }
+    },
     downloadAndAdd: (url: string, pluginType: string, targetPluginId?: string) =>
-      ipcInvoke('plugin__download_and_add', { url, pluginType, targetPluginId }),
-    getPluginType: (pluginId: string) => ipcInvoke('plugin__get_type', { pluginId }),
-    getPluginLog: (pluginId: string) => ipcInvoke('plugin__get_log', { pluginId }),
-    getConfigSchema: (pluginId: string) => ipcInvoke('plugin__get_config_schema', { pluginId }),
-    getConfig: (pluginId: string) => ipcInvoke('plugin__get_config', { pluginId }),
+      ipcInvoke('plugin__download_and_add', { args: { url, pluginType, targetPluginId } }),
+    getPluginType: (pluginId: string) => ipcInvoke('plugin__get_type', { args: { pluginId } }),
+    getPluginLog: (pluginId: string) => ipcInvoke('plugin__get_log', { args: { pluginId } }),
+    getConfigSchema: (pluginId: string) => ipcInvoke('plugin__get_config_schema', { args: { pluginId } }),
+    getConfig: (pluginId: string) => ipcInvoke('plugin__get_config', { args: { pluginId } }),
     saveConfig: (pluginId: string, config: Record<string, any>) =>
-      ipcInvoke('plugin__save_config', { pluginId, config }),
-    testConnection: (pluginId: string) => ipcInvoke('plugin__test_connection', { pluginId }),
+      ipcInvoke('plugin__save_config', { args: { pluginId, config } }),
+    testConnection: async (pluginId: string) => {
+      try {
+        const data = await PluginRunner.testConnection(pluginId)
+        return { success: true, data }
+      } catch (e: any) {
+        return { success: false, error: e?.message || String(e) }
+      }
+    },
     selectAndAdd: (pluginType: string) => ipcInvoke('plugin__select_and_add', { pluginType }),
     getCode: (pluginId: string) => ipcInvoke('plugin__get_code', { args: { pluginId } }),
     onDeepLinkAdd: (

@@ -15,6 +15,11 @@ interface PluginExports {
   pluginInfo?: { name: string; version: string; author: string; description: string }
   sources?: Record<string, { name: string; type: string; qualitys: string[] }>
   musicUrl?: (source: string, musicInfo: any, quality: string) => Promise<string | { error?: string }>
+  [key: string]: any
+}
+
+interface PluginMethodOptions {
+  injectConfig?: boolean
 }
 
 interface LoadedPlugin {
@@ -573,15 +578,146 @@ async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
   const exportKeys = Object.keys(exports)
   console.log(`[PluginRunner] 插件导出: musicUrl=${typeof exports.musicUrl}, keys=[${exportKeys.join(', ')}]`)
 
-  if (typeof exports.musicUrl !== 'function') {
-    // 打印前200字符帮助诊断
-    console.warn('[PluginRunner] 插件代码片段:', code.substring(0, 300))
-    throw new Error('插件未导出 musicUrl 方法，可能格式不兼容')
-  }
-
   const plugin: LoadedPlugin = { exports, code }
   pluginCache.set(pluginId, plugin)
   return plugin
+}
+
+function normalizeMusicUrlResult(source: string, result: any): string {
+  if (typeof result === 'string') {
+    console.log(`[PluginRunner] ${source} musicUrl 返回字符串: ${result.substring(0, 120)}`)
+    return result
+  }
+  if (typeof result === 'object' && result !== null) {
+    const obj = result as Record<string, any>
+    console.log(`[PluginRunner] ${source} musicUrl 返回对象:`, JSON.stringify(obj).substring(0, 200))
+    if (obj.error) throw new Error(String(obj.error))
+    if (obj.url && typeof obj.url === 'string') return obj.url
+  }
+  throw new Error(`插件返回了无效的播放链接 (type=${typeof result})`)
+}
+
+function parseArgsJson(argsJson: string): any[] {
+  try {
+    const parsed = JSON.parse(argsJson || '[]')
+    if (Array.isArray(parsed)) return parsed
+    if (parsed === null || typeof parsed === 'undefined') return []
+    return [parsed]
+  } catch {
+    throw new Error('插件方法参数 JSON 无效')
+  }
+}
+
+async function invokePluginMethod(fn: Function, thisArg: any, args: any[]): Promise<any> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const callbackExpected = fn.length > args.length
+    const timeout = callbackExpected
+      ? setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(new Error('插件回调超时'))
+      }, 15000)
+      : null
+
+    const finish = (err: any, result?: any) => {
+      if (settled) return
+      settled = true
+      if (timeout) clearTimeout(timeout)
+      if (err) {
+        reject(err instanceof Error ? err : new Error(String(err)))
+        return
+      }
+      resolve(result)
+    }
+
+    try {
+      const ret = callbackExpected
+        ? fn.call(thisArg, ...args, (err: any, result: any) => finish(err, result))
+        : fn.call(thisArg, ...args)
+
+      if (ret && typeof ret.then === 'function') {
+        ;(ret as Promise<any>).then((result) => finish(null, result)).catch((err) => finish(err))
+        return
+      }
+
+      if (!callbackExpected || typeof ret !== 'undefined') {
+        finish(null, ret)
+      }
+    } catch (e) {
+      finish(e)
+    }
+  })
+}
+
+async function callMethod(
+  pluginId: string,
+  method: string,
+  argsJson: string,
+  options: PluginMethodOptions = {}
+): Promise<any> {
+  const plugin = await loadPlugin(pluginId)
+  const fn = (plugin.exports as Record<string, any>)[method]
+  if (typeof fn !== 'function') {
+    throw new Error(`插件未导出 ${method} 方法`)
+  }
+
+  let args = parseArgsJson(argsJson)
+  if (options.injectConfig) {
+    const configRes = await (window as any).api.plugins.getConfig(pluginId)
+    if (!configRes?.success) {
+      throw new Error(configRes?.error || '读取插件配置失败')
+    }
+    args = [configRes.data || {}, ...args]
+  }
+
+  const thisArg = isCrPlugin(plugin.code) ? { cerumusic: createCerumusicApi() } : undefined
+  try {
+    return await invokePluginMethod(fn, thisArg, args)
+  } catch (e: any) {
+    const detail = e?.message || String(e)
+    let argsPreview = '[unserializable]'
+    try {
+      argsPreview = JSON.stringify(args).slice(0, 300)
+    } catch {
+      argsPreview = '[unserializable]'
+    }
+    throw new Error(`[plugin=${pluginId}][method=${method}] ${detail} | args=${argsPreview}`)
+  }
+}
+
+async function testConnection(pluginId: string): Promise<{ success: boolean; message: string }> {
+  let result: any
+  try {
+    result = await callMethod(pluginId, 'testConnection', '[]', { injectConfig: true })
+  } catch (e: any) {
+    const message = e?.message || String(e)
+    if (message.includes('插件未导出 testConnection 方法')) {
+      try {
+        result = await callMethod(pluginId, 'ping', '[]', { injectConfig: true })
+      } catch (pingErr: any) {
+        const pingMessage = pingErr?.message || String(pingErr)
+        return { success: false, message: `插件未实现 testConnection/ping: ${pingMessage}` }
+      }
+    } else {
+      return { success: false, message }
+    }
+  }
+
+  if (result && typeof result === 'object') {
+    if (typeof result.success === 'boolean') {
+      return { success: result.success, message: result.message || (result.success ? '连接成功' : '连接失败') }
+    }
+    if (result.error) {
+      return { success: false, message: String(result.error) }
+    }
+  }
+
+  if (typeof result === 'string') {
+    return { success: true, message: result }
+  }
+
+  return { success: !!result, message: result ? '连接成功' : '连接失败' }
 }
 
 async function getMusicUrl(
@@ -591,21 +727,12 @@ async function getMusicUrl(
   quality: string
 ): Promise<string> {
   const plugin = await loadPlugin(pluginId)
+  if (typeof plugin.exports.musicUrl !== 'function') {
+    throw new Error('插件未导出 musicUrl 方法')
+  }
   try {
-    const result = await plugin.exports.musicUrl!(source, songInfo, quality)
-
-    if (typeof result === 'string') {
-      console.log(`[PluginRunner] ${source} musicUrl 返回字符串: ${result.substring(0, 120)}`)
-      return result
-    }
-    if (typeof result === 'object' && result !== null) {
-      console.log(`[PluginRunner] ${source} musicUrl 返回对象:`, JSON.stringify(result).substring(0, 200))
-      if (result.error) throw new Error(result.error)
-      // 有些插件返回 { url: '...', songmid: '...' } 格式
-      if (result.url && typeof result.url === 'string') return result.url
-    }
-
-    throw new Error(`插件返回了无效的播放链接 (type=${typeof result})`)
+    const result = await plugin.exports.musicUrl(source, songInfo, quality)
+    return normalizeMusicUrlResult(source, result)
   } catch (e: any) {
     const detail = e.message || String(e)
     throw new Error(`[${source}] ${detail}`)
@@ -620,4 +747,4 @@ function clearCache(pluginId?: string) {
   }
 }
 
-export default { getMusicUrl, clearCache, loadPlugin }
+export default { getMusicUrl, callMethod, testConnection, clearCache, loadPlugin }

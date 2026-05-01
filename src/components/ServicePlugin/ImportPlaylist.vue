@@ -57,6 +57,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import type { SongList } from '@/types/audio'
 
 interface ServicePlaylist {
   id: string
@@ -98,13 +100,18 @@ async function loadPlaylists() {
     const res = await (window as any).api.plugins.callMethod(
       props.pluginId,
       'getPlaylists',
-      JSON.stringify({})
+      JSON.stringify([])
     )
-    if (res?.success && res.data) {
-      playlists.value = Array.isArray(res.data) ? res.data : []
-    } else {
-      playlists.value = []
+    if (!res?.success) {
+      throw new Error(res?.error || '获取歌单失败')
     }
+
+    const payload = res.data
+    playlists.value = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.playlists)
+        ? payload.playlists
+        : []
   } catch (e: any) {
     error.value = e.message || '获取歌单失败'
   } finally {
@@ -115,15 +122,48 @@ async function loadPlaylists() {
 async function doImport(pl: ServicePlaylist) {
   importingId.value = pl.id
   try {
-    const res = await (window as any).api.plugins.callMethod(
+    const songsRes = await (window as any).api.plugins.callMethod(
       props.pluginId,
-      'importPlaylist',
-      JSON.stringify({ playlistId: pl.id, playlistName: pl.name })
+      'getPlaylistSongs',
+      JSON.stringify([pl.id])
     )
-    if (res?.success) {
-      MessagePlugin.success(`成功导入 "${pl.name}"`)
+
+    if (!songsRes?.success) {
+      throw new Error(songsRes?.error || '获取歌单歌曲失败')
+    }
+
+    const payload = songsRes.data
+    const songs: SongList[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.songs)
+        ? payload.songs
+        : []
+
+    if (songs.length === 0) {
+      MessagePlugin.warning(`歌单 "${pl.name}" 没有可导入歌曲`)
+      return
+    }
+
+    const localUserStore = LocalUserDetailStore()
+    const created = await localUserStore.createPlaylist(
+      pl.name,
+      `从${props.pluginName}导入，共 ${songs.length} 首`,
+      'service'
+    )
+
+    if (!created) {
+      throw new Error('创建本地歌单失败')
+    }
+
+    const added = await localUserStore.addSongsToPlaylist(created.id, songs)
+    if (pl.coverImg) {
+      await localUserStore.updatePlaylistCover(created.id, pl.coverImg)
+    }
+
+    if (added > 0) {
+      MessagePlugin.success(`成功导入 ${added} 首歌曲到歌单 "${pl.name}"`)
     } else {
-      MessagePlugin.error(`导入失败: ${res?.error || '未知错误'}`)
+      MessagePlugin.warning(`歌单 "${pl.name}" 没有新增歌曲`)
     }
   } catch (e: any) {
     MessagePlugin.error(`导入失败: ${e.message}`)
