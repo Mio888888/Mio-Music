@@ -23,12 +23,7 @@ export enum PlayMode {
 }
 
 export type ControlAudioState = {
-  audio: HTMLAudioElement | null | undefined
-  audioA: HTMLAudioElement | null
-  audioB: HTMLAudioElement | null
   primarySlot: AudioSlot
-  srcA: string
-  srcB: string
   secondaryUrl: string
   isPlay: boolean
   currentTime: number

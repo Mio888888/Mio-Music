@@ -5,10 +5,13 @@ mod music_sdk;
 mod local_music;
 mod download;
 mod plugin;
+mod player;
 
 use db::AppDb;
 use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
+#[allow(unused_imports)]
+use player::SharedPlayer;
 use tauri::Manager;
 use commands::hotkey_commands;
 use std::sync::Mutex;
@@ -34,6 +37,10 @@ pub fn run() {
 
             // Start audio device change listener
             audio_device::start_device_listener(app_handle.clone());
+
+            // Initialize native player engine (GStreamer)
+            let shared_player = player::init_player(app_handle.clone());
+            app.manage(shared_player);
 
             // Store AppHandle for hotkey re-registration
             hotkey_commands::set_app_handle(app_handle.clone());
@@ -165,6 +172,22 @@ pub fn run() {
             // Power Save Blocker
             commands::power_save::power_save_blocker__start,
             commands::power_save::power_save_blocker__stop,
+            // Native Player (rodio + cpal)
+            player::commands::player__play,
+            player::commands::player__pause,
+            player::commands::player__resume,
+            player::commands::player__stop,
+            player::commands::player__seek,
+            player::commands::player__set_volume,
+            player::commands::player__get_state,
+            player::commands::player__crossfade,
+            player::commands::player__swap_slot,
+            player::commands::player__set_eq_band,
+            player::commands::player__get_eq_bands,
+            player::commands::player__set_bass_boost,
+            player::commands::player__set_balance,
+            player::commands::player__update_now_playing,
+            player::commands::player__shutdown,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,11 +1,9 @@
 import { ControlAudioStore } from '@/store/ControlAudio'
-import mediaSessionController from './useSmtc'
 import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 
 let installed = false
-let smtcTimer: any = null
 let globalKeyDownHandler: ((e: KeyboardEvent) => void) | null = null
-let removeMusicCtrlListener: (() => void) | null = null
 let removeHotkeyListener: (() => void) | null = null
 
 function dispatch(name: string, val?: any) {
@@ -16,26 +14,7 @@ export function installGlobalMusicControls() {
   if (installed) return
   installed = true
 
-  const controlAudio = ControlAudioStore()
-
-  const tryInitSmtc = () => {
-    const el = controlAudio.Audio.audio
-    if (!el) return
-    mediaSessionController.init(el, {
-      play: () => dispatch('play'), pause: () => dispatch('pause'),
-      playPrevious: () => dispatch('playPrev'), playNext: () => dispatch('playNext')
-    })
-    mediaSessionController.updatePlaybackState(el.paused ? 'paused' : 'playing')
-  }
-
-  tryInitSmtc()
-  let smtcTries = 0
-  smtcTimer = setInterval(() => {
-    if (smtcTries > 20) { clearInterval(smtcTimer); smtcTimer = null; return }
-    smtcTries++
-    if (controlAudio.Audio.audio) { tryInitSmtc(); clearInterval(smtcTimer); smtcTimer = null }
-  }, 150)
-
+  // 键盘快捷键
   let keyThrottle = false
   const throttle = (cb: () => void, delay: number) => {
     if (keyThrottle) return
@@ -59,13 +38,13 @@ export function installGlobalMusicControls() {
   }
   document.addEventListener('keydown', globalKeyDownHandler)
 
-  try { removeMusicCtrlListener = (window as any).api?.onMusicCtrl?.(() => dispatch('toggle')) } catch {}
+  // 媒体键（耳机/键盘上的播放控制按钮）
+  try { (window as any).api?.onMusicCtrl?.(() => dispatch('toggle')) } catch {}
 
-  // Listen for OS-level global shortcut triggers from Tauri backend
+  // 监听 Rust 后台全局快捷键事件
   listen<string>('hotkey-triggered', (event) => {
     const action = event.payload
     if (!action) return
-    // Map hotkey action names to the same dispatch names used by in-app shortcuts
     const actionMap: Record<string, string> = {
       toggle: 'toggle',
       playPrev: 'playPrev',
@@ -87,14 +66,15 @@ export function installGlobalMusicControls() {
     else if (action === 'volumeUp') dispatch('volumeDelta', 5)
     else dispatch(mapped)
   }).then((unlisten) => { removeHotkeyListener = unlisten })
+
+  // 监听 Rust 媒体控制事件（系统媒体键 → 前端切歌）
+  listen('media:next', () => dispatch('playNext'))
+  listen('media:previous', () => dispatch('playPrev'))
 }
 
 export function uninstallGlobalMusicControls() {
   if (!installed) return
   installed = false
-  if (smtcTimer) { clearInterval(smtcTimer); smtcTimer = null }
   if (globalKeyDownHandler) { document.removeEventListener('keydown', globalKeyDownHandler); globalKeyDownHandler = null }
-  if (removeMusicCtrlListener) { removeMusicCtrlListener(); removeMusicCtrlListener = null }
   if (removeHotkeyListener) { removeHotkeyListener(); removeHotkeyListener = null }
-  mediaSessionController.cleanup()
 }

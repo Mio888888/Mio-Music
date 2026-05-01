@@ -113,67 +113,30 @@
 import { ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAudioEffectsStore } from '@/store/AudioEffects'
-import { ControlAudioStore } from '@/store/ControlAudio'
-import AudioManager from '@/utils/audio/AudioManager'
+import { invoke } from '@tauri-apps/api/core'
 
 const store = useAudioEffectsStore()
-const audioStore = ControlAudioStore()
 const { bassBoost, surround, balance } = storeToRefs(store)
 
 const bassPreset = ref('light')
 
 const applyEffects = () => {
-  const audio = audioStore.Audio.audio
-  if (!audio) return
-
-  // Bass Boost
-  const targetBass = bassBoost.value.enabled ? bassBoost.value.gain : 0
-  AudioManager.setBassBoost(audio, targetBass)
-
-  // Surround
-  const targetSurround = surround.value.enabled ? surround.value.mode : 'off'
-  AudioManager.setSurroundMode(audio, targetSurround)
-
-  // Balance
-  const targetBalance = balance.value.enabled ? balance.value.value : 0
-  AudioManager.setBalance(audio, targetBalance)
+  invoke('player__set_bass_boost', { gain: bassBoost.value.enabled ? bassBoost.value.gain : 0 })
+  invoke('player__set_balance', { value: balance.value.enabled ? balance.value.value : 0 })
 }
 
-// Watchers
-watch(
-  [bassBoost, surround, balance],
-  () => {
-    applyEffects()
-  },
-  { deep: true }
-)
-
-// Also watch audio element change
-watch(
-  () => audioStore.Audio.audio,
-  (newVal) => {
-    if (newVal) applyEffects()
-  }
-)
+watch([bassBoost, surround, balance], () => { applyEffects() }, { deep: true })
 
 const applyBassPreset = (val: string) => {
   if (!bassBoost.value.enabled) return
   switch (val) {
-    case 'light':
-      bassBoost.value.gain = 3
-      break
-    case 'medium':
-      bassBoost.value.gain = 6
-      break
-    case 'heavy':
-      bassBoost.value.gain = 9
-      break
+    case 'light': bassBoost.value.gain = 3; break
+    case 'medium': bassBoost.value.gain = 6; break
+    case 'heavy': bassBoost.value.gain = 9; break
   }
 }
 
-const resetAll = () => {
-  store.resetEffects()
-}
+const resetAll = () => { store.resetEffects() }
 
 const formatBalance = (val: number) => {
   if (val === 0) return 'Center'
@@ -182,23 +145,19 @@ const formatBalance = (val: number) => {
     : `Right ${Math.abs(val * 100).toFixed(0)}%`
 }
 
-onMounted(() => {
-  applyEffects()
-})
+onMounted(() => { applyEffects() })
 </script>
 
 <style scoped>
 .audio-effects-settings {
   padding: 20px 0;
 }
-
 .effects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   margin-top: 20px;
 }
-
 .effect-card {
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-component-border);
@@ -206,12 +165,10 @@ onMounted(() => {
   padding: 16px;
   transition: all 0.3s;
 }
-
 .effect-card:hover {
   border-color: var(--td-brand-color);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -220,48 +177,40 @@ onMounted(() => {
   border-bottom: 1px solid var(--td-component-stroke);
   padding-bottom: 8px;
 }
-
 .title {
   font-weight: 600;
   font-size: 16px;
 }
-
 .card-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-
 .control-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .control-group label {
   font-size: 14px;
   color: var(--td-text-color-secondary);
 }
-
 .presets {
   display: flex;
   justify-content: center;
   margin-top: 8px;
 }
-
 .info-text {
   font-size: 12px;
   color: var(--td-text-color-disabled);
   text-align: center;
 }
-
 .balance-labels {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
   color: var(--td-text-color-secondary);
 }
-
 .visual-balance {
   display: flex;
   justify-content: space-around;

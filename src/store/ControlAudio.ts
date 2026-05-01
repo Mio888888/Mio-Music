@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { reactive } from 'vue'
-import { transitionVolume } from '@/utils/audio/volume'
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { LocalUserDetailStore } from './LocalUserDetail'
-import { playSetting as usePlaySettingStore } from './playSetting'
 
 import type {
   AudioEventCallback,
@@ -16,12 +16,7 @@ import type {
 let userInfo: any
 export const ControlAudioStore = defineStore('controlAudio', () => {
   const Audio = reactive<ControlAudioState>({
-    audio: null,
-    audioA: null,
-    audioB: null,
     primarySlot: 'A',
-    srcA: '',
-    srcB: '',
     secondaryUrl: '',
     isPlay: false,
     currentTime: 0,
@@ -58,180 +53,88 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
 
   const clearEventSubscribers = (eventType: AudioEventType): void => { subscribers[eventType] = [] }
 
-  const init = (elA: HTMLAudioElement | null, elB: HTMLAudioElement | null) => {
-    userInfo = LocalUserDetailStore()
-    console.log(elA, elB, '全局音频双槽挂载初始化success')
-    Audio.audioA = elA
-    Audio.audioB = elB
-    Audio.audio = Audio.primarySlot === 'A' ? elA : elB
-  }
+  // --- Tauri 事件监听 ---
 
-  const getPrimaryEl = (): HTMLAudioElement | null => Audio.primarySlot === 'A' ? Audio.audioA : Audio.audioB
-  const getSecondaryEl = (): HTMLAudioElement | null => Audio.primarySlot === 'A' ? Audio.audioB : Audio.audioA
+  let unlisteners: UnlistenFn[] = []
+
+  const init = async () => {
+    userInfo = LocalUserDetailStore()
+    if (Audio.eventInit) return
+    Audio.eventInit = true
+
+    const un1 = await listen('player:state', (event: any) => {
+      const { state, position, duration, volume, url, isPlaying } = event.payload
+      Audio.isPlay = isPlaying
+      Audio.currentTime = position
+      Audio.duration = duration
+      Audio.volume = volume
+      Audio.url = url || ''
+      if (state === 'Playing') publish('play')
+      else if (state === 'Paused') publish('pause')
+    })
+
+    const un2 = await listen('player:time', (event: any) => {
+      const { position, duration } = event.payload
+      Audio.currentTime = position
+      Audio.duration = duration
+      publish('timeupdate')
+    })
+
+    const un3 = await listen('player:ended', () => {
+      Audio.isPlay = false
+      publish('ended')
+      // 通知全局控制器自动播放下一首
+      window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'autoNext' } }))
+    })
+
+    unlisteners = [un1, un2, un3]
+  }
 
   const swapPrimarySlot = () => {
     Audio.primarySlot = Audio.primarySlot === 'A' ? 'B' : 'A'
-    Audio.audio = Audio.primarySlot === 'A' ? Audio.audioA : Audio.audioB
-    Audio.url = Audio.primarySlot === 'A' ? Audio.srcA : Audio.srcB
-    Audio.secondaryUrl = ''
+    invoke('player__swap_slot')
     publish('slotSwap')
   }
 
   const setCurrentTime = (time: number) => {
-    if (typeof time === 'number') {
-      Audio.currentTime = time
-      return
-    }
-    throw new Error('时间必须是数字类型')
+    Audio.currentTime = time
   }
 
   const setDuration = (duration: number) => {
-    if (typeof duration === 'number') {
-      Audio.duration = duration
-      return
-    }
-    throw new Error('时间必须是数字类型')
+    Audio.duration = duration
   }
 
-  const setVolume = (volume: number, transition: boolean = false) => {
-    const syncSecondary = (target: number) => {
-      const sec = getSecondaryEl()
-      if (sec) { try { sec.volume = Number(target.toFixed(2)) } catch {} }
-    }
+  const setVolume = (volume: number, _transition: boolean = false) => {
     if (typeof volume === 'number' && volume >= 0 && volume <= 100) {
-      if (Audio.audio) {
-        const v = volume / 100
-        if (Audio.isPlay && transition) {
-          transitionVolume(Audio.audio, v, Audio.volume <= volume)
-        } else {
-          Audio.audio.volume = Number(v.toFixed(2))
-        }
-        syncSecondary(v)
-        Audio.volume = volume
-        userInfo.userInfo.volume = volume
-      }
-    } else {
-      if (typeof volume === 'number' && Audio.audio) {
-        if (volume <= 0) {
-          Audio.volume = 0
-          Audio.audio.volume = 0
-          syncSecondary(0)
-          userInfo.userInfo.volume = 0
-        } else {
-          Audio.volume = 100
-          Audio.audio.volume = 100
-          syncSecondary(1)
-          userInfo.userInfo.volume = 100
-        }
-      } else {
-        throw new Error('音量必须是0-100之间的数字')
-      }
+      Audio.volume = volume
+      userInfo.userInfo.volume = volume
+      invoke('player__set_volume', { volume })
     }
-  }
-
-  const setUrl = (url: string) => {
-    if (typeof url !== 'string' || url.trim() === '') {
-      throw new Error('音频URL不能为空')
-    }
-    if (Audio.isPlay) stop()
-    const trimmed = url.trim()
-    if (Audio.primarySlot === 'A') Audio.srcA = trimmed
-    else Audio.srcB = trimmed
-    Audio.url = trimmed
-    console.log('音频URL已设置(slot', Audio.primarySlot, '):', Audio.url)
-  }
-
-  const setSecondaryUrl = (url: string) => {
-    if (typeof url !== 'string' || url.trim() === '') {
-      throw new Error('次要音频URL不能为空')
-    }
-    const trimmed = url.trim()
-    if (Audio.primarySlot === 'A') Audio.srcB = trimmed
-    else Audio.srcA = trimmed
-    Audio.secondaryUrl = trimmed
-    console.log('次要音频URL已设置(slot', Audio.primarySlot === 'A' ? 'B' : 'A', '):', trimmed)
-  }
-
-  const clearSecondarySrc = () => {
-    if (Audio.primarySlot === 'A') Audio.srcB = ''
-    else Audio.srcA = ''
-    Audio.secondaryUrl = ''
-  }
-
-  /** 等待 audio 元素就绪（HAVE_CURRENT_DATA 以上） */
-  const waitForReady = (el: HTMLAudioElement, timeoutMs = 5000): Promise<void> => {
-    if (el.readyState >= 2) return Promise.resolve() // HAVE_CURRENT_DATA
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        el.removeEventListener('canplay', onReady)
-        el.removeEventListener('error', onError)
-        reject(new Error('音频加载超时'))
-      }, timeoutMs)
-      const onReady = () => { clearTimeout(timer); el.removeEventListener('canplay', onReady); el.removeEventListener('error', onError); resolve() }
-      const onError = () => { clearTimeout(timer); el.removeEventListener('canplay', onReady); el.removeEventListener('error', onError); reject(new Error('音频加载失败')) }
-      el.addEventListener('canplay', onReady, { once: true })
-      el.addEventListener('error', onError, { once: true })
-    })
   }
 
   const start = async () => {
-    const playSetting = usePlaySettingStore()
-    const volume = Audio.volume
-    if (Audio.audio) {
-      // 等待音频数据就绪再播放，避免 NotSupportedError
-      try {
-        await waitForReady(Audio.audio)
-      } catch (e) {
-        console.warn('音频未就绪:', (e as Error).message)
-        return false
-      }
-      if (!playSetting.getIsPauseTransition) {
-        try {
-          Audio.audio.volume = volume / 100
-          await Audio.audio.play()
-          Audio.isPlay = true
-          return Promise.resolve()
-        } catch (error) {
-          console.error('音频播放失败:', error)
-          Audio.isPlay = false
-          throw new Error('音频播放失败，请检查音频URL是否有效')
-        }
-      }
-
-      Audio.audio.volume = 0
-      try {
-        await Audio.audio.play()
-        Audio.isPlay = true
-        return transitionVolume(Audio.audio, volume / 100, true, true)
-      } catch (error) {
-        Audio.audio.volume = volume / 100
-        console.error('音频播放失败:', error)
-        Audio.isPlay = false
-        throw new Error('音频播放失败，请检查音频URL是否有效')
-      }
-    }
-    return false
+    await invoke('player__resume')
+    Audio.isPlay = true
+    publish('play')
   }
 
-  const stop = () => {
-    const playSetting = usePlaySettingStore()
-    if (Audio.audio) {
-      Audio.isPlay = false
-      if (!playSetting.getIsPauseTransition) {
-        Audio.audio.pause()
-        return Promise.resolve()
-      }
-      return transitionVolume(Audio.audio, Audio.volume / 100, false, true).then(() => {
-        Audio.audio?.pause()
-      })
-    }
-    return false
+  const stop = async () => {
+    await invoke('player__pause')
+    Audio.isPlay = false
+    publish('pause')
+  }
+
+  const destroy = () => {
+    unlisteners.forEach((un) => { try { un() } catch {} })
+    unlisteners = []
+    Audio.eventInit = false
   }
 
   return {
-    Audio, init, setCurrentTime, setVolume, setUrl, setSecondaryUrl, clearSecondarySrc,
-    getPrimaryEl, getSecondaryEl, swapPrimarySlot, start, stop,
-    subscribe, publish, clearAllSubscribers, clearEventSubscribers, setDuration
+    Audio, init, setCurrentTime, setVolume,
+    swapPrimarySlot, start, stop,
+    subscribe, publish, clearAllSubscribers, clearEventSubscribers, setDuration,
+    destroy
   }
 }, { persist: false })
 

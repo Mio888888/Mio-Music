@@ -125,24 +125,60 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
-    let mut req_builder = match method.to_uppercase().as_str() {
-        "POST" => client.post(url),
-        "PUT" => client.put(url),
-        "DELETE" => client.delete(url),
-        "PATCH" => client.patch(url),
-        _ => client.get(url),
-    };
+    // 从 URL 推导 Referer 和 Origin
+    let referer_origin = url.split("://").nth(1)
+        .and_then(|host_port| host_port.split('/').next())
+        .map(|host| format!("https://{}", host))
+        .unwrap_or_default();
 
-    if let Some(hdrs) = headers {
-        for (k, v) in &hdrs {
-            req_builder = req_builder.header(k.as_str(), v.as_str());
+    // 构建请求（带重试）
+    let max_attempts = 3u32;
+    let mut last_status: u16 = 0;
+    let mut resp: Option<reqwest::Response> = None;
+
+    for attempt in 0..max_attempts {
+        let mut req_builder: reqwest::RequestBuilder = match method.to_uppercase().as_str() {
+            "POST" => client.post(url),
+            "PUT" => client.put(url),
+            "DELETE" => client.delete(url),
+            "PATCH" => client.patch(url),
+            _ => client.get(url),
+        };
+
+        // 默认浏览器请求头（插件可覆盖）
+        req_builder = req_builder
+            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .header("Accept", "*/*")
+            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+            .header("Accept-Encoding", "gzip, deflate, br")
+            .header("Referer", &referer_origin)
+            .header("Origin", &referer_origin)
+            .header("Sec-Fetch-Dest", "empty")
+            .header("Sec-Fetch-Mode", "cors")
+            .header("Sec-Fetch-Site", "cross-site");
+
+        if let Some(ref hdrs) = headers {
+            for (k, v) in hdrs {
+                req_builder = req_builder.header(k.as_str(), v.as_str());
+            }
         }
-    }
-    if let Some(b) = body {
-        req_builder = req_builder.body(b.to_string());
+        if let Some(b) = body {
+            req_builder = req_builder.body(b.to_string());
+        }
+
+        let r = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
+        last_status = r.status().as_u16();
+
+        // 只有 5xx 才重试
+        if r.status().is_server_error() && attempt + 1 < max_attempts {
+            tokio::time::sleep(std::time::Duration::from_millis(500 * (attempt as u64 + 1))).await;
+            continue;
+        }
+        resp = Some(r);
+        break;
     }
 
-    let resp = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
+    let resp = resp.ok_or_else(|| format!("请求失败: HTTP {}", last_status))?;
     let status = resp.status().as_u16();
     let resp_headers: std::collections::HashMap<String, String> = resp
         .headers()
@@ -151,7 +187,6 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         .collect();
 
     if raw {
-        // Raw mode: return binary body as base64 (for audio/video/image data)
         let bytes = resp.bytes().await.map_err(|e| format!("读取响应失败: {}", e))?;
         let body_base64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
         return Ok(serde_json::json!({
@@ -163,7 +198,6 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
     }
 
     let text = resp.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
-
     let body_value: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
 
     Ok(serde_json::json!({

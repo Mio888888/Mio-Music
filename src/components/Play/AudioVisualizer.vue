@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { storeToRefs } from 'pinia'
-import audioManager from '@/utils/audio/AudioManager'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 interface Props {
   show?: boolean
@@ -25,142 +25,136 @@ const emit = defineEmits<{
 }>()
 
 const canvasRef = ref<HTMLCanvasElement>()
-const animationId = ref<number>()
-const analyser = ref<AnalyserNode>()
-const lastFrameTime = ref(0)
-const dataArray = ref<Uint8Array>()
 const resizeObserver = ref<ResizeObserver>()
-const componentId = ref<string>(`visualizer-${Date.now()}-${Math.random()}`)
 
 const controlAudio = ControlAudioStore()
 const { Audio } = storeToRefs(controlAudio)
 
-const initAudioAnalyser = () => {
-  if (!Audio.value.audio) return
-  try {
-    const minSize = props.barCount * 2
-    let fftSize = 32
-    while (fftSize < minSize) fftSize *= 2
-    fftSize = Math.min(fftSize, 2048)
+let unlisten: UnlistenFn | null = null
+let animationId: number | undefined
 
-    const createdAnalyser = audioManager.createAnalyser(
-      Audio.value.audio,
-      componentId.value,
-      fftSize
-    )
-    analyser.value = createdAnalyser || undefined
+// ---- 非 reactive 数据，避免 Vue 响应式追踪开销 ----
+const BAND_COUNT = 64
+const SMOOTHING = 0.7 // 越大越平滑（0 = 无平滑，1 = 极度平滑）
+const targetBands = new Float64Array(BAND_COUNT)   // Rust 最新数据
+const smoothedBands = new Float64Array(BAND_COUNT) // 插值平滑后的数据
 
-    if (analyser.value) {
-      const bufferLength = analyser.value.frequencyBinCount
-      dataArray.value = new Uint8Array(new ArrayBuffer(bufferLength))
-    } else {
-      const bufferLength = fftSize / 2
-      dataArray.value = new Uint8Array(new ArrayBuffer(bufferLength))
+// 预计算的绘制参数（只在 resize 时更新）
+let drawWidth = 0
+let drawHeight = 0
+let barWidth = 0
+let halfBars = 0
+let centerX = 0
+let maxBarH = 0
+
+// dB → 归一化幅度（0~1），带感知加权
+function dbToNorm(db: number): number {
+  // 范围约 -80dB ~ +10dB，映射到 0~1
+  const clamped = Math.max(-80, Math.min(10, db))
+  const norm = (clamped + 80) / 90
+  // gamma 校正让低幅度更明显
+  return Math.pow(norm, 0.55)
+}
+
+const setupSpectrumListener = async () => {
+  unlisten = await listen('player:spectrum', (event: any) => {
+    const { bands } = event.payload
+    if (!bands || !Array.isArray(bands)) return
+    const len = Math.min(bands.length, BAND_COUNT)
+    for (let i = 0; i < len; i++) {
+      targetBands[i] = bands[i]
     }
-  } catch (error) {
-    console.error('音频分析器初始化失败:', error)
-    dataArray.value = new Uint8Array(new ArrayBuffer(256))
+  })
+}
+
+function updateSmoothed() {
+  const inv = 1 - SMOOTHING
+  for (let i = 0; i < BAND_COUNT; i++) {
+    smoothedBands[i] = smoothedBands[i] * SMOOTHING + targetBands[i] * inv
   }
 }
 
-const draw = (ts?: number) => {
-  if (!canvasRef.value || !analyser.value || !dataArray.value) return
+let cachedGradient: CanvasGradient | null = null
+let lastColor = ''
 
-  const now = ts ?? performance.now()
-  if (now - lastFrameTime.value < 33) {
-    animationId.value = requestAnimationFrame(draw)
-    return
-  }
-  lastFrameTime.value = now
+function getGradient(ctx: CanvasRenderingContext2D): CanvasGradient | CanvasPattern {
+  if (lastColor === props.color && cachedGradient) return cachedGradient
+  const g = ctx.createLinearGradient(0, drawHeight, 0, 0)
+  g.addColorStop(0, props.color)
+  g.addColorStop(1, props.color.replace(/[\d.]+\)$/, '0.2)'))
+  cachedGradient = g
+  lastColor = props.color
+  return g
+}
 
+function draw() {
+  if (!canvasRef.value) return
   const canvas = canvasRef.value
   const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    animationId.value = requestAnimationFrame(draw)
-    return
-  }
+  if (!ctx) return
 
-  if (analyser.value && dataArray.value) {
-    analyser.value.getByteFrequencyData(dataArray.value as Uint8Array)
+  updateSmoothed()
+
+  // 清屏
+  if (props.backgroundColor === 'transparent') {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
   } else {
-    const time = now * 0.001
-    for (let i = 0; i < dataArray.value.length; i++) {
-      const frequency = i / dataArray.value.length
-      const amplitude = Math.sin(time * 2 + frequency * 10) * 0.5 + 0.5
-      const bass = Math.sin(time * 4) * 0.3 + 0.7
-      dataArray.value[i] = Math.floor(amplitude * bass * 255 * (1 - frequency * 0.7))
-    }
-  }
-
-  // Low frequency event
-  let lowFreqSum = 0
-  const lowBins = Math.min(3, dataArray.value.length)
-  for (let i = 0; i < lowBins; i++) lowFreqSum += dataArray.value[i]
-  emit('lowFreqUpdate', lowFreqSum / lowBins / 255)
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-  if (props.backgroundColor !== 'transparent') {
     ctx.fillStyle = props.backgroundColor
     ctx.fillRect(0, 0, canvas.width, canvas.height)
   }
 
-  const container = canvas.parentElement
-  if (!container) {
-    animationId.value = requestAnimationFrame(draw)
+  if (drawWidth === 0) {
+    animationId = requestAnimationFrame(draw)
     return
   }
-  const containerRect = container.getBoundingClientRect()
-  const canvasWidth = containerRect.width
-  const canvasHeight = props.height
 
-  const halfBarCount = Math.floor(props.barCount / 2)
-  const barWidth = canvasWidth / 2 / halfBarCount
-  const maxBarHeight = canvasHeight * 0.9
-  const centerX = canvasWidth / 2
+  ctx.fillStyle = getGradient(ctx)
 
-  const gradient = ctx.createLinearGradient(0, canvasHeight, 0, 0)
-  gradient.addColorStop(0, props.color)
-  gradient.addColorStop(1, props.color.replace(/[\d\.]+\)$/g, '0.3)'))
-  ctx.fillStyle = gradient
+  // 绘制频谱条
+  for (let i = 0; i < halfBars; i++) {
+    const norm = dbToNorm(smoothedBands[i])
+    const barH = norm * maxBarH
+    const y = drawHeight - barH
 
-  // Symmetric spectrum
-  for (let i = 0; i < halfBarCount; i++) {
-    let barHeight = (dataArray.value[i] / 255) * maxBarHeight
-    barHeight = Math.pow(barHeight / maxBarHeight, 0.6) * maxBarHeight
-    const y = canvasHeight - barHeight
+    // 左侧（镜像）
+    const lx = centerX - (i + 1) * barWidth
+    ctx.fillRect(lx, y, barWidth - 0.5, barH)
 
-    const leftX = centerX - (i + 1) * barWidth
-    ctx.fillRect(leftX, y, barWidth, barHeight)
-
-    const rightX = centerX + i * barWidth
-    ctx.fillRect(rightX, y, barWidth, barHeight)
+    // 右侧
+    const rx = centerX + i * barWidth
+    ctx.fillRect(rx, y, barWidth - 0.5, barH)
   }
+
+  // 低频事件
+  let lowSum = 0
+  for (let i = 0; i < 3 && i < BAND_COUNT; i++) lowSum += dbToNorm(smoothedBands[i])
+  emit('lowFreqUpdate', lowSum / 3)
 
   if (props.show && Audio.value.isPlay) {
-    animationId.value = requestAnimationFrame(draw)
+    animationId = requestAnimationFrame(draw)
   }
 }
 
-const startVisualization = () => {
+function startVisualization() {
   if (!props.show || !Audio.value.isPlay) return
-  if (!analyser.value) initAudioAnalyser()
-  draw()
+  if (animationId !== undefined) cancelAnimationFrame(animationId)
+  animationId = requestAnimationFrame(draw)
 }
 
-const stopVisualization = () => {
-  try {
-    if (animationId.value) {
-      cancelAnimationFrame(animationId.value)
-      animationId.value = undefined
-    }
-  } catch (error) {
-    console.warn('停止动画帧时出错:', error)
+function stopVisualization() {
+  if (animationId !== undefined) {
+    cancelAnimationFrame(animationId)
+    animationId = undefined
+  }
+  // 清屏
+  if (canvasRef.value) {
+    const ctx = canvasRef.value.getContext('2d')
+    if (ctx) ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
   }
 }
 
-watch(() => Audio.value.isPlay, (isPlaying) => {
-  if (isPlaying && props.show) startVisualization()
+watch(() => Audio.value.isPlay, (playing) => {
+  if (playing && props.show) startVisualization()
   else stopVisualization()
 })
 
@@ -169,31 +163,19 @@ watch(() => props.show, (show) => {
   else stopVisualization()
 })
 
-// Watch for active audio element change (crossfade slot swap)
-watch(() => Audio.value.audio, (newEl, oldEl) => {
-  if (!newEl || newEl === oldEl) return
-  try {
-    stopVisualization()
-    try { audioManager.removeAnalyser(componentId.value) } catch {}
-    analyser.value = undefined
-    initAudioAnalyser()
-    if (props.show && Audio.value.isPlay) startVisualization()
-  } catch (e) {
-    console.warn('AudioVisualizer: 切换活跃 audio 元素失败:', e)
-  }
-})
+watch(() => props.color, () => { cachedGradient = null })
 
-const resizeCanvas = () => {
+function resizeCanvas() {
   if (!canvasRef.value) return
   const canvas = canvasRef.value
   const container = canvas.parentElement
   if (!container) return
 
-  const containerRect = container.getBoundingClientRect()
+  const rect = container.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
-  canvas.width = containerRect.width * dpr
-  canvas.height = props.height * dpr
-  canvas.style.width = containerRect.width + 'px'
+  canvas.width = Math.round(rect.width * dpr)
+  canvas.height = Math.round(props.height * dpr)
+  canvas.style.width = rect.width + 'px'
   canvas.style.height = props.height + 'px'
 
   const ctx = canvas.getContext('2d')
@@ -201,43 +183,41 @@ const resizeCanvas = () => {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.scale(dpr, dpr)
   }
+
+  // 更新绘制参数缓存
+  drawWidth = rect.width
+  drawHeight = props.height
+  halfBars = Math.floor(props.barCount / 2)
+  barWidth = drawWidth / 2 / halfBars
+  centerX = drawWidth / 2
+  maxBarH = drawHeight * 0.92
+  cachedGradient = null
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await setupSpectrumListener()
+
   if (canvasRef.value) {
     resizeCanvas()
     resizeObserver.value = new ResizeObserver(() => {
-      nextTick(() => resizeCanvas())
+      nextTick(resizeCanvas)
     })
     const container = canvasRef.value.parentElement
     if (container) resizeObserver.value.observe(container)
   }
-  if (Audio.value.audio && props.show && Audio.value.isPlay) {
-    initAudioAnalyser()
+
+  if (props.show && Audio.value.isPlay) {
     startVisualization()
   }
 })
 
 onBeforeUnmount(() => {
   stopVisualization()
-  try {
-    if (analyser.value) {
-      analyser.value.disconnect()
-      analyser.value = undefined
-    }
-    try { audioManager.removeAnalyser(componentId.value) } catch {}
-  } catch (error) {
-    console.warn('清理音频资源时出错:', error)
+  if (unlisten) { unlisten(); unlisten = null }
+  if (resizeObserver.value) {
+    resizeObserver.value.disconnect()
+    resizeObserver.value = undefined
   }
-  try {
-    if (resizeObserver.value) {
-      resizeObserver.value.disconnect()
-      resizeObserver.value = undefined
-    }
-  } catch (error) {
-    console.warn('断开 ResizeObserver 时出错:', error)
-  }
-  dataArray.value = undefined
 })
 </script>
 

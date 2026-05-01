@@ -319,7 +319,7 @@ defineExpose({ scrollToCurrentSong })
         <div v-else :class="playlistSongsClass" :style="wrapperProps.style">
           <div
             v-for="item in visibleList"
-            :key="item.data.songmid"
+            :key="`${item.data.songmid}-${item.index}`"
             class="playlist-song"
             :class="{
               active: item.data.songmid === currentSongId,

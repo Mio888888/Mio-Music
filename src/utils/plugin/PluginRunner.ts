@@ -447,16 +447,26 @@ function executePluginCode(code: string): PluginExports {
       if (body && typeof body !== 'string') body = JSON.stringify(body);
       return httpProxy(url, { method: method, headers: headers, body: body, timeout: 15000 })
         .then(function(res) {
+          var rawBody = res && res.body;
           return {
             ok: res && res.statusCode >= 200 && res.statusCode < 300,
             status: res ? res.statusCode : 0,
             statusText: '',
             headers: new Map(Object.entries((res && res.headers) || {})),
-            json: function() { return Promise.resolve(res && res.body); },
-            text: function() { var b = res && res.body; return Promise.resolve(typeof b === 'string' ? b : JSON.stringify(b)); }
+            json: function() {
+              if (typeof rawBody === 'string') {
+                try { return Promise.resolve(JSON.parse(rawBody)); } catch (_) {}
+              }
+              return Promise.resolve(rawBody);
+            },
+            text: function() {
+              return Promise.resolve(typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
+            }
           };
         });
     };
+    globalThis.fetch = fetch;
+    globalThis.window = globalThis;
   ` : ''
 
   // 注意: cerumusic 必须作为 Function 参数传入，

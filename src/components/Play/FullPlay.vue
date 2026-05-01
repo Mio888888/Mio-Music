@@ -20,6 +20,7 @@ import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/store/Settings'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useDlnaStore } from '@/store/dlna'
+import { invoke } from '@tauri-apps/api/core'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { usePlaySettingStore } from '@/store'
 import PlaySettings from './PlaySettings.vue'
@@ -298,25 +299,13 @@ const { Audio } = storeToRefs(controlAudio)
 const isAudioPlaying = ref(false)
 
 const updatePlayState = () => {
-  if (Audio.value.audio) {
-    isAudioPlaying.value = !Audio.value.audio.paused
-  } else {
-    isAudioPlaying.value = false
-  }
+  isAudioPlaying.value = Audio.value.isPlay
 }
 
 watch(
-  () => Audio.value.audio,
-  (newAudio, oldAudio) => {
-    if (oldAudio) {
-      oldAudio.removeEventListener('play', updatePlayState)
-      oldAudio.removeEventListener('pause', updatePlayState)
-    }
-    if (newAudio) {
-      newAudio.addEventListener('play', updatePlayState)
-      newAudio.addEventListener('pause', updatePlayState)
-      updatePlayState()
-    }
+  () => Audio.value.isPlay,
+  (playing) => {
+    isAudioPlaying.value = playing
   },
   { immediate: true }
 )
@@ -344,7 +333,7 @@ const jumpTime = (e: any) => {
   }
   // LyricPlayer: e.line.getLine().startTime; LyricAdapter: e.time
   const startTime = e?.line?.getLine?.()?.startTime ?? e?.time ?? 0
-  if (Audio.value.audio) Audio.value.audio.currentTime = startTime / 1000
+  if (Audio.value.isPlay) invoke('player__seek', { position: startTime / 1000 })
 }
 
 // 封面变化 → 更新背景
@@ -426,9 +415,8 @@ onBeforeUnmount(async () => {
     try { await (window as any)?.api?.powerSaveBlocker?.stop?.() } catch {}
     blockerActive.value = false
   }
-  if (Audio.value.audio) {
-    Audio.value.audio.removeEventListener('play', updatePlayState)
-    Audio.value.audio.removeEventListener('pause', updatePlayState)
+  if (Audio.value.isPlay) {
+    // Rust 后端管理播放状态
   }
   if (bgRef.value) {
     const canvas = bgRef.value.getElement()

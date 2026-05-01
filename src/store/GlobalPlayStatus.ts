@@ -139,25 +139,17 @@ const getLikelyServicePluginId = (songInfo: any): string | undefined => {
 const fetchTtmlLyrics = async (
   source: string,
   songId: string | number,
-  signal: AbortSignal
+  _signal: AbortSignal
 ): Promise<LyricLine[] | null> => {
   const ttmlSource = source === 'wy' ? 'ncm' : source === 'tx' ? 'qq' : ''
   if (!ttmlSource) return null
 
   const url = `https://amll-ttml-db.stevexmh.net/${ttmlSource}/${songId}`
-  let content = ''
-
-  try {
-    const proxyResponse = await (window as any).api?.httpProxy?.(url, { method: 'GET', timeout: 10000 })
-    const statusCode = Number(proxyResponse?.statusCode || 0)
-    if (statusCode >= 400) throw new Error(`TTML request failed with status ${statusCode}`)
-    const body = proxyResponse?.body
-    content = typeof body === 'string' ? body : ''
-  } catch {
-    const response = await fetch(url, { signal })
-    if (!response.ok) throw new Error(`TTML request failed with status ${response.status}`)
-    content = await response.text()
-  }
+  const proxyResponse = await (window as any).api?.httpProxy?.(url, { method: 'GET', timeout: 10000 })
+  const statusCode = Number(proxyResponse?.statusCode || 0)
+  if (statusCode >= 400) throw new Error(`TTML request failed with status ${statusCode}`)
+  const body = proxyResponse?.body
+  const content = typeof body === 'string' ? body : ''
 
   if (!content || content.length < 100) throw new Error('TTML empty')
   const lines = parseTTML(content).lines as LyricLine[]
