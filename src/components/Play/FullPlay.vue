@@ -658,8 +658,8 @@ onUnmounted(() => {
     >
       <AudioVisualizer
         :show="Audio.isPlay"
-        :height="70"
-        :bar-count="80"
+        :height="200"
+        :bar-count="128"
         :color="mainColor"
         @low-freq-update="handleLowFreqUpdate"
       />
@@ -1092,8 +1092,7 @@ onUnmounted(() => {
     z-index: 5;
     left: 0;
     right: 0;
-    height: 60px;
-    filter: blur(6px);
+    height: 200px;
     display: flex;
     align-items: center;
     transition: bottom 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);

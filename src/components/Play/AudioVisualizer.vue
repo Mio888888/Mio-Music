@@ -15,7 +15,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   show: true,
   height: 80,
-  barCount: 64,
+  barCount: 128,
   color: 'rgba(255, 255, 255, 0.8)',
   backgroundColor: 'transparent'
 })
@@ -33,13 +33,16 @@ const { Audio } = storeToRefs(controlAudio)
 let unlisten: UnlistenFn | null = null
 let animationId: number | undefined
 
-// ---- 非 reactive 数据，避免 Vue 响应式追踪开销 ----
-const BAND_COUNT = 64
-const SMOOTHING = 0.7 // 越大越平滑（0 = 无平滑，1 = 极度平滑）
-const targetBands = new Float64Array(BAND_COUNT)   // Rust 最新数据
-const smoothedBands = new Float64Array(BAND_COUNT) // 插值平滑后的数据
+const BAND_COUNT = 128
+const ATTACK = 0.3
+const RELEASE = 0.85
+const PEAK_FALL = 0.6 // peak 每帧下落速度 (dB)
+const PEAK_BAR_H = 2
 
-// 预计算的绘制参数（只在 resize 时更新）
+const targetBands = new Float64Array(BAND_COUNT)
+const smoothedBands = new Float64Array(BAND_COUNT)
+const peakBands = new Float64Array(BAND_COUNT)
+
 let drawWidth = 0
 let drawHeight = 0
 let barWidth = 0
@@ -47,12 +50,9 @@ let halfBars = 0
 let centerX = 0
 let maxBarH = 0
 
-// dB → 归一化幅度（0~1），带感知加权
 function dbToNorm(db: number): number {
-  // 范围约 -80dB ~ +10dB，映射到 0~1
   const clamped = Math.max(-80, Math.min(10, db))
   const norm = (clamped + 80) / 90
-  // gamma 校正让低幅度更明显
   return Math.pow(norm, 0.55)
 }
 
@@ -68,10 +68,34 @@ const setupSpectrumListener = async () => {
 }
 
 function updateSmoothed() {
-  const inv = 1 - SMOOTHING
   for (let i = 0; i < BAND_COUNT; i++) {
-    smoothedBands[i] = smoothedBands[i] * SMOOTHING + targetBands[i] * inv
+    const target = targetBands[i]
+    const prev = smoothedBands[i]
+    if (target > prev) {
+      smoothedBands[i] = prev * ATTACK + target * (1 - ATTACK)
+    } else {
+      smoothedBands[i] = prev * RELEASE + target * (1 - RELEASE)
+    }
+    // peak hold
+    if (smoothedBands[i] > peakBands[i]) {
+      peakBands[i] = smoothedBands[i]
+    } else {
+      peakBands[i] = Math.max(smoothedBands[i], peakBands[i] - PEAK_FALL)
+    }
   }
+}
+
+function drawRoundedBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  if (h < 1) return
+  const radius = Math.min(r, w / 2, h / 2)
+  ctx.beginPath()
+  ctx.moveTo(x, y + h)
+  ctx.lineTo(x, y + radius)
+  ctx.arcTo(x, y, x + radius, y, radius)
+  ctx.arcTo(x + w, y, x + w, y + radius, radius)
+  ctx.lineTo(x + w, y + h)
+  ctx.closePath()
+  ctx.fill()
 }
 
 let cachedGradient: CanvasGradient | null = null
@@ -95,7 +119,6 @@ function draw() {
 
   updateSmoothed()
 
-  // 清屏
   if (props.backgroundColor === 'transparent') {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
   } else {
@@ -108,24 +131,45 @@ function draw() {
     return
   }
 
-  ctx.fillStyle = getGradient(ctx)
+  const gradient = getGradient(ctx)
+  ctx.fillStyle = gradient
 
-  // 绘制频谱条
+  // glow effect via shadowBlur
+  ctx.shadowColor = props.color.replace(/[\d.]+\)$/, '0.6)')
+  ctx.shadowBlur = 8
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 0
+
+  const cornerR = Math.max(1, barWidth * 0.3)
+
   for (let i = 0; i < halfBars; i++) {
     const norm = dbToNorm(smoothedBands[i])
     const barH = norm * maxBarH
     const y = drawHeight - barH
 
-    // 左侧（镜像）
     const lx = centerX - (i + 1) * barWidth
-    ctx.fillRect(lx, y, barWidth - 0.5, barH)
+    drawRoundedBar(ctx, lx, y, barWidth - 0.5, barH, cornerR)
 
-    // 右侧
     const rx = centerX + i * barWidth
-    ctx.fillRect(rx, y, barWidth - 0.5, barH)
+    drawRoundedBar(ctx, rx, y, barWidth - 0.5, barH, cornerR)
   }
 
-  // 低频事件
+  // peak indicators
+  ctx.shadowBlur = 0
+  ctx.fillStyle = props.color
+  for (let i = 0; i < halfBars; i++) {
+    const peakNorm = dbToNorm(peakBands[i])
+    const peakH = peakNorm * maxBarH
+    const peakY = drawHeight - peakH - PEAK_BAR_H
+
+    const lx = centerX - (i + 1) * barWidth
+    ctx.fillRect(lx, peakY, barWidth - 0.5, PEAK_BAR_H)
+
+    const rx = centerX + i * barWidth
+    ctx.fillRect(rx, peakY, barWidth - 0.5, PEAK_BAR_H)
+  }
+
+  // low freq event
   let lowSum = 0
   for (let i = 0; i < 3 && i < BAND_COUNT; i++) lowSum += dbToNorm(smoothedBands[i])
   emit('lowFreqUpdate', lowSum / 3)
@@ -146,7 +190,6 @@ function stopVisualization() {
     cancelAnimationFrame(animationId)
     animationId = undefined
   }
-  // 清屏
   if (canvasRef.value) {
     const ctx = canvasRef.value.getContext('2d')
     if (ctx) ctx.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
@@ -184,7 +227,6 @@ function resizeCanvas() {
     ctx.scale(dpr, dpr)
   }
 
-  // 更新绘制参数缓存
   drawWidth = rect.width
   drawHeight = props.height
   halfBars = Math.floor(props.barCount / 2)

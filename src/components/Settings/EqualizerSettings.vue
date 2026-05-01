@@ -306,7 +306,7 @@ const setupVisualizer = async () => {
     ctx.fillStyle = 'rgba(30, 30, 30, 0.2)'
     ctx.fillRect(0, 0, width, height)
 
-    const barCount = Math.min(spectrumData.length, 64)
+    const barCount = Math.min(spectrumData.length, 128)
     const barWidth = (width / barCount) * 2.5
     let x = 0
 

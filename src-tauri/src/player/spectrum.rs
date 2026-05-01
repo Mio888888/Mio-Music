@@ -4,8 +4,8 @@ use parking_lot::Mutex;
 use rodio::Source;
 use rustfft::{FftPlanner, num_complex::Complex};
 
-const FFT_SIZE: usize = 512;
-const OUTPUT_BANDS: usize = 64;
+const FFT_SIZE: usize = 1024;
+const OUTPUT_BANDS: usize = 128;
 
 pub struct SpectrumState {
     buffer: Vec<f32>,
@@ -47,24 +47,18 @@ impl SpectrumState {
 
         self.fft.process(&mut input);
 
-        // 取前 OUTPUT_BANDS 个频率 bin 的幅度 (dB)
-        // 使用分段映射：低频多 bin 合并，高频稀疏采样
         let magnitudes: Vec<f64> = (0..OUTPUT_BANDS)
             .map(|band| {
-                // 对数映射：低频段窄，高频段宽
                 let lo = self.band_start(band);
-                let hi = self.band_start(band + 1);
-                let mut sum = 0.0;
-                let mut count = 0;
+                let hi = self.band_start(band + 1).max(lo + 1);
+                let mut max_sq = 0.0f64;
                 for i in lo..hi {
-                    if i >= input.len() { break }
-                    let c = &input[i + 1]; // skip DC bin
-                    let mag = (c.re * c.re + c.im * c.im).sqrt();
-                    sum += mag;
-                    count += 1;
+                    if i + 1 >= input.len() { break }
+                    let c = &input[i + 1];
+                    let sq = c.re * c.re + c.im * c.im;
+                    if sq > max_sq { max_sq = sq; }
                 }
-                let avg = if count > 0 { sum / count as f64 } else { 0.0 };
-                20.0 * (avg / FFT_SIZE as f64 + 1e-10).log10()
+                10.0 * (max_sq / FFT_SIZE as f64 + 1e-10).log10()
             })
             .collect();
 
@@ -74,10 +68,9 @@ impl SpectrumState {
     /// 对数频率映射：模仿人耳对频率的感知
     /// 将 OUTPUT_BANDS 个柱子映射到 FFT bin 上
     fn band_start(&self, band: usize) -> usize {
-        // 从 bin 1 开始（跳过 DC），到 bin OUTPUT_BANDS 结束
-        // 使用幂函数分布让低频更密集
+        let max_bin = FFT_SIZE / 2 - 1;
         let t = band as f64 / OUTPUT_BANDS as f64;
-        (t.powf(1.6) * (OUTPUT_BANDS as f64)).round() as usize
+        (t.powf(1.6) * max_bin as f64).round() as usize
     }
 }
 
@@ -103,7 +96,7 @@ impl<S: Source<Item = f32>> SpectrumSource<S> {
         // stride = 跳过多少 mono 样本来匹配
         let target_fills_per_sec = 30;
         let mono_per_fill = sr as usize / target_fills_per_sec;
-        let stride = if mono_per_fill > 512 { mono_per_fill / 512 } else { 1 };
+        let stride = if mono_per_fill > FFT_SIZE { mono_per_fill / FFT_SIZE } else { 1 };
         Self { inner, state, sample_count: 0, channel_count: channels, stride, stride_counter: 0 }
     }
 }
