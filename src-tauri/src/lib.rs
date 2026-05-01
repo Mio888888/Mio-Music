@@ -107,6 +107,8 @@ pub fn run() {
             // Music SDK
             music_sdk::commands::service_music_sdk_request,
             music_sdk::commands::service_music_tip_search,
+            music_sdk::commands::service_music_search_music,
+            music_sdk::commands::service_music_find_music,
             // Local Music
             local_music::commands::local_music__scan,
             local_music::commands::local_music__get_cover,

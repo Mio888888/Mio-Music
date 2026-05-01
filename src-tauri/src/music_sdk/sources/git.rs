@@ -76,8 +76,10 @@ fn format_music_item(item: &serde_json::Value) -> Option<MusicItem> {
         interval: String::new(),
         img, lrc,
         types: Some(types),
+        types_map: None,
         type_url: Some(serde_json::json!({})),
         hash: None,
+        song_id: None, str_media_mid: None, album_mid: None,
     })
 }
 
@@ -121,7 +123,7 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
     let end = (start + limit as usize).min(db.len());
 
     let list: Vec<MusicItem> = if start < db.len() {
-        db[start..end].iter().filter_map(|item| format_music_item(item)).collect()
+        db[start..end].iter().filter_map(format_music_item).collect()
     } else {
         vec![]
     };
@@ -167,7 +169,7 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
         .collect();
 
     let total = filtered.len() as i64;
-    let start = ((page - 1) * limit as u64) as usize;
+    let start = ((page - 1) * limit) as usize;
     let end = (start + limit as usize).min(filtered.len());
     let list = if start < filtered.len() {
         filtered[start..end].to_vec()

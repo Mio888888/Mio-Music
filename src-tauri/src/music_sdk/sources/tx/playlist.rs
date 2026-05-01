@@ -1,20 +1,9 @@
-use crate::music_sdk::client::{self, MusicItem, PlaylistItem, PlaylistResult, SearchResult};
-
-fn get_http() -> &'static reqwest::Client {
-    client::get_client()
-}
-
-fn get_str<'a>(args: &'a serde_json::Value, key: &str) -> &'a str {
-    args.get(key).and_then(|v| v.as_str()).unwrap_or("")
-}
-
-fn get_u64(args: &serde_json::Value, key: &str, default: u64) -> u64 {
-    args.get(key).and_then(|v| v.as_u64()).unwrap_or(default)
-}
+use super::helpers::*;
+use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult};
 
 // --- Playlist Tags ---
 
-async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
     let tags_url = "https://u.y.qq.com/cgi-bin/musicu.fcg?loginUin=0&hostUin=0&format=json&inCharset=utf-8&outCharset=utf-8&notice=0&platform=wk_v15.json&needNewCode=0&data=%7B%22tags%22%3A%7B%22method%22%3A%22get_all_categories%22%2C%22param%22%3A%7B%22qq%22%3A%22%22%7D%2C%22module%22%3A%22playlist.PlaylistAllCategoriesServer%22%7D%7D";
     let hot_tag_url = "https://c.y.qq.com/node/pc/wk_v15/category_playlist.html";
 
@@ -40,11 +29,7 @@ async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value
                     .iter().map(|item| {
                         let id = item.get("id").cloned().unwrap_or(serde_json::Value::Null);
                         let name = item.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                        serde_json::json!({
-                            "id": id,
-                            "name": name,
-                            "source": "tx"
-                        })
+                        serde_json::json!({ "id": id, "name": name, "source": "tx" })
                     }).collect();
                 serde_json::json!({ "name": name, "list": list, "source": "tx" })
             }).collect();
@@ -57,7 +42,6 @@ async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value
                 .send().await.map_err(|e| e.to_string())?;
             let html = resp.text().await.map_err(|e| e.to_string())?;
 
-            // Parse hot tags from HTML: data-id="(\w+)">(.+?)</a>
             let re = regex_lite::Regex::new(r#"data-id="(\w+)">(.+?)</a>"#).map_err(|e| e.to_string())?;
             let hot: Vec<serde_json::Value> = re.captures_iter(&html).filter_map(|caps| {
                 let id = caps.get(1)?.as_str();
@@ -80,7 +64,6 @@ fn build_tx_playlist_url(sort_id: &str, tag_id: &str, page: u64) -> String {
     let base = "https://u.y.qq.com/cgi-bin/musicu.fcg?loginUin=0&hostUin=0&format=json&inCharset=utf-8&outCharset=utf-8&notice=0&platform=wk_v15.json&needNewCode=0";
 
     let data = if !tag_id.is_empty() {
-        // Use category-specific API
         let id: i64 = tag_id.parse().unwrap_or(0);
         serde_json::json!({
             "comm": { "cv": 1602, "ct": 20 },
@@ -114,7 +97,7 @@ fn build_tx_playlist_url(sort_id: &str, tag_id: &str, page: u64) -> String {
     format!("{}&data={}", base, urlencoding::encode(&serde_json::to_string(&data).unwrap_or_default()))
 }
 
-async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::Value, String> {
     let tag_id = get_str(&args, "tagId").to_string();
     let sort_id = get_str(&args, "sortId").to_string();
     let page = get_u64(&args, "page", 1);
@@ -134,7 +117,6 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
     let playlist_data = resp.get("playlist").and_then(|p| p.get("data")).cloned().unwrap_or(serde_json::json!({}));
 
     let (list, total) = if tag_id.is_empty() {
-        // filterList: data.v_playlist
         let raw_list = playlist_data.get("v_playlist").and_then(|v| v.as_array()).cloned().unwrap_or_default();
         let total = playlist_data.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
         let list: Vec<PlaylistItem> = raw_list.iter().map(|item| {
@@ -152,7 +134,6 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
         }).collect();
         (list, total)
     } else {
-        // filterList2: content.v_item
         let content = playlist_data.get("content").cloned().unwrap_or(serde_json::json!({}));
         let raw_list = content.get("v_item").and_then(|v| v.as_array()).cloned().unwrap_or_default();
         let total = content.get("total_cnt").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -179,9 +160,13 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
     }).unwrap())
 }
 
+pub async fn get_hot_songlist(args: serde_json::Value) -> Result<serde_json::Value, String> {
+    get_category_playlists(args).await
+}
+
 // --- Leaderboards ---
 
-async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value, String> {
     let url = "https://c.y.qq.com/v8/fcg-bin/fcg_myqq_toplist.fcg?g_tk=1928093487&inCharset=utf-8&outCharset=utf-8&notice=0&format=json&uin=0&needNewCode=1&platform=h5";
     let resp: serde_json::Value = get_http().get(url)
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
@@ -196,10 +181,9 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
     let raw_list = resp.get("data").and_then(|d| d.get("topList")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let list: Vec<serde_json::Value> = raw_list.iter().filter_map(|board| {
         let id = board.get("id")?.as_i64()?;
-        if id == 201 { return None; } // Exclude MV榜
+        if id == 201 { return None; }
 
         let mut name = board.get("topTitle")?.as_str()?.to_string();
-        // Normalize name to match reference
         if name.starts_with("巅峰榜·") {
             name = name.replace("巅峰榜·", "");
         }
@@ -211,31 +195,25 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
         let listen = board.get("listenCount").cloned().unwrap_or(serde_json::Value::Null);
 
         Some(serde_json::json!({
-            "id": format!("tx__{}", id),
-            "name": name,
-            "bangid": id.to_string(),
-            "img": pic,
-                "pic": pic,
-            "listen": listen,
-            "source": "tx"
+            "id": format!("tx__{}", id), "name": name,
+            "bangid": id.to_string(), "img": pic, "pic": pic,
+            "listen": listen, "source": "tx"
         }))
     }).collect();
 
     Ok(serde_json::json!({ "list": list, "source": "tx" }))
 }
 
-// --- Leaderboard Detail (songs in a board) ---
+// --- Leaderboard Detail ---
 
-async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
     let raw_id = args.get("id").map(|v| match v {
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Number(n) => n.to_string(),
         _ => String::new(),
     }).unwrap_or_default();
-    let _page = get_u64(&args, "page", 1);
     let limit = get_u64(&args, "limit", 300);
 
-    // Extract numeric ID from "tx__XX" format
     let bang_id: i64 = if raw_id.starts_with("tx__") {
         raw_id.replace("tx__", "").parse().unwrap_or(0)
     } else {
@@ -268,37 +246,7 @@ async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_json::V
     let total = song_info_list.len() as i64;
 
     let list: Vec<MusicItem> = song_info_list.iter().map(|item| {
-        let singer_list = item.get("singer").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        let singer = singer_list.iter().filter_map(|s| s.get("name")).filter_map(|n| n.as_str()).collect::<Vec<_>>().join("、");
-        let name = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-        let album_name = item.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()).unwrap_or("");
-        let album_mid = item.get("album").and_then(|a| a.get("mid")).and_then(|v| v.as_str()).unwrap_or("");
-        let songmid = item.get("mid").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let interval = item.get("interval").and_then(|v| v.as_i64()).unwrap_or(0);
-
-        let img = if album_name.is_empty() || album_name == "空" {
-            singer_list.first().and_then(|s| s.get("mid")).and_then(|v| v.as_str())
-                .map(|m| format!("https://y.gtimg.cn/music/photo_new/T001R500x500M000{}.jpg", m))
-                .unwrap_or_default()
-        } else {
-            format!("https://y.gtimg.cn/music/photo_new/T002R500x500M000{}.jpg", album_mid)
-        };
-
-        // Quality types
-        let file = item.get("file").cloned().unwrap_or(serde_json::json!({}));
-        let mut types = Vec::new();
-        if file.get("size_new").and_then(|v| v.get(0)).and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("master".to_string()); }
-        if file.get("size_hires").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("hires".to_string()); }
-        if file.get("size_flac").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("flac".to_string()); }
-        if file.get("size_320mp3").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("320k".to_string()); }
-        if file.get("size_128mp3").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("128k".to_string()); }
-
-        MusicItem {
-            songmid: serde_json::Value::String(songmid), singer, name: name.to_string(),
-            album_name: album_name.to_string(), album_id: serde_json::Value::String(album_mid.to_string()),
-            source: "tx".into(), interval: format_play_time(interval), img, lrc: None,
-            types: Some(types), type_url: Some(serde_json::json!({})), hash: None,
-        }
+        tx_parse_music_item(item)
     }).collect();
 
     Ok(serde_json::json!({
@@ -309,7 +257,7 @@ async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_json::V
 
 // --- Playlist Detail ---
 
-async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
+pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Value, String> {
     let raw_id = args.get("id").map(|v| match v {
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Number(n) => n.to_string(),
@@ -340,36 +288,40 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
     let songlist = cdlist.get("songlist").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let total = songlist.len() as i64;
 
+    // Fetch batch quality info
+    let song_ids: Vec<i64> = songlist.iter()
+        .filter_map(|item| item.get("id").and_then(|v| v.as_i64()))
+        .collect();
+    let quality_map = super::playback::get_batch_quality_info(&song_ids).await.unwrap_or_default();
+
     let list: Vec<MusicItem> = songlist.iter().map(|item| {
+        let song_id = item.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
         let singer_list = item.get("singer").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-        let singer = singer_list.iter().filter_map(|s| s.get("name")).filter_map(|n| n.as_str()).collect::<Vec<_>>().join("、");
+        let singer = format_singer(&singer_list);
         let name = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
-        let album_name = item.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()).unwrap_or("");
-        let album_mid = item.get("album").and_then(|a| a.get("mid")).and_then(|v| v.as_str()).unwrap_or("");
+        let album_name = item.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let album_mid = item.get("album").and_then(|a| a.get("mid")).and_then(|v| v.as_str()).unwrap_or("").to_string();
         let songmid = item.get("mid").and_then(|v| v.as_str()).unwrap_or("").to_string();
         let interval = item.get("interval").and_then(|v| v.as_i64()).unwrap_or(0);
+        let img = get_song_img(item, &album_mid);
 
-        let img = if album_name.is_empty() || album_name == "空" {
-            singer_list.first().and_then(|s| s.get("mid")).and_then(|v| v.as_str())
-                .map(|m| format!("https://y.gtimg.cn/music/photo_new/T001R500x500M000{}.jpg", m))
-                .unwrap_or_default()
+        let (types, types_map) = if let Some((t, m)) = quality_map.get(&song_id) {
+            (t.clone(), m.clone())
         } else {
-            format!("https://y.gtimg.cn/music/photo_new/T002R500x500M000{}.jpg", album_mid)
+            let file = item.get("file").cloned().unwrap_or(serde_json::json!({}));
+            parse_quality_types(&file)
         };
 
-        let file = item.get("file").cloned().unwrap_or(serde_json::json!({}));
-        let mut types = Vec::new();
-        if file.get("size_new").and_then(|v| v.get(0)).and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("master".to_string()); }
-        if file.get("size_hires").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("hires".to_string()); }
-        if file.get("size_flac").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("flac".to_string()); }
-        if file.get("size_320mp3").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("320k".to_string()); }
-        if file.get("size_128mp3").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("128k".to_string()); }
-
         MusicItem {
-            songmid: serde_json::Value::String(songmid), singer, name: name.to_string(),
-            album_name: album_name.to_string(), album_id: serde_json::Value::String(album_mid.to_string()),
+            songmid: serde_json::Value::String(songmid.clone()),
+            singer, name: name.to_string(), album_name,
+            album_id: serde_json::Value::String(album_mid.clone()),
             source: "tx".into(), interval: format_play_time(interval), img, lrc: None,
-            types: Some(types), type_url: Some(serde_json::json!({})), hash: None,
+            types: Some(types), types_map: Some(types_map), type_url: Some(serde_json::json!({})),
+            hash: None,
+            song_id: Some(serde_json::json!(song_id)),
+            str_media_mid: Some(item.get("file").and_then(|f| f.get("media_mid")).and_then(|v| v.as_str()).unwrap_or("").to_string()),
+            album_mid: Some(album_mid),
         }
     }).collect();
 
@@ -385,87 +337,30 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
     }))
 }
 
-// --- Search ---
+// --- Shared Music Item parser ---
 
-async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let keyword = get_str(&args, "keyword");
-    let page = get_u64(&args, "page", 1);
-    let limit = get_u64(&args, "limit", 20);
-    if keyword.is_empty() {
-        return Ok(serde_json::to_value(SearchResult {
-            list: vec![], all_page: 0, limit: limit as i64, total: 0, source: "tx".into(),
-        }).unwrap());
-    }
+fn tx_parse_music_item(item: &serde_json::Value) -> MusicItem {
+    let singer_list = item.get("singer").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let singer = format_singer(&singer_list);
+    let name = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+    let album_name = item.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let album_mid = item.get("album").and_then(|a| a.get("mid")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let songmid = item.get("mid").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let interval = item.get("interval").and_then(|v| v.as_i64()).unwrap_or(0);
+    let img = get_song_img(item, &album_mid);
 
-    let url = format!(
-        "http://c.y.qq.com/soso/fcgi-bin/client_music_search_songlist?page_no={}&num_per_page={}&format=json&query={}&remoteplace=txt.yqq.playlist&inCharset=utf8&outCharset=utf-8",
-        page - 1, limit, urlencoding::encode(keyword)
-    );
+    let file = item.get("file").cloned().unwrap_or(serde_json::json!({}));
+    let (types, types_map) = parse_quality_types(&file);
 
-    let resp: serde_json::Value = get_http().get(&url)
-        .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
-        .header("Referer", "http://y.qq.com/portal/search.html")
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
-
-    let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
-    if code != 0 {
-        return Err(format!("TX search API error: code={}", code));
-    }
-
-    let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
-    let total = data.get("sum").and_then(|v| v.as_i64()).unwrap_or(0);
-    let raw_list = data.get("list").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-
-    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| {
-        let dissid = item.get("dissid").cloned().unwrap_or(serde_json::Value::Null);
-        PlaylistItem {
-            id: dissid,
-            name: item.get("dissname").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            img: item.get("imgurl").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            source: "tx".into(),
-            desc: item.get("introduction").and_then(|v| v.as_str()).unwrap_or("").replace("<br>", "\n"),
-            play_count: item.get("listennum").cloned().unwrap_or(serde_json::Value::Null),
-            author: item.get("creator").and_then(|c| c.get("name")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            total: serde_json::Value::Null,
-        }
-    }).collect();
-
-    Ok(serde_json::to_value(PlaylistResult {
-        list, all_page: (total as f64 / limit as f64).ceil() as i64,
-        limit: limit as i64, total, source: "tx".into(),
-    }).unwrap())
-}
-
-async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    search(args).await
-}
-
-// --- Helpers ---
-
-fn format_play_time(seconds: i64) -> String {
-    let m = seconds / 60;
-    let s = seconds % 60;
-    format!("{:02}:{:02}", m, s)
-}
-
-// --- Router ---
-
-pub async fn handle(method: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
-    match method {
-        "search" => search(args).await,
-        "tipSearch" | "hotSearch" => Ok(serde_json::json!({ "list": [] })),
-        "getMusicUrl" => Ok(serde_json::json!({ "url": "" })),
-        "getPic" => Ok(serde_json::json!({ "url": "" })),
-        "getLyric" => Ok(serde_json::json!({ "lrc": "" })),
-        "getComment" | "getHotComment" => Ok(serde_json::json!({ "comments": [], "total": 0 })),
-        "getHotSonglist" | "getHotPlaylists" => get_category_playlists(args).await,
-        "getPlaylistTags" | "getSongboardTags" => get_playlist_tags(args).await,
-        "getCategoryPlaylists" => get_category_playlists(args).await,
-        "getLeaderboards" => get_leaderboards(args).await,
-        "getPlaylistDetail" | "getPlaylistDetailById" => get_playlist_detail(args).await,
-        "getLeaderboardDetail" => get_leaderboard_detail(args).await,
-        "searchPlaylist" => search_playlist(args).await,
-        _ => Err(format!("Unknown SDK method for tx: {}", method)),
+    MusicItem {
+        songmid: serde_json::Value::String(songmid.clone()),
+        singer, name: name.to_string(), album_name,
+        album_id: serde_json::Value::String(album_mid.clone()),
+        source: "tx".into(), interval: format_play_time(interval), img, lrc: None,
+        types: Some(types), types_map: Some(types_map), type_url: Some(serde_json::json!({})),
+        hash: None,
+        song_id: Some(serde_json::json!(item.get("id").and_then(|v| v.as_i64()).unwrap_or(0))),
+        str_media_mid: Some(item.get("file").and_then(|f| f.get("media_mid")).and_then(|v| v.as_str()).unwrap_or("").to_string()),
+        album_mid: Some(album_mid),
     }
 }

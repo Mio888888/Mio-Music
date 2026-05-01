@@ -116,8 +116,9 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
         Some(MusicItem {
             songmid: serde_json::json!(songmid), singer, name, album_name, album_id,
             source: "bd".into(), interval, img, lrc: None,
-            types: Some(types), type_url: Some(serde_json::json!({})),
+            types: Some(types), types_map: None, type_url: Some(serde_json::json!({})),
             hash: None,
+            song_id: None, str_media_mid: None, album_mid: None,
         })
     }).collect();
 
@@ -176,8 +177,9 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
             songmid: serde_json::json!(songmid), singer, name, album_name, album_id,
             source: "bd".into(), interval,
             img: item.get("albpic").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            lrc: None, types: Some(types), type_url: Some(serde_json::json!({})),
+            lrc: None, types: Some(types), types_map: None, type_url: Some(serde_json::json!({})),
             hash: None,
+            song_id: None, str_media_mid: None, album_mid: None,
         })
     }).collect();
 
