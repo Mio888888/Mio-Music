@@ -4,6 +4,7 @@ use crate::db::music_db;
 use crate::local_music::{scanner, cover_cache};
 use crate::AppDb;
 use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 pub fn local_music__scan(state: State<'_, AppDb>, dirs: Vec<String>) -> Result<serde_json::Value, String> {
@@ -110,4 +111,21 @@ pub fn local_music__clear_index(state: State<'_, AppDb>) -> Result<serde_json::V
     let n = music_db::clear_tracks(&conn).map_err(|e| e.to_string())?;
     cover_cache::clear_cache();
     Ok(serde_json::json!({ "success": true, "data": n }))
+}
+
+#[tauri::command]
+pub async fn local_music__select_dirs(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let dirs = app.dialog()
+        .file()
+        .set_title("选择音乐文件夹")
+        .blocking_pick_folders();
+    match dirs {
+        Some(paths) => {
+            let dir_strs: Vec<String> = paths.iter()
+                .map(|p| p.to_string())
+                .collect();
+            Ok(serde_json::json!({ "success": true, "data": dir_strs }))
+        }
+        None => Ok(serde_json::json!({ "success": true, "data": [] })),
+    }
 }

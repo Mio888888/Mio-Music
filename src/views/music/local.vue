@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
+import {
+  ChevronRightIcon,
+  RefreshIcon,
+  EllipsisIcon,
+  PlayCircleIcon,
+  SearchIcon,
+  FolderIcon
+} from 'tdesign-icons-vue-next'
 import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 
 const router = useRouter()
@@ -14,28 +22,40 @@ const playStatus = useGlobalPlayStatusStore()
 const loading = ref(false)
 const scanning = ref(false)
 const tracks = ref<any[]>([])
-const searchKeyword = ref('')
+const searchQuery = ref('')
 const coverCache = ref<Record<string, string>>({})
 
-// Multi-select
+// 目录管理
+const scanDirs = ref<string[]>([])
+const showDirModal = ref(false)
+
+// 多选
 const selectedIds = ref<Set<string>>(new Set())
+const multiSelect = ref(false)
 const showAddToPlaylist = ref(false)
 const songsToAdd = ref<any[]>([])
 
-const hasSelection = computed(() => selectedIds.value.size > 0)
+// 右键菜单
+const contextMenuVisible = ref(false)
+const contextMenuPos = ref({ top: 0, left: 0 })
+const contextMenuTrack = ref<any | null>(null)
 
-const isAllSelected = computed(() =>
-  filteredTracks.value.length > 0 && filteredTracks.value.every(t => selectedIds.value.has(t.songmid))
-)
+// 当前播放
+const currentSongId = computed(() => localUserStore.userInfo?.lastPlaySongId)
 
-const filteredTracks = computed(() => {
-  if (!searchKeyword.value.trim()) return tracks.value
-  const kw = searchKeyword.value.toLowerCase()
-  return tracks.value.filter(t =>
-    t.name.toLowerCase().includes(kw) || t.singer.toLowerCase().includes(kw) || t.albumName.toLowerCase().includes(kw)
-  )
+const displayTracks = computed(() => {
+  const q = (searchQuery.value || '').trim().toLowerCase()
+  if (!q) return tracks.value
+  const includes = (s?: string) => !!s && s.toLowerCase().includes(q)
+  return tracks.value.filter(t => includes(t.name) || includes(t.singer) || includes(t.albumName))
 })
 
+const hasSelection = computed(() => selectedIds.value.size > 0)
+const isAllSelected = computed(() =>
+  displayTracks.value.length > 0 && displayTracks.value.every(t => selectedIds.value.has(t.songmid))
+)
+
+// 加载歌曲
 const fetchTracks = async () => {
   loading.value = true
   try {
@@ -49,6 +69,7 @@ const fetchTracks = async () => {
   finally { loading.value = false }
 }
 
+// 加载封面
 const loadCovers = async (ids: string[]) => {
   try {
     const res = await (window as any).api?.localMusic?.getCoversBase64?.(ids)
@@ -56,16 +77,47 @@ const loadCovers = async (ids: string[]) => {
   } catch {}
 }
 
-const scanDirs = async () => {
+// 目录管理
+const fetchDirs = async () => {
+  try {
+    const res = await (window as any).api?.localMusic?.getDirs?.()
+    if (res?.success && Array.isArray(res.data)) scanDirs.value = res.data
+  } catch {}
+}
+
+const selectDirs = async () => {
+  try {
+    const res = await (window as any).api?.localMusic?.selectDirs?.()
+    const dirs = res?.success ? (res.data || []) : (Array.isArray(res) ? res : [])
+    if (Array.isArray(dirs) && dirs.length > 0) {
+      scanDirs.value = Array.from(new Set([...scanDirs.value, ...dirs]))
+    }
+  } catch {}
+}
+
+const removeDir = (d: string) => {
+  scanDirs.value = scanDirs.value.filter(x => x !== d)
+}
+
+const saveDirs = async () => {
+  try {
+    await (window as any).api?.localMusic?.setDirs?.(scanDirs.value)
+    showDirModal.value = false
+    MessagePlugin.success('目录已保存')
+  } catch {
+    MessagePlugin.error('保存目录失败')
+  }
+}
+
+// 扫描
+const scanLibrary = async () => {
+  if (scanDirs.value.length === 0) {
+    MessagePlugin.warning('请先选择扫描目录')
+    return
+  }
   scanning.value = true
   try {
-    const dirRes = await (window as any).api?.localMusic?.getDirs?.()
-    const dirs = dirRes?.success ? (dirRes.data || []) : []
-    if (dirs.length === 0) {
-      MessagePlugin.warning('请先在设置中添加音乐目录')
-      return
-    }
-    const scanRes = await (window as any).api?.localMusic?.scan?.(dirs)
+    const scanRes = await (window as any).api?.localMusic?.scan?.(scanDirs.value)
     if (scanRes?.success) {
       const data = scanRes.data
       MessagePlugin.success(`扫描完成: ${data.scanned} 个文件, ${data.added} 首新增`)
@@ -75,6 +127,22 @@ const scanDirs = async () => {
   finally { scanning.value = false }
 }
 
+// 清空
+const clearScan = async () => {
+  try {
+    const res = await (window as any).api?.localMusic?.clearIndex?.()
+    if (res?.success) {
+      tracks.value = []
+      MessagePlugin.success('已清空扫描索引')
+    } else {
+      MessagePlugin.error('清空失败')
+    }
+  } catch {
+    MessagePlugin.error('清空失败')
+  }
+}
+
+// 播放
 const handlePlay = (track: any) => {
   const song = {
     songmid: track.songmid, name: track.name, singer: track.singer,
@@ -86,23 +154,35 @@ const handlePlay = (track: any) => {
   localUserStore.addSongToFirst(song)
 }
 
-const openTagEditor = (track: any) => {
-  router.push({ name: 'local-tag-editor', query: { songmid: track.songmid } })
+// 播放全部
+const playAll = () => {
+  if (displayTracks.value.length === 0) return
+  const songList = displayTracks.value.map(track => ({
+    songmid: track.songmid, name: track.name, singer: track.singer,
+    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+    source: 'local', url: track.url || '', interval: track.interval
+  }))
+  localUserStore.replaceSongList(songList as any)
+  playSong(songList[0] as any)
+  playStatus.updatePlayerInfo(songList[0] as any)
+  MessagePlugin.success(`正在播放 ${songList.length} 首本地歌曲`)
 }
 
-const formatDuration = (sec: number) => {
-  if (!sec || !isFinite(sec)) return '--:--'
-  const m = Math.floor(sec / 60), s = Math.floor(sec % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
+// 添加全部到播放列表
+const addAllToPlaylist = () => {
+  if (displayTracks.value.length === 0) return
+  displayTracks.value.forEach(track => {
+    const song = {
+      songmid: track.songmid, name: track.name, singer: track.singer,
+      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+      source: 'local', url: track.url || '', interval: track.interval
+    }
+    localUserStore.addSong(song)
+  })
+  MessagePlugin.success('已将全部加入播放列表')
 }
 
-const formatSize = (bytes: number) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1048576).toFixed(1) + ' MB'
-}
-
-// Selection
+// 选择
 const toggleSelect = (songmid: string) => {
   const s = new Set(selectedIds.value)
   if (s.has(songmid)) s.delete(songmid)
@@ -114,14 +194,14 @@ const toggleSelectAll = () => {
   if (isAllSelected.value) {
     selectedIds.value = new Set()
   } else {
-    selectedIds.value = new Set(filteredTracks.value.map(t => t.songmid))
+    selectedIds.value = new Set(displayTracks.value.map(t => t.songmid))
   }
 }
 
 const clearSelection = () => { selectedIds.value = new Set() }
 
 const batchPlay = () => {
-  const selected = filteredTracks.value.filter(t => selectedIds.value.has(t.songmid))
+  const selected = displayTracks.value.filter(t => selectedIds.value.has(t.songmid))
   if (selected.length === 0) return
   const songList = selected.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
@@ -134,7 +214,7 @@ const batchPlay = () => {
 }
 
 const batchAddToPlaylist = () => {
-  const selected = filteredTracks.value.filter(t => selectedIds.value.has(t.songmid))
+  const selected = displayTracks.value.filter(t => selectedIds.value.has(t.songmid))
   if (selected.length === 0) return
   songsToAdd.value = selected.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
@@ -144,20 +224,144 @@ const batchAddToPlaylist = () => {
   showAddToPlaylist.value = true
 }
 
-onMounted(() => fetchTracks())
+// 右键菜单
+const handleContextMenu = (e: MouseEvent, track: any) => {
+  e.preventDefault()
+  e.stopPropagation()
+  contextMenuTrack.value = track
+  contextMenuPos.value = { top: e.clientY, left: e.clientX }
+  contextMenuVisible.value = true
+}
+
+const closeContextMenu = () => {
+  contextMenuVisible.value = false
+  contextMenuTrack.value = null
+}
+
+const handleMenuAction = (action: string) => {
+  const track = contextMenuTrack.value
+  if (!track) return
+  closeContextMenu()
+  if (action === 'play') handlePlay(track)
+  else if (action === 'addToEnd') {
+    const song = {
+      songmid: track.songmid, name: track.name, singer: track.singer,
+      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+      source: 'local', url: track.url || '', interval: track.interval
+    }
+    localUserStore.addSong(song)
+    MessagePlugin.success('已添加到播放列表')
+  } else if (action === 'addToList') {
+    songsToAdd.value = [{
+      songmid: track.songmid, name: track.name, singer: track.singer,
+      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+      source: 'local', url: track.url || '', interval: track.interval
+    }]
+    showAddToPlaylist.value = true
+  } else if (action === 'editTags') {
+    router.push({ name: 'local-tag-editor', query: { songmid: track.songmid } })
+  }
+}
+
+// 编辑标签
+const openTagEditor = (track: any) => {
+  router.push({ name: 'local-tag-editor', query: { songmid: track.songmid } })
+}
+
+// 格式化
+const formatDuration = (sec: number) => {
+  if (!sec || !isFinite(sec)) return '--:--'
+  const m = Math.floor(sec / 60), s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+const formatSize = (bytes: number) => {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+// 更多操作下拉
+const moreActions = [
+  { content: '播放全部', value: 'playAll' },
+  { content: '添加全部到播放列表', value: 'addAll' },
+  { content: multiSelect.value ? '取消批量选择' : '批量选择', value: 'toggleMulti' },
+  { content: '清空所有', value: 'clear' }
+]
+
+const handleMoreAction = (value: string) => {
+  if (value === 'playAll') playAll()
+  else if (value === 'addAll') addAllToPlaylist()
+  else if (value === 'toggleMulti') { multiSelect.value = !multiSelect.value; if (!multiSelect.value) clearSelection() }
+  else if (value === 'clear') clearScan()
+}
+
+const handleGlobalClick = () => { if (contextMenuVisible.value) closeContextMenu() }
+
+// 生命周期
+onMounted(async () => {
+  await fetchDirs()
+  await fetchTracks()
+  document.addEventListener('click', handleGlobalClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleGlobalClick)
+})
 </script>
 
 <template>
   <div class="local-container">
+    <!-- 头部 -->
     <div class="local-header">
-      <h2>本地音乐 <span class="count">({{ tracks.length }} 首)</span></h2>
-      <div class="header-actions">
-        <t-input v-model="searchKeyword" placeholder="搜索本地音乐" clearable style="width: 240px" />
-        <t-button theme="primary" :loading="scanning" @click="scanDirs">扫描音乐</t-button>
+      <div class="left-container">
+        <h2 class="title">
+          本地音乐库<span style="font-size: 12px; color: var(--td-text-color-placeholder)">共 {{ tracks.length }} 首</span>
+        </h2>
+      </div>
+      <div class="right-container">
+        <t-button shape="round" theme="primary" variant="text" @click="showDirModal = true">
+          <span style="display: flex; align-items: center">
+            <span style="font-weight: bold">选择目录</span>
+            <ChevronRightIcon :stroke-width="2.5" style="margin-left: 2px" />
+          </span>
+        </t-button>
       </div>
     </div>
 
-    <!-- Batch toolbar -->
+    <!-- 控制栏 -->
+    <div class="controls">
+      <t-button theme="primary" class="local-btn play-all" @click="playAll" :disabled="tracks.length === 0">
+        <template #icon><i class="iconfont icon-bofang"></i></template>
+        播放全部
+      </t-button>
+      <t-button theme="default" class="local-btn scan" :loading="scanning" @click="scanLibrary">
+        <template #icon><RefreshIcon :stroke-width="1.5" /></template>
+      </t-button>
+      <t-dropdown
+        trigger="hover"
+        :options="moreActions"
+        placement="bottom-left"
+        @click="(data: any) => handleMoreAction(data.value)"
+      >
+        <t-button theme="default" class="local-btn more">
+          <template #icon><EllipsisIcon :stroke-width="1.5" /></template>
+        </t-button>
+      </t-dropdown>
+      <div style="margin-left: auto; display: flex; align-items: center">
+        <t-input
+          v-model="searchQuery"
+          clearable
+          placeholder="搜索本地歌曲/歌手/专辑"
+          style="width: 260px"
+        >
+          <template #prefix-icon><SearchIcon size="16px" /></template>
+        </t-input>
+      </div>
+    </div>
+
+    <!-- 批量操作栏 -->
     <div v-if="hasSelection" class="batch-toolbar">
       <span class="batch-info">已选择 {{ selectedIds.size }} 首</span>
       <t-button size="small" @click="batchPlay">播放选中</t-button>
@@ -165,14 +369,20 @@ onMounted(() => fetchTracks())
       <t-button size="small" variant="text" @click="clearSelection">取消选择</t-button>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div><p>加载中...</p>
+    <!-- 歌曲列表 -->
+    <div v-if="loading" class="loading-container">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p>加载中...</p>
+      </div>
     </div>
-    <div v-else-if="filteredTracks.length > 0" class="track-list">
+
+    <div v-else-if="displayTracks.length > 0" class="list">
       <div class="list-header">
         <span class="col-check">
           <t-checkbox :checked="isAllSelected" @change="toggleSelectAll" />
         </span>
+        <span class="col-cover"></span>
         <span class="col-name">歌曲</span>
         <span class="col-singer">歌手</span>
         <span class="col-album">专辑</span>
@@ -180,31 +390,88 @@ onMounted(() => fetchTracks())
         <span class="col-size">大小</span>
         <span class="col-actions-header">操作</span>
       </div>
-      <div v-for="track in filteredTracks" :key="track.songmid"
-        class="track-row"
-        :class="{ 'is-selected': selectedIds.has(track.songmid) }"
-        @click="handlePlay(track)"
-      >
-        <div class="col-check" @click.stop>
-          <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
-        </div>
-        <div class="col-name">
-          <img v-if="coverCache[track.songmid]" :src="coverCache[track.songmid]" class="track-cover" />
-          <img v-else src="/default-cover.png" class="track-cover" />
-          <span>{{ track.name }}</span>
-        </div>
-        <span class="col-singer">{{ track.singer || '未知' }}</span>
-        <span class="col-album">{{ track.albumName || '未知专辑' }}</span>
-        <span class="col-duration">{{ formatDuration(track.duration) }}</span>
-        <span class="col-size">{{ formatSize(track.size) }}</span>
-        <div class="col-actions" @click.stop>
-          <t-button variant="text" size="small" @click="openTagEditor(track)">编辑</t-button>
+      <div class="list-body">
+        <div
+          v-for="track in displayTracks"
+          :key="track.songmid"
+          class="row"
+          :class="{ 'is-selected': selectedIds.has(track.songmid) }"
+          @click="multiSelect ? toggleSelect(track.songmid) : handlePlay(track)"
+          @contextmenu="handleContextMenu($event, track)"
+        >
+          <div class="col-check" @click.stop>
+            <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
+          </div>
+          <div class="col-cover">
+            <img
+              v-if="coverCache[track.songmid]"
+              :src="coverCache[track.songmid]"
+              class="track-cover"
+            />
+            <img v-else src="/default-cover.png" class="track-cover" />
+          </div>
+          <div class="col-name">
+            <span class="name-text" :class="{ playing: track.songmid === currentSongId }">{{ track.name }}</span>
+          </div>
+          <span class="col-singer">{{ track.singer || '未知' }}</span>
+          <span class="col-album">{{ track.albumName || '未知专辑' }}</span>
+          <span class="col-duration">{{ formatDuration(track.duration || track.interval) }}</span>
+          <span class="col-size">{{ formatSize(track.size) }}</span>
+          <div class="col-actions" @click.stop>
+            <t-button variant="text" size="small" @click="openTagEditor(track)">编辑</t-button>
+          </div>
         </div>
       </div>
     </div>
-    <div v-else class="empty-state">
-      <p>{{ searchKeyword ? '没有匹配的音乐' : '还没有本地音乐，点击"扫描音乐"开始' }}</p>
+
+    <div v-else class="empty">
+      {{ searchQuery ? '没有匹配的音乐' : '暂无数据，点击选择目录后扫描' }}
     </div>
+
+    <!-- 目录管理弹窗 -->
+    <t-dialog
+      v-model:visible="showDirModal"
+      header="选择本地文件夹"
+      placement="center"
+      width="500px"
+      :footer="false"
+    >
+      <div class="dir-modal-content">
+        <div class="dir-hint">你可以添加常用目录，文件将即时索引。</div>
+        <div v-for="d in scanDirs" :key="d" class="dir-row">
+          <span class="dir-path">{{ d }}</span>
+          <t-button size="small" variant="text" theme="danger" @click="removeDir(d)">删除</t-button>
+        </div>
+        <div class="dir-actions">
+          <t-button block variant="outline" @click="selectDirs">添加文件夹</t-button>
+          <t-button block theme="primary" @click="saveDirs">确认</t-button>
+        </div>
+      </div>
+    </t-dialog>
+
+    <!-- 右键菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="contextMenuVisible"
+        class="context-menu"
+        :style="{ top: contextMenuPos.top + 'px', left: contextMenuPos.left + 'px' }"
+        @click.stop
+      >
+        <div class="menu-item" @click="handleMenuAction('play')">
+          <PlayCircleIcon size="14px" /> 播放
+        </div>
+        <div class="menu-item" @click="handleMenuAction('addToEnd')">
+          <i class="iconfont icon-zengjia" style="font-size:14px"></i> 加入播放列表
+        </div>
+        <div class="menu-item" @click="handleMenuAction('addToList')">
+          <FolderIcon size="14px" /> 添加到本地歌单
+        </div>
+        <div class="menu-separator"></div>
+        <div class="menu-item" @click="handleMenuAction('editTags')">
+          <i class="iconfont icon-bianji" style="font-size:14px"></i> 编辑标签
+        </div>
+      </div>
+    </Teleport>
 
     <AddToPlaylistDialog
       v-model:visible="showAddToPlaylist"
@@ -214,20 +481,55 @@ onMounted(() => fetchTracks())
 </template>
 
 <style scoped>
-.local-container { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; padding: 20px; }
-.local-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; margin-bottom: 16px; }
-.local-header h2 {
+.local-container {
+  padding: 0 2rem;
+  padding-top: 1rem;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部 */
+.local-header {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.local-header .title {
   border-left: 8px solid var(--td-brand-color-3);
   padding-left: 12px;
   border-radius: 8px;
   line-height: 1.5em;
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 28px;
+  font-weight: 900;
   color: var(--td-text-color-primary);
   margin: 0;
 }
-.count { font-size: 14px; font-weight: 400; color: var(--td-text-color-secondary); }
-.header-actions { display: flex; gap: 8px; }
+
+.local-header .title span {
+  padding-left: 8px;
+  font-size: 18px;
+}
+
+/* 控制栏 */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.local-btn {
+  padding: 6px 9px;
+  border-radius: 8px;
+  height: 36px;
+}
+
+/* 批量操作栏 */
 .batch-toolbar {
   display: flex;
   align-items: center;
@@ -238,26 +540,281 @@ onMounted(() => fetchTracks())
   border-radius: 8px;
   flex-shrink: 0;
 }
-.batch-info { font-size: 13px; color: var(--td-brand-color); font-weight: 500; margin-right: 4px; }
-.track-list { flex: 1; overflow-y: auto; }
-.list-header, .track-row { display: flex; align-items: center; padding: 8px 12px; }
-.list-header { font-size: 12px; color: var(--td-text-color-secondary); border-bottom: 1px solid var(--td-border-level-1-color); }
-.track-row { cursor: pointer; transition: background 0.15s; border-radius: 6px; }
-.track-row:hover { background: var(--td-bg-color-component-hover); }
-.track-row.is-selected { background: var(--td-brand-color-light); }
-.col-check { width: 36px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.col-name { flex: 3; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; color: var(--td-text-color-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.col-singer { flex: 2; font-size: 13px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.col-album { flex: 2; font-size: 13px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.col-duration { width: 60px; font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; }
-.col-size { width: 80px; font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; }
-.col-actions { width: 60px; flex-shrink: 0; }
-.col-actions-header { width: 60px; flex-shrink: 0; }
-.track-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-.loading-state { display: flex; flex-direction: column; align-items: center; padding: 60px; }
-.loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
-.loading-state p { color: var(--td-text-color-secondary); }
-.empty-state { display: flex; align-items: center; justify-content: center; min-height: 300px; }
-.empty-state p { color: var(--td-text-color-secondary); }
+
+.batch-info {
+  font-size: 13px;
+  color: var(--td-brand-color);
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+/* 加载状态 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--td-bg-color-component-hover);
+  border-top: 4px solid var(--td-brand-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+.loading-content p {
+  font-size: 14px;
+  color: var(--td-text-color-secondary);
+  margin: 0;
+}
+
+/* 歌曲列表 */
+.list {
+  margin-top: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--td-text-color-secondary);
+  border-bottom: 1px solid var(--td-border-level-1-color);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--td-bg-color-container);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.list-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.row:hover {
+  background: var(--td-bg-color-component-hover);
+}
+
+.row.is-selected {
+  background: var(--td-brand-color-light);
+}
+
+/* 列宽 */
+.col-check {
+  width: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.col-cover {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.col-name {
+  flex: 2;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.name-text {
+  color: var(--td-text-color-primary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.name-text.playing {
+  color: var(--td-brand-color);
+}
+
+.col-singer {
+  flex: 1.5;
+  font-size: 13px;
+  color: var(--td-text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.col-album {
+  flex: 1.5;
+  font-size: 13px;
+  color: var(--td-text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.col-duration {
+  width: 60px;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-size {
+  width: 80px;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-actions {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.col-actions-header {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+/* 空状态 */
+.empty {
+  padding: 24px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--td-text-color-placeholder);
+}
+
+/* 目录弹窗 */
+.dir-modal-content {
+  padding: 0;
+}
+
+.dir-hint {
+  margin-bottom: 10px;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+}
+
+.dir-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--td-border-level-1-color);
+}
+
+.dir-path {
+  font-size: 13px;
+  color: var(--td-text-color-primary);
+  word-break: break-all;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.dir-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.dir-actions .t-button {
+  flex: 1;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .local-container { padding: 0 1rem; padding-top: 1rem; }
+
+  .local-header .title { font-size: 22px; }
+
+  .controls { flex-wrap: wrap; }
+
+  .controls .t-input { width: 100%; }
+
+  .col-album, .col-size { display: none; }
+}
+</style>
+
+<style>
+/* 右键菜单 (unscoped) */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 156px;
+  background: var(--td-bg-color-container);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
+  padding: 4px;
+  animation: menuIn 0.15s ease;
+}
+
+.context-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--td-text-color-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.context-menu .menu-item:hover {
+  background: var(--td-bg-color-component-hover);
+}
+
+.context-menu .menu-separator {
+  height: 1px;
+  background: var(--td-border-level-1-color);
+  margin: 4px 8px;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
 </style>

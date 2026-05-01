@@ -106,6 +106,7 @@ pub fn run() {
             local_music::commands::local_music__get_tags,
             local_music::commands::local_music__get_lyric,
             local_music::commands::local_music__clear_index,
+            local_music::commands::local_music__select_dirs,
             // Download Manager
             download::commands::download__add_task,
             download::commands::download__get_tasks,
