@@ -201,7 +201,7 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
         let mut name = board.get("topTitle")?.as_str()?.to_string();
         // Normalize name to match reference
         if name.starts_with("巅峰榜·") {
-            name = name[4..].to_string();
+            name = name.replace("巅峰榜·", "");
         }
         if !name.ends_with('榜') {
             name.push('榜');
@@ -215,6 +215,7 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
             "name": name,
             "bangid": id.to_string(),
             "img": pic,
+                "pic": pic,
             "listen": listen,
             "source": "tx"
         }))

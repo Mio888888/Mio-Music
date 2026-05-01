@@ -256,8 +256,8 @@ onDeactivated(() => {
           <div class="playlist-info">
             <h4 class="playlist-title">{{ playlist.title }}</h4>
             <p class="playlist-desc">{{ playlist.description }}</p>
-            <div class="playlist-meta">
-              <span class="play-count">
+            <div v-if="playlist.playCount || playlist.total" class="playlist-meta">
+              <span v-if="playlist.playCount" class="play-count">
                 <i class="iconfont icon-bofang"></i>
                 {{ formatCount(playlist.playCount) }}
               </span>

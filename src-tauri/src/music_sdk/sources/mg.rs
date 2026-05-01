@@ -168,6 +168,7 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
             "name": name,
             "bangid": id,
             "img": img,
+            "pic": img,
             "listen": 0,
             "update_frequency": freq,
             "source": "mg"

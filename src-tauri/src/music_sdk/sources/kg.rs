@@ -12,6 +12,29 @@ fn get_u64(args: &serde_json::Value, key: &str, default: u64) -> u64 {
     args.get(key).and_then(|v| v.as_u64()).unwrap_or(default)
 }
 
+/// Parse Kugou count values which may be numbers or pre-formatted strings like "1681.7万", "2.3亿"
+fn parse_kugou_count(v: &serde_json::Value) -> serde_json::Value {
+    if let Some(n) = v.as_f64() {
+        return serde_json::json!(n as i64);
+    }
+    if let Some(s) = v.as_str() {
+        let s = s.trim();
+        if s.ends_with('亿') {
+            if let Ok(n) = s.trim_end_matches('亿').parse::<f64>() {
+                return serde_json::json!((n * 100_000_000.0) as i64);
+            }
+        } else if s.ends_with('万') {
+            if let Ok(n) = s.trim_end_matches('万').parse::<f64>() {
+                return serde_json::json!((n * 10_000.0) as i64);
+            }
+        }
+        if let Ok(n) = s.parse::<f64>() {
+            return serde_json::json!(n as i64);
+        }
+    }
+    serde_json::Value::Null
+}
+
 // --- Playlist Tags (no signing needed) ---
 
 async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -27,11 +50,11 @@ async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value
 
     let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
 
-    // Hot tags
-    let hot_tag_raw = data.get("hotTag").cloned().unwrap_or(serde_json::json!({}));
+    // Hot tags — actual data is nested inside hotTag.data
+    let hot_tag_raw = data.get("hotTag").and_then(|v| v.get("data")).cloned().unwrap_or(serde_json::json!({}));
     let hot_tag: Vec<serde_json::Value> = if let Some(obj) = hot_tag_raw.as_object() {
         obj.values().filter_map(|tag| {
-            let id = tag.get("special_id")?.as_i64()?;
+            let id = tag.get("special_id")?.as_str()?;
             let name = tag.get("special_name")?.as_str()?;
             Some(serde_json::json!({
                 "id": id.to_string(),
@@ -97,15 +120,18 @@ async fn get_category_playlists(args: serde_json::Value) -> Result<serde_json::V
     let raw_list = resp.get("special_db").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let list: Vec<PlaylistItem> = raw_list.iter().map(|item| {
         let special_id = item.get("specialid").cloned().unwrap_or(serde_json::Value::Null);
+        // total_play_count may be a pre-formatted string like "1681.7万" — convert to number
+        let play_count_val = item.get("total_play_count").or(item.get("play_count"))
+            .map(|v| parse_kugou_count(v)).unwrap_or(serde_json::Value::Null);
         PlaylistItem {
             id: serde_json::json!(format!("id_{}", special_id.as_i64().unwrap_or(0))),
             name: item.get("specialname").and_then(|v| v.as_str()).unwrap_or("").to_string(),
             img: item.get("img").or(item.get("imgurl")).and_then(|v| v.as_str()).unwrap_or("").to_string(),
             source: "kg".into(),
             desc: item.get("intro").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            play_count: item.get("total_play_count").or(item.get("play_count")).cloned().unwrap_or(serde_json::Value::Null),
+            play_count: play_count_val,
             author: item.get("nickname").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-            total: serde_json::Value::Null,
+            total: item.get("song_count").cloned().unwrap_or(serde_json::Value::Null),
         }
     }).collect();
 
@@ -150,6 +176,7 @@ async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value,
             "name": name,
             "bangid": rankid.to_string(),
             "img": imgurl,
+                "pic": imgurl,
             "listen": play_times,
             "update_frequency": update_frequency,
             "source": "kg"
@@ -248,26 +275,27 @@ async fn fetch_kg_song_details(hashes: &[String]) -> Result<Vec<MusicItem>, Stri
     let list: Vec<MusicItem> = data.iter().filter_map(|item| {
         // Each item is an array with one element
         let info = item.as_array()?.first()?;
-        let base = info.get("base")?;
         let audio_info = info.get("audio_info")?;
         let album_info = info.get("album_info");
 
-        let songmid = base.get("hash")?.as_str()?.to_string();
-        let name = base.get("songname")?.as_str().unwrap_or("").to_string();
-        let singer = info.get("author_name")?.as_str().unwrap_or("").to_string();
+        let hash = audio_info.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        if hash.is_empty() { return None; }
+        let songmid = hash.clone();
+        let name = info.get("songname").or_else(|| info.get("ori_audio_name"))
+            .and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let singer = info.get("author_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let album_name = album_info.and_then(|a| a.get("album_name")).and_then(|v| v.as_str()).unwrap_or("").to_string();
         let album_id = album_info.and_then(|a| a.get("album_id")).cloned().unwrap_or(serde_json::Value::Null);
-        let img = audio_info.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let duration = audio_info.get("duration").and_then(|v| v.as_i64()).unwrap_or(0);
-        let interval = format_play_time(duration);
+        let img = album_info.and_then(|a| a.get("imgurl")).or_else(|| audio_info.get("img"))
+            .and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let duration_ms = audio_info.get("timelength").and_then(|v| v.as_i64()).unwrap_or(0);
+        let interval = format_play_time(duration_ms / 1000);
 
-        // Quality types from audio_info
         let mut types = Vec::new();
+        let filesize_flac = audio_info.get("filesize_flac").and_then(|v| v.as_i64()).unwrap_or(0);
         let filesize_320 = audio_info.get("filesize_320").and_then(|v| v.as_i64()).unwrap_or(0);
         let filesize_128 = audio_info.get("filesize").and_then(|v| v.as_i64()).unwrap_or(0);
-        let filesize_flac = audio_info.get("filesize_flac").and_then(|v| v.as_i64()).unwrap_or(0);
-
         if filesize_flac > 0 { types.push("flac".to_string()); }
         if filesize_320 > 0 { types.push("320k".to_string()); }
         if filesize_128 > 0 { types.push("128k".to_string()); }
@@ -277,7 +305,7 @@ async fn fetch_kg_song_details(hashes: &[String]) -> Result<Vec<MusicItem>, Stri
             songmid: serde_json::Value::String(songmid), singer, name, album_name, album_id,
             source: "kg".into(), interval, img, lrc: None,
             types: Some(types), type_url: Some(serde_json::json!({})),
-            hash: Some(base.get("hash")?.as_str().unwrap_or("").to_string()),
+            hash: Some(hash),
         })
     }).collect();
 
