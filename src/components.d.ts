@@ -57,6 +57,7 @@ declare module 'vue' {
     SettingsSearch: typeof import('./components/SettingsSearch.vue')['default']
     ShaderBackground: typeof import('./components/Play/ShaderBackground.vue')['default']
     SkeletonLoader: typeof import('./components/SkeletonLoader.vue')['default']
+    SongVirtualList: typeof import('./components/Music/SongVirtualList.vue')['default']
     SvgIcon: typeof import('./components/SvgIcon.vue')['default']
     TAlert: typeof import('tdesign-vue-next')['Alert']
     TAside: typeof import('tdesign-vue-next')['Aside']

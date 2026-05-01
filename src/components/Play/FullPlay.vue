@@ -666,16 +666,14 @@ onUnmounted(() => {
     </div>
     <!-- 播放设置浮动按钮 -->
     <div ref="floatActionRef" class="float-action" :class="{ idle: isIdle }">
-      <t-tooltip content="播放器主题" placement="bottom">
-        <button class="skin-btn" @click="showSettings = !showSettings">
-          <pen-ball-icon
-            :fill-color="'transparent'"
-            :stroke-color="'currentColor'"
-            :stroke-width="2"
-            :style="{ fontSize: '20px' }"
-          />
-        </button>
-      </t-tooltip>
+      <button class="skin-btn" data-tooltip="播放器主题" @click="showSettings = !showSettings">
+        <pen-ball-icon
+          :fill-color="'transparent'"
+          :stroke-color="'currentColor'"
+          :stroke-width="2"
+          :style="{ fontSize: '20px' }"
+        />
+      </button>
       <Transition name="fade-up">
         <div v-if="showSettings" class="settings-panel">
           <PlaySettings />
@@ -1114,12 +1112,32 @@ onUnmounted(() => {
   bottom: calc(var(--bottom-height) + var(--play-bottom-height));
 
   .skin-btn {
+    position: relative;
     backdrop-filter: blur(20px);
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.628);
     height: 50px;
     width: 50px;
     border-radius: 50%;
+    &[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    &:hover[data-tooltip]::after {
+      opacity: 1;
+    }
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: flex;

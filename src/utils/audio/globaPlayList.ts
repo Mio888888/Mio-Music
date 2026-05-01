@@ -15,9 +15,9 @@ let _playIndex = -1
 let currentPlayRequestId = 0
 
 const qualityMap: Record<string, string> = {
-  '128k': '标准', '192k': '高品', '320k': '超高', flac: '无损',
-  flac24bit: '超高解析', hires: '高清臻音', atmos: '全景环绕',
-  atmos_plus: '全景增强', master: '超清母带'
+  '128k': '128kbps', '320k': '320kbps', flac: 'FLAC 无损',
+  flac24bit: '24bit FLAC', hires: 'Hi-Res 高解析度', atmos: '杜比全景声',
+  master: '母带音质'
 }
 
 /**

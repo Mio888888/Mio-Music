@@ -2,7 +2,7 @@
 import { ref, computed, nextTick, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
-import { MessagePlugin, Popconfirm } from 'tdesign-vue-next'
+import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { DeleteIcon } from 'tdesign-icons-vue-next'
 import { useVirtualList } from '@vueuse/core'
 import type { SongList } from '@/types/audio'
@@ -285,6 +285,18 @@ const handleClearPlaylist = () => {
   MessagePlugin.success('播放列表已清空')
 }
 
+const handleClearConfirm = () => {
+  if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
+  const dialog = DialogPlugin.confirm({
+    header: '清空播放列表',
+    body: '确定要清空播放列表吗？此操作不可撤销。',
+    confirmBtn: { content: '确认清空', theme: 'danger' },
+    cancelBtn: '取消',
+    onConfirm: () => { handleClearPlaylist(); dialog.destroy() },
+    onClose: () => { dialog.destroy() }
+  })
+}
+
 const handleLocateCurrentSong = () => {
   if (!props.currentSongId) { MessagePlugin.info('当前没有正在播放的歌曲'); return }
   const currentSongExists = list.value.some((song) => song.songmid === props.currentSongId)
@@ -366,20 +378,10 @@ defineExpose({ scrollToCurrentSong })
           <span class="iconfont icon-dingwei" style="font-size: 14px"></span>
           <span>定位当前播放</span>
         </button>
-        <Popconfirm
-          content="确定要清空播放列表吗？此操作不可撤销。"
-          :confirm-btn="{ content: '确认清空', theme: 'danger' }"
-          cancel-btn="取消"
-          placement="top"
-          theme="warning"
-          :popup-props="{ zIndex: 9999, overlayStyle: { zIndex: 9998 } }"
-          @confirm="handleClearPlaylist"
-        >
-          <button class="playlist-action-btn clear-btn">
-            <DeleteIcon size="16" />
-            <span>清空播放列表</span>
-          </button>
-        </Popconfirm>
+        <button class="playlist-action-btn clear-btn" @click="handleClearConfirm">
+          <DeleteIcon size="16" />
+          <span>清空播放列表</span>
+        </button>
       </div>
     </div>
   </transition>

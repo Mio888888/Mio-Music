@@ -9,10 +9,8 @@ import type { MusicSource } from '@/types/userInfo'
 const emit = defineEmits(['switch-category'])
 
 const QUALITY_ORDER: Record<string, number> = {
-  low: 1, standard: 2, high: 3,
-  '128k': 4, '192k': 5, '320k': 6,
-  lossless: 7, flac: 8,
-  hires: 9, flac24bit: 10, atmos: 11, master: 12,
+  '128k': 1, '320k': 2,
+  flac: 3, flac24bit: 4, hires: 5, atmos: 6, master: 7,
 }
 
 const sortQualities = (qualities: string[]): string[] =>
@@ -123,22 +121,19 @@ const onQualityChange = (value: number | number[]) => {
 
 const getQualityDisplayName = (quality: string) => {
   const qualityMap: Record<string, string> = {
-    low: '标准', standard: '高品质', high: '超高品质', lossless: '无损',
-    '128k': '标准 128K', '192k': '高品质 192K', '320k': '超高品质 320K',
-    flac: '无损 FLAC', flac24bit: '高解析度无损', hires: '高清臻音',
-    atmos: '沉浸环绕声', master: '超清母带'
+    '128k': '128kbps', '320k': '320kbps',
+    flac: 'FLAC 无损', flac24bit: '24bit FLAC', hires: 'Hi-Res 高解析度',
+    atmos: '杜比全景声', master: '母带音质'
   }
   return qualityMap[quality] || quality
 }
 
 const getQualityDescription = (quality: string) => {
   const descriptions: Record<string, string> = {
-    low: '适合网络较慢的环境，节省流量', standard: '平衡音质与文件大小，推荐选择',
-    high: '高音质体验，适合有线网络', lossless: '最佳音质体验，需要较好的网络环境',
-    '128k': '基础音质，文件较小', '192k': '良好音质，适合大多数场景',
-    '320k': '高品质音质，接近CD品质', flac: '无损音质，完美还原原始录音',
-    flac24bit: '更饱满清晰的高解析度音质，最高192kHz/24bit', hires: '声音听感加强，96kHz/24bit',
-    atmos: '沉浸式空间环绕音感，最高5.1声道', master: '母带级音质,192kHz/24bit'
+    '128k': '128kbps 基础音质', '320k': '320kbps 高品质音质',
+    flac: 'FLAC 无损，完美还原原始录音', flac24bit: '24bit FLAC 高解析度无损',
+    hires: 'Hi-Res 高解析度，96kHz/24bit', atmos: '杜比全景声，沉浸式空间音频',
+    master: '母带音质，192kHz/24bit'
   }
   return descriptions[quality] || '自定义音质设置'
 }

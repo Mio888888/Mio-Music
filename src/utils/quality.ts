@@ -1,12 +1,10 @@
 export const QUALITY_ORDER = [
   'master',
-  'atmos_plus',
   'atmos',
   'hires',
   'flac24bit',
   'flac',
   '320k',
-  '192k',
   '128k'
 ] as const
 
@@ -14,15 +12,13 @@ export type KnownQuality = (typeof QUALITY_ORDER)[number]
 export type QualityInput = KnownQuality | string | { type: string; size?: string }
 
 const DISPLAY_NAME_MAP: Record<string, string> = {
-  '128k': '标准',
-  '192k': '高品',
-  '320k': '超高',
-  flac: '无损',
-  flac24bit: '超高解析',
-  hires: '高清臻音',
-  atmos: '全景环绕',
-  atmos_plus: '全景增强',
-  master: '超清母带'
+  '128k': '128kbps',
+  '320k': '320kbps',
+  flac: 'FLAC 无损',
+  flac24bit: '24bit FLAC',
+  hires: 'Hi-Res 高解析度',
+  atmos: '杜比全景声',
+  master: '母带音质'
 }
 
 export function getQualityDisplayName(quality: QualityInput | null | undefined): string {
