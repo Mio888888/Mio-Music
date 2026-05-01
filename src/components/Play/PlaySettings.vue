@@ -12,6 +12,11 @@ const lightMainColor = computed(() => {
   return player.value.coverDetail.lightMainColor || 'rgba(255, 255, 255, 0.9)'
 })
 
+const seamlessModeOptions = [
+  { label: '无缝衔接', value: 'gapless' },
+  { label: '渐入渐出', value: 'crossfade' },
+]
+
 const settingSections = computed(() => [
   {
     title: '界面设置',
@@ -51,11 +56,7 @@ const settingSections = computed(() => [
         value: playSetting.getIsPauseTransition,
         update: (val: boolean) => playSetting.setIsPauseTransition(val)
       },
-      {
-        label: '无感过渡(智能交叉淡化)',
-        value: playSetting.getIsSeamlessTransition,
-        update: (val: boolean) => playSetting.setIsSeamlessTransition(val)
-      },
+      // 无感过渡单独渲染
       {
         label: '使用 Apple 风格歌词',
         value: playSetting.getUseAmlLyricRenderer,
@@ -109,10 +110,50 @@ const settingSections = computed(() => [
 
     <template v-for="section in settingSections" :key="section.title">
       <div class="panel-header" style="margin-top: 24px">{{ section.title }}</div>
-      <div v-for="item in section.items" :key="item.label" class="control-row">
-        <span>{{ item.label }}</span>
-        <t-switch :value="item.value" @update:value="item.update" />
-      </div>
+      <template v-if="section.title === '播放设置'">
+        <div v-for="item in section.items" :key="item.label" class="control-row">
+          <span>{{ item.label }}</span>
+          <t-switch :value="item.value" @update:value="item.update" />
+        </div>
+        <!-- 无缝换曲 -->
+        <div class="control-row">
+          <span>无缝换曲</span>
+          <t-switch :value="playSetting.getIsSeamlessTransition" @update:value="(v: boolean) => playSetting.setIsSeamlessTransition(v)" />
+        </div>
+        <template v-if="playSetting.getIsSeamlessTransition">
+          <div class="control-row sub-control">
+            <span>过渡模式</span>
+            <t-radio-group
+              variant="default-filled"
+              :value="playSetting.getSeamlessMode"
+              @change="(v: any) => playSetting.setSeamlessMode(v as 'gapless' | 'crossfade')"
+              size="small"
+            >
+              <t-radio-button v-for="opt in seamlessModeOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </t-radio-button>
+            </t-radio-group>
+          </div>
+          <div v-if="playSetting.getSeamlessMode === 'crossfade'" class="control-row sub-control">
+            <span>过渡时长 {{ (playSetting.getCrossfadeDuration / 1000).toFixed(1) }}s</span>
+            <t-slider
+              :value="playSetting.getCrossfadeDuration"
+              :min="500"
+              :max="8000"
+              :step="500"
+              :label="false"
+              style="flex: 1; max-width: 160px; margin-left: 12px"
+              @change="(v: any) => playSetting.setCrossfadeDuration(Number(v))"
+            />
+          </div>
+        </template>
+      </template>
+      <template v-else>
+        <div v-for="item in section.items" :key="item.label" class="control-row">
+          <span>{{ item.label }}</span>
+          <t-switch :value="item.value" @update:value="item.update" />
+        </div>
+      </template>
     </template>
   </div>
 </template>
@@ -199,6 +240,11 @@ const settingSections = computed(() => [
     color: rgba(241, 241, 241, 0.8);
     font-size: 14px;
     font-weight: 500;
+  }
+
+  &.sub-control {
+    padding-left: 20px;
+    margin-top: 2px;
   }
 }
 </style>

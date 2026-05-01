@@ -190,6 +190,10 @@ pub fn run() {
             player::commands::player__set_balance,
             player::commands::player__update_now_playing,
             player::commands::player__shutdown,
+            player::commands::player__preload,
+            player::commands::player__gapless_swap,
+            player::commands::player__clear_secondary,
+            player::commands::player__set_seamless_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

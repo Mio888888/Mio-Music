@@ -2,17 +2,25 @@ import { ref, toRaw } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { playSetting } from '@/store/playSetting'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality } from '@/utils/quality'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 export const playMode = ref<PlayMode>(PlayMode.SEQUENCE)
 export const isLoadingSong = ref(false)
 
 let _playIndex = -1
 let currentPlayRequestId = 0
+
+// ===== 无缝换曲预加载状态 =====
+let prefetchRequestId = 0
+let preloadedSong: SongList | null = null
+let preloadedReady = false
+let unlistenPreload: UnlistenFn | null = null
 
 const qualityMap: Record<string, string> = {
   '128k': '128kbps', '320k': '320kbps', flac: 'FLAC 无损',
@@ -81,10 +89,82 @@ export function getCurrentSong(): SongList | null {
   return null
 }
 
+// ===== 计算下一首 =====
+
+function computeNextSong(): SongList | null {
+  const store = LocalUserDetailStore()
+  if (store.list.length === 0) return null
+
+  if (playMode.value === PlayMode.SINGLE) {
+    return store.list[_playIndex] || null
+  }
+  if (playMode.value === PlayMode.RANDOM) {
+    return store.list[Math.floor(Math.random() * store.list.length)]
+  }
+  // SEQUENCE
+  const nextIdx = (_playIndex + 1) % store.list.length
+  return store.list[nextIdx]
+}
+
+// ===== 预加载 =====
+
+function syncSeamlessConfig() {
+  const setting = playSetting()
+  invoke('player__set_seamless_config', {
+    mode: setting.seamlessMode,
+    crossfadeDurationMs: setting.crossfadeDuration,
+  })
+}
+
+async function ensurePreloadListener() {
+  if (unlistenPreload) return
+  unlistenPreload = await listen('player:preload_ready', () => {
+    preloadedReady = true
+  })
+}
+
+export async function scheduleNextPrefetch() {
+  const setting = playSetting()
+  if (!setting.isSeamlessTransition) return
+
+  syncSeamlessConfig()
+  await ensurePreloadListener()
+
+  preloadedSong = null
+  preloadedReady = false
+
+  const nextSong = computeNextSong()
+  if (!nextSong || nextSong.source === 'local') return
+
+  const requestId = ++prefetchRequestId
+
+  try {
+    const url = await getSongRealUrl(toRaw(nextSong) as any)
+    if (requestId !== prefetchRequestId) return
+
+    await invoke('player__preload', { url })
+    preloadedSong = nextSong
+  } catch (e) {
+    console.warn('预加载下一曲失败:', e)
+  }
+}
+
+export function invalidatePrefetch() {
+  prefetchRequestId++
+  preloadedSong = null
+  preloadedReady = false
+  invoke('player__clear_secondary').catch(() => {})
+}
+
+// ===== 播放控制 =====
+
 /**
  * 播放歌曲：解析 URL → Tauri Rust 原生播放
  */
 export async function playSong(song: SongList) {
+  // 手动切歌时清除预加载
+  invalidatePrefetch()
+
   const requestId = Date.now()
   currentPlayRequestId = requestId
 
@@ -142,6 +222,9 @@ export async function playSong(song: SongList) {
     await invoke('player__set_volume', { volume: audio.Audio.volume })
 
     isLoadingSong.value = false
+
+    // 播放成功后调度预加载
+    scheduleNextPrefetch()
   } catch (error: any) {
     if (currentPlayRequestId !== requestId) return
     console.error('播放失败:', error)
@@ -153,6 +236,14 @@ export async function playSong(song: SongList) {
 export function playNext(): SongList | null {
   const store = LocalUserDetailStore()
   if (store.list.length === 0) return null
+
+  // 无缝换曲模式：尝试使用预加载的下一曲
+  const setting = playSetting()
+  if (setting.isSeamlessTransition && preloadedSong && preloadedReady) {
+    seamlessNext()
+    return preloadedSong
+  }
+
   if (playMode.value === PlayMode.SINGLE) {
     const song = store.list[_playIndex]
     if (song) { playSong(song); return song }
@@ -167,6 +258,67 @@ export function playNext(): SongList | null {
     playSong(song)
   }
   return song
+}
+
+/**
+ * 无缝换曲：尝试使用预加载的 secondary slot 切换
+ * @returns true 表示无缝切换成功，false 表示需要回退到普通 playNext
+ */
+export async function seamlessNext(): Promise<boolean> {
+  if (!preloadedSong || !preloadedReady) return false
+
+  const setting = playSetting()
+
+  if (setting.seamlessMode === 'crossfade') {
+    // crossfade 模式：Rust poll 已在末尾自动触发渐变，此处只需 swap slot
+    try {
+      await invoke('player__swap_slot')
+    } catch {
+      return false
+    }
+  } else {
+    // gapless 模式：即时切换
+    try {
+      const result: any = await invoke('player__gapless_swap')
+      if (result && !result.success) return false
+      if (result?.data === false) return false
+    } catch {
+      return false
+    }
+  }
+
+  // 更新播放状态
+  const store = LocalUserDetailStore()
+  const globalPlayStatus = useGlobalPlayStatusStore()
+  const audio = ControlAudioStore()
+  const song = preloadedSong
+
+  const idx = store.list.findIndex((s) => s.songmid === song.songmid)
+  if (idx !== -1) {
+    _playIndex = idx
+  }
+  store.userInfo.lastPlaySongId = song.songmid
+  globalPlayStatus.player.songInfo = toRaw(song) as any
+
+  // 更新 macOS 系统媒体控制
+  try {
+    await invoke('player__update_now_playing', {
+      title: song.name || '未知歌曲',
+      artist: song.singer || '未知艺术家',
+      album: song.albumName || '',
+      duration: 0,
+      coverUrl: song.img || null
+    })
+  } catch {}
+
+  await invoke('player__set_volume', { volume: audio.Audio.volume })
+
+  // 重置预加载状态并调度下一曲预加载
+  preloadedSong = null
+  preloadedReady = false
+  scheduleNextPrefetch()
+
+  return true
 }
 
 export function playPrevious(): SongList | null {
@@ -188,6 +340,9 @@ export function updatePlayMode() {
   const modes = [PlayMode.SEQUENCE, PlayMode.RANDOM, PlayMode.SINGLE]
   const idx = modes.indexOf(playMode.value)
   playMode.value = modes[(idx + 1) % modes.length]
+  // 播放模式变更后重新调度预加载
+  invalidatePrefetch()
+  scheduleNextPrefetch()
 }
 
 export function togglePlayPause() {
@@ -196,6 +351,18 @@ export function togglePlayPause() {
     invoke('player__pause')
     audio.Audio.isPlay = false
   } else {
+    // 没有已加载的音频（重启后），重新播放上一首或列表第一首
+    if (!audio.Audio.url) {
+      const store = LocalUserDetailStore()
+      if (store.list.length > 0) {
+        const lastId = store.userInfo.lastPlaySongId
+        const idx = lastId ? store.list.findIndex((s: SongList) => s.songmid === lastId) : -1
+        const song = idx >= 0 ? store.list[idx] : store.list[0]
+        playSong(song)
+        return
+      }
+      return
+    }
     invoke('player__resume')
     audio.Audio.isPlay = true
   }

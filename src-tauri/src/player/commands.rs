@@ -171,3 +171,40 @@ pub fn player__shutdown(player: State<'_, SharedPlayer>) -> CmdResult<()> {
     player.lock().shutdown();
     Ok(CommandResult::ok(()))
 }
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__preload(
+    player: State<'_, SharedPlayer>,
+    url: String,
+) -> CmdResult<()> {
+    player.lock().preload(url);
+    Ok(CommandResult::ok(()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__gapless_swap(player: State<'_, SharedPlayer>) -> CmdResult<bool> {
+    let swapped = player.lock().gapless_swap();
+    Ok(CommandResult::ok(swapped))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__clear_secondary(player: State<'_, SharedPlayer>) -> CmdResult<()> {
+    player.lock().clear_secondary();
+    Ok(CommandResult::ok(()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__set_seamless_config(
+    player: State<'_, SharedPlayer>,
+    mode: String,
+    crossfade_duration_ms: Option<u64>,
+) -> CmdResult<()> {
+    let auto_crossfade = mode == "crossfade";
+    let duration = crossfade_duration_ms.unwrap_or(3000);
+    player.lock().set_seamless_config(auto_crossfade, duration);
+    Ok(CommandResult::ok(()))
+}

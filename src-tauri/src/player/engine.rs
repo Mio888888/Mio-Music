@@ -90,6 +90,16 @@ impl SlotPipeline {
     pub fn is_playing(&self) -> bool { !self.sink.is_paused() && !self.sink.empty() }
     pub fn url(&self) -> &str { &self.url }
     pub fn take_spectrum(&self) -> Option<Vec<f64>> { self.spectrum_state.lock().take_spectrum() }
+
+    /// 创建管线后立即暂停（用于预加载）
+    pub fn new_paused(
+        stream_handle: &OutputStreamHandle,
+        url: &str,
+    ) -> Result<Self, String> {
+        let pipeline = Self::new(stream_handle, url, 0.0)?;
+        pipeline.sink.pause();
+        Ok(pipeline)
+    }
 }
 
 // ==================== URL 解析 ====================
@@ -306,6 +316,13 @@ struct CrossfadeState {
     duration_ms: u64,
 }
 
+// ==================== 预加载结果 ====================
+
+enum PreloadResult {
+    Ready(SlotPipeline),
+    Error(String),
+}
+
 // ==================== 播放引擎 ====================
 
 pub struct PlayerEngine {
@@ -319,6 +336,12 @@ pub struct PlayerEngine {
     shutdown_tx: std::sync::mpsc::Sender<()>,
     app_handle: tauri::AppHandle,
     poll_tick: u32,
+    // 预加载通道
+    preload_tx: std::sync::mpsc::Sender<PreloadResult>,
+    preload_rx: std::sync::mpsc::Receiver<PreloadResult>,
+    // 无缝换曲配置
+    crossfade_duration_ms: u64,
+    auto_crossfade_enabled: bool,
 }
 
 impl PlayerEngine {
@@ -327,6 +350,7 @@ impl PlayerEngine {
         stream_handle: OutputStreamHandle,
         shutdown_tx: std::sync::mpsc::Sender<()>,
     ) -> Self {
+        let (preload_tx, preload_rx) = std::sync::mpsc::channel();
         Self {
             stream_handle,
             primary: None,
@@ -337,6 +361,10 @@ impl PlayerEngine {
             shutdown_tx,
             app_handle,
             poll_tick: 0,
+            preload_tx,
+            preload_rx,
+            crossfade_duration_ms: 3000,
+            auto_crossfade_enabled: false,
         }
     }
 
@@ -418,6 +446,65 @@ impl PlayerEngine {
         if let Some(ref s) = self.secondary { *s.balance.lock() = value }
     }
 
+    /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
+    pub fn preload(&mut self, url: String) {
+        // 清除旧的预加载
+        self.secondary = None;
+
+        let stream_handle = self.stream_handle.clone();
+        let tx = self.preload_tx.clone();
+
+        std::thread::spawn(move || {
+            let result = match SlotPipeline::new_paused(&stream_handle, &url) {
+                Ok(pipeline) => PreloadResult::Ready(pipeline),
+                Err(e) => PreloadResult::Error(e),
+            };
+            let _ = tx.send(result);
+        });
+    }
+
+    /// Gapless 即时切换：将预加载的 secondary 提升为 primary 并开始播放
+    pub fn gapless_swap(&mut self) -> bool {
+        if let Some(secondary) = self.secondary.take() {
+            let vol = self.volume / 100.0;
+            self.primary = Some(secondary);
+            if let Some(ref p) = self.primary {
+                p.set_volume(vol);
+                p.resume();
+            }
+            self.emit_state();
+            return true;
+        }
+        false
+    }
+
+    /// 从已预加载的 secondary 启动 crossfade 渐变
+    fn start_crossfade_from_preloaded(&mut self) {
+        if self.secondary.is_none() { return }
+        if let Some(ref s) = self.secondary {
+            s.set_volume(0.0);
+            s.resume();
+        }
+        self.crossfade = Some(CrossfadeState {
+            active: true,
+            start: Instant::now(),
+            duration_ms: self.crossfade_duration_ms,
+        });
+    }
+
+    /// 清除 secondary slot，释放内存
+    pub fn clear_secondary(&mut self) {
+        self.secondary = None;
+        // 排空 channel 中残留的预加载结果
+        while self.preload_rx.try_recv().is_ok() {}
+    }
+
+    /// 配置无缝换曲参数
+    pub fn set_seamless_config(&mut self, auto_crossfade: bool, duration_ms: u64) {
+        self.auto_crossfade_enabled = auto_crossfade;
+        self.crossfade_duration_ms = duration_ms.max(500);
+    }
+
     pub fn snapshot(&self) -> PlayerSnapshot {
         let p = self.primary.as_ref();
         let state = p.map(|p| {
@@ -442,6 +529,20 @@ impl PlayerEngine {
     pub fn poll(&mut self) {
         if self.shutdown { return }
         self.poll_tick = self.poll_tick.wrapping_add(1);
+
+        // 检查预加载结果（非阻塞）
+        if let Ok(result) = self.preload_rx.try_recv() {
+            match result {
+                PreloadResult::Ready(pipeline) => {
+                    self.secondary = Some(pipeline);
+                    let _ = self.app_handle.emit("player:preload_ready", serde_json::json!({}));
+                }
+                PreloadResult::Error(e) => {
+                    eprintln!("预加载失败: {e}");
+                }
+            }
+        }
+
         self.tick_crossfade();
 
         if let Some(ref p) = self.primary {
@@ -458,8 +559,27 @@ impl PlayerEngine {
                     "position": p.position(), "duration": p.duration(),
                 }));
             }
+        }
 
-            if p.sink.empty() && !p.sink.is_paused() {
+        // 自动 crossfade：提取 primary 状态后调用 mutable 方法
+        let should_crossfade = {
+            let p = self.primary.as_ref();
+            p.map_or(false, |p| {
+                if !self.auto_crossfade_enabled || self.crossfade.is_some() || self.secondary.is_none() {
+                    return false;
+                }
+                let pos = p.position();
+                let dur = p.duration();
+                let threshold = self.crossfade_duration_ms as f64 / 1000.0;
+                dur > 0.0 && pos > 0.0 && dur - pos <= threshold && dur > threshold
+            })
+        };
+        if should_crossfade {
+            self.start_crossfade_from_preloaded();
+        }
+
+        if let Some(ref p) = self.primary {
+            if p.sink.empty() && !p.sink.is_paused() && self.crossfade.is_none() {
                 let _ = self.app_handle.emit("player:ended", serde_json::json!({ "slot": "A" }));
             }
         }
@@ -469,6 +589,7 @@ impl PlayerEngine {
         let Some(ref mut cf) = self.crossfade else { return };
         if !cf.active { return }
 
+        let mut done = false;
         let progress = (cf.start.elapsed().as_millis() as f64 / cf.duration_ms as f64).min(1.0);
         let vol = self.volume / 100.0;
 
@@ -477,7 +598,11 @@ impl PlayerEngine {
 
         if progress >= 1.0 {
             self.primary = self.secondary.take();
-            cf.active = false;
+            done = true;
+        }
+
+        if done {
+            self.crossfade = None;
         }
     }
 

@@ -51,7 +51,7 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     Object.keys(subscribers).forEach((eventType) => { subscribers[eventType as AudioEventType] = [] })
   }
 
-  const clearEventSubscribers = (eventType: AudioEventType): void => { subscribers[eventType] = [] }
+  const clearEventSubscribers = (eventType: AudioEventType) => { subscribers[eventType] = [] }
 
   // --- Tauri 事件监听 ---
 
