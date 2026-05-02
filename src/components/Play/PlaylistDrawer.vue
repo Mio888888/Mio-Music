@@ -451,7 +451,6 @@ defineExpose({ scrollToCurrentSong })
 .playlist-container.full-screen-mode .playlist-empty { color: #ccc; }
 
 .playlist-header {
-  -webkit-app-region: no-drag;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -461,7 +460,6 @@ defineExpose({ scrollToCurrentSong })
 }
 .playlist-title { font-size: 16px; font-weight: 600; }
 .playlist-close {
-  -webkit-app-region: no-drag;
   background: transparent;
   border: none;
   color: #666;
@@ -617,7 +615,6 @@ defineExpose({ scrollToCurrentSong })
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   backdrop-filter: blur(10px);
-  -webkit-app-region: no-drag;
 }
 .locate-btn { background: rgba(35, 115, 206, 0.1); color: #2373ce; border: 1px solid rgba(35, 115, 206, 0.2); }
 .locate-btn:hover:not(:disabled) { background: rgba(35, 115, 206, 0.15); border-color: rgba(35, 115, 206, 0.3); transform: translateY(-1px); }

@@ -166,7 +166,7 @@ const handleKeyDown = () => {
   <t-layout class="home-container">
     <t-aside class="sidebar">
       <div class="sidebar-content">
-        <div class="logo-section">
+        <div class="logo-section" data-tauri-drag-region>
           <div class="logo-icon" :class="{ 'spring-logo': showNewYear }">
             <i class="iconfont icon-music"></i>
           </div>
@@ -200,7 +200,7 @@ const handleKeyDown = () => {
     <t-layout style="flex: 1">
       <t-content>
         <div class="content">
-          <div class="header">
+          <div class="header" data-tauri-drag-region>
             <t-button shape="circle" theme="default" class="nav-btn" @click="goBack">
               <i class="iconfont icon-xiangzuo"></i>
             </t-button>
@@ -341,7 +341,6 @@ const handleKeyDown = () => {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  -webkit-app-region: drag;
 }
 
 .logo-icon {
@@ -425,7 +424,6 @@ const handleKeyDown = () => {
   display: flex;
   align-items: center;
   padding: 1.5rem;
-  -webkit-app-region: drag;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -436,7 +434,6 @@ const handleKeyDown = () => {
 
 .nav-btn {
   margin-right: 0.5rem;
-  -webkit-app-region: no-drag;
 }
 
 .nav-btn .iconfont {
@@ -454,7 +451,6 @@ const handleKeyDown = () => {
   position: relative;
   align-items: center;
   justify-content: space-between;
-  -webkit-app-region: no-drag;
 }
 
 .search-input {
