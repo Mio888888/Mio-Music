@@ -103,60 +103,90 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "crlyric": "", "source": "wy" }));
     }
 
-    let body = eapi_form("/api/song/lyric/v1", &serde_json::json!({
-        "id": songmid.parse::<i64>().unwrap_or(0),
-        "cp": false, "tv": 0, "lv": 0, "rv": 0, "kv": 0,
-        "yv": 0, "ytv": 0, "yrv": 0
-    }));
+    let retry_limit = 3;
+    for retry_count in 0..retry_limit {
+        let body = eapi_form("/api/song/lyric/v1", &serde_json::json!({
+            "id": songmid.parse::<i64>().unwrap_or(0),
+            "cp": false, "tv": 0, "lv": 0, "rv": 0, "kv": 0,
+            "yv": 0, "ytv": 0, "yrv": 0
+        }));
 
-    let resp: serde_json::Value = get_http()
-        .post("https://interface3.music.163.com/eapi/song/lyric/v1")
-        .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
-        .header("Origin", "https://music.163.com")
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        let resp: serde_json::Value = match get_http()
+            .post("https://interface3.music.163.com/eapi/song/lyric/v1")
+            .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
+            .header("Origin", "https://music.163.com")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send().await
+        {
+            Ok(r) => match r.json().await {
+                Ok(json) => json,
+                Err(e) => {
+                    if retry_count < retry_limit - 1 { continue; }
+                    return Err(format!("WY getLyric parse error: {}", e));
+                }
+            },
+            Err(e) => {
+                if retry_count < retry_limit - 1 { continue; }
+                return Err(format!("WY getLyric request error: {}", e));
+            }
+        };
 
-    let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
-    if code != 200 {
-        return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "crlyric": "", "source": "wy" }));
+        let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
+        if code != 200 || resp.get("lrc").and_then(|l| l.get("lyric")).and_then(|v| v.as_str()).is_none() {
+            if retry_count < retry_limit - 1 { continue; }
+            return Err(format!("WY getLyric failed: code={}", code));
+        }
+
+        let yrc_lyric = resp.get("yrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
+        let ytlrc = resp.get("ytlrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
+        let yromalrc = resp.get("yromalrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
+
+        let lrc_raw = resp.get("lrc").and_then(|l| l.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
+        let tlrc_raw = resp.get("tlyric").and_then(|t| t.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
+        let rlrc_raw = resp.get("romalrc").and_then(|r| r.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
+
+        // Fix time labels: [00:00:00] -> [00:00.000]
+        let (lrc, tlrc, rlrc) = fix_time_label(lrc_raw, tlrc_raw, rlrc_raw);
+
+        if let Some(yrc) = yrc_lyric {
+            let parsed = parse_yrc_lyrics(yrc, ytlrc.unwrap_or(""), yromalrc.unwrap_or(""), &lrc, &tlrc, &rlrc);
+            return Ok(parsed);
+        }
+
+        // Fallback to standard LRC
+        let lyric = parse_lrc_with_header(&lrc);
+        let tlyric = if !tlrc.is_empty() { parse_lrc_with_header(&tlrc) } else { String::new() };
+        let rlyric = if !rlrc.is_empty() { parse_lrc_with_header(&rlrc) } else { String::new() };
+
+        return Ok(serde_json::json!({
+            "lyric": lyric, "tlyric": tlyric, "rlyric": rlyric, "crlyric": "", "source": "wy"
+        }));
     }
 
-    let yrc_lyric = resp.get("yrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
-    let ytlrc = resp.get("ytlrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
-    let yromalrc = resp.get("yromalrc").and_then(|y| y.get("lyric")).and_then(|v| v.as_str());
-
-    let lrc_raw = resp.get("lrc").and_then(|l| l.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
-    let tlrc_raw = resp.get("tlyric").and_then(|t| t.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
-    let rlrc_raw = resp.get("romalrc").and_then(|r| r.get("lyric")).and_then(|v| v.as_str()).unwrap_or("");
-
-    // Fix time labels: [00:00:00] -> [00:00.000]
-    let lrc = fix_time_label(lrc_raw);
-    let tlrc = fix_time_label(tlrc_raw);
-    let rlrc = fix_time_label(rlrc_raw);
-
-    if let Some(yrc) = yrc_lyric {
-        // Use YRC (word-by-word) format
-        let parsed = parse_yrc_lyrics(yrc, ytlrc.unwrap_or(""), yromalrc.unwrap_or(""), &lrc, &tlrc, &rlrc);
-        return Ok(parsed);
-    }
-
-    // Fallback to standard LRC
-    let lyric = parse_lrc_with_header(&lrc);
-    let tlyric = if !tlrc.is_empty() { parse_lrc_with_header(&tlrc) } else { String::new() };
-    let rlyric = if !rlrc.is_empty() { parse_lrc_with_header(&rlrc) } else { String::new() };
-
-    Ok(serde_json::json!({
-        "lyric": lyric, "tlyric": tlyric, "rlyric": rlyric, "crlyric": "", "source": "wy"
-    }))
+    Err("WY getLyric: all retries exhausted".to_string())
 }
 
-fn fix_time_label(lrc: &str) -> String {
-    if lrc.is_empty() { return String::new(); }
+fn fix_time_label(lrc: &str, tlrc: &str, romalrc: &str) -> (String, String, String) {
+    if lrc.is_empty() {
+        return (String::new(), tlrc.to_string(), romalrc.to_string());
+    }
     let re = regex_lite::Regex::new(r"\[(\d{2}:\d{2}):(\d{2})\]").unwrap();
-    let result = re.replace_all(lrc, "[$1.$2]");
-    result.to_string()
+    let new_lrc = re.replace_all(lrc, "[$1.$2]").to_string();
+    let new_tlrc = re.replace_all(tlrc, "[$1.$2]").to_string();
+    let has_changes = new_lrc != lrc || new_tlrc != tlrc;
+    let result_lrc = new_lrc;
+    let result_tlrc = new_tlrc;
+    let mut result_romalrc = romalrc.to_string();
+    if has_changes && !romalrc.is_empty() {
+        let re3 = regex_lite::Regex::new(r"\[(\d{2}:\d{2}):(\d{2,3})\]").unwrap();
+        let re_trail = regex_lite::Regex::new(r"\[(\d{2}:\d{2}\.\d{2})0\]").unwrap();
+        result_romalrc = re_trail.replace_all(
+            &re3.replace_all(&result_romalrc, "[$1.$2]"),
+            "[$1]"
+        ).to_string();
+    }
+    (result_lrc, result_tlrc, result_romalrc)
 }
 
 fn parse_lrc_with_header(str: &str) -> String {

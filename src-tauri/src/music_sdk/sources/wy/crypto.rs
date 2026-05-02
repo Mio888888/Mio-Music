@@ -108,7 +108,7 @@ pub fn weapi_form(object: &serde_json::Value) -> String {
 pub fn eapi_form(url: &str, data: &serde_json::Value) -> String {
     let data_str = serde_json::to_string(data).unwrap_or_default();
     let eparams = eapi_encrypt(url, &data_str);
-    format!("eparams={}", eparams)
+    format!("params={}", eparams)
 }
 
 /// Build linuxapi form body
