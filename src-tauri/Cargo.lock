@@ -17,6 +17,7 @@ dependencies = [
  "des",
  "dirs 5.0.1",
  "ecb",
+ "encoding_rs",
  "flate2",
  "futures-util",
  "hex",
