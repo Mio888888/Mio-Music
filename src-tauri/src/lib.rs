@@ -13,7 +13,7 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::Manager;
+use tauri::{Manager, window::{Effect, EffectsBuilder}};
 use commands::hotkey_commands;
 use std::sync::Mutex;
 
@@ -31,6 +31,15 @@ pub fn run() {
         .manage(plugin_manager)
         .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
         .setup(|app| {
+            // Apply window effects (frosted glass)
+            if let Some(window) = app.get_webview_window("main") {
+                let effects = EffectsBuilder::new()
+                    .effects(vec![Effect::HudWindow, Effect::Acrylic, Effect::Mica])
+                    .radius(20.0)
+                    .build();
+                let _ = window.set_effects(effects);
+            }
+
             let app_handle = app.handle().clone();
             let app_data_dir = db::get_app_data_dir();
             let download_manager = DownloadManager::new(&app_data_dir, app_handle.clone());

@@ -45,7 +45,7 @@ const openLink = async (url: string) => {
   <div class="settings-section">
     <div class="setting-group">
       <div class="app-header">
-        <div class="app-logo"><img src="/logo.svg" alt="Ceru Music" /></div>
+        <div class="app-logo"><img src="/logo_2026.svg" alt="Ceru Music" /></div>
         <div class="app-info">
           <div class="app-title-row">
             <h2>Cerulean Music</h2>
