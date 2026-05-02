@@ -322,20 +322,86 @@ function randomBytes(size: number): Uint8Array {
   return buf
 }
 
-// ==================== RSA 加密 ====================
+// ==================== RSA 加密 (PKCS1 v1.5, 同步, BigInt) ====================
 
-async function rsaEncrypt(data: string, pemKey: string): Promise<string> {
+// ASN.1 DER parser: extract RSA modulus (n) and exponent (e) from SubjectPublicKeyInfo
+function parseRsaPublicKey(der: Uint8Array): { n: bigint; e: bigint } {
+  let offset = 0
+  const readTag = () => der[offset++]
+  const readLen = (): number => {
+    const b = der[offset++]
+    if (b < 0x80) return b
+    const bytes = b & 0x7f
+    let len = 0
+    for (let i = 0; i < bytes; i++) len = (len << 8) | der[offset++]
+    return len
+  }
+  const readInteger = (): bigint => {
+    readTag() // 0x02 INTEGER
+    const len = readLen()
+    let val = 0n
+    for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(der[offset++])
+    return val
+  }
+  // Outer SEQUENCE (SubjectPublicKeyInfo)
+  readTag(); readLen()
+  // AlgorithmIdentifier SEQUENCE { OID, NULL }
+  readTag(); const algLen = readLen(); offset += algLen
+  // BIT STRING wrapper
+  readTag(); readLen(); offset++ // skip 0x00 padding byte
+  // RSAPublicKey SEQUENCE { INTEGER n, INTEGER e }
+  readTag(); readLen()
+  const n = readInteger()
+  const e = readInteger()
+  return { n, e }
+}
+
+function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let result = 1n
+  base = base % mod
+  while (exp > 0n) {
+    if (exp & 1n) result = (result * base) % mod
+    exp >>= 1n
+    base = (base * base) % mod
+  }
+  return result
+}
+
+function rsaEncrypt(data: string, pemKey: string): string {
   const pemBody = pemKey
-    .replace(/-----BEGIN PUBLIC KEY-----/, '')
-    .replace(/-----END PUBLIC KEY-----/, '')
-    .replace(/\s+/g, '')
+    .replace(/-----BEGIN PUBLIC KEY-----/g, '')
+    .replace(/-----END PUBLIC KEY-----/g, '')
+    .replace(/[\s\r\n]/g, '')
   const binaryDer = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
+  const { n, e } = parseRsaPublicKey(binaryDer)
 
-  const publicKey = await crypto.subtle.importKey(
-    'spki', binaryDer.buffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']
-  )
-  const encrypted = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, publicKey, new TextEncoder().encode(data))
-  return btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+  const keySize = Math.ceil(n.toString(16).length / 2)
+  const dataBytes = new TextEncoder().encode(data)
+  const padLen = keySize - dataBytes.length - 3
+  if (padLen < 8) throw new Error('RSA: data too long for key size')
+
+  // PKCS1 v1.5 padding: 0x00 0x02 [random non-zero] 0x00 [data]
+  const padded = new Uint8Array(keySize)
+  padded[1] = 0x02
+  const rand = new Uint8Array(padLen)
+  crypto.getRandomValues(rand)
+  for (let i = 0; i < rand.length; i++) {
+    padded[2 + i] = rand[i] === 0 ? 1 : rand[i]
+  }
+  padded[2 + padLen] = 0x00
+  padded.set(dataBytes, 3 + padLen)
+
+  let m = 0n
+  for (const b of padded) m = (m << 8n) | BigInt(b)
+  const c = modPow(m, e, n)
+
+  const result = new Uint8Array(keySize)
+  let tmp = c
+  for (let i = keySize - 1; i >= 0; i--) {
+    result[i] = Number(tmp & 0xffn)
+    tmp >>= 8n
+  }
+  return btoa(String.fromCharCode(...result))
 }
 
 // ==================== cerumusic API 工厂 ====================
@@ -347,19 +413,26 @@ function createCerumusicApi() {
     utils: {
       buffer: {
         from: (data: string | ArrayBuffer | Uint8Array, encoding?: string) => {
+          let bytes: Uint8Array
           if (typeof data === 'string') {
             const enc = (encoding || 'utf8').toLowerCase()
-            if (enc === 'base64') return Uint8Array.from(atob(data), c => c.charCodeAt(0))
-            if (enc === 'hex') {
-              const bytes = new Uint8Array(data.length / 2)
+            if (enc === 'base64') bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0))
+            else if (enc === 'hex') {
+              bytes = new Uint8Array(data.length / 2)
               for (let i = 0; i < data.length; i += 2) bytes[i / 2] = parseInt(data.substr(i, 2), 16)
-              return bytes
-            }
-            return new TextEncoder().encode(data)
+            } else bytes = new TextEncoder().encode(data)
+          } else if (data instanceof ArrayBuffer) bytes = new Uint8Array(data)
+          else if (data instanceof Uint8Array) bytes = new Uint8Array(data)
+          else bytes = new Uint8Array(data as any)
+          // Patch toString for Node.js Buffer compatibility
+          const origToString = bytes.toString.bind(bytes)
+          ;(bytes as any).toString = function(enc?: string) {
+            if (!enc || enc === 'utf8' || enc === 'utf-8') return new TextDecoder().decode(bytes)
+            if (enc === 'hex') return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+            if (enc === 'base64') { let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]); return btoa(bin) }
+            return origToString()
           }
-          if (data instanceof ArrayBuffer) return new Uint8Array(data)
-          if (data instanceof Uint8Array) return data
-          return new Uint8Array(data as any)
+          return bytes
         },
         bufToString: (buffer: Uint8Array, encoding?: string) => {
           const enc = (encoding || 'utf8').toLowerCase()
@@ -434,7 +507,7 @@ function isCrPlugin(code: string): boolean {
 
 function executePluginCode(code: string): PluginExports {
   const isCr = isCrPlugin(code)
-  const cerumusicApi = isCr ? createCerumusicApi() : null
+  const cerumusicApi = createCerumusicApi()
 
   // Cr 插件：注入代理 fetch 拦截插件内的 fetch() 调用，绕过 CORS
   const fetchProxy = isCr ? `
@@ -479,6 +552,7 @@ function executePluginCode(code: string): PluginExports {
     ${fetchProxy}
     var module = { exports: {} };
     var exports = module.exports;
+    var global = globalThis;
     try {
       ${code}
     } catch(e) {
@@ -501,39 +575,53 @@ function executePluginCode(code: string): PluginExports {
     env: 'browser'
   }
 
-  // Browser-compatible Buffer polyfill for global scope
+  // Browser-compatible Buffer polyfill: wraps Uint8Array with Node.js Buffer-like toString
+  function patchBufferToString(bytes: Uint8Array): Uint8Array {
+    const origToString = bytes.toString.bind(bytes)
+    ;(bytes as any).toString = function(encoding?: string, start?: number, end?: number) {
+      const s = start || 0, e = end ?? bytes.length
+      const slice = bytes.slice(s, e)
+      if (!encoding || encoding === 'utf8' || encoding === 'utf-8') return new TextDecoder().decode(slice)
+      if (encoding === 'hex') return Array.from(slice).map(b => b.toString(16).padStart(2, '0')).join('')
+      if (encoding === 'base64') { let bin = ''; for (let i = 0; i < slice.length; i++) bin += String.fromCharCode(slice[i]); return btoa(bin) }
+      if (encoding === 'binary' || encoding === 'latin1') return Array.from(slice).map(b => String.fromCharCode(b)).join('')
+      return origToString()
+    }
+    return bytes
+  }
   const BufferPolyfill: any = {
-    from(data: any, encoding?: string) {
+    from(data: any, encodingOrOffset?: string | number, length?: number) {
+      let bytes: Uint8Array
       if (typeof data === 'string') {
-        const enc = (encoding || 'utf8').toLowerCase()
-        if (enc === 'base64') return Uint8Array.from(atob(data), c => c.charCodeAt(0))
-        if (enc === 'hex') {
-          const bytes = new Uint8Array(data.length / 2)
+        const enc = ((encodingOrOffset as string) || 'utf8').toLowerCase()
+        if (enc === 'base64') bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0))
+        else if (enc === 'hex') {
+          bytes = new Uint8Array(data.length / 2)
           for (let i = 0; i < data.length; i += 2) bytes[i / 2] = parseInt(data.substr(i, 2), 16)
-          return bytes
-        }
-        return new TextEncoder().encode(data)
-      }
-      if (data instanceof ArrayBuffer) return new Uint8Array(data)
-      if (data instanceof Uint8Array) return data
-      return new Uint8Array(data)
+        } else bytes = new TextEncoder().encode(data)
+      } else if (data instanceof ArrayBuffer) bytes = new Uint8Array(data)
+      else if (data instanceof Uint8Array) bytes = new Uint8Array(data)
+      else if (Array.isArray(data)) bytes = new Uint8Array(data)
+      else bytes = new Uint8Array(data)
+      return patchBufferToString(bytes)
     },
     isBuffer(obj: any) { return obj instanceof Uint8Array },
     concat(list: Uint8Array[], totalLength?: number) {
-      const len = totalLength ?? list.reduce((s, b) => s + b.length, 0)
+      const len = totalLength ?? list.reduce((s: number, b: Uint8Array) => s + b.length, 0)
       const result = new Uint8Array(len)
       let offset = 0
       for (const buf of list) { result.set(buf, offset); offset += buf.length }
-      return result
-    }
+      return patchBufferToString(result)
+    },
+    alloc(size: number) { return patchBufferToString(new Uint8Array(size)) }
   }
 
   // cerumusicApi 作为第14个参数传入，对应 Function 参数列表中的 'cerumusic'
   // 这使得 cerumusic 在插件代码中作为局部变量可访问
   // 同时也赋值给 globalThis，确保间接引用也能找到
   const sandboxGlobal = {} as any
-  if (isCr && cerumusicApi) {
-    sandboxGlobal.cerumusic = cerumusicApi
+  sandboxGlobal.cerumusic = cerumusicApi
+  if (isCr) {
     sandboxGlobal.fetch = fetch
   }
 

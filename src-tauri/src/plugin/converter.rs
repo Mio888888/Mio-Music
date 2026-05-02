@@ -133,6 +133,9 @@ let isInitialized = false;
 let pluginSources = {{}};
 let requestHandler = null;
 
+// 从 cerumusic 获取网络请求和工具函数
+const {{ request, utils }} = cerumusic;
+
 initializePlugin();
 function initializePlugin() {{
   if (isInitialized) return;
@@ -162,6 +165,24 @@ function initializePlugin() {{
         }});
       }}
     }},
+    request: request,
+    utils: {{
+      buffer: utils.buffer,
+      crypto: {{
+        aesEncrypt: (data, mode, key, iv) => {{
+          try {{ return utils.crypto.aesEncrypt(data, mode, key, iv); }} catch(e) {{ return data; }}
+        }},
+        md5: (str) => {{
+          try {{ return utils.crypto.md5(str); }} catch(e) {{ return str; }}
+        }},
+        randomBytes: (size) => {{
+          try {{ return utils.crypto.randomBytes(size); }} catch(e) {{ return new Uint8Array(size); }}
+        }},
+        rsaEncrypt: (data, key) => {{
+          try {{ return utils.crypto.rsaEncrypt(data, key); }} catch(e) {{ return data; }}
+        }}
+      }}
+    }},
     version: '1.0.0',
     apiVersion: '1.0.0',
     currentScriptInfo: {{
@@ -179,14 +200,14 @@ function initializePlugin() {{
     const pluginFunction = new Function(
       'globalThis', 'lx', 'console', 'setTimeout', 'clearTimeout',
       'setInterval', 'clearInterval', 'Buffer', 'JSON', 'require',
-      'module', 'exports', 'process',
+      'module', 'exports', 'process', 'global',
       originalPluginCode
     );
 
     pluginFunction(
       {{ lx: mockLx }}, mockLx, console, setTimeout, clearTimeout,
       setInterval, clearInterval, Buffer, JSON, () => ({{}}),
-      {{ exports: {{}} }}, {{}}, {{ env: {{ NODE_ENV: 'production' }} }}
+      {{ exports: {{}} }}, {{}}, {{ env: {{ NODE_ENV: 'production' }} }}, {{ lx: mockLx }}
     );
 
     isInitialized = true;
