@@ -43,6 +43,11 @@ const lyricFontFamily = computed(
   () => settingsStore.settings.lyricFontFamily || 'PingFangSC-Semibold'
 )
 
+const safeLyricLines = computed(() => {
+  const rawLines = toRaw(player.value.lyrics.lines || [])
+  return JSON.parse(JSON.stringify(rawLines))
+})
+
 const showLeftPanel = computed({
   get: () => playSetting.getShowLeftPanel,
   set: (val) => playSetting.setShowLeftPanel(val)
@@ -550,7 +555,6 @@ onUnmounted(() => {
     >
       <div
         class="left"
-        :style="player.lyrics.lines.length <= 0 && showLeftPanel ? 'width:100vw' : ''"
       >
         <!-- 黑胶模式 -->
         <template v-if="playSetting.getLayoutMode === 'cd'">
@@ -566,10 +570,7 @@ onUnmounted(() => {
             :style="
               !isAudioPlaying
                 ? 'animation-play-state: paused;'
-                : '' +
-                  (player.lyrics.lines.length <= 0
-                    ? 'width:70vh;height:70vh; transition: width 0.3s ease, height 0.3s ease; transition-delay: 0.8s;'
-                    : '')
+                : ''
             "
           >
             <div class="vinyl-record"></div>
@@ -612,11 +613,14 @@ onUnmounted(() => {
           </div>
         </template>
       </div>
-      <div v-if="player.lyrics.lines.length > 0" class="right">
+      <div class="right">
+        <div v-if="player.lyrics.lines.length <= 0 && !player.isLoading" class="lyric-empty">
+          <span>暂无歌词</span>
+        </div>
         <LyricPlayer
-          v-if="playSetting.getUseAmlLyricRenderer"
+          v-if="playSetting.getUseAmlLyricRenderer && player.lyrics.lines.length > 0"
           ref="lyricPlayerRef"
-          :lyric-lines="player.lyrics.lines"
+          :lyric-lines="safeLyricLines"
           :current-time="state.currentTime"
           :word-fade-width="0.5"
           :playing="isAudioPlaying"
@@ -632,9 +636,9 @@ onUnmounted(() => {
           @line-click="jumpTime"
         />
         <LyricAdapter
-          v-else
+          v-else-if="player.lyrics.lines.length > 0"
           ref="lyricPlayerRef"
-          :lyric-lines="player.lyrics.lines"
+          :lyric-lines="safeLyricLines"
           :current-time="state.currentTime"
           :playing="isAudioPlaying"
           class="lyric-player"
@@ -932,6 +936,19 @@ onUnmounted(() => {
       width: 60%;
       transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       mask: linear-gradient(rgba(255,255,255,0) 0px, rgba(255,255,255,0.6) 5%, rgb(255,255,255) 15%, rgb(255,255,255) 75%, rgba(255,255,255,0.6) 85%, rgba(255,255,255,0));
+
+      .lyric-empty {
+        height: calc(100vh - var(--play-bottom-height));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-80px);
+        span {
+          font-size: 16px;
+          opacity: 0.4;
+          font-weight: 400;
+        }
+      }
 
       :deep(.lyric-player) {
         height: calc(100vh - var(--play-bottom-height));

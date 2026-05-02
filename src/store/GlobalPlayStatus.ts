@@ -134,7 +134,7 @@ const extractServiceLyricText = (serviceResult: any): string => {
 const getCleanSongInfo = (songInfo: any) => JSON.parse(JSON.stringify(toRaw(songInfo)))
 
 const getLikelyServicePluginId = (songInfo: any): string | undefined => {
-  const keys = ['_servicePluginId', 'servicePluginId', 'pluginId', '_pluginId']
+  const keys = ['_servicePluginId', 'servicePluginId']
   for (const key of keys) {
     const val = songInfo?.[key]
     if (typeof val === 'string' && val) return val
@@ -169,36 +169,59 @@ const fetchSdkLyrics = async (
   grepLyricInfo: boolean,
   useStrictMode: boolean
 ): Promise<LyricLine[] | null> => {
-  const lyricData = await (window as any).api?.music?.requestSdk?.('getLyric', {
-    source,
-    songInfo: getCleanSongInfo(songInfo),
-    grepLyricInfo,
-    useStrictMode
-  })
+  let lyricData: any
+  try {
+    lyricData = await (window as any).api?.music?.requestSdk?.('getLyric', {
+      source,
+      songInfo: getCleanSongInfo(songInfo),
+      grepLyricInfo,
+      useStrictMode
+    })
+  } catch (e) {
+    console.warn('[Lyrics] SDK getLyric IPC failed:', e)
+    return null
+  }
+
+  if (!lyricData) {
+    console.warn('[Lyrics] SDK getLyric returned empty for source:', source)
+    return null
+  }
+
+  const crlyric = typeof lyricData?.crlyric === 'string' ? lyricData.crlyric.trim() : ''
+  const lyric = typeof lyricData?.lyric === 'string' ? lyricData.lyric.trim() : ''
+  const lrc = typeof lyricData?.lrc === 'string' ? lyricData.lrc.trim() : ''
+  const hasLyricField =
+    Object.prototype.hasOwnProperty.call(lyricData, 'crlyric') ||
+    Object.prototype.hasOwnProperty.call(lyricData, 'lyric') ||
+    Object.prototype.hasOwnProperty.call(lyricData, 'lrc')
 
   let lyrics: LyricLine[] = []
-  if (lyricData?.crlyric) {
-    lyrics = parseCrLyricBySource(source, lyricData.crlyric)
-  } else if (lyricData?.lyric) {
-    lyrics = parseLyricByFormat(lyricData.lyric)
-  } else if ((lyricData as any)?.lrc) {
-    lyrics = parseLyricByFormat((lyricData as any).lrc)
+  if (crlyric) {
+    lyrics = parseCrLyricBySource(source, crlyric)
+  } else if (lyric) {
+    lyrics = parseLyricByFormat(lyric)
+  } else if (lrc) {
+    lyrics = parseLyricByFormat(lrc)
+  } else if (hasLyricField) {
+    console.warn('[Lyrics] SDK getLyric fields are present but empty:', source, Object.keys(lyricData))
+  } else {
+    console.warn('[Lyrics] SDK getLyric response has no lyric-related fields:', source, Object.keys(lyricData))
   }
 
   lyrics = mergeTranslation(lyrics, lyricData?.tlyric)
   return lyrics.length ? lyrics : null
 }
 
-const fetchServicePluginLyrics = async (songInfo: any): Promise<LyricLine[] | null> => {
-  const pluginId = getLikelyServicePluginId(songInfo) || LocalUserDetailStore().userSource.pluginId
-  if (!pluginId) return null
+const fetchServicePluginLyrics = async (servicePluginId: string, songInfo: any): Promise<LyricLine[] | null> => {
+  if (!servicePluginId) return null
   try {
     const source = songInfo?.source || 'kw'
-    const result = await PluginRunner.getLyric(pluginId, source, getCleanSongInfo(songInfo))
+    const result = await PluginRunner.getLyric(servicePluginId, source, getCleanSongInfo(songInfo))
     const text = extractServiceLyricText(result)
     if (!text) return null
     return parseLyricByFormat(text)
-  } catch {
+  } catch (e) {
+    console.warn('[Lyrics] Service plugin getLyric failed:', e)
     return null
   }
 }
@@ -232,20 +255,29 @@ const resolveLyrics = async (
       if (e?.name === 'AbortError') throw e
     }
     const sdk = await sdkPromise
+    if (!sdk?.length) console.warn('[Lyrics] resolveLyrics: TTML and SDK both empty for', source, songId)
     return sdk?.length ? sanitizeLyricLines(sdk) : []
   }
 
   if (source === 'local') {
     const localLyrics = await fetchLocalLyrics(songInfo)
+    if (!localLyrics?.length) console.warn('[Lyrics] resolveLyrics: local lyrics empty for', songInfo?.songmid)
     return localLyrics?.length ? sanitizeLyricLines(localLyrics) : []
   }
 
-  const serviceLyrics = await fetchServicePluginLyrics(songInfo)
-  if (serviceLyrics?.length) return sanitizeLyricLines(serviceLyrics)
+  const servicePluginId = getLikelyServicePluginId(songInfo)
+  if (servicePluginId) {
+    const serviceLyrics = await fetchServicePluginLyrics(servicePluginId, songInfo)
+    if (serviceLyrics?.length) return sanitizeLyricLines(serviceLyrics)
+    console.warn('[Lyrics] resolveLyrics: service plugin lyrics empty for', source, songId)
+    return []
+  }
 
   const sdk = await fetchSdkLyrics(source, songInfo, options.grepLyricInfo, options.useStrictMode)
+  if (!sdk?.length) console.warn('[Lyrics] resolveLyrics: SDK empty for', source, songId)
   return sdk?.length ? sanitizeLyricLines(sdk) : []
 }
+
 
 export interface Comment {
   id: number | string
@@ -357,9 +389,11 @@ export const useGlobalPlayStatusStore = defineStore(
     watch(
       () => localUserStore.userInfo.lastPlaySongId,
       (newId) => {
+        console.warn('[Lyrics][Watch:lastPlaySongId]', { newId, currentSongId: player.songId })
         if (newId && newId !== player.songId) {
           player.songId = String(newId)
           const song = localUserStore.list.find((s: any) => s.songmid === newId)
+          console.warn('[Lyrics][Watch:lastPlaySongId] matched song:', !!song, song?.name, song?.source)
           if (song) updatePlayerInfo(song)
         }
       },
@@ -466,12 +500,22 @@ export const useGlobalPlayStatusStore = defineStore(
 
     watch(
       [() => player.songId, () => player.songInfo?.songmid],
-      async ([newId], _old, onCleanup) => {
+      async ([newId, newSongmid], oldVals, onCleanup) => {
+        console.warn('[Lyrics][Watch:resolveLyrics] triggered:', {
+          newId,
+          newSongmid,
+          oldId: oldVals?.[0],
+          oldSongmid: oldVals?.[1],
+          source: (player.songInfo as any)?.source,
+          songName: (player.songInfo as any)?.name
+        })
         if (!newId || !player.songInfo) {
+          console.warn('[Lyrics][Watch:resolveLyrics] skipped: missing newId or songInfo')
           player.lyrics.lines = []
           return
         }
         player.isLoading = true
+        console.warn('[Lyrics][Watch:resolveLyrics] start resolve for:', newId, (player.songInfo as any)?.source)
         let active = true
         const abort = new AbortController()
         onCleanup(() => {

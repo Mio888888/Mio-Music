@@ -196,49 +196,53 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
 pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, String> {
     let song_info = args.get("songInfo").cloned().unwrap_or(serde_json::json!({}));
     let name = song_info.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let hash = song_info.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let interval = song_info.get("interval").and_then(|v| v.as_str()).unwrap_or("0").to_string();
 
-    let time_ms = parse_interval_to_ms(&interval);
+    let songmid = song_info.get("songmid")
+        .map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        })
+        .unwrap_or_default();
 
-    // Step 1: Search for lyric candidates
-    let search_url = format!(
-        "http://lyrics.kugou.com/search?ver=1&man=yes&client=pc&keyword={}&hash={}&timelength={}&lrctxt=1",
-        urlencoding::encode(&name), hash, time_ms
-    );
+    let hash = song_info.get("hash")
+        .and_then(|v| v.as_str())
+        .filter(|v| !v.is_empty())
+        .map(|v| v.to_string())
+        .unwrap_or(songmid);
 
-    let search_resp: serde_json::Value = get_http().get(&search_url)
-        .header("KG-RC", "1")
-        .header("KG-THash", "expand_search_manager.cpp:852736169:451")
-        .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
-
-    let candidates = search_resp.get("candidates").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    if candidates.is_empty() {
-        return Ok(serde_json::json!({ "lrc": "", "tlyric": "", "source": "kg" }));
+    if hash.is_empty() {
+        return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" }));
     }
 
-    let first = &candidates[0];
-    let lyric_id = first.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-    let access_key = first.get("accesskey").and_then(|v| v.as_str()).unwrap_or("");
-    let krctype = first.get("krctype").and_then(|v| v.as_i64()).unwrap_or(0);
-    let contenttype = first.get("contenttype").and_then(|v| v.as_i64()).unwrap_or(0);
+    let interval = song_info.get("interval")
+        .map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
+            _ => "0".to_string(),
+        })
+        .unwrap_or_else(|| "0".to_string());
 
-    let fmt = if krctype == 1 && contenttype != 1 { "krc" } else { "lrc" };
+    let timelength = song_info
+        .get("_interval")
+        .and_then(|v| match v {
+            serde_json::Value::Number(n) => n.as_i64(),
+            serde_json::Value::String(s) => s.parse::<i64>().ok(),
+            _ => None,
+        })
+        .unwrap_or_else(|| parse_interval_to_seconds(&interval));
 
-    // Step 2: Download lyric
-    let download_url = format!(
-        "http://lyrics.kugou.com/download?ver=1&client=pc&id={}&accesskey={}&fmt={}&charset=utf8",
-        lyric_id, access_key, fmt
-    );
+    let search_info = match search_lyric(&name, &hash, timelength).await {
+        Ok(Some(info)) => info,
+        Ok(None) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+        Err(_) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+    };
 
-    let download_resp: serde_json::Value = get_http().get(&download_url)
-        .header("KG-RC", "1")
-        .header("KG-THash", "expand_search_manager.cpp:852736169:451")
-        .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+    let download_resp = match get_lyric_download(search_info.id, &search_info.access_key, &search_info.fmt).await {
+        Ok(Some(resp)) => resp,
+        Ok(None) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+        Err(_) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+    };
 
     let content = download_resp.get("content").and_then(|v| v.as_str()).unwrap_or("");
     let fmt_result = download_resp.get("fmt").and_then(|v| v.as_str()).unwrap_or("");
@@ -246,7 +250,6 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
     match fmt_result {
         "krc" => decode_krc(content),
         "lrc" => {
-            // Base64 decode
             use base64::Engine;
             let decoded = base64::engine::general_purpose::STANDARD.decode(content)
                 .map_err(|e| e.to_string())?;
@@ -257,12 +260,97 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
     }
 }
 
-fn parse_interval_to_ms(interval: &str) -> i64 {
+struct KgLyricSearchInfo {
+    id: i64,
+    access_key: String,
+    fmt: String,
+}
+
+async fn search_lyric(name: &str, hash: &str, timelength: i64) -> Result<Option<KgLyricSearchInfo>, String> {
+    let search_url = format!(
+        "http://lyrics.kugou.com/search?ver=1&man=yes&client=pc&keyword={}&hash={}&timelength={}&lrctxt=1",
+        urlencoding::encode(name), hash, timelength
+    );
+
+    for _ in 0..=5 {
+        let resp = match get_http().get(&search_url)
+            .header("KG-RC", "1")
+            .header("KG-THash", "expand_search_manager.cpp:852736169:451")
+            .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
+            .send().await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        if !resp.status().is_success() {
+            continue;
+        }
+
+        let body: serde_json::Value = match resp.json().await {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        let candidates = body.get("candidates").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        if candidates.is_empty() {
+            return Ok(None);
+        }
+
+        let first = &candidates[0];
+        let id = first.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let access_key = first.get("accesskey").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let krctype = first.get("krctype").and_then(|v| v.as_i64()).unwrap_or(0);
+        let contenttype = first.get("contenttype").and_then(|v| v.as_i64()).unwrap_or(0);
+        let fmt = if krctype == 1 && contenttype != 1 { "krc" } else { "lrc" }.to_string();
+
+        if id > 0 && !access_key.is_empty() {
+            return Ok(Some(KgLyricSearchInfo { id, access_key, fmt }));
+        }
+
+        return Ok(None);
+    }
+
+    Err("Get lyric failed".into())
+}
+
+async fn get_lyric_download(id: i64, access_key: &str, fmt: &str) -> Result<Option<serde_json::Value>, String> {
+    let download_url = format!(
+        "http://lyrics.kugou.com/download?ver=1&client=pc&id={}&accesskey={}&fmt={}&charset=utf8",
+        id, access_key, fmt
+    );
+
+    for _ in 0..=5 {
+        let resp = match get_http().get(&download_url)
+            .header("KG-RC", "1")
+            .header("KG-THash", "expand_search_manager.cpp:852736169:451")
+            .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
+            .send().await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        if !resp.status().is_success() {
+            continue;
+        }
+
+        let body: serde_json::Value = match resp.json().await {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        return Ok(Some(body));
+    }
+
+    Err("Get lyric failed".into())
+}
+
+
+fn parse_interval_to_seconds(interval: &str) -> i64 {
     let parts: Vec<&str> = interval.split(':').collect();
     if parts.len() == 2 {
         let m: i64 = parts[0].parse().unwrap_or(0);
         let s: i64 = parts[1].parse().unwrap_or(0);
-        (m * 60 + s) * 1000
+        m * 60 + s
     } else {
         interval.parse().unwrap_or(0)
     }

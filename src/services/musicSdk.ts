@@ -143,7 +143,7 @@ export const musicSdk = {
 
   async getLyric(songInfo: MusicItem): Promise<string> {
     const res = await this.request('getLyric', { songInfo })
-    return res?.lrc || ''
+    return res?.lyric || res?.lrc || ''
   },
 
   async searchPlaylist(keyword: string, page = 1, limit = 30): Promise<PlaylistResult> {

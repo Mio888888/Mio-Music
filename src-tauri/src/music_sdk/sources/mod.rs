@@ -37,7 +37,7 @@ fn stub_response(method: &str, source: &str) -> Result<serde_json::Value, String
         "getLeaderboards" => Ok(json!({ "list": [], "source": src })),
         "getMusicUrl" => Ok(json!({ "url": "" })),
         "getPic" => Ok(json!({ "url": "" })),
-        "getLyric" => Ok(json!({ "lrc": "", "source": src })),
+        "getLyric" => Ok(json!({ "lyric": "", "source": src })),
         "getHotComment" | "getComment" => Ok(json!({ "comments": [], "total": 0, "source": src })),
         "recognize" => Ok(json!({ "list": [] })),
         "getSingerInfo" => Ok(json!({})),
