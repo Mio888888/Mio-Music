@@ -1,8 +1,16 @@
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, toRaw } from 'vue'
 import { ControlAudioStore } from './ControlAudio'
 import type { SongList } from '../types/audio'
 import type { UserInfo } from '../types/userInfo'
+
+function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout> | null = null
+  return ((...args: any[]) => {
+    if (timer) clearTimeout(timer)
+    timer = setTimeout(() => { fn(...args); timer = null }, ms)
+  }) as T
+}
 
 export interface PlaylistRow {
   id: string
@@ -65,8 +73,14 @@ export const LocalUserDetailStore = defineStore('Local', () => {
   function startWatch() {
     if (isWatchStarted.value) return
     isWatchStarted.value = true
-    watch(list, (newVal) => { localStorage.setItem('songList', JSON.stringify(newVal)) }, { deep: true })
-    watch(userInfo, (newVal) => { localStorage.setItem('userInfo', JSON.stringify(newVal)) }, { deep: true })
+    const saveList = debounce((val: SongList[]) => {
+      localStorage.setItem('songList', JSON.stringify(toRaw(val)))
+    }, 500)
+    const saveUserInfo = debounce((val: UserInfo) => {
+      localStorage.setItem('userInfo', JSON.stringify(toRaw(val)))
+    }, 500)
+    watch(list, (newVal) => saveList(newVal), { deep: true })
+    watch(userInfo, (newVal) => saveUserInfo(newVal), { deep: true })
   }
 
   function addSong(song: SongList) {

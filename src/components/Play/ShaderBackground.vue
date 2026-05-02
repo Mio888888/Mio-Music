@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
-import { analyzeImageColors, Color } from '@/utils/color/colorExtractor'
+import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import DefaultCover from '@/assets/images/Default.jpg'
 import CoverImage from '@/assets/images/cover.png'
 
@@ -29,6 +29,18 @@ const actualCoverImage = computed(() => {
   }
   return props.coverImage
 })
+
+const globalPlayStatus = useGlobalPlayStatusStore()
+
+watch(() => globalPlayStatus.player.coverDetail.ColorObject, (color) => {
+  if (color) {
+    dominantColor.value = {
+      r: color.r / 255,
+      g: color.g / 255,
+      b: color.b / 255
+    }
+  }
+}, { immediate: true })
 
 // Vertex shader
 const vertexShaderSource = `
@@ -257,23 +269,7 @@ function stopRenderLoop() {
   }
 }
 
-async function updateColors() {
-  try {
-    const result = await analyzeImageColors(actualCoverImage.value)
-    dominantColor.value = {
-      r: result.dominantColor.r / 255,
-      g: result.dominantColor.g / 255,
-      b: result.dominantColor.b / 255
-    }
-  } catch (error) {
-    dominantColor.value = { r: 0.3, g: 0.3, b: 0.5 }
-  }
-}
-
-watch(() => actualCoverImage.value, async () => { await updateColors() }, { immediate: true })
-
 onMounted(async () => {
-  await updateColors()
   window.addEventListener('resize', resizeCanvas)
   initWebGL()
 })

@@ -523,6 +523,9 @@ export const useGlobalPlayStatusStore = defineStore(
           return
         }
 
+        // 延迟调度：让播放状态先渲染，避免与封面/URL 解析并发争抢 IPC
+        await new Promise(r => setTimeout(r, 300))
+
         player.isLoading = true
         const targetSongId = String(newSongmid)
         const source = newSource || 'kg'
@@ -628,8 +631,7 @@ export const useGlobalPlayStatusStore = defineStore(
       player.comments.latestPage = 0
       player.comments.latestTotal = 0
       player.comments.latestMaxPage = 0
-      fetchComments(1, 'hot')
-      fetchComments(1, 'latest')
+      setTimeout(() => { fetchComments(1, 'hot'); fetchComments(1, 'latest') }, 500)
     }
 
     return { player, updatePlayerInfo, fetchComments }

@@ -332,9 +332,9 @@ struct CrossfadeState {
     duration_ms: u64,
 }
 
-// ==================== 预加载结果 ====================
+// ==================== 预加载/异步播放结果 ====================
 
-enum PreloadResult {
+enum AsyncPipelineResult {
     Ready(SlotPipeline),
     Error(String),
 }
@@ -352,9 +352,12 @@ pub struct PlayerEngine {
     shutdown_tx: std::sync::mpsc::Sender<()>,
     app_handle: tauri::AppHandle,
     poll_tick: u32,
+    // 异步播放通道
+    play_tx: std::sync::mpsc::Sender<AsyncPipelineResult>,
+    play_rx: std::sync::mpsc::Receiver<AsyncPipelineResult>,
     // 预加载通道
-    preload_tx: std::sync::mpsc::Sender<PreloadResult>,
-    preload_rx: std::sync::mpsc::Receiver<PreloadResult>,
+    preload_tx: std::sync::mpsc::Sender<AsyncPipelineResult>,
+    preload_rx: std::sync::mpsc::Receiver<AsyncPipelineResult>,
     // 无缝换曲配置
     crossfade_duration_ms: u64,
     auto_crossfade_enabled: bool,
@@ -368,6 +371,7 @@ impl PlayerEngine {
         stream_handle: OutputStreamHandle,
         shutdown_tx: std::sync::mpsc::Sender<()>,
     ) -> Self {
+        let (play_tx, play_rx) = std::sync::mpsc::channel();
         let (preload_tx, preload_rx) = std::sync::mpsc::channel();
         Self {
             stream_handle,
@@ -379,6 +383,8 @@ impl PlayerEngine {
             shutdown_tx,
             app_handle,
             poll_tick: 0,
+            play_tx,
+            play_rx,
             preload_tx,
             preload_rx,
             crossfade_duration_ms: 3000,
@@ -387,12 +393,25 @@ impl PlayerEngine {
         }
     }
 
-    pub fn play(&mut self, url: &str, _slot: Option<AudioSlot>) -> Result<(), String> {
-        self.primary = Some(SlotPipeline::new(
-            &self.stream_handle, url, self.volume / 100.0,
-        )?);
+    /// 异步播放：在后台线程下载 + 解码，完成后自动赋值 primary 并发出事件
+    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>) -> Result<(), String> {
+        self.primary = None;
+        self.secondary = None;
+        self.crossfade = None;
         self.ended_emitted = false;
-        self.emit_state();
+
+        let stream_handle = self.stream_handle.clone();
+        let url = url.to_string();
+        let volume = self.volume / 100.0;
+        let tx = self.play_tx.clone();
+
+        std::thread::spawn(move || {
+            let result = match SlotPipeline::new(&stream_handle, &url, volume) {
+                Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                Err(e) => AsyncPipelineResult::Error(e),
+            };
+            let _ = tx.send(result);
+        });
         Ok(())
     }
 
@@ -476,8 +495,8 @@ impl PlayerEngine {
 
         std::thread::spawn(move || {
             let result = match SlotPipeline::new_paused(&stream_handle, &url) {
-                Ok(pipeline) => PreloadResult::Ready(pipeline),
-                Err(e) => PreloadResult::Error(e),
+                Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                Err(e) => AsyncPipelineResult::Error(e),
             };
             let _ = tx.send(result);
         });
@@ -551,14 +570,28 @@ impl PlayerEngine {
         if self.shutdown { return }
         self.poll_tick = self.poll_tick.wrapping_add(1);
 
+        // 检查异步播放结果（非阻塞）
+        if let Ok(result) = self.play_rx.try_recv() {
+            match result {
+                AsyncPipelineResult::Ready(pipeline) => {
+                    self.primary = Some(pipeline);
+                    self.ended_emitted = false;
+                    self.emit_state();
+                }
+                AsyncPipelineResult::Error(e) => {
+                    let _ = self.app_handle.emit("player:error", serde_json::json!({ "error": e }));
+                }
+            }
+        }
+
         // 检查预加载结果（非阻塞）
         if let Ok(result) = self.preload_rx.try_recv() {
             match result {
-                PreloadResult::Ready(pipeline) => {
+                AsyncPipelineResult::Ready(pipeline) => {
                     self.secondary = Some(pipeline);
                     let _ = self.app_handle.emit("player:preload_ready", serde_json::json!({}));
                 }
-                PreloadResult::Error(e) => {
+                AsyncPipelineResult::Error(e) => {
                     eprintln!("预加载失败: {e}");
                 }
             }
@@ -567,15 +600,15 @@ impl PlayerEngine {
         self.tick_crossfade();
 
         if let Some(ref p) = self.primary {
-            // 频谱：每 2 tick 发一次（~60Hz poll / 2 = ~30FPS）
-            if self.poll_tick % 2 == 0 {
+            // 频谱：每 3 tick 发一次（~30Hz poll / 3 ≈ 10FPS）
+            if self.poll_tick % 3 == 0 {
                 if let Some(bands) = p.take_spectrum() {
                     let _ = self.app_handle.emit("player:spectrum", serde_json::json!({ "bands": bands }));
                 }
             }
 
-            // 时间：每 3 tick 发一次（~20Hz）
-            if self.poll_tick % 3 == 0 && p.is_playing() {
+            // 时间：每 6 tick 发一次（~5Hz，200ms 足够 UI 更新）
+            if self.poll_tick % 6 == 0 && p.is_playing() {
                 let _ = self.app_handle.emit("player:time", serde_json::json!({
                     "position": p.position(), "duration": p.duration(),
                 }));
@@ -649,7 +682,7 @@ pub fn start_bus_poller(shared: SharedPlayer) {
                 if engine.is_shutdown() { break }
                 engine.poll();
             }
-            std::thread::sleep(Duration::from_millis(16));
+            std::thread::sleep(Duration::from_millis(33));
         }
     });
 }

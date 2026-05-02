@@ -34,7 +34,7 @@ pub fn player__play(
         _ => None,
     });
     let mut engine = player.lock();
-    match engine.play(&url, audio_slot) {
+    match engine.play_async(&url, audio_slot) {
         Ok(()) => Ok(CommandResult::ok(())),
         Err(e) => Ok(CommandResult::err(e)),
     }

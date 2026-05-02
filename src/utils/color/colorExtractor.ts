@@ -1,16 +1,29 @@
 export interface Color { r: number; g: number; b: number }
 export interface ImageAnalysisResult { dominantColor: Color; useBlackText: boolean }
 
+const colorCache = new Map<string, ImageAnalysisResult>()
+const MAX_CACHE = 50
+
 export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysisResult> {
+  const cached = colorCache.get(imageSrc)
+  if (cached) return cached
   return new Promise((resolve) => {
+    const cacheAndResolve = (result: ImageAnalysisResult) => {
+      if (colorCache.size >= MAX_CACHE) {
+        const firstKey = colorCache.keys().next().value
+        if (firstKey !== undefined) colorCache.delete(firstKey)
+      }
+      colorCache.set(imageSrc, result)
+      resolve(result)
+    }
     if (!imageSrc || imageSrc.startsWith('@')) {
-      resolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }); return
+      cacheAndResolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }); return
     }
     const img = new Image()
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')
-        if (!ctx) { resolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }); return }
+        if (!ctx) { cacheAndResolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }); return }
         const size = 100; canvas.width = size; canvas.height = size
         ctx.drawImage(img, 0, 0, size, size)
         const imageData = ctx.getImageData(0, 0, size, size).data
@@ -32,10 +45,10 @@ export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysi
         else dominantColor = dominantColors.length > 0 ? dominantColors[0] : { r: 76, g: 116, b: 206 }
         dominantColor = enhanceColor(dominantColor)
         const avgL = pixelCount > 0 ? totalLuminance / pixelCount : 0.5
-        resolve({ dominantColor, useBlackText: avgL >= 0.6 })
-      } catch { resolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }) }
+        cacheAndResolve({ dominantColor, useBlackText: avgL >= 0.6 })
+      } catch { cacheAndResolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false }) }
     }
-    img.onerror = () => resolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false })
+    img.onerror = () => cacheAndResolve({ dominantColor: { r: 76, g: 116, b: 206 }, useBlackText: false })
     img.src = imageSrc
     if (img.complete) img.onload!(new Event('load'))
   })

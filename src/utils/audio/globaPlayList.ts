@@ -283,9 +283,6 @@ export async function playSong(song: SongList) {
   const requestId = Date.now()
   currentPlayRequestId = requestId
 
-  await new Promise((resolve) => setTimeout(resolve, 200))
-  if (currentPlayRequestId !== requestId) return
-
   const store = LocalUserDetailStore()
   const audio = ControlAudioStore()
   const globalPlayStatus = useGlobalPlayStatusStore()

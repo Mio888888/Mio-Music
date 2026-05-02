@@ -92,7 +92,13 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'crossfadeSwap' } }))
     })
 
-    unlisteners = [un1, un2, un3, un4]
+    const un5 = await listen('player:error', (event: any) => {
+      console.error('[Player] 异步播放错误:', event.payload?.error)
+      Audio.isPlay = false
+      publish('error')
+    })
+
+    unlisteners = [un1, un2, un3, un4, un5]
   }
 
   const swapPrimarySlot = () => {
