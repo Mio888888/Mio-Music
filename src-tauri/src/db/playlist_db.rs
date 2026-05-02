@@ -15,13 +15,19 @@ pub struct PlaylistRow {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlaylistSongRow {
+    #[serde(default)]
     pub playlist_id: String,
-    pub songmid: String,
+    #[serde(default)]
     pub position: i64,
+    #[serde(default)]
     pub data: String,
+    pub songmid: String,
     pub name: String,
+    #[serde(default)]
     pub singer: String,
+    #[serde(default, rename = "albumName")]
     pub album_name: String,
+    #[serde(default)]
     pub img: String,
 }
 
@@ -241,6 +247,37 @@ pub fn remove_songs(conn: &Connection, playlist_id: &str, songmids: &[String]) -
 
 pub fn clear_songs(conn: &Connection, playlist_id: &str) -> Result<usize> {
     conn.execute("DELETE FROM playlist_songs WHERE playlist_id = ?1", [playlist_id])
+}
+
+pub fn search_playlists(conn: &Connection, keyword: &str, source: Option<&str>) -> Result<Vec<PlaylistRow>> {
+    let pattern = format!("%{}%", keyword);
+    let mut stmt = if source.is_some() {
+        conn.prepare(
+            "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists WHERE name LIKE ?1 AND source = ?2 ORDER BY createTime"
+        )?
+    } else {
+        conn.prepare(
+            "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists WHERE name LIKE ?1 ORDER BY createTime"
+        )?
+    };
+    let map_row = |row: &rusqlite::Row| -> Result<PlaylistRow> {
+        Ok(PlaylistRow {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            description: row.get(2)?,
+            cover_img_url: row.get(3)?,
+            source: row.get(4)?,
+            meta: row.get(5)?,
+            create_time: row.get(6)?,
+            update_time: row.get(7)?,
+        })
+    };
+    let rows: Vec<PlaylistRow> = if let Some(s) = source {
+        stmt.query_map(params![pattern, s], map_row)?.filter_map(|r| r.ok()).collect()
+    } else {
+        stmt.query_map(params![pattern], map_row)?.filter_map(|r| r.ok()).collect()
+    };
+    Ok(rows)
 }
 
 pub fn search_songs(conn: &Connection, playlist_id: &str, keyword: &str) -> Result<Vec<PlaylistSongRow>> {

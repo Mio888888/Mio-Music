@@ -115,7 +115,7 @@ const handleBack = () => {
     </div>
 
     <div class="window-controls">
-      <slot name="extra" />
+      <slot name="before-settings" />
 
       <t-button
         v-if="showSettings"

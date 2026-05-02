@@ -88,6 +88,15 @@ pub fn songlist__update_cover(state: DbState<'_>, id: String, cover_url: String)
 }
 
 #[tauri::command]
+pub fn songlist__search(state: DbState<'_>, keyword: String, source: Option<String>) -> Result<serde_json::Value, String> {
+    let conn = state.playlist.lock().map_err(|e| e.to_string())?;
+    match playlist_db::search_playlists(&conn, &keyword, source.as_deref()) {
+        Ok(list) => Ok(serde_json::to_value(ApiResponse::ok(list)).unwrap()),
+        Err(e) => Ok(serde_json::to_value(ApiResponse::<Vec<playlist_db::PlaylistRow>>::err(e.to_string())).unwrap()),
+    }
+}
+
+#[tauri::command]
 pub fn songlist__exists(state: DbState<'_>, id: String) -> Result<serde_json::Value, String> {
     let conn = state.playlist.lock().map_err(|e| e.to_string())?;
     match playlist_db::playlist_exists(&conn, &id) {

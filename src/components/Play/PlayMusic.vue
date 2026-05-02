@@ -1381,6 +1381,8 @@ watch(showFullPlay, (val) => {
     }
 
     &.play-btn {
+      width: 42px;
+      height: 42px;
       background-color: v-bind(playbg);
       transition: background-color 0.2s ease;
 

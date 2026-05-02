@@ -79,6 +79,7 @@ pub fn run() {
             commands::playlist_commands::songlist__delete,
             commands::playlist_commands::songlist__update,
             commands::playlist_commands::songlist__update_cover,
+            commands::playlist_commands::songlist__search,
             commands::playlist_commands::songlist__exists,
             // Songlist song commands
             commands::playlist_commands::songlist__list_songs,

@@ -254,32 +254,32 @@ const api = {
     create: (name: string, description?: string, source?: string, meta?: Record<string, any>) =>
       ipcInvoke('songlist__create', { name, description, source, meta }),
     getAll: () => ipcInvoke('songlist__get_all'),
-    getById: (hashId: string) => ipcInvoke('songlist__get', hashId),
-    delete: (hashId: string) => ipcInvoke('songlist__delete', hashId),
-    batchDelete: (hashIds: string[]) => ipcInvoke('songlist__batch_delete', hashIds),
+    getById: (hashId: string) => ipcInvoke('songlist__get', { id: hashId }),
+    delete: (hashId: string) => ipcInvoke('songlist__delete', { id: hashId }),
+    batchDelete: (hashIds: string[]) => ipcInvoke('songlist__batch_delete', { ids: hashIds }),
     edit: (hashId: string, updates: any) => ipcInvoke('songlist__update', { id: hashId, ...updates }),
     updateCover: (hashId: string, coverImgUrl: string) =>
-      ipcInvoke('songlist__update_cover', { id: hashId, cover_url: coverImgUrl }),
+      ipcInvoke('songlist__update_cover', { id: hashId, coverUrl: coverImgUrl }),
     search: (keyword: string, source?: string) =>
       ipcInvoke('songlist__search', { keyword, source }),
     getStatistics: () => ipcInvoke('songlist__get_statistics'),
-    exists: (hashId: string) => ipcInvoke('songlist__exists', hashId),
+    exists: (hashId: string) => ipcInvoke('songlist__exists', { id: hashId }),
 
     addSongs: (hashId: string, songs: any[]) =>
-      ipcInvoke('songlist__add_songs', { playlist_id: hashId, songs }),
+      ipcInvoke('songlist__add_songs', { playlistId: hashId, songs }),
     removeSong: (hashId: string, songmid: string | number) =>
-      ipcInvoke('songlist__remove_song', { playlist_id: hashId, songmid }),
+      ipcInvoke('songlist__remove_song', { playlistId: hashId, songmid }),
     removeSongs: (hashId: string, songmids: (string | number)[]) =>
-      ipcInvoke('songlist__remove_batch', { playlist_id: hashId, songmids }),
-    clearSongs: (hashId: string) => ipcInvoke('songlist__clear_songs', hashId),
-    getSongs: (hashId: string) => ipcInvoke('songlist__list_songs', hashId),
-    getSongCount: (hashId: string) => ipcInvoke('songlist__count_songs', hashId),
+      ipcInvoke('songlist__remove_batch', { playlistId: hashId, songmids }),
+    clearSongs: (hashId: string) => ipcInvoke('songlist__clear_songs', { playlistId: hashId }),
+    getSongs: (hashId: string) => ipcInvoke('songlist__list_songs', { playlistId: hashId }),
+    getSongCount: (hashId: string) => ipcInvoke('songlist__count_songs', { playlistId: hashId }),
     hasSong: (hashId: string, songmid: string | number) =>
-      ipcInvoke('songlist__has_song', { playlist_id: hashId, songmid }),
+      ipcInvoke('songlist__has_song', { playlistId: hashId, songmid }),
     getSong: (hashId: string, songmid: string | number) =>
       ipcInvoke('songlist__get_song', { hashId, songmid }),
     searchSongs: (hashId: string, keyword: string) =>
-      ipcInvoke('songlist__search_songs', { playlist_id: hashId, keyword }),
+      ipcInvoke('songlist__search_songs', { playlistId: hashId, keyword }),
     getSongStatistics: (hashId: string) => ipcInvoke('songlist__get_song_statistics', hashId),
     validateIntegrity: (hashId: string) => ipcInvoke('songlist__validate_integrity', hashId),
     repairData: (hashId: string) => ipcInvoke('songlist__repair_data', hashId),
@@ -287,10 +287,10 @@ const api = {
     reorderSongs: (hashId: string, songmids: (string | number)[]) =>
       ipcInvoke('songlist__reorder_songs', { hashId, songmids }),
     moveSong: (hashId: string, songmid: string | number, toIndex: number) =>
-      ipcInvoke('songlist__move_song', { hashId, songmid, toIndex }),
+      ipcInvoke('songlist__move_song', { playlistId: hashId, songmid, toIndex }),
 
     getFavoritesId: () => ipcInvoke('songlist__get_favorites_id'),
-    setFavoritesId: (id: string) => ipcInvoke('songlist__set_favorites_id', id)
+    setFavoritesId: (id: string) => ipcInvoke('songlist__set_favorites_id', { id })
   },
 
   getUserConfig: () => ipcInvoke('get-user-config'),

@@ -270,8 +270,11 @@ const handleKeyDown = () => {
                 <template #icon><i class="iconfont icon-shengyin" style="font-size: 16px"></i></template>
               </t-button>
 
-              <UserCapsule />
-              <TitleBarControls />
+              <TitleBarControls>
+                <template #before-settings>
+                  <UserCapsule />
+                </template>
+              </TitleBarControls>
             </div>
           </div>
 
