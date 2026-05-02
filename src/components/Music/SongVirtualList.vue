@@ -208,8 +208,31 @@ const removeSelected = () => {
   selectedSet.value = new Set([...selectedSet.value].filter(id => !removeIds.has(id)))
 }
 
-// --- Hover & interaction ---
-const hoveredSong = ref<string | number | null>(null)
+// --- Song data cache (avoids repeated computed lookups per row) ---
+const songCache = new Map<number, MusicItem>()
+const songIdCache = new Map<number, string>()
+
+watch(() => [props.songs, sortType.value], () => {
+  songCache.clear()
+  songIdCache.clear()
+})
+
+const getSong = (index: number): MusicItem | undefined => {
+  let s = songCache.get(index)
+  if (s !== undefined) return s
+  s = sortedSongs.value[index]
+  if (s) songCache.set(index, s)
+  return s
+}
+
+const getSongId = (index: number): string => {
+  let id = songIdCache.get(index)
+  if (id !== undefined) return id
+  const s = getSong(index)
+  id = s ? String(s.songmid) : ''
+  songIdCache.set(index, id)
+  return id
+}
 
 // --- Like / favorites ---
 const likedSet = ref<Set<string | number>>(new Set())
@@ -284,7 +307,7 @@ const handleMenuAction = (action: string) => {
 }
 
 // --- Format ---
-const formatDuration = (duration: string | number) => {
+const formatDuration = (duration: string | number | undefined) => {
   if (!duration) return '--:--'
   if (typeof duration === 'string' && duration.includes(':')) return duration
   const sec = typeof duration === 'number' ? duration : parseInt(duration)
@@ -465,7 +488,7 @@ watch(() => props.songs, (newSongs) => {
     <div
       ref="scrollContainerRef"
       class="virtual-scroll-container"
-      @scroll="(e) => emit('scroll', e)"
+      @scroll.passive="(e) => emit('scroll', e)"
     >
       <div :style="{ height: totalSize + 'px', position: 'relative', width: '100%' }">
         <div
@@ -474,7 +497,8 @@ watch(() => props.songs, (newSongs) => {
             top: 0,
             left: 0,
             width: '100%',
-            transform: `translateY(${virtualItems.length > 0 ? virtualItems[0].start : 0}px)`
+            transform: `translateY(${virtualItems.length > 0 ? virtualItems[0].start : 0}px)`,
+            willChange: 'transform'
           }"
         >
           <div
@@ -483,11 +507,9 @@ watch(() => props.songs, (newSongs) => {
             :data-index="virtualRow.index"
             class="song-item"
             :class="{
-              'is-playing': String(sortedSongs[virtualRow.index]?.songmid) === String(currentSongId)
+              'is-playing': getSongId(virtualRow.index) === String(currentSongId)
             }"
-            @mouseenter="hoveredSong = sortedSongs[virtualRow.index]?.songmid"
-            @mouseleave="hoveredSong = null"
-            @contextmenu="handleContextMenu($event, sortedSongs[virtualRow.index])"
+            @contextmenu="handleContextMenu($event, getSong(virtualRow.index)!)"
           >
             <!-- 序号列 -->
             <div v-if="showIndex" class="col-index">
@@ -498,7 +520,7 @@ watch(() => props.songs, (newSongs) => {
                 <button
                   class="play-btn-overlay"
                   title="播放"
-                  @click.stop="emit('play', sortedSongs[virtualRow.index])"
+                  @click.stop="emit('play', getSong(virtualRow.index)!)"
                 >
                   <i class="iconfont icon-bofang"></i>
                 </button>
@@ -507,9 +529,9 @@ watch(() => props.songs, (newSongs) => {
                 v-else
                 class="select-checkbox"
                 :class="{ 'always-show': isMultiSelect }"
-                :checked="selectedSet.has(sortedSongs[virtualRow.index]?.songmid)"
+                :checked="selectedSet.has(getSongId(virtualRow.index))"
                 @change="(checked: boolean) => {
-                  const song = sortedSongs[virtualRow.index]
+                  const song = getSong(virtualRow.index)!
                   if (checked) selectedSet.add(song.songmid)
                   else selectedSet.delete(song.songmid)
                 }"
@@ -517,42 +539,42 @@ watch(() => props.songs, (newSongs) => {
             </div>
 
             <!-- 歌曲信息 -->
-            <div class="col-title" @click="handleSongClick(sortedSongs[virtualRow.index])">
-              <div v-if="sortedSongs[virtualRow.index]?.img" class="song-cover">
-                <img :src="sortedSongs[virtualRow.index].img" alt="" loading="lazy" />
+            <div class="col-title" @click="handleSongClick(getSong(virtualRow.index)!)">
+              <div v-if="getSong(virtualRow.index)?.img" class="song-cover">
+                <img :src="getSong(virtualRow.index)!.img" alt="" loading="lazy" />
               </div>
               <div class="song-info">
-                <div class="song-title" :title="sortedSongs[virtualRow.index]?.name">
-                  {{ sortedSongs[virtualRow.index]?.name }}
+                <div class="song-title" :title="getSong(virtualRow.index)?.name">
+                  {{ getSong(virtualRow.index)?.name }}
                 </div>
-                <div class="song-artist" :title="sortedSongs[virtualRow.index]?.singer">
+                <div class="song-artist" :title="getSong(virtualRow.index)?.singer">
                   <span
-                    v-if="sortedSongs[virtualRow.index]?.types?.length"
+                    v-if="getSong(virtualRow.index)?.types?.length"
                     class="quality-tag"
                   >
-                    {{ getQualityDisplayName(sortedSongs[virtualRow.index]!.types![sortedSongs[virtualRow.index]!.types!.length - 1]) }}
+                    {{ getQualityDisplayName(getSong(virtualRow.index)!.types![getSong(virtualRow.index)!.types!.length - 1]) }}
                   </span>
                   <span
-                    v-else-if="getLocalQualityLabel(sortedSongs[virtualRow.index])"
+                    v-else-if="getLocalQualityLabel(getSong(virtualRow.index)!)"
                     class="quality-tag"
                   >
-                    {{ getLocalQualityLabel(sortedSongs[virtualRow.index]) }}
+                    {{ getLocalQualityLabel(getSong(virtualRow.index)!) }}
                   </span>
                   <span
-                    v-if="sortedSongs[virtualRow.index]?.source && sortedSongs[virtualRow.index]?.source !== 'local'"
+                    v-if="getSong(virtualRow.index)?.source && getSong(virtualRow.index)?.source !== 'local'"
                     class="source-tag"
                   >
-                    {{ sortedSongs[virtualRow.index].source }}
+                    {{ getSong(virtualRow.index)!.source }}
                   </span>
-                  {{ sortedSongs[virtualRow.index]?.singer }}
+                  {{ getSong(virtualRow.index)?.singer }}
                 </div>
               </div>
             </div>
 
             <!-- 专辑 -->
             <div v-if="showAlbum" class="col-album">
-              <span class="album-name" :title="sortedSongs[virtualRow.index]?.albumName">
-                {{ sortedSongs[virtualRow.index]?.albumName || '-' }}
+              <span class="album-name" :title="getSong(virtualRow.index)?.albumName">
+                {{ getSong(virtualRow.index)?.albumName || '-' }}
               </span>
             </div>
 
@@ -561,36 +583,36 @@ watch(() => props.songs, (newSongs) => {
               <button
                 class="like-btn"
                 title="喜欢"
-                @click.stop="onToggleLike(sortedSongs[virtualRow.index])"
+                @click.stop="onToggleLike(getSong(virtualRow.index)!)"
               >
                 <HeartIcon
-                  :fill-color="isLiked(sortedSongs[virtualRow.index]) ? 'var(--td-error-color)' : ''"
-                  :stroke-color="isLiked(sortedSongs[virtualRow.index]) ? [] : ['currentColor']"
-                  :stroke-width="isLiked(sortedSongs[virtualRow.index]) ? 0 : 2"
+                  :fill-color="isLiked(getSong(virtualRow.index)!) ? 'var(--td-error-color)' : ''"
+                  :stroke-color="isLiked(getSong(virtualRow.index)!) ? [] : ['currentColor']"
+                  :stroke-width="isLiked(getSong(virtualRow.index)!) ? 0 : 2"
                   size="18"
                 />
               </button>
             </div>
 
-            <!-- 时长 / hover操作 -->
+            <!-- 时长 / hover操作 — CSS-driven via .is-hovered -->
             <div v-if="showDuration" class="col-duration">
               <div class="duration-wrapper">
-                <span v-if="hoveredSong !== sortedSongs[virtualRow.index]?.songmid" class="duration">
-                  {{ formatDuration(sortedSongs[virtualRow.index]?.interval) }}
+                <span class="duration">
+                  {{ formatDuration(getSong(virtualRow.index)?.interval) }}
                 </span>
-                <div v-else class="action-buttons">
+                <div class="action-buttons">
                   <button
-                    v-if="enableDownload && sortedSongs[virtualRow.index]?.source !== 'local'"
+                    v-if="enableDownload && getSong(virtualRow.index)?.source !== 'local'"
                     class="action-btn-small"
                     title="下载"
-                    @click.stop="emit('download', sortedSongs[virtualRow.index])"
+                    @click.stop="emit('download', getSong(virtualRow.index)!)"
                   >
                     <DownloadIcon size="16" />
                   </button>
                   <button
                     class="action-btn-small"
                     title="添加到播放列表"
-                    @click.stop="emit('addToPlaylist', sortedSongs[virtualRow.index])"
+                    @click.stop="emit('addToPlaylist', getSong(virtualRow.index)!)"
                   >
                     <i class="iconfont icon-zengjia"></i>
                   </button>
@@ -743,6 +765,7 @@ watch(() => props.songs, (newSongs) => {
   position: relative;
   flex: 1;
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* --- Song items --- */
@@ -752,10 +775,11 @@ watch(() => props.songs, (newSongs) => {
   padding: 8px 10px;
   border-bottom: 1px solid var(--song-list-item-border, var(--td-border-level-1-color));
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.15s ease;
   height: 64px;
   box-sizing: border-box;
   background-color: transparent;
+  contain: layout style paint;
 
   &:hover,
   &.is-hovered {
@@ -763,6 +787,11 @@ watch(() => props.songs, (newSongs) => {
 
     .col-title .song-info .song-title {
       color: var(--song-list-title-hover, var(--td-brand-color));
+    }
+
+    .col-duration .duration-wrapper {
+      .duration { opacity: 0; }
+      .action-buttons { opacity: 1; pointer-events: auto; }
     }
   }
 
@@ -988,6 +1017,7 @@ watch(() => props.songs, (newSongs) => {
       align-items: center;
       justify-content: center;
       width: 100%;
+      position: relative;
 
       .duration {
         font-size: 12px;
@@ -995,6 +1025,7 @@ watch(() => props.songs, (newSongs) => {
         font-variant-numeric: tabular-nums;
         min-width: 35px;
         text-align: center;
+        transition: opacity 0.15s ease;
       }
 
       .action-buttons {
@@ -1002,6 +1033,10 @@ watch(() => props.songs, (newSongs) => {
         gap: 2px;
         justify-content: center;
         align-items: center;
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
 
         .action-btn-small {
           background: none;

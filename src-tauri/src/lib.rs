@@ -1,3 +1,4 @@
+mod audio_capture;
 mod audio_device;
 mod db;
 mod commands;
@@ -160,6 +161,9 @@ pub fn run() {
             commands::directory_commands::clear_cache,
             // Audio Device
             audio_device::audio__enumerate_devices,
+            // Audio Capture (microphone)
+            audio_capture::audio_capture__start,
+            audio_capture::audio_capture__stop,
             audio_device::audio__set_output_device,
             audio_device::audio__get_device_volume,
             audio_device::audio__set_device_volume,
