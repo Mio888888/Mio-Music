@@ -6,6 +6,47 @@ pub fn get_http() -> &'static reqwest::Client {
     client::get_client()
 }
 
+/// Read an HTTP response body as bytes, check status, then parse as JSON.
+/// On parse failure the raw body (truncated) and diagnostic headers are included in the error.
+pub async fn parse_json_response(resp: reqwest::Response) -> Result<serde_json::Value, String> {
+    let status = resp.status();
+    let url = resp.url().to_string();
+    let content_encoding = resp.headers().get("content-encoding").cloned();
+    let content_length = resp.headers().get("content-length").cloned();
+    let bytes = resp.bytes().await.map_err(|e| format!("WY read body error [{}]: {}", url, e))?;
+
+    if !status.is_success() {
+        let preview = String::from_utf8_lossy(&bytes[..bytes.len().min(200)]);
+        return Err(format!("WY HTTP error [{}]: status={}, cl={:?}, ce={:?}, body={}", url, status, content_length, content_encoding, preview));
+    }
+
+    if bytes.is_empty() {
+        return Err(format!("WY empty body [{}]: status={}, cl={:?}, ce={:?}", url, status, content_length, content_encoding));
+    }
+
+    // Detect gzip magic bytes (server sent compressed data but client didn't decompress)
+    let effective_bytes = if bytes.len() >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b {
+        match flate2::read::GzDecoder::new(std::io::Cursor::new(&bytes)) {
+            decoder => {
+                use std::io::Read;
+                let mut decoded = Vec::new();
+                let mut d = decoder;
+                match d.read_to_end(&mut decoded) {
+                    Ok(_) if !decoded.is_empty() => decoded,
+                    _ => bytes.to_vec(),
+                }
+            }
+        }
+    } else {
+        bytes.to_vec()
+    };
+
+    serde_json::from_slice(&effective_bytes).map_err(|e| {
+        let preview = String::from_utf8_lossy(&effective_bytes[..effective_bytes.len().min(200)]);
+        format!("WY JSON parse error [{}]: {}, body={}", url, e, preview)
+    })
+}
+
 pub fn get_str<'a>(args: &'a serde_json::Value, key: &str) -> &'a str {
     args.get(key).and_then(|v| v.as_str()).unwrap_or("")
 }

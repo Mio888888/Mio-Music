@@ -31,19 +31,25 @@ pub async fn get_comment(args: serde_json::Value) -> Result<serde_json::Value, S
         "threadId": rid
     }));
 
-    let resp: serde_json::Value = get_http()
+    let resp = match get_http()
         .post("https://music.163.com/weapi/comment/resource/comments/get")
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
         .header("Origin", "https://music.163.com")
         .header("Referer", "http://music.163.com/")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .send().await
+    {
+        Ok(r) => match parse_json_response(r).await {
+            Ok(json) => json,
+            Err(_) => return Ok(empty_comment_result(page, limit)),
+        },
+        Err(_) => return Ok(empty_comment_result(page, limit)),
+    };
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
-        return Err(format!("WY comment API error: code={}", code));
+        return Ok(empty_comment_result(page, limit));
     }
 
     let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
@@ -84,19 +90,25 @@ pub async fn get_hot_comment(args: serde_json::Value) -> Result<serde_json::Valu
         "beforeTime": before_time
     }));
 
-    let resp: serde_json::Value = get_http()
+    let resp = match get_http()
         .post(format!("https://music.163.com/weapi/v1/resource/hotcomments/{}", rid))
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
         .header("Origin", "https://music.163.com")
         .header("Referer", "http://music.163.com/")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .send().await
+    {
+        Ok(r) => match parse_json_response(r).await {
+            Ok(json) => json,
+            Err(_) => return Ok(empty_comment_result(page, limit)),
+        },
+        Err(_) => return Ok(empty_comment_result(page, limit)),
+    };
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
-        return Err(format!("WY hot comment API error: code={}", code));
+        return Ok(empty_comment_result(page, limit));
     }
 
     let total = resp.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -108,6 +120,13 @@ pub async fn get_hot_comment(args: serde_json::Value) -> Result<serde_json::Valu
         "page": page, "limit": limit,
         "maxPage": ((total as f64 / limit as f64).ceil() as i64).max(1)
     }))
+}
+
+fn empty_comment_result(page: u64, limit: u64) -> serde_json::Value {
+    serde_json::json!({
+        "source": "wy", "comments": [], "total": 0,
+        "page": page, "limit": limit, "maxPage": 1
+    })
 }
 
 fn filter_comments(raw_list: &[serde_json::Value]) -> Vec<serde_json::Value> {

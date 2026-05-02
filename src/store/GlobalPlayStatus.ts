@@ -408,11 +408,9 @@ export const useGlobalPlayStatusStore = defineStore(
     watch(
       () => localUserStore.userInfo.lastPlaySongId,
       (newId) => {
-        console.warn('[Lyrics][Watch:lastPlaySongId]', { newId, currentSongId: player.songId })
         if (newId && newId !== player.songId) {
           player.songId = String(newId)
           const song = localUserStore.list.find((s: any) => s.songmid === newId)
-          console.warn('[Lyrics][Watch:lastPlaySongId] matched song:', !!song, song?.name, song?.source)
           if (song) updatePlayerInfo(song)
         }
       },
@@ -519,18 +517,8 @@ export const useGlobalPlayStatusStore = defineStore(
 
     watch(
       [() => player.songInfo?.songmid, () => (player.songInfo as any)?.source],
-      async ([newSongmid, newSource], oldVals, onCleanup) => {
-        console.warn('[Lyrics][Watch:resolveLyrics] triggered:', {
-          songId: player.songId,
-          newSongmid,
-          newSource,
-          oldSongmid: oldVals?.[0],
-          oldSource: oldVals?.[1],
-          songName: (player.songInfo as any)?.name
-        })
-
+      async ([newSongmid, newSource], _oldVals, onCleanup) => {
         if (!newSongmid || !player.songInfo) {
-          console.warn('[Lyrics][Watch:resolveLyrics] skipped: missing songmid or songInfo')
           player.lyrics.lines = []
           return
         }
@@ -538,7 +526,6 @@ export const useGlobalPlayStatusStore = defineStore(
         player.isLoading = true
         const targetSongId = String(newSongmid)
         const source = newSource || 'kg'
-        console.warn('[Lyrics][Watch:resolveLyrics] start resolve for:', targetSongId, source)
 
         let active = true
         const abort = new AbortController()

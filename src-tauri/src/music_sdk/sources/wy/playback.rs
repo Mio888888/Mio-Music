@@ -28,15 +28,15 @@ pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value,
         "header": { "os": "pc", "appver": "2.9.7" }
     }));
 
-    let resp: serde_json::Value = get_http()
+    let resp = get_http()
         .post("https://music.163.com/weapi/song/enhance/player/url")
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
         .header("Referer", "https://music.163.com/")
         .header("Origin", "https://music.163.com")
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .send().await.map_err(|e| e.to_string())?;
+    let resp = parse_json_response(resp).await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -73,7 +73,7 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
             .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.90 Safari/537.36")
             .send().await;
         if let Ok(r) = resp {
-            if let Ok(json) = r.json::<serde_json::Value>().await {
+            if let Ok(json) = parse_json_response(r).await {
                 if let Some(pic) = json.get("songs").and_then(|s| s.as_array())
                     .and_then(|a| a.first())
                     .and_then(|s| s.get("album"))
@@ -119,11 +119,11 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
             .body(body)
             .send().await
         {
-            Ok(r) => match r.json().await {
+            Ok(r) => match parse_json_response(r).await {
                 Ok(json) => json,
                 Err(e) => {
                     if retry_count < retry_limit - 1 { continue; }
-                    return Err(format!("WY getLyric parse error: {}", e));
+                    return Err(e);
                 }
             },
             Err(e) => {

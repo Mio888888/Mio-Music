@@ -268,16 +268,16 @@ const api = {
     addSongs: (hashId: string, songs: any[]) =>
       ipcInvoke('songlist__add_songs', { playlistId: hashId, songs }),
     removeSong: (hashId: string, songmid: string | number) =>
-      ipcInvoke('songlist__remove_song', { playlistId: hashId, songmid }),
+      ipcInvoke('songlist__remove_song', { playlistId: hashId, songmid: String(songmid) }),
     removeSongs: (hashId: string, songmids: (string | number)[]) =>
-      ipcInvoke('songlist__remove_batch', { playlistId: hashId, songmids }),
+      ipcInvoke('songlist__remove_batch', { playlistId: hashId, songmids: songmids.map(String) }),
     clearSongs: (hashId: string) => ipcInvoke('songlist__clear_songs', { playlistId: hashId }),
     getSongs: (hashId: string) => ipcInvoke('songlist__list_songs', { playlistId: hashId }),
     getSongCount: (hashId: string) => ipcInvoke('songlist__count_songs', { playlistId: hashId }),
     hasSong: (hashId: string, songmid: string | number) =>
-      ipcInvoke('songlist__has_song', { playlistId: hashId, songmid }),
+      ipcInvoke('songlist__has_song', { playlistId: hashId, songmid: String(songmid) }),
     getSong: (hashId: string, songmid: string | number) =>
-      ipcInvoke('songlist__get_song', { hashId, songmid }),
+      ipcInvoke('songlist__get_song', { hashId, songmid: String(songmid) }),
     searchSongs: (hashId: string, keyword: string) =>
       ipcInvoke('songlist__search_songs', { playlistId: hashId, keyword }),
     getSongStatistics: (hashId: string) => ipcInvoke('songlist__get_song_statistics', hashId),
@@ -285,9 +285,9 @@ const api = {
     repairData: (hashId: string) => ipcInvoke('songlist__repair_data', hashId),
     forceSave: (hashId: string) => ipcInvoke('songlist__force_save', hashId),
     reorderSongs: (hashId: string, songmids: (string | number)[]) =>
-      ipcInvoke('songlist__reorder_songs', { hashId, songmids }),
+      ipcInvoke('songlist__reorder_songs', { hashId, songmids: songmids.map(String) }),
     moveSong: (hashId: string, songmid: string | number, toIndex: number) =>
-      ipcInvoke('songlist__move_song', { playlistId: hashId, songmid, toIndex }),
+      ipcInvoke('songlist__move_song', { playlistId: hashId, songmid: String(songmid), toIndex }),
 
     getFavoritesId: () => ipcInvoke('songlist__get_favorites_id'),
     setFavoritesId: (id: string) => ipcInvoke('songlist__set_favorites_id', { id })
