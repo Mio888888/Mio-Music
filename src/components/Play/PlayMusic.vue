@@ -805,7 +805,8 @@ watch(showFullPlay, (val) => {
         </div>
 
         <div class="left-actions">
-          <t-tooltip :content="isLiked ? '已喜欢' : '喜欢'">
+          <t-tooltip>
+            <template #content>{{ isLiked ? '已喜欢' : '喜欢' }}</template>
             <t-button
               class="control-btn"
               variant="text"
@@ -881,7 +882,8 @@ watch(showFullPlay, (val) => {
 
         <div class="extra-controls">
           <!-- 播放模式按钮 -->
-          <t-tooltip :content="playModeTip">
+          <t-tooltip>
+            <template #content>{{ playModeTip }}</template>
             <t-button
               class="control-btn"
               shape="circle"
@@ -924,11 +926,10 @@ watch(showFullPlay, (val) => {
           </div>
 
           <!-- 桌面歌词开关按钮 -->
-          <t-tooltip
-            :content="
-              desktopLyricOpen ? (desktopLyricLocked ? '解锁歌词' : '关闭桌面歌词') : '打开桌面歌词'
-            "
-          >
+          <t-tooltip>
+            <template #content>
+              {{ desktopLyricOpen ? (desktopLyricLocked ? '解锁歌词' : '关闭桌面歌词') : '打开桌面歌词' }}
+            </template>
             <t-button
               class="control-btn lyric-btn"
               shape="circle"
