@@ -249,7 +249,7 @@ watch(
   (val) => {
     isAnimating.value = true
     if (animatingTimer) clearTimeout(animatingTimer)
-    animatingTimer = setTimeout(() => { isAnimating.value = false }, 350)
+    animatingTimer = setTimeout(() => { isAnimating.value = false }, 300)
     if (val) {
       resetIdleTimer()
       window.addEventListener('mousemove', resetIdleTimer)
@@ -727,7 +727,7 @@ onUnmounted(() => {
   z-index: 10;
   color: white;
   font-size: 18px;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, transform 0.3s ease;
 
   &:hover {
     background: rgba(255, 255, 255, 0.3);
@@ -755,19 +755,21 @@ onUnmounted(() => {
   --text-color: rgba(255, 255, 255, 0.9);
   z-index: 120;
   position: fixed;
-  top: var(--height);
+  top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
   color: var(--text-color);
+  transform: translateY(var(--height));
+  will-change: transform;
 
   &.animating {
-    transition: top 0.28s cubic-bezier(0.8, 0, 0.8, 0.43);
+    transition: transform 0.3s cubic-bezier(0.8, 0, 0.8, 0.43);
   }
   &.use-black-text {
     --text-color: rgba(255, 255, 255, 0.9);
   }
-  &.active { top: 0; }
+  &.active { transform: translateY(0); }
 
   &.idle {
     .playbox {
@@ -791,7 +793,7 @@ onUnmounted(() => {
     right: 0;
     padding: 30px 30px;
     padding-bottom: 10px;
-    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
   .playbox {
@@ -807,7 +809,7 @@ onUnmounted(() => {
 
     .left {
       width: 40%;
-      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       opacity: 1;
       transform: translateX(0);
       display: flex;
@@ -1179,7 +1181,7 @@ onUnmounted(() => {
 }
 
 .fade-up-enter-active, .fade-up-leave-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .fade-up-enter-from, .fade-up-leave-to {
   opacity: 0;

@@ -2,11 +2,11 @@
   <div class="skeleton-container" :class="type">
     <!-- 歌曲列表骨架 -->
     <template v-if="type === 'song-list'">
-      <div v-for="i in rows" :key="i" class="skeleton-song-item">
+      <div v-for="(w, i) in widths" :key="i" class="skeleton-song-item">
         <div class="sk-index skeleton-block" />
         <div class="sk-info">
-          <div class="sk-title skeleton-block" :style="{ width: `${60 + Math.random() * 30}%` }" />
-          <div class="sk-sub skeleton-block" :style="{ width: `${40 + Math.random() * 30}%` }" />
+          <div class="sk-title skeleton-block" :style="{ width: w.title + '%' }" />
+          <div class="sk-sub skeleton-block" :style="{ width: w.sub + '%' }" />
         </div>
         <div class="sk-duration skeleton-block" />
       </div>
@@ -33,7 +33,9 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{
   type?: 'song-list' | 'playlist-grid' | 'block'
   rows?: number
   height?: number
@@ -42,11 +44,19 @@ withDefaults(defineProps<{
   rows: 8,
   height: 48
 })
+
+const widths = computed(() =>
+  Array.from({ length: props.rows || 8 }, (_, i) => ({
+    title: 60 + ((i * 17 + 5) % 30),
+    sub: 40 + ((i * 13 + 7) % 30),
+  }))
+)
 </script>
 
 <style scoped>
 .skeleton-container {
   width: 100%;
+  transition: opacity 0.3s ease;
 }
 
 .skeleton-container.playlist-grid {

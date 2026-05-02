@@ -1,5 +1,4 @@
 import './assets/base.css'
-import 'animate.css'
 import './assets/icon_font/iconfont.css'
 import './assets/icon_font/iconfont.js'
 import './assets/main.css'

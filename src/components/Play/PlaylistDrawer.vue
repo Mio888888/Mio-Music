@@ -313,7 +313,9 @@ defineExpose({ scrollToCurrentSong })
 </script>
 
 <template>
-  <div v-show="show" class="cover" @click="handleClose"></div>
+  <transition name="playlist-mask">
+    <div v-show="show" class="cover" @click="handleClose"></div>
+  </transition>
   <transition name="playlist-drawer">
     <div
       v-show="show"
@@ -541,12 +543,11 @@ defineExpose({ scrollToCurrentSong })
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate(-50%, -50%) scale(1);
+  transition: opacity 0.2s ease, transform 0.2s ease;
   opacity: 1;
-  filter: blur(0);
 }
-.playlist-song:hover .song-duration { opacity: 0; filter: blur(4px); transform: translate(-50%, -50%) scale(0.9); }
+.playlist-song:hover .song-duration { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
 .playlist-song .song-remove {
   background: transparent;
   border: none;
@@ -559,13 +560,12 @@ defineExpose({ scrollToCurrentSong })
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.9);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate(-50%, -50%) scale(0.8);
+  transition: opacity 0.2s ease, transform 0.2s ease;
   opacity: 0;
-  filter: blur(4px);
   pointer-events: none;
 }
-.playlist-song:hover .song-remove { opacity: 1; filter: blur(0); transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+.playlist-song:hover .song-remove { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
 .playlist-song:hover .song-remove:hover { color: #e5484d; border-radius: 4px; }
 .song-actions { position: relative; width: 60px; height: 100%; flex-shrink: 0; }
 
@@ -585,11 +585,14 @@ defineExpose({ scrollToCurrentSong })
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 .playlist-container.full-screen-mode .hover-tip { background: rgba(255, 255, 255, 0.6); color: #000000; }
-.hover-tip-enter-active, .hover-tip-leave-active { transition: all 0.2s ease; }
+.hover-tip-enter-active, .hover-tip-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .hover-tip-enter-from, .hover-tip-leave-to { opacity: 0; transform: translateY(-50%) scale(0.9); }
 
-.playlist-drawer-enter-active, .playlist-drawer-leave-active { transition: transform 0.2s cubic-bezier(0.8, 0, 0.8, 0.43); }
+.playlist-drawer-enter-active, .playlist-drawer-leave-active { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .playlist-drawer-enter-from, .playlist-drawer-leave-to { transform: translateX(100%); }
+
+.playlist-mask-enter-active, .playlist-mask-leave-active { transition: opacity 0.25s ease; }
+.playlist-mask-enter-from, .playlist-mask-leave-to { opacity: 0; }
 
 .playlist-footer {
   display: flex;
@@ -612,7 +615,7 @@ defineExpose({ scrollToCurrentSong })
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   backdrop-filter: blur(10px);
   -webkit-app-region: no-drag;
 }

@@ -717,6 +717,18 @@ const playbghover = computed(
 
 const bg = ref('var(--player-bg-default)')
 
+// 封面图切换淡入效果
+const coverOpacity = ref(1)
+watch(
+  () => player.value.cover,
+  () => {
+    coverOpacity.value = 0
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => { coverOpacity.value = 1 })
+    })
+  }
+)
+
 watch(
   songInfo,
   async (newVal) => {
@@ -781,7 +793,7 @@ watch(showFullPlay, (val) => {
       <!-- 左侧：封面和歌曲信息 -->
       <div class="left-section">
         <div v-if="songInfo.songmid" class="album-cover">
-          <img :src="player.cover || songCover" alt="专辑封面" />
+          <img :src="player.cover || songCover" :style="{ opacity: coverOpacity }" alt="专辑封面" />
         </div>
 
         <div class="song-info">
@@ -977,11 +989,11 @@ watch(showFullPlay, (val) => {
 
 <style lang="scss" scoped>
 .fade-leave-active {
-  transition: all 0.2s ease-in-out;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
 
 .fade-enter-active {
-  transition: all 0.1s ease-in-out;
+  transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
 }
 
 .fade-leave-to {
@@ -1001,7 +1013,7 @@ watch(showFullPlay, (val) => {
 
 .comment-fade-enter-active,
 .comment-fade-leave-active {
-  transition: all 0.2s ease-in-out;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
 .comment-fade-enter-from,
 .comment-fade-leave-to {
@@ -1071,7 +1083,7 @@ watch(showFullPlay, (val) => {
 /* 加载歌曲过渡动画 - 缩小透明效果 */
 .loadSong-enter-active,
 .loadSong-leave-active {
-  transition: all 0.2s ease-in-out;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
 }
 
 .loadSong-enter-from,
@@ -1097,7 +1109,7 @@ watch(showFullPlay, (val) => {
     background 0.3s;
   background: v-bind(bg);
   // border-top: 1px solid #e5e7eb;
-  backdrop-filter: blur(1000px);
+  backdrop-filter: blur(30px);
   z-index: 1000;
   height: var(--play-bottom-height);
   display: flex;
@@ -1117,7 +1129,7 @@ watch(showFullPlay, (val) => {
   position: absolute;
   top: calc(var(--touch-range-height) / 2 * -1);
   cursor: pointer;
-  transition: all 0.2s ease-in-out;
+  transition: height 0.2s ease-in-out;
 
   .progress-bar {
     width: 100%;
@@ -1283,6 +1295,7 @@ watch(showFullPlay, (val) => {
       height: 100%;
       object-fit: cover;
       -webkit-user-drag: none;
+      transition: opacity 0.35s ease;
     }
   }
 

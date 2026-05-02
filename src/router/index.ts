@@ -1,4 +1,20 @@
 import { createWebHashHistory, createRouter, type RouteRecordRaw, type RouterOptions } from 'vue-router'
+import { ref } from 'vue'
+
+export const routeDirection = ref<'forward' | 'backward'>('forward')
+
+const routeDepths: Record<string, number> = {
+  find: 0,
+  songlist: 1,
+  local: 2,
+  download: 3,
+  search: 2,
+  recognize: 2,
+  recent: 2,
+  list: 4,
+  'local-tag-editor': 5,
+  profile: 2,
+}
 
 const appRouter: RouteRecordRaw[] = [
   {
@@ -27,7 +43,6 @@ const appRouter: RouteRecordRaw[] = [
   {
     path: '/settings',
     name: 'settings',
-    meta: { transitionIn: 'animate__fadeIn', transitionOut: 'animate__fadeOut' },
     component: () => import('@/views/settings/index.vue')
   }
 ]
@@ -38,21 +53,16 @@ const routes: RouteRecordRaw[] = [
   { path: '/recognition-worker', name: 'recognition-worker', component: () => import('@/views/music/RecognitionWorker.vue') }
 ]
 
-function setAnimate(routerObj: RouteRecordRaw[]) {
-  for (const item of routerObj) {
-    if (item.children && item.children.length > 0) {
-      setAnimate(item.children)
-    } else if (!item.meta) {
-      item.meta = { transitionIn: 'animate__fadeInRight', transitionOut: 'animate__fadeOutLeft' }
-    }
-  }
-}
-setAnimate(routes)
-
 const router = createRouter({
   history: createWebHashHistory(),
   routes
 } as RouterOptions)
+
+router.beforeEach((to, from) => {
+  const toDepth = routeDepths[to.name as string] ?? 0
+  const fromDepth = routeDepths[from.name as string] ?? 0
+  routeDirection.value = toDepth >= fromDepth ? 'forward' : 'backward'
+})
 
 const getRoutePreloadEnabled = (): boolean => {
   try {

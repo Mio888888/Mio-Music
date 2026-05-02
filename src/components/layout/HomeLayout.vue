@@ -285,14 +285,9 @@ const handleKeyDown = () => {
 </template>
 
 <style scoped>
-:deep(.animate__animated) {
-  position: absolute;
-  width: 100%;
-}
-
 .source-enter-active,
 .source-leave-active {
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .source-enter-from {
   opacity: 0;
@@ -380,6 +375,7 @@ const handleKeyDown = () => {
   padding: 0.7rem 1rem;
   border-radius: 0.5rem;
   border: none;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .nav-button .nav-icon {

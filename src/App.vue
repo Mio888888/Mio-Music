@@ -2,10 +2,7 @@
   <Provider v-if="!$route.path.includes('desktop-lyric')">
     <GlobalBackground />
     <router-view v-slot="{ Component }">
-      <Transition
-        :enter-active-class="`animate__animated animate__fadeIn pagesApp`"
-        :leave-active-class="`animate__animated animate__fadeOut pagesApp`"
-      >
+      <Transition name="fade-page" mode="out-in">
         <component :is="Component" />
       </Transition>
     </router-view>
@@ -41,3 +38,14 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.fade-page-enter-active,
+.fade-page-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-page-enter-from,
+.fade-page-leave-to {
+  opacity: 0;
+}
+</style>

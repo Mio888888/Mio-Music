@@ -791,10 +791,9 @@ watch(() => props.songs, (newSongs) => {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 0.2s ease, transform 0.2s ease;
       opacity: 1;
-      filter: blur(0);
     }
 
     .play-btn-overlay {
@@ -813,10 +812,9 @@ watch(() => props.songs, (newSongs) => {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) scale(0.9);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translate(-50%, -50%) scale(0.8);
+      transition: opacity 0.2s ease, transform 0.2s ease;
       opacity: 0;
-      filter: blur(4px);
       pointer-events: none;
 
       &:hover {
@@ -828,15 +826,13 @@ watch(() => props.songs, (newSongs) => {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) scale(0.9);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translate(-50%, -50%) scale(0.8);
+      transition: opacity 0.2s ease, transform 0.2s ease;
       opacity: 0;
-      filter: blur(4px);
       pointer-events: none;
 
       &.always-show {
         opacity: 1;
-        filter: blur(0);
         transform: translate(-50%, -50%) scale(1);
         pointer-events: auto;
       }
@@ -846,18 +842,15 @@ watch(() => props.songs, (newSongs) => {
   &:hover .col-index {
     .track-number {
       opacity: 0;
-      filter: blur(4px);
-      transform: translate(-50%, -50%) scale(0.9);
+      transform: translate(-50%, -50%) scale(0.8);
     }
     .play-btn-overlay {
       opacity: 1;
-      filter: blur(0);
       transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
     }
     .select-checkbox {
       opacity: 1;
-      filter: blur(0);
       transform: translate(-50%, -50%) scale(1);
       pointer-events: auto;
     }
@@ -970,7 +963,7 @@ watch(() => props.songs, (newSongs) => {
       color: var(--song-list-btn-color, var(--td-text-color-placeholder));
       padding: 8px;
       border-radius: 50%;
-      transition: all 0.2s;
+      transition: color 0.15s ease, background-color 0.15s ease;
       width: 32px;
       height: 32px;
       display: flex;
@@ -1017,7 +1010,7 @@ watch(() => props.songs, (newSongs) => {
           color: var(--song-list-btn-color, var(--td-text-color-secondary));
           padding: 6px;
           border-radius: 50%;
-          transition: all 0.2s;
+          transition: color 0.15s ease, background-color 0.15s ease;
           width: 28px;
           height: 28px;
           display: flex;
@@ -1039,7 +1032,7 @@ watch(() => props.songs, (newSongs) => {
 /* --- Header transition --- */
 .header-fade-enter-active,
 .header-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .header-fade-enter-from,
 .header-fade-leave-to {
