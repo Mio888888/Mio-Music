@@ -89,5 +89,5 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         .collect::<Vec<_>>()
         .join("\n");
 
-    Ok(serde_json::json!({ "lrc": lrc_text, "source": "kw" }))
+    Ok(serde_json::json!({ "lyric": lrc_text, "tlyric": "", "source": "kw" }))
 }

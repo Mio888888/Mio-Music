@@ -253,7 +253,7 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
             let lyric = String::from_utf8_lossy(&decoded).to_string();
             Ok(serde_json::json!({ "lyric": lyric, "tlyric": "", "source": "kg" }))
         }
-        _ => Ok(serde_json::json!({ "lrc": "", "tlyric": "", "source": "kg" })),
+        _ => Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
     }
 }
 

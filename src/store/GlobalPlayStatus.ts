@@ -181,6 +181,8 @@ const fetchSdkLyrics = async (
     lyrics = parseCrLyricBySource(source, lyricData.crlyric)
   } else if (lyricData?.lyric) {
     lyrics = parseLyricByFormat(lyricData.lyric)
+  } else if ((lyricData as any)?.lrc) {
+    lyrics = parseLyricByFormat((lyricData as any).lrc)
   }
 
   lyrics = mergeTranslation(lyrics, lyricData?.tlyric)
