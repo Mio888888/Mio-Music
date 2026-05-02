@@ -16,7 +16,8 @@ async fn get_music_info(songmid: &str) -> Result<serde_json::Value, String> {
 
     let resp: serde_json::Value = get_http()
         .post("https://u.y.qq.com/cgi-bin/musicu.fcg")
-        .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36")
+        .header("Referer", "https://y.qq.com")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
         .json().await.map_err(|e| e.to_string())?;
@@ -24,7 +25,7 @@ async fn get_music_info(songmid: &str) -> Result<serde_json::Value, String> {
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 0 || req_code != 0 {
-        return Err("TX get music info failed".into());
+        return Err(format!("TX get music info failed: code={}, req_code={}", code, req_code));
     }
 
     let track_info = resp.get("req").and_then(|r| r.get("data"))
@@ -187,6 +188,8 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
 
 /// Get lyrics (with QRC decryption)
 pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, String> {
+    let empty_result = || serde_json::json!({ "lyric": "", "tlyric": "", "crlyric": "", "rlyric": "", "source": "tx" });
+
     let song_info = args.get("songInfo").cloned().unwrap_or(serde_json::json!({}));
     let songmid = song_info.get("songmid").and_then(|v| v.as_str()).unwrap_or("");
     let song_id = song_info.get("songId")
@@ -197,52 +200,73 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
     let resolved_id = if let Some(id) = song_id {
         id
     } else {
-        let info = get_music_info(songmid).await?;
-        info.get("id").and_then(|v| v.as_i64()).unwrap_or(0)
+        match get_music_info(songmid).await {
+            Ok(info) => info.get("id").and_then(|v| v.as_i64()).unwrap_or(0),
+            Err(e) => {
+                println!("[TX Lyrics] get_music_info failed: {}", e);
+                0
+            }
+        }
     };
 
     if resolved_id == 0 {
-        return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "crlyric": "", "source": "tx" }));
+        return Ok(empty_result());
     }
 
-    let body = serde_json::json!({
-        "comm": { "ct": "19", "cv": "1859", "uin": "0" },
-        "req": {
-            "method": "GetPlayLyricInfo",
-            "module": "music.musichallSong.PlayLyricInfo",
-            "param": {
-                "format": "json", "crypt": 1, "ct": 19, "cv": 1873,
-                "interval": 0, "lrc_t": 0, "qrc": 1, "qrc_t": 0,
-                "roma": 1, "roma_t": 0, "songID": resolved_id,
-                "trans": 1, "trans_t": 0, "type": -1
+    // Retry up to 3 times (matching JS reference behavior)
+    let max_retries = 3;
+    for attempt in 0..max_retries {
+        let body = serde_json::json!({
+            "comm": { "ct": "19", "cv": "1859", "uin": "0" },
+            "req": {
+                "method": "GetPlayLyricInfo",
+                "module": "music.musichallSong.PlayLyricInfo",
+                "param": {
+                    "format": "json", "crypt": 1, "ct": 19, "cv": 1873,
+                    "interval": 0, "lrc_t": 0, "qrc": 1, "qrc_t": 0,
+                    "roma": 1, "roma_t": 0, "songID": resolved_id,
+                    "trans": 1, "trans_t": 0, "type": -1
+                }
             }
+        });
+
+        let resp_result: Result<serde_json::Value, String> = get_http()
+            .post("https://u.y.qq.com/cgi-bin/musicu.fcg")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36")
+            .header("Referer", "https://y.qq.com")
+            .json(&body)
+            .send().await.map_err(|e| e.to_string())?
+            .json().await.map_err(|e| e.to_string());
+
+        let resp = match resp_result {
+            Ok(r) => r,
+            Err(e) => {
+                println!("[TX Lyrics] API request failed (attempt {}/{}): {}", attempt + 1, max_retries, e);
+                if attempt < max_retries - 1 { continue; }
+                return Ok(empty_result());
+            }
+        };
+
+        let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
+        let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
+        if code != 0 || req_code != 0 {
+            println!("[TX Lyrics] API error (attempt {}/{}): code={}, req_code={}", attempt + 1, max_retries, code, req_code);
+            if attempt < max_retries - 1 { continue; }
+            return Ok(empty_result());
         }
-    });
 
-    let resp: serde_json::Value = get_http()
-        .post("https://u.y.qq.com/cgi-bin/musicu.fcg")
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.198 Safari/537.36")
-        .header("Referer", "https://y.qq.com")
-        .json(&body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        let data = resp.get("req").and_then(|r| r.get("data")).cloned().unwrap_or(serde_json::json!({}));
 
-    let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
-    let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
-    if code != 0 || req_code != 0 {
-        return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "crlyric": "", "source": "tx" }));
+        let lrc_enc = data.get("lyric").and_then(|v| v.as_str()).unwrap_or("");
+        let trans_enc = data.get("trans").and_then(|v| v.as_str()).unwrap_or("");
+        let roma_enc = data.get("roma").and_then(|v| v.as_str()).unwrap_or("");
+
+        let lrc = qrc_decrypt(lrc_enc).unwrap_or_default();
+        let tlrc = qrc_decrypt(trans_enc).unwrap_or_default();
+        let rlrc = qrc_decrypt(roma_enc).unwrap_or_default();
+
+        return Ok(parse_qrc_lyrics(&lrc, &tlrc, &rlrc));
     }
 
-    let data = resp.get("req").and_then(|r| r.get("data")).cloned().unwrap_or(serde_json::json!({}));
-
-    let lrc_enc = data.get("lyric").and_then(|v| v.as_str()).unwrap_or("");
-    let trans_enc = data.get("trans").and_then(|v| v.as_str()).unwrap_or("");
-    let roma_enc = data.get("roma").and_then(|v| v.as_str()).unwrap_or("");
-
-    // Decrypt all three QRC streams
-    let lrc = qrc_decrypt(lrc_enc).unwrap_or_default();
-    let tlrc = qrc_decrypt(trans_enc).unwrap_or_default();
-    let rlrc = qrc_decrypt(roma_enc).unwrap_or_default();
-
-    Ok(parse_qrc_lyrics(&lrc, &tlrc, &rlrc))
+    Ok(empty_result())
 }

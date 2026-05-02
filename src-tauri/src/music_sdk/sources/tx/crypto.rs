@@ -237,9 +237,10 @@ pub fn qrc_decrypt(encrypted_hex: &str) -> Result<String, String> {
     let input = hex::decode(encrypted_hex).map_err(|e| format!("QRC hex decode error: {}", e))?;
 
     let key = b"!@#)(*$%123ZXC!@!@#)(NHL";
-    let schedule1 = key_schedule(&key[0..8], false);   // DECRYPT
-    let schedule2 = key_schedule(&key[8..16], true);    // ENCRYPT
-    let schedule3 = key_schedule(&key[16..24], false);  // DECRYPT
+    // key_schedule mode: true = reverse order (DECRYPT), false = forward order (ENCRYPT)
+    let schedule1 = key_schedule(&key[0..8], true);    // DECRYPT
+    let schedule2 = key_schedule(&key[8..16], false);   // ENCRYPT
+    let schedule3 = key_schedule(&key[16..24], true);   // DECRYPT
 
     let mut decrypted = Vec::with_capacity(input.len());
     for chunk in input.chunks(8) {
@@ -404,13 +405,11 @@ pub fn parse_qrc_lyrics(lrc: &str, tlrc: &str, rlrc: &str) -> serde_json::Value 
 
     if !lrc.is_empty() {
         let clean_lrc = remove_tag(lrc);
-        let (parsed_lyric, parsed_lxlyric) = parse_ceru(&clean_lrc);
+        let (parsed_lyric, _parsed_lxlyric) = parse_ceru(&clean_lrc);
         lyric = parsed_lyric;
+        // Store raw decrypted QRC (same as JS: info.crlyric = lrc)
+        // Frontend parseQrc() expects original QRC format with [ms,dur] and (off,dur,0) tags
         crlyric = lrc.to_string();
-        // Use lxlrc (word-by-word with absolute offsets) if available
-        if !parsed_lxlyric.is_empty() {
-            crlyric = parsed_lxlyric;
-        }
     }
     if !rlrc.is_empty() {
         let clean_rlrc = remove_tag(rlrc);
@@ -418,7 +417,8 @@ pub fn parse_qrc_lyrics(lrc: &str, tlrc: &str, rlrc: &str) -> serde_json::Value 
         rlyric = fix_time_tags(&parsed_rlyric, &lyric);
     }
     if !tlrc.is_empty() {
-        tlyric = fix_time_tags(tlrc, &lyric);
+        let clean_tlrc = remove_tag(tlrc);
+        tlyric = fix_time_tags(&clean_tlrc, &lyric);
     }
 
     serde_json::json!({
