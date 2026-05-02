@@ -87,7 +87,12 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'autoNext' } }))
     })
 
-    unlisteners = [un1, un2, un3]
+    const un4 = await listen('player:crossfade_swap', () => {
+      // Rust 自动 crossfade 完成交换，通知前端更新 UI 状态
+      window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'crossfadeSwap' } }))
+    })
+
+    unlisteners = [un1, un2, un3, un4]
   }
 
   const swapPrimarySlot = () => {

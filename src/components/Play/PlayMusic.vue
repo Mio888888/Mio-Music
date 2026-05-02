@@ -30,7 +30,8 @@ import {
   setVolume,
   seekTo,
   playSong,
-  playMode
+  playMode,
+  onCrossfadeSwap
 } from '@/utils/audio/globaPlayList'
 import songCover from '@/assets/images/song.jpg'
 import { downloadSingleSong } from '@/utils/audio/download'
@@ -326,6 +327,8 @@ function globalControls(e: Event) {
     toggleFullPlay()
   } else if (name === 'autoNext') {
     playNext()
+  } else if (name === 'crossfadeSwap') {
+    onCrossfadeSwap()
   } else if (name === 'toggle') {
     togglePlayPause()
   } else if (name === 'playPrev') {

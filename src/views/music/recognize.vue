@@ -230,7 +230,7 @@ async function start() {
       }
     )
 
-    await invoke('audio_capture__start', { chunkDurationMs: SLICE_DURATION })
+    await invoke('audio_capture_start', { chunkDurationMs: SLICE_DURATION })
 
     await nextTick()
     startVisualizerLoop()
@@ -285,7 +285,7 @@ async function stopRecording(success: boolean = false) {
   if (!running.value) return
 
   try {
-    await invoke('audio_capture__stop')
+    await invoke('audio_capture_stop')
   } catch {}
 
   stopVisualizerLoop()
@@ -381,7 +381,7 @@ function reset() {
   stopVisualizerLoop()
 
   try {
-    invoke('audio_capture__stop')
+    invoke('audio_capture_stop')
   } catch {}
 
   if (unlistenLevel) {

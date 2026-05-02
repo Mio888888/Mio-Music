@@ -502,11 +502,15 @@ export const useGlobalPlayStatusStore = defineStore(
     )
 
     function updatePlayerInfo(songInfo: SongList) {
-      if (player.songInfo?.songmid === songInfo.songmid) return
-      player.songInfo = songInfo
+      const changed = player.songInfo?.songmid !== songInfo.songmid
+      if (changed) {
+        player.songInfo = songInfo
+      }
       player.songName = songInfo.name || ''
       player.singer = songInfo.singer || ''
-      updateComments(songInfo)
+      if (changed) {
+        updateComments(songInfo)
+      }
     }
 
     async function fetchComments(page = 1, type: 'hot' | 'latest' = 'hot') {

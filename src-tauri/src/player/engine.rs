@@ -37,12 +37,28 @@ impl SlotPipeline {
     ) -> Result<Self, String> {
         let file_path = resolve_audio_file(url)?;
 
-        // 先尝试 rodio 解码（MP3/WAV/FLAC/OGG），失败则回退到 symphonia（AAC 等）
-        let (channels, sample_rate, duration, source): (u16, u32, f64, PcmSource) =
+        // AAC/M4A (ISO BMFF / ftyp) 直接走 symphonia，避免 rodio symphonia 解码器的 seek panic
+        // 其他格式先尝试 rodio，失败再回退 symphonia
+        let needs_symphonia_direct = {
+            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            if matches!(ext.as_str(), "m4a" | "aac" | "mp4" | "m4b" | "m4p") {
+                true
+            } else {
+                // 无扩展名时检测魔数：ISO BMFF 容器以 ftyp box 开头
+                std::fs::read(&file_path)
+                    .map(|buf| buf.len() >= 8 && &buf[4..8] == b"ftyp")
+                    .unwrap_or(false)
+            }
+        };
+
+        let (channels, sample_rate, duration, source): (u16, u32, f64, PcmSource) = if needs_symphonia_direct {
+            decode_with_symphonia(&file_path)?
+        } else {
             match decode_with_rodio(&file_path) {
                 Ok(result) => result,
                 Err(_) => decode_with_symphonia(&file_path)?,
-            };
+            }
+        };
 
         let eq_state = Arc::new(Mutex::new(EqState::new(channels, sample_rate)));
         let spectrum_state = Arc::new(Mutex::new(SpectrumState::new()));
@@ -342,6 +358,8 @@ pub struct PlayerEngine {
     // 无缝换曲配置
     crossfade_duration_ms: u64,
     auto_crossfade_enabled: bool,
+    // player:ended 防重复
+    ended_emitted: bool,
 }
 
 impl PlayerEngine {
@@ -365,6 +383,7 @@ impl PlayerEngine {
             preload_rx,
             crossfade_duration_ms: 3000,
             auto_crossfade_enabled: false,
+            ended_emitted: false,
         }
     }
 
@@ -372,6 +391,7 @@ impl PlayerEngine {
         self.primary = Some(SlotPipeline::new(
             &self.stream_handle, url, self.volume / 100.0,
         )?);
+        self.ended_emitted = false;
         self.emit_state();
         Ok(())
     }
@@ -472,6 +492,7 @@ impl PlayerEngine {
                 p.set_volume(vol);
                 p.resume();
             }
+            self.ended_emitted = false;
             self.emit_state();
             return true;
         }
@@ -579,7 +600,8 @@ impl PlayerEngine {
         }
 
         if let Some(ref p) = self.primary {
-            if p.sink.empty() && !p.sink.is_paused() && self.crossfade.is_none() {
+            if p.sink.empty() && !p.sink.is_paused() && self.crossfade.is_none() && !self.ended_emitted {
+                self.ended_emitted = true;
                 let _ = self.app_handle.emit("player:ended", serde_json::json!({ "slot": "A" }));
             }
         }
@@ -598,6 +620,8 @@ impl PlayerEngine {
 
         if progress >= 1.0 {
             self.primary = self.secondary.take();
+            self.ended_emitted = false;
+            let _ = self.app_handle.emit("player:crossfade_swap", serde_json::json!({}));
             done = true;
         }
 

@@ -162,8 +162,8 @@ pub fn run() {
             // Audio Device
             audio_device::audio__enumerate_devices,
             // Audio Capture (microphone)
-            audio_capture::audio_capture__start,
-            audio_capture::audio_capture__stop,
+            audio_capture::audio_capture_start,
+            audio_capture::audio_capture_stop,
             audio_device::audio__set_output_device,
             audio_device::audio__get_device_volume,
             audio_device::audio__set_device_volume,

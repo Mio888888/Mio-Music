@@ -255,6 +255,7 @@ export async function playSong(song: SongList) {
       _playIndex = idx
     }
 
+    console.log('[playSong] updating state:', song.name, song.singer, 'img:', !!song.img)
     store.userInfo.lastPlaySongId = song.songmid
     globalPlayStatus.player.songInfo = toRaw(song) as any
 
@@ -322,10 +323,12 @@ export function playNext(): SongList | null {
   // 无缝换曲模式：尝试使用预加载的下一曲
   const setting = playSetting()
   if (setting.isSeamlessTransition && preloadedSong && preloadedReady) {
+    console.log('[playNext] seamless path, preloadedSong:', preloadedSong.name, 'mode:', setting.seamlessMode)
     seamlessNext()
     return preloadedSong
   }
 
+  console.log('[playNext] normal path, seamless:', setting.isSeamlessTransition, 'preloaded:', !!preloadedSong, 'ready:', preloadedReady)
   if (playMode.value === PlayMode.SINGLE) {
     const song = store.list[_playIndex]
     if (song) { playSong(song); return song }
@@ -352,24 +355,65 @@ export async function seamlessNext(): Promise<boolean> {
   const setting = playSetting()
 
   if (setting.seamlessMode === 'crossfade') {
-    // crossfade 模式：Rust poll 已在末尾自动触发渐变，此处只需 swap slot
-    try {
-      await invoke('player__swap_slot')
-    } catch {
-      return false
-    }
-  } else {
-    // gapless 模式：即时切换
-    try {
-      const result: any = await invoke('player__gapless_swap')
-      if (result && !result.success) return false
-      if (result?.data === false) return false
-    } catch {
-      return false
-    }
+    // crossfade 模式：Rust 后端自动完成渐变和 slot 交换
+    // 前端只更新 UI 状态，不调用 swap_slot（否则会与 Rust 自动交换冲突导致音频错位）
+    updateSeamlessState()
+    return true
   }
 
-  // 更新播放状态
+  // gapless 模式：前端主动触发即时切换
+  try {
+    const result: any = await invoke('player__gapless_swap')
+    if (result && !result.success) return false
+    if (result?.data === false) return false
+  } catch {
+    return false
+  }
+  updateSeamlessState()
+  return true
+}
+
+/**
+ * 无缝换曲通用状态更新（crossfade 和 gapless 共用）
+ */
+function updateSeamlessState() {
+  if (!preloadedSong) return
+  const store = LocalUserDetailStore()
+  const globalPlayStatus = useGlobalPlayStatusStore()
+  const song = preloadedSong
+
+  const idx = store.list.findIndex((s) => s.songmid === song.songmid)
+  if (idx !== -1) {
+    _playIndex = idx
+  }
+  store.userInfo.lastPlaySongId = song.songmid
+  globalPlayStatus.player.songInfo = toRaw(song) as any
+
+  try {
+    invoke('player__update_now_playing', {
+      title: song.name || '未知歌曲',
+      artist: song.singer || '未知艺术家',
+      album: song.albumName || '',
+      duration: 0,
+      coverUrl: song.img || null
+    })
+  } catch {}
+
+  const audio = ControlAudioStore()
+  invoke('player__set_volume', { volume: audio.Audio.volume })
+
+  preloadedSong = null
+  preloadedReady = false
+  scheduleNextPrefetch()
+}
+
+/**
+ * Rust 自动 crossfade 完成后的前端状态同步
+ * Rust 后端自动完成 slot 交换后通知前端，前端使用已有的 preloadedSong 更新 UI
+ */
+export function onCrossfadeSwap() {
+  if (!preloadedSong) return
+
   const store = LocalUserDetailStore()
   const globalPlayStatus = useGlobalPlayStatusStore()
   const audio = ControlAudioStore()
@@ -382,9 +426,8 @@ export async function seamlessNext(): Promise<boolean> {
   store.userInfo.lastPlaySongId = song.songmid
   globalPlayStatus.player.songInfo = toRaw(song) as any
 
-  // 更新 macOS 系统媒体控制
   try {
-    await invoke('player__update_now_playing', {
+    invoke('player__update_now_playing', {
       title: song.name || '未知歌曲',
       artist: song.singer || '未知艺术家',
       album: song.albumName || '',
@@ -393,14 +436,9 @@ export async function seamlessNext(): Promise<boolean> {
     })
   } catch {}
 
-  await invoke('player__set_volume', { volume: audio.Audio.volume })
-
-  // 重置预加载状态并调度下一曲预加载
   preloadedSong = null
   preloadedReady = false
   scheduleNextPrefetch()
-
-  return true
 }
 
 export function playPrevious(): SongList | null {

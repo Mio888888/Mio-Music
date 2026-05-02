@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter};
 static STOP_SENDER: Mutex<Option<Sender<()>>> = Mutex::new(None);
 
 #[tauri::command]
-pub fn audio_capture__start(
+pub fn audio_capture_start(
     app: AppHandle,
     chunk_duration_ms: Option<u64>,
 ) -> Result<(), String> {
@@ -128,7 +128,7 @@ fn capture_thread(
 }
 
 #[tauri::command]
-pub fn audio_capture__stop() -> Result<(), String> {
+pub fn audio_capture_stop() -> Result<(), String> {
     stop_internal();
     Ok(())
 }
