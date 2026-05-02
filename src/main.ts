@@ -24,6 +24,13 @@ config.instance = new LogtoClient({
 })
 
 const app = createApp(App)
+
+// 过滤 TDesign TPopup 已知的 slot 警告（TPopupTrigger 在 render 外调用 slot）
+app.config.warnHandler = (msg) => {
+  if (typeof msg === 'string' && msg.includes('invoked outside of the render function')) return
+  console.warn(msg)
+}
+
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 app.use(pinia)
