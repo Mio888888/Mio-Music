@@ -21,6 +21,10 @@ let prefetchRequestId = 0
 let preloadedSong: SongList | null = null
 let preloadedReady = false
 let unlistenPreload: UnlistenFn | null = null
+let prefetchTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 预加载提前量（秒）：剩余时长低于此值时开始预加载 */
+const PREFETCH_LEAD_TIME = 30
 
 const qualityMap: Record<string, string> = {
   '128k': '128kbps', '320k': '320kbps', flac: 'FLAC 无损',
@@ -192,16 +196,8 @@ async function ensurePreloadListener() {
   })
 }
 
-export async function scheduleNextPrefetch() {
-  const setting = playSetting()
-  if (!setting.isSeamlessTransition) return
-
-  syncSeamlessConfig()
-  await ensurePreloadListener()
-
-  preloadedSong = null
-  preloadedReady = false
-
+/** 实际执行预加载（URL 解析 + 下载到 secondary slot） */
+async function doPrefetchNext() {
   const nextSong = computeNextSong()
   if (!nextSong || nextSong.source === 'local') return
 
@@ -218,7 +214,57 @@ export async function scheduleNextPrefetch() {
   }
 }
 
+/**
+ * 调度下一曲预加载：当剩余时长 > 30s 时延迟触发，否则立即执行。
+ * 手动切歌会通过 invalidatePrefetch() 取消待执行的 timer。
+ */
+export function scheduleNextPrefetch() {
+  const setting = playSetting()
+  if (!setting.isSeamlessTransition) return
+
+  syncSeamlessConfig()
+  ensurePreloadListener()
+
+  preloadedSong = null
+  preloadedReady = false
+
+  // 清除上一次的延迟 timer
+  if (prefetchTimer !== null) {
+    clearTimeout(prefetchTimer)
+    prefetchTimer = null
+  }
+
+  const audio = ControlAudioStore()
+  const duration = audio.Audio.duration
+
+  // duration 有效且剩余时长足够：延迟到接近结束时再预加载
+  if (duration > 0 && duration > PREFETCH_LEAD_TIME) {
+    const delayMs = (duration - PREFETCH_LEAD_TIME) * 1000
+    const current = audio.Audio.currentTime
+    const remainingMs = (duration - current) * 1000
+
+    // 已经接近结束（可能 seek 过），立即触发
+    if (remainingMs <= PREFETCH_LEAD_TIME * 1000) {
+      doPrefetchNext()
+      return
+    }
+
+    prefetchTimer = setTimeout(() => {
+      prefetchTimer = null
+      doPrefetchNext()
+    }, delayMs)
+    return
+  }
+
+  // 短歌曲或 duration 未知：立即预加载
+  doPrefetchNext()
+}
+
 export function invalidatePrefetch() {
+  if (prefetchTimer !== null) {
+    clearTimeout(prefetchTimer)
+    prefetchTimer = null
+  }
   prefetchRequestId++
   preloadedSong = null
   preloadedReady = false
