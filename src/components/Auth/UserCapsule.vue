@@ -61,10 +61,6 @@ const handleMenuSelect = (key: string | number) => {
 </script>
 
 <style scoped>
-.user-capsule-container {
-  -webkit-app-region: none;
-}
-
 .user-capsule {
   display: flex;
   align-items: center;

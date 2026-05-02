@@ -169,7 +169,7 @@ const handleSearchSelect = async (item: SearchItem) => {
 
 <template>
   <div class="main-container">
-    <div class="header">
+    <div class="header" data-tauri-drag-region>
       <TitleBarControls title="设置" :show-back="true" :show-account="false">
         <template #extra>
           <div style="flex-shrink: 0">
@@ -223,7 +223,6 @@ const handleSearchSelect = async (item: SearchItem) => {
 }
 
 .header {
-  -webkit-app-region: drag;
   display: flex;
   align-items: center;
   background: var(--settings-header-bg);
