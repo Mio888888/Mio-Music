@@ -4,14 +4,17 @@ use std::collections::HashMap;
 
 /// Get batch quality info for Kugou hashes.
 /// Returns a map of hash -> (types_vec, types_map)
-pub async fn get_batch_quality_info(hashes: &[String]) -> Result<HashMap<String, (Vec<String>, HashMap<String, QualityInfo>)>, String> {
+pub async fn get_batch_quality_info(
+    hashes: &[String],
+) -> Result<HashMap<String, (Vec<String>, HashMap<String, QualityInfo>)>, String> {
     if hashes.is_empty() {
         return Ok(HashMap::new());
     }
 
-    let resources: Vec<serde_json::Value> = hashes.iter().map(|hash| {
-        serde_json::json!({ "id": 0, "type": "audio", "hash": hash })
-    }).collect();
+    let resources: Vec<serde_json::Value> = hashes
+        .iter()
+        .map(|hash| serde_json::json!({ "id": 0, "type": "audio", "hash": hash }))
+        .collect();
 
     let timestamp = chrono::Utc::now().timestamp_millis();
     let url = format!(
@@ -30,17 +33,31 @@ pub async fn get_batch_quality_info(hashes: &[String]) -> Result<HashMap<String,
 
     let resp: serde_json::Value = get_http()
         .post(&url)
-        .header("User-Agent", "Android712-AndroidPhone-20049-376-0-FeeCacheUpdate-wifi")
+        .header(
+            "User-Agent",
+            "Android712-AndroidPhone-20049-376-0-FeeCacheUpdate-wifi",
+        )
         .json(&body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let errcode = resp.get("error_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let errcode = resp
+        .get("error_code")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(-1);
     if errcode != 0 {
         return Err("KuGou quality info API error".into());
     }
 
-    let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let data = resp
+        .get("data")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     let mut map = HashMap::new();
 
     for (idx, song_data) in data.iter().enumerate() {
@@ -54,9 +71,20 @@ pub async fn get_batch_quality_info(hashes: &[String]) -> Result<HashMap<String,
         };
 
         for quality_data in relate_goods {
-            let quality = quality_data.get("quality").and_then(|v| v.as_str()).unwrap_or("");
-            let file_size = quality_data.get("info").and_then(|i| i.get("filesize")).and_then(|v| v.as_i64()).unwrap_or(0);
-            let q_hash = quality_data.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let quality = quality_data
+                .get("quality")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let file_size = quality_data
+                .get("info")
+                .and_then(|i| i.get("filesize"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let q_hash = quality_data
+                .get("hash")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let size_str = format_file_size(file_size);
 
             let (type_name, rank) = match quality {
@@ -69,8 +97,19 @@ pub async fn get_batch_quality_info(hashes: &[String]) -> Result<HashMap<String,
                 _ => continue,
             };
 
-            types.push((rank, type_name.to_string(), size_str.clone(), q_hash.clone()));
-            types_map.insert(type_name.to_string(), QualityInfo { size: size_str, hash: Some(q_hash) });
+            types.push((
+                rank,
+                type_name.to_string(),
+                size_str.clone(),
+                q_hash.clone(),
+            ));
+            types_map.insert(
+                type_name.to_string(),
+                QualityInfo {
+                    size: size_str,
+                    hash: Some(q_hash),
+                },
+            );
         }
 
         types.sort_by_key(|t| t.0);
@@ -83,7 +122,8 @@ pub async fn get_batch_quality_info(hashes: &[String]) -> Result<HashMap<String,
 
 /// Get music play URL
 pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let songmid = args.get("songInfo")
+    let songmid = args
+        .get("songInfo")
         .and_then(|s| s.get("songmid"))
         .map(|v| match v {
             serde_json::Value::String(s) => s.clone(),
@@ -91,7 +131,8 @@ pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value,
             _ => String::new(),
         })
         .unwrap_or_default();
-    let hash = args.get("songInfo")
+    let hash = args
+        .get("songInfo")
         .and_then(|s| s.get("hash"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
@@ -99,28 +140,52 @@ pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value,
     let quality = get_str(&args, "quality");
 
     // Use hash if available, otherwise use songmid
-    let target_hash = if !hash.is_empty() { hash } else { songmid.clone() };
+    let target_hash = if !hash.is_empty() {
+        hash
+    } else {
+        songmid.clone()
+    };
 
     let url = format!(
         "https://trackercdn.kugou.com/i/v2/?appid=1005&clientver=20049&cmd=25&pid=1&behavior=play&hash={}",
         target_hash
     );
 
-    let resp: serde_json::Value = get_http().get(&url)
-        .header("User-Agent", "Android712-AndroidPhone-20049-376-0-FeeCacheUpdate-wifi")
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+    let resp: serde_json::Value = get_http()
+        .get(&url)
+        .header(
+            "User-Agent",
+            "Android712-AndroidPhone-20049-376-0-FeeCacheUpdate-wifi",
+        )
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let urls = resp.get("url").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let play_url = urls.first().and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let urls = resp
+        .get("url")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let play_url = urls
+        .first()
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
 
     Ok(serde_json::json!({ "url": play_url, "type": quality }))
 }
 
 /// Get album art
 pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let song_info = args.get("songInfo").cloned().unwrap_or(serde_json::json!({}));
-    let songmid = song_info.get("songmid")
+    let song_info = args
+        .get("songInfo")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
+    let songmid = song_info
+        .get("songmid")
         .map(|v| match v {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Number(n) => n.to_string(),
@@ -128,13 +193,21 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
         })
         .unwrap_or_default();
     let hash = song_info.get("hash").and_then(|v| v.as_str()).unwrap_or("");
-    let album_id = song_info.get("albumId").and_then(|v| v.as_i64()).unwrap_or(0);
-    let singer = song_info.get("singer").and_then(|v| v.as_str()).unwrap_or("");
+    let album_id = song_info
+        .get("albumId")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let singer = song_info
+        .get("singer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let name = song_info.get("name").and_then(|v| v.as_str()).unwrap_or("");
 
     // If songmid length is 32, use audioId split (matches JS logic)
     let album_audio_id = if songmid.len() == 32 {
-        song_info.get("audioId").and_then(|v| v.as_str())
+        song_info
+            .get("audioId")
+            .and_then(|v| v.as_str())
             .and_then(|s| s.split('_').next())
             .unwrap_or(&songmid)
             .to_string()
@@ -168,25 +241,46 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
         .header("KG-THash", "expand_search_manager.cpp:852736169:451")
         .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
         .json(&body)
-        .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let errcode = resp.get("error_code").and_then(|v| v.as_i64()).unwrap_or(-1);
+    let errcode = resp
+        .get("error_code")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(-1);
     if errcode != 0 {
         return Err("KuGou pic API error".into());
     }
 
-    let data_arr = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let info = data_arr.first()
+    let data_arr = resp
+        .get("data")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let info = data_arr
+        .first()
         .and_then(|d| d.get("info"))
         .cloned()
         .unwrap_or(serde_json::json!({}));
 
     let img = if let Some(imgsize_arr) = info.get("imgsize").and_then(|v| v.as_array()) {
-        let size = imgsize_arr.first().and_then(|v| v.as_str()).unwrap_or("400");
-        info.get("image").and_then(|v| v.as_str()).unwrap_or("").replace("{size}", size)
+        let size = imgsize_arr
+            .first()
+            .and_then(|v| v.as_str())
+            .unwrap_or("400");
+        info.get("image")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .replace("{size}", size)
     } else {
-        info.get("image").and_then(|v| v.as_str()).unwrap_or("").to_string()
+        info.get("image")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
     };
 
     Ok(serde_json::json!({ "url": img }))
@@ -194,10 +288,18 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
 
 /// Get lyrics (search + download + decode KRC)
 pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let song_info = args.get("songInfo").cloned().unwrap_or(serde_json::json!({}));
-    let name = song_info.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let song_info = args
+        .get("songInfo")
+        .cloned()
+        .unwrap_or(serde_json::json!({}));
+    let name = song_info
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
 
-    let songmid = song_info.get("songmid")
+    let songmid = song_info
+        .get("songmid")
         .map(|v| match v {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Number(n) => n.to_string(),
@@ -205,7 +307,8 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         })
         .unwrap_or_default();
 
-    let hash = song_info.get("hash")
+    let hash = song_info
+        .get("hash")
         .and_then(|v| v.as_str())
         .filter(|v| !v.is_empty())
         .map(|v| v.to_string())
@@ -215,7 +318,8 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" }));
     }
 
-    let interval = song_info.get("interval")
+    let interval = song_info
+        .get("interval")
         .map(|v| match v {
             serde_json::Value::String(s) => s.clone(),
             serde_json::Value::Number(n) => n.to_string(),
@@ -233,25 +337,47 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         .unwrap_or_else(|| parse_interval_to_seconds(&interval));
 
     let search_info = match search_lyric(&name, &hash, timelength).await {
-        Ok(Some(info)) => info,
-        Ok(None) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
-        Err(_) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+        Ok(Some(info)) => Some(info),
+        _ => {
+            if hash.len() != 32 {
+                match search_lyric(&name, "", timelength).await {
+                    Ok(Some(info)) => Some(info),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
     };
 
-    let download_resp = match get_lyric_download(search_info.id, &search_info.access_key, &search_info.fmt).await {
-        Ok(Some(resp)) => resp,
-        Ok(None) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
-        Err(_) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+    let Some(search_info) = search_info else {
+        return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" }));
     };
 
-    let content = download_resp.get("content").and_then(|v| v.as_str()).unwrap_or("");
-    let fmt_result = download_resp.get("fmt").and_then(|v| v.as_str()).unwrap_or("");
+    let download_resp =
+        match get_lyric_download(search_info.id, &search_info.access_key, &search_info.fmt).await {
+            Ok(Some(resp)) => resp,
+            Ok(None) => {
+                return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" }))
+            }
+            Err(_) => return Ok(serde_json::json!({ "lyric": "", "tlyric": "", "source": "kg" })),
+        };
+
+    let content = download_resp
+        .get("content")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let fmt_result = download_resp
+        .get("fmt")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     match fmt_result {
         "krc" => decode_krc(content),
         "lrc" => {
             use base64::Engine;
-            let decoded = base64::engine::general_purpose::STANDARD.decode(content)
+            let decoded = base64::engine::general_purpose::STANDARD
+                .decode(content)
                 .map_err(|e| e.to_string())?;
             let lyric = String::from_utf8_lossy(&decoded).to_string();
             Ok(serde_json::json!({ "lyric": lyric, "tlyric": "", "source": "kg" }))
@@ -266,18 +392,25 @@ struct KgLyricSearchInfo {
     fmt: String,
 }
 
-async fn search_lyric(name: &str, hash: &str, timelength: i64) -> Result<Option<KgLyricSearchInfo>, String> {
+async fn search_lyric(
+    name: &str,
+    hash: &str,
+    timelength: i64,
+) -> Result<Option<KgLyricSearchInfo>, String> {
     let search_url = format!(
         "http://lyrics.kugou.com/search?ver=1&man=yes&client=pc&keyword={}&hash={}&timelength={}&lrctxt=1",
         urlencoding::encode(name), hash, timelength
     );
 
     for _ in 0..=5 {
-        let resp = match get_http().get(&search_url)
+        let resp = match get_http()
+            .get(&search_url)
             .header("KG-RC", "1")
             .header("KG-THash", "expand_search_manager.cpp:852736169:451")
             .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
-            .send().await {
+            .send()
+            .await
+        {
             Ok(r) => r,
             Err(_) => continue,
         };
@@ -291,20 +424,48 @@ async fn search_lyric(name: &str, hash: &str, timelength: i64) -> Result<Option<
             Err(_) => continue,
         };
 
-        let candidates = body.get("candidates").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let candidates = body
+            .get("candidates")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
         if candidates.is_empty() {
             return Ok(None);
         }
 
-        let first = &candidates[0];
-        let id = first.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-        let access_key = first.get("accesskey").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let krctype = first.get("krctype").and_then(|v| v.as_i64()).unwrap_or(0);
-        let contenttype = first.get("contenttype").and_then(|v| v.as_i64()).unwrap_or(0);
-        let fmt = if krctype == 1 && contenttype != 1 { "krc" } else { "lrc" }.to_string();
+        let parse_i64 = |v: Option<&serde_json::Value>| -> i64 {
+            match v {
+                Some(serde_json::Value::Number(n)) => n.as_i64().unwrap_or(0),
+                Some(serde_json::Value::String(s)) => s.parse::<i64>().unwrap_or(0),
+                _ => 0,
+            }
+        };
 
-        if id > 0 && !access_key.is_empty() {
-            return Ok(Some(KgLyricSearchInfo { id, access_key, fmt }));
+        for candidate in &candidates {
+            let id = parse_i64(candidate.get("id"));
+            let access_key = candidate
+                .get("accesskey")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .or_else(|| candidate.get("accessKey").and_then(|v| v.as_str()).filter(|s| !s.is_empty()))
+                .unwrap_or("")
+                .to_string();
+            let krctype = parse_i64(candidate.get("krctype"));
+            let contenttype = parse_i64(candidate.get("contenttype"));
+            let fmt = if krctype == 1 && contenttype != 1 {
+                "krc"
+            } else {
+                "lrc"
+            }
+            .to_string();
+
+            if id > 0 && !access_key.is_empty() {
+                return Ok(Some(KgLyricSearchInfo {
+                    id,
+                    access_key,
+                    fmt,
+                }));
+            }
         }
 
         return Ok(None);
@@ -313,18 +474,27 @@ async fn search_lyric(name: &str, hash: &str, timelength: i64) -> Result<Option<
     Err("Get lyric failed".into())
 }
 
-async fn get_lyric_download(id: i64, access_key: &str, fmt: &str) -> Result<Option<serde_json::Value>, String> {
+async fn get_lyric_download(
+    id: i64,
+    access_key: &str,
+    fmt: &str,
+) -> Result<Option<serde_json::Value>, String> {
     let download_url = format!(
         "http://lyrics.kugou.com/download?ver=1&client=pc&id={}&accesskey={}&fmt={}&charset=utf8",
         id, access_key, fmt
     );
 
+    println!("[KG Lyrics] download_url: {}", download_url);
+
     for _ in 0..=5 {
-        let resp = match get_http().get(&download_url)
+        let resp = match get_http()
+            .get(&download_url)
             .header("KG-RC", "1")
             .header("KG-THash", "expand_search_manager.cpp:852736169:451")
             .header("User-Agent", "KuGou2012-9020-ExpandSearchManager")
-            .send().await {
+            .send()
+            .await
+        {
             Ok(r) => r,
             Err(_) => continue,
         };
@@ -344,7 +514,6 @@ async fn get_lyric_download(id: i64, access_key: &str, fmt: &str) -> Result<Opti
     Err("Get lyric failed".into())
 }
 
-
 fn parse_interval_to_seconds(interval: &str) -> i64 {
     let parts: Vec<&str> = interval.split(':').collect();
     if parts.len() == 2 {
@@ -363,11 +532,12 @@ fn decode_krc(content: &str) -> Result<serde_json::Value, String> {
     use std::io::Read;
 
     let enc_key: [u8; 16] = [
-        0x40, 0x47, 0x61, 0x77, 0x5e, 0x32, 0x74, 0x47,
-        0x51, 0x36, 0x31, 0x2d, 0xce, 0xd2, 0x6e, 0x69,
+        0x40, 0x47, 0x61, 0x77, 0x5e, 0x32, 0x74, 0x47, 0x51, 0x36, 0x31, 0x2d, 0xce, 0xd2, 0x6e,
+        0x69,
     ];
 
-    let raw = base64::engine::general_purpose::STANDARD.decode(content)
+    let raw = base64::engine::general_purpose::STANDARD
+        .decode(content)
         .map_err(|e| format!("KRC base64 decode error: {}", e))?;
 
     if raw.len() < 4 {
@@ -383,7 +553,8 @@ fn decode_krc(content: &str) -> Result<serde_json::Value, String> {
     // Zlib inflate
     let mut decoder = ZlibDecoder::new(&decoded[..]);
     let mut decompressed = String::new();
-    decoder.read_to_string(&mut decompressed)
+    decoder
+        .read_to_string(&mut decompressed)
         .map_err(|e| format!("KRC zlib decompress error: {}", e))?;
 
     // Parse the KRC format into standard LRC
@@ -427,11 +598,16 @@ fn parse_krc_lyric(str: &str) -> Result<serde_json::Value, String> {
                             if item_type == 1 {
                                 // Translation lyrics
                                 if let Some(lines) = lyric_content {
-                                    tlyric = lines.iter()
+                                    tlyric = lines
+                                        .iter()
                                         .filter_map(|line| line.as_array())
-                                        .map(|words| words.iter()
-                                            .filter_map(|w| w.as_str())
-                                            .collect::<Vec<_>>().join(""))
+                                        .map(|words| {
+                                            words
+                                                .iter()
+                                                .filter_map(|w| w.as_str())
+                                                .collect::<Vec<_>>()
+                                                .join("")
+                                        })
                                         .collect::<Vec<_>>()
                                         .join("\n");
                                 }
@@ -473,8 +649,48 @@ fn parse_krc_lyric(str: &str) -> Result<serde_json::Value, String> {
     let lyric = lyric_lines.join("\n");
     let crlyric = crlyric_lines.join("\n");
 
+    let final_lyric = if lyric.trim().is_empty() {
+        let standard_lrc_regex = regex_lite::Regex::new(r"^\[\d{1,2}:\d{2}(?:\.\d{1,3})?\].+").unwrap();
+        let line_tag_regex = regex_lite::Regex::new(r"^\[\d+,\d+\]").unwrap();
+        let word_tag_regex = regex_lite::Regex::new(r"<\d+,\d+,\d+>").unwrap();
+
+        let standard_lrc_lines: Vec<String> = content
+            .lines()
+            .map(str::trim)
+            .filter(|line| standard_lrc_regex.is_match(line))
+            .map(|line| line.to_string())
+            .collect();
+
+        if !standard_lrc_lines.is_empty() {
+            standard_lrc_lines.join("\n")
+        } else {
+            let fallback_lines: Vec<String> = content
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .filter(|line| !line.starts_with("[ti:") && !line.starts_with("[ar:") && !line.starts_with("[al:") && !line.starts_with("[by:") && !line.starts_with("[offset:"))
+                .map(|line| line_tag_regex.replace(line, "").to_string())
+                .map(|line| word_tag_regex.replace_all(&line, "").to_string())
+                .map(|line| line.trim().to_string())
+                .filter(|line| !line.is_empty() && !line.starts_with('['))
+                .collect();
+
+            fallback_lines
+                .iter()
+                .enumerate()
+                .map(|(idx, line)| {
+                    let time_tag = ms_to_lrc_time((idx as i64) * 2000);
+                    format!("[{}]{}", time_tag, line)
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+    } else {
+        lyric
+    };
+
     Ok(serde_json::json!({
-        "lyric": lyric,
+        "lyric": final_lyric,
         "tlyric": tlyric,
         "crlyric": crlyric,
         "source": "kg"

@@ -196,16 +196,35 @@ const fetchSdkLyrics = async (
     Object.prototype.hasOwnProperty.call(lyricData, 'lrc')
 
   let lyrics: LyricLine[] = []
+
   if (crlyric) {
-    lyrics = parseCrLyricBySource(source, crlyric)
-  } else if (lyric) {
+    try {
+      lyrics = parseCrLyricBySource(source, crlyric)
+    } catch (e) {
+      console.warn('[Lyrics] parse crlyric failed, fallback to lyric/lrc:', source, e)
+      lyrics = []
+    }
+  }
+
+  if (!lyrics.length && lyric) {
     lyrics = parseLyricByFormat(lyric)
-  } else if (lrc) {
+  }
+
+  if (!lyrics.length && lrc) {
     lyrics = parseLyricByFormat(lrc)
-  } else if (hasLyricField) {
-    console.warn('[Lyrics] SDK getLyric fields are present but empty:', source, Object.keys(lyricData))
-  } else {
-    console.warn('[Lyrics] SDK getLyric response has no lyric-related fields:', source, Object.keys(lyricData))
+  }
+
+  if (!lyrics.length) {
+    if (hasLyricField) {
+      console.warn('[Lyrics] SDK getLyric parsed empty:', source, {
+        keys: Object.keys(lyricData),
+        hasCrlyric: !!crlyric,
+        hasLyric: !!lyric,
+        hasLrc: !!lrc
+      })
+    } else {
+      console.warn('[Lyrics] SDK getLyric response has no lyric-related fields:', source, Object.keys(lyricData))
+    }
   }
 
   lyrics = mergeTranslation(lyrics, lyricData?.tlyric)
@@ -499,23 +518,28 @@ export const useGlobalPlayStatusStore = defineStore(
     }
 
     watch(
-      [() => player.songId, () => player.songInfo?.songmid],
-      async ([newId, newSongmid], oldVals, onCleanup) => {
+      [() => player.songInfo?.songmid, () => (player.songInfo as any)?.source],
+      async ([newSongmid, newSource], oldVals, onCleanup) => {
         console.warn('[Lyrics][Watch:resolveLyrics] triggered:', {
-          newId,
+          songId: player.songId,
           newSongmid,
-          oldId: oldVals?.[0],
-          oldSongmid: oldVals?.[1],
-          source: (player.songInfo as any)?.source,
+          newSource,
+          oldSongmid: oldVals?.[0],
+          oldSource: oldVals?.[1],
           songName: (player.songInfo as any)?.name
         })
-        if (!newId || !player.songInfo) {
-          console.warn('[Lyrics][Watch:resolveLyrics] skipped: missing newId or songInfo')
+
+        if (!newSongmid || !player.songInfo) {
+          console.warn('[Lyrics][Watch:resolveLyrics] skipped: missing songmid or songInfo')
           player.lyrics.lines = []
           return
         }
+
         player.isLoading = true
-        console.warn('[Lyrics][Watch:resolveLyrics] start resolve for:', newId, (player.songInfo as any)?.source)
+        const targetSongId = String(newSongmid)
+        const source = newSource || 'kg'
+        console.warn('[Lyrics][Watch:resolveLyrics] start resolve for:', targetSongId, source)
+
         let active = true
         const abort = new AbortController()
         onCleanup(() => {
@@ -524,10 +548,9 @@ export const useGlobalPlayStatusStore = defineStore(
         })
 
         try {
-          const source = (player.songInfo as any).source || 'kg'
           const parsedLyrics = await resolveLyrics(
             source,
-            String(newId),
+            targetSongId,
             toRaw(player.songInfo),
             {
               grepLyricInfo: playSettingStore.getIsGrepLyricInfo,
