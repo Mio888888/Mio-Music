@@ -25,10 +25,19 @@ ul {
 
 html {
   font-size: min(max(1.4vw, 15px), 18px);
+  background: transparent;
+  overflow: hidden;
+}
+body {
+  background: transparent;
+  overflow: hidden;
 }
 #app {
   height: 100%;
   width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.75);
 }
 
 .icon {

@@ -10,7 +10,6 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-hide",
-    "core:window:allow-start-dragging",
     "opener:default",
     "dialog:default",
     "global-shortcut:default"

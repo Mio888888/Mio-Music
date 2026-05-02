@@ -94,8 +94,8 @@ const handleBack = () => {
 </script>
 
 <template>
-  <div :class="controlsClass" data-tauri-drag-region>
-    <div class="left" data-tauri-drag-region>
+  <div :class="controlsClass">
+    <div class="left">
       <div class="back-box">
         <t-button
           v-if="showBack"
@@ -203,8 +203,10 @@ const handleBack = () => {
   align-items: center;
   width: 100%;
   gap: 0.25rem;
+  -webkit-app-region: drag;
 
   .control-btn {
+    -webkit-app-region: no-drag;
     width: 2.25rem;
     height: 2.25rem;
     min-width: 2.25rem;
@@ -227,6 +229,7 @@ const handleBack = () => {
     align-items: center;
     gap: 0.25rem;
     flex: 1;
+    -webkit-app-region: drag;
     min-height: 20px;
 
     .back-box {
@@ -235,6 +238,7 @@ const handleBack = () => {
       gap: 0.25rem;
 
       .back-btn {
+        -webkit-app-region: no-drag;
         margin-right: 0.5rem;
 
         &:hover {
@@ -263,6 +267,7 @@ const handleBack = () => {
   }
 
   .window-controls {
+    -webkit-app-region: no-drag;
     display: flex;
     align-items: center;
     gap: 0.125rem;

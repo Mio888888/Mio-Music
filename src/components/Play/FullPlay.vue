@@ -535,7 +535,7 @@ onUnmounted(() => {
       <TitleBarControls
         v-if="props.show"
         class="top"
-        data-tauri-drag-region
+        style="-webkit-app-region: drag"
         :color="useBlackText ? 'black' : 'white'"
         :show-account="false"
       />
@@ -715,6 +715,7 @@ onUnmounted(() => {
 .fullscreen-btn,
 .putawayscreen-btn {
   position: absolute;
+  -webkit-app-region: no-drag;
   top: 25px;
   left: 30px;
   padding: 10px;

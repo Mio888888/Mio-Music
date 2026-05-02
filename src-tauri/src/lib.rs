@@ -13,7 +13,7 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::{Manager, window::{Effect, EffectsBuilder}};
+use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
 use commands::hotkey_commands;
 use std::sync::Mutex;
 
@@ -31,13 +31,51 @@ pub fn run() {
         .manage(plugin_manager)
         .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
         .setup(|app| {
-            // Apply window effects (frosted glass)
-            if let Some(window) = app.get_webview_window("main") {
-                let effects = EffectsBuilder::new()
-                    .effects(vec![Effect::HudWindow, Effect::Acrylic, Effect::Mica])
-                    .radius(20.0)
-                    .build();
-                let _ = window.set_effects(effects);
+            let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+                .title("音乐")
+                .inner_size(1200.0, 800.0)
+                .center();
+
+            #[cfg(target_os = "macos")]
+            let win_builder = win_builder.title_bar_style(TitleBarStyle::Overlay);
+
+            let window = win_builder.build().expect("Failed to create main window");
+
+            #[cfg(target_os = "macos")]
+            {
+                use cocoa::appkit::{NSColor, NSWindow, NSWindowButton, NSWindowTitleVisibility};
+                use cocoa::base::{id, nil, YES};
+                use objc::{msg_send, sel, sel_impl};
+                use objc::runtime::Object;
+
+                unsafe fn hide_button(button: id) {
+                    let _: () = msg_send![button as *mut Object, setHidden: YES];
+                }
+
+                let ns_window = window.ns_window().expect("Failed to get NSWindow") as id;
+                unsafe {
+                    let bg_color = NSColor::colorWithRed_green_blue_alpha_(
+                        nil,
+                        50.0 / 255.0,
+                        158.0 / 255.0,
+                        163.5 / 255.0,
+                        0.45,
+                    );
+                    ns_window.setBackgroundColor_(bg_color);
+                    ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+                    ns_window.setTitlebarAppearsTransparent_(YES);
+
+                    for button in [
+                        NSWindowButton::NSWindowCloseButton,
+                        NSWindowButton::NSWindowMiniaturizeButton,
+                        NSWindowButton::NSWindowZoomButton,
+                    ] {
+                        let btn = ns_window.standardWindowButton_(button);
+                        if btn != nil {
+                            hide_button(btn);
+                        }
+                    }
+                }
             }
 
             let app_handle = app.handle().clone();
