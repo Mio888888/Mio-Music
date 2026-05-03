@@ -1,11 +1,24 @@
 <script setup lang="ts">
 import '@applemusic-like-lyrics/core/style.css'
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, markRaw, type Component } from 'vue'
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
-import { LyricPlayer } from '@applemusic-like-lyrics/vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { LyricLine } from '@/types/lyric'
 
-const lyricLines = ref<LyricLine[]>([])
+const LyricPlayerComp = shallowRef<Component | null>(null)
+const lyricPlayerError = ref(false)
+
+async function loadLyricPlayer() {
+  try {
+    const mod = await import('@applemusic-like-lyrics/vue')
+    LyricPlayerComp.value = mod.LyricPlayer
+  } catch (e) {
+    console.error('[DeskTopLyric] Failed to load LyricPlayer:', e)
+    lyricPlayerError.value = true
+  }
+}
+
+const lyricLines = shallowRef<LyricLine[]>([])
 const songInfo = ref({ name: '', singer: '' })
 const isPlaying = ref(false)
 const isLocked = ref(false)
@@ -24,6 +37,10 @@ interface StyleOption {
   shadowColor?: string
   fontWeight?: number
   fontFamily?: string
+  position?: 'left' | 'center' | 'right' | 'both'
+  showYrc?: boolean
+  textBackgroundMask?: boolean
+  backgroundMaskColor?: string
 }
 
 const styleOptions = ref<StyleOption>({})
@@ -32,7 +49,56 @@ const fontWeight = computed(() => styleOptions.value.fontWeight || 700)
 const fontFamily = computed(() => styleOptions.value.fontFamily || '')
 const resolvedFontFamily = computed(() => fontFamily.value || '-apple-system, BlinkMacSystemFont, sans-serif')
 const lyricViewColor = computed(() => styleOptions.value.mainColor || 'rgba(255, 255, 255, 1)')
+const lyricShadowColor = computed(() => styleOptions.value.shadowColor || 'rgba(0, 0, 0, 0.7)')
+const lyricTextShadow = computed(() => `0 0 4px ${lyricShadowColor.value}, 0 0 10px ${lyricShadowColor.value}`)
 
+const lyricPosition = computed(() => styleOptions.value.position || 'center')
+const alignAnchor = computed(() => {
+  if (lyricPosition.value === 'left') return 'left'
+  if (lyricPosition.value === 'right') return 'right'
+  return 'center'
+})
+const alignPosition = computed(() => {
+  if (lyricPosition.value === 'left') return 0.2
+  if (lyricPosition.value === 'right') return 0.8
+  return 0.5
+})
+const lyricTextAlign = computed(() => {
+  if (lyricPosition.value === 'left') return 'left'
+  if (lyricPosition.value === 'right') return 'right'
+  return 'center'
+})
+
+const showYrc = computed(() => styleOptions.value.showYrc !== false)
+const textBackgroundMask = computed(() => styleOptions.value.textBackgroundMask === true)
+const backgroundMaskColor = computed(() => styleOptions.value.backgroundMaskColor || 'rgba(0,0,0,0.5)')
+const lyricLineBackground = computed(() => (textBackgroundMask.value ? backgroundMaskColor.value : 'transparent'))
+const lyricLineShadow = computed(() => (textBackgroundMask.value ? `0 2px 12px ${backgroundMaskColor.value}` : 'none'))
+
+const safeLyricLines = computed(() => {
+  if (showYrc.value) return lyricLines.value
+
+  return lyricLines.value.map((line: any) => {
+    const words = Array.isArray(line?.words) ? line.words : []
+    const text = words.map((w: any) => w?.word ?? '').join('')
+    const startTime = Number(line?.startTime ?? words[0]?.startTime ?? 0)
+    const endTime = Number(line?.endTime ?? words[words.length - 1]?.endTime ?? startTime + 1)
+    return {
+      ...line,
+      words: [
+        {
+          word: text,
+          startTime,
+          endTime,
+          obscene: false,
+          romanWord: '',
+        },
+      ],
+      startTime,
+      endTime,
+    }
+  })
+})
 const currentTimeMs = computed(() => Math.floor(playSeekMs.value))
 
 const placeholderText = computed(() => {
@@ -64,7 +130,26 @@ function stopRafLoop() {
 
 // IPC handlers
 function handleLyricChange(lines: LyricLine[]) {
-  lyricLines.value = lines || []
+  console.log('[DeskTopLyric] Received lyric change, raw lines:', lines?.length, lines?.[0])
+  const normalized = (lines || []).map((l: any) => ({
+    ...l,
+    translatedLyric: l.translatedLyric ?? '',
+    romanLyric: l.romanLyric ?? '',
+    isBG: l.isBG ?? false,
+    isDuet: l.isDuet ?? false,
+    words: (l.words || []).map((w: any) => ({
+      ...w,
+      word: w?.word ?? '',
+      startTime: Number(w?.startTime ?? 0),
+      endTime: Number(w?.endTime ?? 0),
+      obscene: w?.obscene ?? false,
+      romanWord: w?.romanWord ?? '',
+    })),
+    startTime: Number(l?.startTime ?? 0),
+    endTime: Number(l?.endTime ?? 0),
+  }))
+  lyricLines.value = markRaw(normalized)
+  console.log('[DeskTopLyric] Processed lyricLines:', lyricLines.value.length, lyricLines.value[0])
 }
 
 function handleSongChange(data: { name: string; singer: string }) {
@@ -114,8 +199,19 @@ function onToggleLock() {
 
 function onClose() { emitControl('close') }
 
+async function onDragStart(e: MouseEvent) {
+  if (isLocked.value) return
+  e.preventDefault()
+  try {
+    await getCurrentWindow().startDragging()
+  } catch {}
+}
+
 // Lifecycle
 onMounted(async () => {
+  // Load AMLL LyricPlayer component (may fail in some WebView contexts)
+  loadLyricPlayer()
+
   try {
     const saved = await (window as any).electron?.ipcRenderer?.invoke('get-desktop-lyric-option')
     if (saved) styleOptions.value = saved
@@ -152,6 +248,7 @@ onMounted(async () => {
   )
 
   startRafLoop()
+  console.log('[DeskTopLyric] Component mounted, emitting ready event')
   emit('desktop-lyric-ready', {}).catch(() => {})
 })
 
@@ -171,17 +268,36 @@ onBeforeUnmount(() => {
     @mouseleave="isHovering = false"
   >
     <!-- AMLL LyricPlayer -->
-    <LyricPlayer
-      v-if="lyricLines.length > 0"
-      :lyric-lines="lyricLines"
+    <component
+      :is="LyricPlayerComp"
+      v-if="LyricPlayerComp && lyricLines.length > 0"
+      :lyric-lines="safeLyricLines"
       :current-time="currentTimeMs"
       :playing="isPlaying"
       :enable-blur="false"
       :enable-spring="false"
       :enable-scale="false"
-      :align-position="0.35"
+      :align-anchor="alignAnchor"
+      :align-position="alignPosition"
+      :style="{ textAlign: lyricTextAlign }"
       class="desktop-lyric-player"
     />
+
+    <!-- Drag handle (top area, visible on hover when not locked) -->
+    <div
+      v-if="isHovering && !isLocked"
+      class="drag-handle"
+      @pointerdown="onDragStart"
+    >
+      <div class="drag-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="lyricPlayerError" class="lyric-placeholder">
+      <span>歌词组件加载失败</span>
+    </div>
 
     <!-- Placeholder when no lyrics -->
     <div v-else class="lyric-placeholder">
@@ -250,9 +366,16 @@ onBeforeUnmount(() => {
   font-family: -apple-system, BlinkMacSystemFont, 'PingFangSC-Semibold', 'Segoe UI', Roboto,
     sans-serif;
   font-weight: v-bind(fontWeight);
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+
+  &.hovered {
+    opacity: 1;
+  }
 
   &.locked {
     pointer-events: none;
+    opacity: 0.4;
   }
 }
 
@@ -265,6 +388,27 @@ onBeforeUnmount(() => {
   --amll-lp-font-size: v-bind(fontSize + 'px');
   --amll-lyric-player-font-weight: v-bind(fontWeight);
   font-family: v-bind(resolvedFontFamily);
+  text-shadow: v-bind(lyricTextShadow);
+
+  :deep(.FmKaba_lyricMainLine),
+  :deep(.FmKaba_lyricSubLine),
+  :deep([class*='lyricMainLine']),
+  :deep([class*='lyricSubLine']) {
+    text-shadow: v-bind(lyricTextShadow) !important;
+    font-weight: v-bind(fontWeight) !important;
+  }
+
+  :deep(.FmKaba_lyricLine),
+  :deep(.amll-lyric-player),
+  :deep([class*='lyricLine']) {
+    background-color: v-bind(lyricLineBackground) !important;
+    box-shadow: v-bind(lyricLineShadow) !important;
+  }
+
+  :deep(.FmKaba_lyricBgLine),
+  :deep([class*='lyricBgLine']) {
+    opacity: 0 !important;
+  }
 
   :deep([class*='romanWord']) {
     font-size: calc(var(--amll-lp-font-size) * 0.5) !important;
@@ -285,9 +429,40 @@ onBeforeUnmount(() => {
   font-size: v-bind(fontSize + 'px');
   font-weight: v-bind(fontWeight);
   color: v-bind(lyricViewColor);
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  text-shadow: v-bind(lyricTextShadow);
   font-family: v-bind(resolvedFontFamily);
-  opacity: 0.6;
+}
+
+/* Drag handle */
+.drag-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent);
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.drag-dots {
+  display: flex;
+  gap: 3px;
+  padding: 4px 8px;
+
+  span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+  }
 }
 
 /* Controls bar */
@@ -356,7 +531,15 @@ onBeforeUnmount(() => {
 </style>
 
 <style>
-body {
+html,
+body,
+#app {
   background-color: transparent !important;
+  background: transparent !important;
+}
+
+#app {
+  border-radius: 0 !important;
+  overflow: visible !important;
 }
 </style>

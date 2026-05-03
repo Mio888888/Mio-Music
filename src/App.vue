@@ -8,7 +8,7 @@
     </router-view>
   </Provider>
   <router-view v-else />
-  <GlobalContextMenu />
+  <GlobalContextMenu v-if="!$route.path.includes('desktop-lyric')" />
 </template>
 
 <script setup lang="ts">
@@ -24,6 +24,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 onMounted(async () => {
+  if (window.location.hash.includes('/desktop-lyric')) return
+
   LocalUserDetailStore().init()
   const url = new URL(window.location.href)
   const code = url.searchParams.get('code')

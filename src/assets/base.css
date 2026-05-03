@@ -40,6 +40,18 @@ body {
   background-color: rgba(255, 255, 255, 0.75);
 }
 
+html:has(body #app .desktop-lyric),
+body:has(#app .desktop-lyric),
+#app:has(.desktop-lyric) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+#app:has(.desktop-lyric) {
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
 .icon {
   width: 1em;
   height: 1em;

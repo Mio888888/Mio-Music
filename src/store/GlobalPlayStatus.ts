@@ -69,7 +69,16 @@ const sanitizeLyricLines = (lines: LyricLine[]): LyricLine[] => {
     if (!Number.isFinite(endTime) || endTime <= startTime) endTime = startTime + defaultLineDuration
     if (endTime < lastWordEnd) endTime = lastWordEnd
 
-    cleaned.push({ ...(rawLine as any), startTime, endTime, words: fixedWords })
+    cleaned.push({
+      ...(rawLine as any),
+      startTime,
+      endTime,
+      words: fixedWords,
+      translatedLyric: (rawLine as any).translatedLyric ?? '',
+      romanLyric: (rawLine as any).romanLyric ?? '',
+      isBG: (rawLine as any).isBG ?? false,
+      isDuet: (rawLine as any).isDuet ?? false,
+    })
   }
 
   cleaned.sort((a: any, b: any) => (a?.startTime ?? 0) - (b?.startTime ?? 0))

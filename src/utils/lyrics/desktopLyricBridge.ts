@@ -27,6 +27,7 @@ function computeLyricIndex(lines: LyricLine[], timeMs: number): number {
 }
 
 function pushLyricChange(lines: LyricLine[]) {
+  console.log('[DesktopLyricBridge] Pushing lyric change, lines:', lines.length, lines[0])
   emit('desktop-lyric-change', lines).catch(() => {})
 }
 
@@ -54,6 +55,7 @@ function pushSnapshot(audioStore: ReturnType<typeof ControlAudioStore>, playStat
   const { player } = storeToRefs(playStatus)
 
   const lines = player.value.lyrics?.lines || []
+  console.log('[DesktopLyricBridge] pushSnapshot, lines count:', lines.length, 'first line:', lines[0])
   pushLyricChange(lines)
 
   const song = player.value.songInfo as any

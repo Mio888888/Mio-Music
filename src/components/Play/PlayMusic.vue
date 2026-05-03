@@ -349,6 +349,8 @@ function globalControls(e: Event) {
   } else if (name === 'volumeDelta') {
     const delta = val || 0
     setVolume(Math.max(0, Math.min(100, Audio.value.volume + delta)))
+  } else if (name === 'toggleDesktopLyric') {
+    toggleDesktopLyric()
   }
 }
 

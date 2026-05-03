@@ -16,12 +16,14 @@ import './bridge'
 // 全局 fetch 拦截器：代理跨域图片请求到 Rust 后端，绕过 WebView CORS
 import './utils/cors-proxy'
 
-// Initialize Logto client
+// Initialize Logto client (skip in desktop lyric window)
 import config from './config'
-config.instance = new LogtoClient({
-  appId: config.appId,
-  endpoint: config.endpoint,
-})
+if (!window.location.hash.includes('/desktop-lyric')) {
+  config.instance = new LogtoClient({
+    appId: config.appId,
+    endpoint: config.endpoint,
+  })
+}
 
 const app = createApp(App)
 
