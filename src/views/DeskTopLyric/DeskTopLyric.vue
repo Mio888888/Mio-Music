@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, type ComputedRef } from 'vue'
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
 import type { LyricLine, LyricWord } from '@/types/lyric'
 
@@ -30,11 +30,22 @@ let rafId: number | null = null
 // Unlisteners
 const unlisteners: UnlistenFn[] = []
 
-// Colors
-const playedColor = '#73BCFC'
+// Style options (from DesktopLyricStyle settings)
+interface StyleOption {
+  fontSize?: number
+  mainColor?: string
+  shadowColor?: string
+  fontWeight?: number
+  fontFamily?: string
+}
+
+const styleOptions = ref<StyleOption>({})
+const playedColor = computed(() => styleOptions.value.mainColor || '#73BCFC')
 const unplayedColor = 'rgba(255,255,255,0.5)'
-const shadowColor = 'rgba(255,255,255,0.5)'
-const fontSize = 30
+const shadowColor = computed(() => styleOptions.value.shadowColor || 'rgba(255,255,255,0.5)')
+const fontSize = computed(() => styleOptions.value.fontSize || 30)
+const fontWeight = computed(() => styleOptions.value.fontWeight || 700)
+const fontFamily = computed(() => styleOptions.value.fontFamily || '')
 
 // Refs for scroll measurement
 const lineRefMap = new Map<string, HTMLElement>()
@@ -282,12 +293,25 @@ function onClose() {
 
 function getLineTop(index: number): string {
   if (index === 0) return '0px'
-  return `${fontSize * 1.9}px`
+  return `${fontSize.value * 1.9}px`
 }
 
 // ---------- Lifecycle ----------
 
 onMounted(async () => {
+  // Load saved style options
+  try {
+    const saved = await (window as any).electron?.ipcRenderer?.invoke('get-desktop-lyric-option')
+    if (saved) styleOptions.value = saved
+  } catch {}
+
+  // Listen for real-time style changes from settings UI
+  unlisteners.push(
+    await listen<StyleOption>('desktop-lyric-style-change', (event) => {
+      styleOptions.value = event.payload
+    })
+  )
+
   // Listen for IPC events from bridge
   unlisteners.push(
     await listen<LyricLine[]>('desktop-lyric-change', (event) => {
@@ -349,7 +373,9 @@ onBeforeUnmount(() => {
       name="lyric-slide"
       :style="{
         fontSize: fontSize + 'px',
-        textShadow: `0 0 4px ${shadowColor}`
+        textShadow: `0 0 4px ${shadowColor}`,
+        fontFamily: fontFamily || undefined,
+        fontWeight: fontWeight
       }"
       class="lyric-container"
     >
@@ -494,6 +520,7 @@ onBeforeUnmount(() => {
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, 'PingFangSC-Semibold', 'Segoe UI', Roboto,
     sans-serif;
+  font-weight: v-bind(fontWeight);
 
   &.locked {
     pointer-events: none;

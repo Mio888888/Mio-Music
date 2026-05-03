@@ -9,7 +9,7 @@ use crate::db::AppDb;
 use base64::Engine;
 use serde_json::Value;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 pub type DbState<'a> = State<'a, AppDb>;
 
@@ -160,10 +160,34 @@ pub async fn get_font_list() -> Result<Vec<String>, String> {
     Ok(fonts)
 }
 
-/// 桌面歌词选项（暂未实现，返回 null 让前端使用默认值）
+/// 桌面歌词选项 — 从 app_data_dir/desktop_lyric_option.json 读取
 #[tauri::command]
 pub async fn get_desktop_lyric_option() -> Result<Option<Value>, String> {
-    Ok(None)
+    let dir = crate::db::get_app_data_dir();
+    let path = dir.join("desktop_lyric_option.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let data = std::fs::read_to_string(&path).map_err(|e| format!("读取桌面歌词配置失败: {}", e))?;
+    let val: Value = serde_json::from_str(&data).map_err(|e| format!("解析桌面歌词配置失败: {}", e))?;
+    Ok(Some(val))
+}
+
+/// 桌面歌词选项 — 保存到 app_data_dir/desktop_lyric_option.json 并广播事件到桌面歌词窗口
+#[tauri::command]
+pub async fn set_desktop_lyric_option(
+    app: AppHandle,
+    args: Vec<Value>,
+) -> Result<(), String> {
+    let options = args.first().ok_or("缺少配置参数")?.clone();
+    let dir = crate::db::get_app_data_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建目录失败: {}", e))?;
+    let path = dir.join("desktop_lyric_option.json");
+    let data = serde_json::to_string_pretty(&options).map_err(|e| format!("序列化配置失败: {}", e))?;
+    std::fs::write(&path, data).map_err(|e| format!("写入桌面歌词配置失败: {}", e))?;
+    // 广播到桌面歌词窗口使其实时更新
+    app.emit("desktop-lyric-style-change", options).map_err(|e| format!("广播样式事件失败: {}", e))?;
+    Ok(())
 }
 
 /// Audio proxy — fetches a remote audio URL via Rust backend (bypassing CORS)

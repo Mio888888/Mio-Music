@@ -229,6 +229,7 @@ pub fn run() {
             commands::get_lyric_lock_state,
             commands::get_font_list,
             commands::get_desktop_lyric_option,
+            commands::set_desktop_lyric_option,
             // Power Save Blocker
             commands::power_save::power_save_blocker__start,
             commands::power_save::power_save_blocker__stop,
