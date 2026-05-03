@@ -116,7 +116,6 @@ pub fn parse_quality_types(privilege: &serde_json::Value) -> Vec<String> {
         types.push("128k".to_string());
     }
     types.dedup();
-    types.reverse();
     types
 }
 
@@ -162,7 +161,6 @@ pub fn parse_quality_types_from_detail(data: &serde_json::Value) -> (Vec<String>
         types_map.insert("128k".to_string(), QualityInfo { size, hash: None });
     }
 
-    types.reverse();
     (types, types_map)
 }
 

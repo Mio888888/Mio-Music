@@ -110,7 +110,22 @@ pub fn parse_quality_types(file: &serde_json::Value) -> (Vec<String>, HashMap<St
         }
     }
 
+    types.sort_by(|a, b| quality_rank(b).cmp(&quality_rank(a)));
+
     (types, types_map)
+}
+
+fn quality_rank(q: &str) -> u8 {
+    match q {
+        "master" => 7,
+        "atmos_plus" => 6,
+        "atmos" => 5,
+        "hires" => 4,
+        "flac" => 3,
+        "320k" => 2,
+        "128k" => 1,
+        _ => 0,
+    }
 }
 
 /// Replace QQ Music emoji codes with actual emoji characters
