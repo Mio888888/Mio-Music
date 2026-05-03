@@ -8,6 +8,7 @@ import { analyzeImageColors, type Color } from '@/utils/color/colorExtractor'
 import { type LyricLine } from '@/types/lyric'
 import {
   parseLrc as amllParseLrc,
+  parseLrcA2,
   parseYrc,
   parseQrc,
   parseTTML
@@ -26,6 +27,7 @@ function parseLyricByFormat(raw: string): LyricLine[] {
     if (/<tt[\s>]/.test(trimmed)) return parseTTML(trimmed).lines
   } catch {}
   try {
+    if (/<\d{2}:\d{2}\.\d{3}>/.test(trimmed)) return parseLrcA2(trimmed)
     return amllParseLrc(trimmed)
   } catch {
     return []
