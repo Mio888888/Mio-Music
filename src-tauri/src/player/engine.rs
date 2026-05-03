@@ -1,8 +1,7 @@
-use crate::player::effects::{BalanceSource, BassBoostSource, EqSource, EqState};
+use crate::player::effects::{AtomicF64, BalanceSource, BassBoostSource, EqSource, EqState};
 use crate::player::spectrum::{PositionSource, PositionState, SpectrumSource, SpectrumState};
 use crate::player::{AudioSlot, PlaybackState, PlayerSnapshot, SharedPlayer};
 use base64::Engine;
-use parking_lot::Mutex;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
 use std::io::BufReader;
 use std::path::PathBuf;
@@ -21,11 +20,11 @@ use symphonia::core::units::Time;
 pub struct SlotPipeline {
     sink: Sink,
     url: String,
-    eq_state: Arc<Mutex<EqState>>,
-    spectrum_state: Arc<Mutex<SpectrumState>>,
-    position_state: Arc<Mutex<PositionState>>,
-    balance: Arc<Mutex<f64>>,
-    bass_boost_gain: Arc<Mutex<f64>>,
+    eq_state: Arc<EqState>,
+    spectrum_state: Arc<SpectrumState>,
+    position_state: Arc<PositionState>,
+    balance: Arc<AtomicF64>,
+    bass_boost_gain: Arc<AtomicF64>,
     #[allow(dead_code)]
     temp_file: Option<PathBuf>,
 }
@@ -64,18 +63,13 @@ impl SlotPipeline {
             }
         };
 
-        let eq_state = Arc::new(Mutex::new(EqState::new(channels, sample_rate)));
-        let spectrum_state = Arc::new(Mutex::new(SpectrumState::new()));
-        let position_state = Arc::new(Mutex::new(PositionState::new()));
-        let balance = Arc::new(Mutex::new(0.0));
-        let bass_boost_gain = Arc::new(Mutex::new(0.0));
+        let eq_state = Arc::new(EqState::new(channels, sample_rate));
+        let spectrum_state = Arc::new(SpectrumState::new());
+        let position_state = Arc::new(PositionState::new());
+        let balance = Arc::new(AtomicF64::new(0.0));
+        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
 
-        {
-            let mut ps = position_state.lock();
-            ps.sample_rate = sample_rate;
-            ps.channels = channels;
-            ps.duration_secs = duration;
-        }
+        position_state.set_initial(sample_rate, channels, duration);
 
         // 管线: Decoder → BassBoost → EQ → Balance → Spectrum → Position
         let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
@@ -105,11 +99,11 @@ impl SlotPipeline {
     pub fn resume(&self) { self.sink.play() }
     pub fn seek(&self, pos: Duration) { let _ = self.sink.try_seek(pos); }
     pub fn set_volume(&self, vol: f64) { self.sink.set_volume(vol as f32) }
-    pub fn position(&self) -> f64 { self.position_state.lock().position_secs() }
-    pub fn duration(&self) -> f64 { self.position_state.lock().duration_secs }
+    pub fn position(&self) -> f64 { self.position_state.position_secs() }
+    pub fn duration(&self) -> f64 { self.position_state.duration_secs() }
     pub fn is_playing(&self) -> bool { !self.sink.is_paused() && !self.sink.empty() }
     pub fn url(&self) -> &str { &self.url }
-    pub fn take_spectrum(&self) -> Option<Vec<f64>> { self.spectrum_state.lock().take_spectrum() }
+    pub fn take_spectrum(&self) -> Option<Vec<f64>> { self.spectrum_state.take_spectrum() }
 
     /// 创建管线后立即暂停（用于预加载）
     pub fn from_file_paused(
@@ -584,24 +578,24 @@ impl PlayerEngine {
     }
 
     pub fn set_eq_band(&self, index: usize, gain: f64) {
-        if let Some(ref p) = self.primary { p.eq_state.lock().set_band(index, gain) }
-        if let Some(ref s) = self.secondary { s.eq_state.lock().set_band(index, gain) }
+        if let Some(ref p) = self.primary { p.eq_state.set_band(index, gain) }
+        if let Some(ref s) = self.secondary { s.eq_state.set_band(index, gain) }
     }
 
     pub fn get_eq_bands(&self) -> Vec<f64> {
         self.primary.as_ref()
-            .map(|p| p.eq_state.lock().gains.to_vec())
+            .map(|p| p.eq_state.get_gains().to_vec())
             .unwrap_or_else(|| vec![0.0; 10])
     }
 
     pub fn set_bass_boost(&self, gain: f64) {
-        if let Some(ref p) = self.primary { *p.bass_boost_gain.lock() = gain }
-        if let Some(ref s) = self.secondary { *s.bass_boost_gain.lock() = gain }
+        if let Some(ref p) = self.primary { p.bass_boost_gain.store(gain) }
+        if let Some(ref s) = self.secondary { s.bass_boost_gain.store(gain) }
     }
 
     pub fn set_balance(&self, value: f64) {
-        if let Some(ref p) = self.primary { *p.balance.lock() = value }
-        if let Some(ref s) = self.secondary { *s.balance.lock() = value }
+        if let Some(ref p) = self.primary { p.balance.store(value) }
+        if let Some(ref s) = self.secondary { s.balance.store(value) }
     }
 
     /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
@@ -835,4 +829,24 @@ pub fn create_output_stream() -> Result<(OutputStreamHandle, std::sync::mpsc::Se
 
     let handle = handle_rx.recv().map_err(|e| format!("音频线程通信失败: {e}"))??;
     Ok((handle, shutdown_tx))
+}
+
+/// 清理上次运行遗留的临时音频文件
+pub fn cleanup_temp_files() {
+    let temp_dir = std::env::temp_dir().join("lanyin_player");
+    if !temp_dir.exists() { return }
+    let threshold = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+        for entry in entries.flatten() {
+            if let Ok(meta) = entry.metadata() {
+                if meta.is_file() {
+                    if let Ok(mtime) = meta.modified() {
+                        if mtime < threshold {
+                            let _ = std::fs::remove_file(entry.path());
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

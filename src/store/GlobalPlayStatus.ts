@@ -3,7 +3,7 @@ import type { SongList } from '@/types/audio'
 import { LocalUserDetailStore } from './LocalUserDetail'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { playSetting } from './playSetting'
-import { reactive, watch, toRaw } from 'vue'
+import { reactive, watch, toRaw, markRaw } from 'vue'
 import { analyzeImageColors, type Color } from '@/utils/color/colorExtractor'
 import { type LyricLine } from '@/types/lyric'
 import {
@@ -548,7 +548,7 @@ export const useGlobalPlayStatusStore = defineStore(
             },
             abort.signal
           )
-          if (active) player.lyrics.lines = parsedLyrics
+          if (active) player.lyrics.lines = markRaw(parsedLyrics)
         } catch {
           if (active) player.lyrics.lines = []
         } finally {
@@ -636,5 +636,5 @@ export const useGlobalPlayStatusStore = defineStore(
 
     return { player, updatePlayerInfo, fetchComments }
   },
-  { persist: true }
+  { persist: false }
 )

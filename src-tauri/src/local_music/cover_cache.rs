@@ -1,16 +1,18 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use base64::Engine;
+use lru::LruCache;
+use std::num::NonZeroUsize;
 
-static COVER_CACHE: once_cell::sync::Lazy<Mutex<HashMap<String, String>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
-
-const MAX_CACHE_SIZE: usize = 200;
+static COVER_CACHE: once_cell::sync::Lazy<Mutex<LruCache<String, String>>> =
+    once_cell::sync::Lazy::new(|| {
+        Mutex::new(LruCache::new(NonZeroUsize::new(200).unwrap()))
+    });
 
 pub fn get_cover_base64(songmid: &str, path: &str) -> Option<String> {
     // Check memory cache first
     {
-        let cache = COVER_CACHE.lock().unwrap();
+        let mut cache = COVER_CACHE.lock().unwrap();
         if let Some(cached) = cache.get(songmid) {
             return Some(cached.clone());
         }
@@ -28,25 +30,20 @@ pub fn get_cover_base64(songmid: &str, path: &str) -> Option<String> {
     };
     let data_uri = format!("data:{};base64,{}", mime, b64);
 
-    // Store in cache
+    // Store in cache (LRU eviction is automatic)
     {
         let mut cache = COVER_CACHE.lock().unwrap();
-        if cache.len() >= MAX_CACHE_SIZE {
-            // Simple eviction: remove first entry
-            if let Some(key) = cache.keys().next().cloned() {
-                cache.remove(&key);
-            }
-        }
-        cache.insert(songmid.to_string(), data_uri.clone());
+        cache.put(songmid.to_string(), data_uri.clone());
     }
 
     Some(data_uri)
 }
 
 pub fn batch_get_covers(songmids: &[String], tracks: &[(String, String)]) -> HashMap<String, String> {
+    let lookup: std::collections::HashSet<&String> = songmids.iter().collect();
     let mut result = HashMap::new();
     for (songmid, path) in tracks {
-        if songmids.contains(&songmid.clone()) {
+        if lookup.contains(songmid) {
             if let Some(cover) = get_cover_base64(songmid, path) {
                 result.insert(songmid.clone(), cover);
             }

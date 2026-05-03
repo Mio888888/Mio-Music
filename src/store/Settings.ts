@@ -158,5 +158,5 @@ export const useSettingsStore = defineStore('settings', () => {
     enableSpringFestivalTheme
   }
 }, {
-  persist: true
+  persist: false
 })

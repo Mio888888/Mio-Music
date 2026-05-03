@@ -42,7 +42,7 @@ import {
   LockOnIcon,
   ChatBubble1Icon
 } from 'tdesign-icons-vue-next'
-import _ from 'lodash'
+import cloneDeep from 'lodash/cloneDeep'
 import { songListAPI } from '@/api/songList'
 import { useDlnaStore } from '@/store/dlna'
 import { crossfadeState } from '@/utils/audio/crossfade'
@@ -515,7 +515,7 @@ const onToggleLike = async () => {
       }
     } else {
       const addRes = await songListAPI.addSongs(favoritesId!, [
-        _.cloneDeep(toRaw(currentSong)) as any
+        cloneDeep(toRaw(currentSong)) as any
       ])
       if (addRes.success) {
         likeState.value = true
@@ -532,7 +532,7 @@ const onToggleLike = async () => {
 
 const onDownload = async () => {
   try {
-    await downloadSingleSong(_.cloneDeep(toRaw(songInfo.value)) as any)
+    await downloadSingleSong(cloneDeep(toRaw(songInfo.value)) as any)
     MessagePlugin.success('开始下载当前歌曲')
   } catch (e: any) {
     console.error('下载失败:', e)

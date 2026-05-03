@@ -7,7 +7,7 @@ import {
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/vue'
 import LyricAdapter from './Lyric/LyricAdapter.vue'
 import type { SongList } from '@/types/audio'
-import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick, toRaw } from 'vue'
+import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import {
   Fullscreen1Icon,
@@ -15,7 +15,7 @@ import {
   ChevronDownIcon,
   PenBallIcon
 } from 'tdesign-icons-vue-next'
-import _ from 'lodash'
+import debounce from 'lodash/debounce'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/store/Settings'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
@@ -43,10 +43,7 @@ const lyricFontFamily = computed(
   () => settingsStore.settings.lyricFontFamily || 'PingFangSC-Semibold'
 )
 
-const safeLyricLines = computed(() => {
-  const rawLines = toRaw(player.value.lyrics.lines || [])
-  return JSON.parse(JSON.stringify(rawLines))
-})
+const safeLyricLines = computed(() => player.value.lyrics.lines || [])
 
 const showLeftPanel = computed({
   get: () => playSetting.getShowLeftPanel,
@@ -87,7 +84,7 @@ const addBurst = (x: number, y: number) => {
     const speed = rnd(2, 6)
     particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: rnd(60, 120), color: c, alpha: 1, size: rnd(1, 2.8) })
   }
-  if (particles.length > 2000) particles.splice(0, particles.length - 2000)
+  if (particles.length > 500) particles.splice(0, particles.length - 500)
 }
 
 const scheduleBursts = (w: number, h: number) => {
@@ -480,7 +477,7 @@ const handleWindowFocus = () => {
   if (!document.hidden) bgRef.value?.resume()
 }
 
-const debouncedCheckOverflow = _.debounce(checkOverflow, 200)
+const debouncedCheckOverflow = debounce(checkOverflow, 200)
 
 onMounted(() => {
   window.addEventListener('resize', debouncedCheckOverflow)

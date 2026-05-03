@@ -29,6 +29,8 @@ pub struct PlayerSnapshot {
 }
 
 pub fn init_player(app_handle: tauri::AppHandle) -> SharedPlayer {
+    engine::cleanup_temp_files();
+
     let (stream_handle, shutdown_tx) = engine::create_output_stream()
         .expect("音频输出初始化失败");
 

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use parking_lot::Mutex;
 use rodio::Source;
@@ -7,11 +8,16 @@ use rustfft::{FftPlanner, num_complex::Complex};
 const FFT_SIZE: usize = 1024;
 const OUTPUT_BANDS: usize = 128;
 
-pub struct SpectrumState {
-    buffer: Vec<f32>,
+// ==================== Spectrum State ====================
+
+struct SpectrumBuffer {
+    data: Vec<f32>,
     write_pos: usize,
     ready: bool,
-    // 缓存规划器和 FFT 方案，避免每帧重建
+}
+
+pub struct SpectrumState {
+    buffer: Mutex<SpectrumBuffer>,
     fft: Arc<dyn rustfft::Fft<f64>>,
     window: Vec<f64>,
 }
@@ -21,25 +27,33 @@ impl SpectrumState {
         let mut planner = FftPlanner::new();
         let fft = planner.plan_fft_forward(FFT_SIZE);
 
-        // 预计算 Hann 窗
         let window: Vec<f64> = (0..FFT_SIZE)
             .map(|i| 0.5 * (1.0 - (2.0 * std::f64::consts::PI * i as f64 / FFT_SIZE as f64).cos()))
             .collect();
 
         Self {
-            buffer: vec![0.0; FFT_SIZE],
-            write_pos: 0,
-            ready: false,
+            buffer: Mutex::new(SpectrumBuffer {
+                data: vec![0.0; FFT_SIZE],
+                write_pos: 0,
+                ready: false,
+            }),
             fft,
             window,
         }
     }
 
-    pub fn take_spectrum(&mut self) -> Option<Vec<f64>> {
-        if !self.ready { return None }
-        self.ready = false;
+    /// 提取频谱数据：锁内仅拷贝 4KB 数据，FFT 在锁外计算，
+    /// 避免音频线程因 poller 持锁计算 FFT 而等待。
+    pub fn take_spectrum(&self) -> Option<Vec<f64>> {
+        let data = {
+            let mut buf = self.buffer.lock();
+            if !buf.ready { return None }
+            buf.ready = false;
+            buf.write_pos = 0;
+            buf.data.clone()
+        };
 
-        let mut input: Vec<Complex<f64>> = self.buffer
+        let mut input: Vec<Complex<f64>> = data
             .iter()
             .zip(self.window.iter())
             .map(|(&s, &w)| Complex::new(s as f64 * w, 0.0))
@@ -65,8 +79,6 @@ impl SpectrumState {
         Some(magnitudes)
     }
 
-    /// 对数频率映射：模仿人耳对频率的感知
-    /// 将 OUTPUT_BANDS 个柱子映射到 FFT bin 上
     fn band_start(&self, band: usize) -> usize {
         let max_bin = FFT_SIZE / 2 - 1;
         let t = band as f64 / OUTPUT_BANDS as f64;
@@ -78,22 +90,17 @@ impl SpectrumState {
 
 pub struct SpectrumSource<S> {
     inner: S,
-    state: Arc<Mutex<SpectrumState>>,
+    state: Arc<SpectrumState>,
     sample_count: usize,
     channel_count: u16,
-    // 每 N 个采样才写一次 buffer，降低锁竞争
     stride: usize,
     stride_counter: usize,
 }
 
 impl<S: Source<Item = f32>> SpectrumSource<S> {
-    pub fn new(inner: S, state: Arc<Mutex<SpectrumState>>) -> Self {
+    pub fn new(inner: S, state: Arc<SpectrumState>) -> Self {
         let channels = inner.channels();
         let sr = inner.sample_rate();
-        // 目标：FFT buffer 每秒填充约 30 次
-        // FFT_SIZE 个 mono 样本 / 30 ≈ 每次写多少
-        // 44100Hz / 30 ≈ 1470 mono 样本/帧
-        // stride = 跳过多少 mono 样本来匹配
         let target_fills_per_sec = 30;
         let mono_per_fill = sr as usize / target_fills_per_sec;
         let stride = if mono_per_fill > FFT_SIZE { mono_per_fill / FFT_SIZE } else { 1 };
@@ -110,14 +117,13 @@ where S: Source<Item = f32>,
         let sample = self.inner.next()?;
         self.sample_count += 1;
 
-        // 只取第一个声道
         if (self.sample_count - 1) % self.channel_count as usize == 0 {
             self.stride_counter += 1;
             if self.stride_counter >= self.stride {
                 self.stride_counter = 0;
-                let mut st = self.state.lock();
+                let mut st = self.state.buffer.lock();
                 let pos = st.write_pos;
-                st.buffer[pos] = sample;
+                st.data[pos] = sample;
                 st.write_pos = pos + 1;
                 if st.write_pos >= FFT_SIZE {
                     st.write_pos = 0;
@@ -140,35 +146,57 @@ where S: Source<Item = f32>,
     fn try_seek(&mut self, pos: std::time::Duration) -> Result<(), rodio::source::SeekError> { self.inner.try_seek(pos) }
 }
 
-// ==================== Position Source ====================
+// ==================== Position State (lock-free) ====================
 
+/// 播放位置状态：全部使用原子操作，音频线程零锁写入，
+/// poller 线程零锁读取。
 pub struct PositionState {
-    pub samples_played: u64,
-    pub seek_offset_secs: f64,
-    pub sample_rate: u32,
-    pub channels: u16,
-    pub duration_secs: f64,
+    samples_played: AtomicU64,
+    seek_offset_secs: AtomicU64,
+    sample_rate: AtomicU32,
+    channels: AtomicU32,
+    duration_secs: AtomicU64,
 }
 
 impl PositionState {
     pub fn new() -> Self {
-        Self { samples_played: 0, seek_offset_secs: 0.0, sample_rate: 44100, channels: 2, duration_secs: 0.0 }
+        Self {
+            samples_played: AtomicU64::new(0),
+            seek_offset_secs: AtomicU64::new(0.0f64.to_bits()),
+            sample_rate: AtomicU32::new(44100),
+            channels: AtomicU32::new(2),
+            duration_secs: AtomicU64::new(0.0f64.to_bits()),
+        }
+    }
+
+    pub fn set_initial(&self, sample_rate: u32, channels: u16, duration: f64) {
+        self.sample_rate.store(sample_rate, Ordering::Relaxed);
+        self.channels.store(channels as u32, Ordering::Relaxed);
+        self.duration_secs.store(duration.to_bits(), Ordering::Relaxed);
     }
 
     pub fn position_secs(&self) -> f64 {
-        let total_samples = self.samples_played as f64;
-        let base = total_samples / (self.sample_rate as f64 * self.channels as f64);
-        base + self.seek_offset_secs
+        let samples = self.samples_played.load(Ordering::Relaxed) as f64;
+        let sr = self.sample_rate.load(Ordering::Relaxed) as f64;
+        let ch = self.channels.load(Ordering::Relaxed) as f64;
+        let offset = f64::from_bits(self.seek_offset_secs.load(Ordering::Relaxed));
+        samples / (sr * ch) + offset
+    }
+
+    pub fn duration_secs(&self) -> f64 {
+        f64::from_bits(self.duration_secs.load(Ordering::Relaxed))
     }
 }
 
+// ==================== Position Source ====================
+
 pub struct PositionSource<S> {
     inner: S,
-    state: Arc<Mutex<PositionState>>,
+    state: Arc<PositionState>,
 }
 
 impl<S> PositionSource<S> {
-    pub fn new(inner: S, state: Arc<Mutex<PositionState>>) -> Self {
+    pub fn new(inner: S, state: Arc<PositionState>) -> Self {
         Self { inner, state }
     }
 }
@@ -180,10 +208,7 @@ where S: Source<Item = f32>,
 
     fn next(&mut self) -> Option<f32> {
         let sample = self.inner.next()?;
-        let mut st = self.state.lock();
-        st.samples_played += 1;
-        st.sample_rate = self.inner.sample_rate();
-        st.channels = self.inner.channels();
+        self.state.samples_played.fetch_add(1, Ordering::Relaxed);
         Some(sample)
     }
 }
@@ -198,9 +223,8 @@ where S: Source<Item = f32>,
     fn try_seek(&mut self, pos: std::time::Duration) -> Result<(), rodio::source::SeekError> {
         let result = self.inner.try_seek(pos);
         if result.is_ok() {
-            let mut st = self.state.lock();
-            st.samples_played = 0;
-            st.seek_offset_secs = pos.as_secs_f64();
+            self.state.samples_played.store(0, Ordering::Relaxed);
+            self.state.seek_offset_secs.store(pos.as_secs_f64().to_bits(), Ordering::Relaxed);
         }
         result
     }
