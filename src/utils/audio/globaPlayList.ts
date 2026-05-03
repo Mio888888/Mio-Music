@@ -11,7 +11,7 @@ import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
-export const playMode = ref<PlayMode>(PlayMode.SEQUENCE)
+export const playMode = ref<PlayMode>(PlayMode.LIST)
 export const isLoadingSong = ref(false)
 
 let _playIndex = -1
@@ -198,6 +198,10 @@ function computeNextSong(): SongList | null {
   }
   if (playMode.value === PlayMode.RANDOM) {
     return store.list[Math.floor(Math.random() * store.list.length)]
+  }
+  if (playMode.value === PlayMode.LIST) {
+    if (_playIndex >= store.list.length - 1) return null
+    return store.list[_playIndex + 1]
   }
   // SEQUENCE
   const nextIdx = (_playIndex + 1) % store.list.length
@@ -412,6 +416,14 @@ export function playNext(): SongList | null {
   const store = LocalUserDetailStore()
   if (store.list.length === 0) return null
 
+  // 列表播放模式：最后一曲后停止播放
+  if (playMode.value === PlayMode.LIST && _playIndex >= store.list.length - 1) {
+    const audio = ControlAudioStore()
+    invoke('player__pause')
+    audio.Audio.isPlay = false
+    return null
+  }
+
   // 无缝换曲模式：尝试使用预加载的下一曲
   const setting = playSetting()
   if (setting.isSeamlessTransition && preloadedSong && preloadedReady) {
@@ -550,7 +562,7 @@ export function playPrevious(): SongList | null {
 }
 
 export function updatePlayMode() {
-  const modes = [PlayMode.SEQUENCE, PlayMode.RANDOM, PlayMode.SINGLE]
+  const modes = [PlayMode.LIST, PlayMode.SEQUENCE, PlayMode.RANDOM, PlayMode.SINGLE]
   const idx = modes.indexOf(playMode.value)
   playMode.value = modes[(idx + 1) % modes.length]
   // 播放模式变更后重新调度预加载

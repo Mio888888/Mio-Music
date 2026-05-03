@@ -17,6 +17,7 @@ export type AudioSubscribeMethod = (
 ) => UnsubscribeFunction
 
 export enum PlayMode {
+  LIST = 'list',
   SEQUENCE = 'sequence',
   RANDOM = 'random',
   SINGLE = 'single'

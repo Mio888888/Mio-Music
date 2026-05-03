@@ -223,9 +223,12 @@ let isFull = false
 const playModeTip = ref('')
 const playModeIconClass = computed(() => {
   switch (playMode.value) {
-    case PlayMode.SEQUENCE:
-      playModeTip.value = '顺序播放'
+    case PlayMode.LIST:
+      playModeTip.value = '列表播放'
       return 'iconfont icon-shunxubofangtubiao'
+    case PlayMode.SEQUENCE:
+      playModeTip.value = '列表循环'
+      return 'iconfont icon-bofang-xunhuanbofang'
     case PlayMode.RANDOM:
       playModeTip.value = '随机播放'
       return 'iconfont icon-suijibofang'
@@ -233,6 +236,7 @@ const playModeIconClass = computed(() => {
       playModeTip.value = '单曲循环'
       return 'iconfont icon-bofang-xunhuanbofang'
     default:
+      playModeTip.value = '列表播放'
       return 'iconfont icon-shunxubofangtubiao'
   }
 })
