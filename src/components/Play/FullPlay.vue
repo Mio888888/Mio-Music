@@ -7,6 +7,8 @@ import {
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/vue'
 import type { SongList } from '@/types/audio'
 import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { PerformanceDegrader } from '@/utils/performanceMonitor'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import {
   Fullscreen1Icon,
@@ -323,6 +325,16 @@ const bgRef = ref<CoreBackgroundRender<PixiRenderer> | undefined>(undefined)
 const lyricPlayerRef = ref<LyricPlayerRef | undefined>(undefined)
 const backgroundContainer = ref<HTMLDivElement | null>(null)
 
+// 音频响应相关
+let spectrumUnlisten: UnlistenFn | null = null
+const backgroundConfig = computed(() => settingsStore.settings.backgroundRender?.fullPlay)
+const audioResponseEnabled = computed(() => backgroundConfig.value?.audioResponse ?? true)
+
+// 性能监控和自动降级
+const performanceDegrader = new PerformanceDegrader()
+const showPerformanceWarning = ref(false)
+const hasAutoDegraded = ref(false)
+
 const actualCoverImage = computed(() => {
   return player.value.cover || props.coverImage || '/src/assets/images/Default.jpg'
 })
@@ -378,31 +390,139 @@ watch(
 
 // 初始化背景渲染器
 const initBackgroundRender = async () => {
-  if (backgroundContainer.value) {
-    if (bgRef.value) {
-      bgRef.value.dispose()
-      const canvas = bgRef.value.getElement()
-      canvas?.parentNode?.removeChild(canvas)
-    }
-    bgRef.value = CoreBackgroundRender.new(PixiRenderer)
+  if (!backgroundContainer.value) {
+    console.warn('[FullPlay] backgroundContainer 不存在，跳过背景初始化')
+    return
+  }
+
+  if (!backgroundConfig.value?.enabled) {
+    console.log('[FullPlay] 背景效果已禁用，跳过初始化')
+    return
+  }
+
+  console.log('[FullPlay] 初始化背景渲染器，配置:', backgroundConfig.value)
+
+  if (bgRef.value) {
+    bgRef.value.dispose()
     const canvas = bgRef.value.getElement()
-    canvas.style.position = 'absolute'
-    canvas.style.top = '0'
-    canvas.style.left = '0'
-    canvas.style.width = '100%'
-    canvas.style.height = '100%'
-    canvas.style.zIndex = '-1'
-    backgroundContainer.value.appendChild(canvas)
-    bgRef.value.setRenderScale(0.5)
-    bgRef.value.setFlowSpeed(1)
-    bgRef.value.setFPS(30)
-    bgRef.value.setHasLyric(player.value.lyrics.lines.length > 10)
-    await bgRef.value.setAlbum(actualCoverImage.value, false)
-    bgRef.value.resume()
+    canvas?.parentNode?.removeChild(canvas)
+  }
+  bgRef.value = CoreBackgroundRender.new(PixiRenderer)
+  const canvas = bgRef.value.getElement()
+  canvas.style.position = 'absolute'
+  canvas.style.top = '0'
+  canvas.style.left = '0'
+  canvas.style.width = '100%'
+  canvas.style.height = '100%'
+  canvas.style.zIndex = '-1'
+  backgroundContainer.value.appendChild(canvas)
+
+  // 应用配置
+  applyBackgroundConfig()
+  console.log('[FullPlay] 背景配置已应用')
+
+  bgRef.value.setHasLyric(player.value.lyrics.lines.length > 10)
+  await bgRef.value.setAlbum(actualCoverImage.value, false)
+  bgRef.value.resume()
+
+  console.log('[FullPlay] 背景渲染器已启动')
+
+  // 如果启用了音频响应，启动它
+  if (audioResponseEnabled.value && Audio.value.isPlay) {
+    console.log('[FullPlay] 启动音频响应')
+    startAudioResponse()
   }
 }
 
-onMounted(async () => { await initBackgroundRender() })
+// 应用背景配置到渲染器
+const applyBackgroundConfig = () => {
+  if (!bgRef.value || !backgroundConfig.value) return
+
+  console.log('[FullPlay] 应用背景配置:', {
+    renderScale: backgroundConfig.value.renderScale,
+    flowSpeed: backgroundConfig.value.flowSpeed,
+    fps: backgroundConfig.value.fps,
+    staticMode: backgroundConfig.value.staticMode,
+    audioResponse: backgroundConfig.value.audioResponse
+  })
+
+  bgRef.value.setRenderScale(backgroundConfig.value.renderScale)
+  bgRef.value.setFlowSpeed(backgroundConfig.value.flowSpeed)
+  bgRef.value.setFPS(backgroundConfig.value.fps)
+  bgRef.value.setStaticMode(backgroundConfig.value.staticMode)
+}
+
+// 启动音频响应效果
+const startAudioResponse = async () => {
+  if (!audioResponseEnabled.value || spectrumUnlisten) return
+
+  try {
+    spectrumUnlisten = await listen('player:spectrum', (event: any) => {
+      if (!bgRef.value || !Audio.value.isPlay) return
+
+      const { bands } = event.payload
+      if (bands && Array.isArray(bands) && bands.length > 0) {
+        // 提取低频能量（前 10 个频段）
+        const lowFreqBands = bands.slice(0, 10)
+        const avgLowFreq = lowFreqBands.reduce((sum: number, val: number) => sum + val, 0) / lowFreqBands.length
+
+        // 转换为 0-1 范围（-80dB 到 0dB）
+        const normalizedVolume = Math.max(0, Math.min(1, (avgLowFreq + 80) / 80))
+
+        // 应用到背景渲染器
+        bgRef.value.setLowFreqVolume(normalizedVolume)
+      }
+    })
+  } catch (error) {
+    console.error('[FullPlay] 启动音频响应失败:', error)
+  }
+}
+
+// 停止音频响应效果
+const stopAudioResponse = () => {
+  if (spectrumUnlisten) {
+    spectrumUnlisten()
+    spectrumUnlisten = null
+  }
+  // 重置低频音量
+  bgRef.value?.setLowFreqVolume(0)
+}
+
+onMounted(async () => {
+  await initBackgroundRender()
+
+  // 启动性能监控（仅在启用背景效果时）
+  if (settingsStore.settings.backgroundRender?.fullPlay?.enabled) {
+    performanceDegrader.start({
+      onTick: (fps) => {
+        // 可选：实时 FPS 显示（调试用）
+        // console.log('[Performance] FPS:', fps.toFixed(1))
+      },
+      onDegrade: (degradedConfig) => {
+        console.warn('[FullPlay] 检测到性能问题，自动降低背景效果')
+        hasAutoDegraded.value = true
+        showPerformanceWarning.value = true
+
+        // 应用降级配置
+        settingsStore.updateSettings({
+          backgroundRender: {
+            ...settingsStore.settings.backgroundRender!,
+            fullPlay: {
+              ...settingsStore.settings.backgroundRender!.fullPlay,
+              ...degradedConfig
+            }
+          }
+        })
+
+        // 3秒后自动隐藏提示
+        setTimeout(() => {
+          showPerformanceWarning.value = false
+        }, 5000)
+      },
+      enabled: true
+    })
+  }
+})
 
 onBeforeUnmount(async () => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
@@ -418,6 +538,10 @@ onBeforeUnmount(async () => {
   if (Audio.value.isPlay) {
     // Rust 后端管理播放状态
   }
+  // 停止音频响应
+  stopAudioResponse()
+  // 停止性能监控
+  performanceDegrader.stop()
   if (bgRef.value) {
     const canvas = bgRef.value.getElement()
     canvas?.parentNode?.removeChild(canvas)
@@ -429,6 +553,76 @@ onBeforeUnmount(async () => {
 
 watch(() => Audio.value.url, (newUrl) => { state.audioUrl = newUrl })
 watch(() => Audio.value.currentTime, (newTime) => { state.currentTime = Math.round(newTime * 1000) })
+
+// 监听播放状态，自动启停音频响应
+watch(
+  () => Audio.value.isPlay,
+  (isPlaying) => {
+    if (audioResponseEnabled.value) {
+      if (isPlaying) {
+        startAudioResponse()
+      } else {
+        stopAudioResponse()
+      }
+    }
+  }
+)
+
+// 监听音频响应配置变化
+watch(
+  () => audioResponseEnabled.value,
+  (enabled) => {
+    if (enabled) {
+      if (Audio.value.isPlay) {
+        startAudioResponse()
+      }
+    } else {
+      stopAudioResponse()
+    }
+  }
+)
+
+// 监听歌词变化，更新 hasLyric 状态
+watch(
+  () => player.value.lyrics.lines,
+  (lines) => {
+    if (bgRef.value) {
+      bgRef.value.setHasLyric(lines.length > 10)
+    }
+  }
+)
+
+// 监听背景配置变化，动态更新渲染器
+watch(
+  () => backgroundConfig.value,
+  (newConfig) => {
+    if (!newConfig) return
+
+    // 如果启用状态改变
+    if (newConfig.enabled && !bgRef.value) {
+      // 从禁用到启用，重新初始化
+      initBackgroundRender()
+    } else if (!newConfig.enabled && bgRef.value) {
+      // 从启用到禁用，清理
+      bgRef.value.dispose()
+      const canvas = bgRef.value.getElement()
+      canvas?.parentNode?.removeChild(canvas)
+      bgRef.value = undefined
+      stopAudioResponse()
+    } else if (newConfig.enabled && bgRef.value) {
+      // 已启用，更新参数
+      applyBackgroundConfig()
+
+      // 音频响应开关变化
+      if (newConfig.audioResponse && Audio.value.isPlay && !spectrumUnlisten) {
+        startAudioResponse()
+      } else if (!newConfig.audioResponse && spectrumUnlisten) {
+        stopAudioResponse()
+      }
+    }
+  },
+  { deep: true }
+)
 
 const handleLowFreqUpdate = (volume: number) => { state.lowFreqVolume = volume }
 
@@ -510,6 +704,17 @@ onUnmounted(() => {
       style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1"
     ></div>
     <div v-if="showFestivalEffects" ref="festivalOverlay" class="festival-overlay"></div>
+
+    <!-- 性能警告提示 -->
+    <Transition name="fade">
+      <div v-if="showPerformanceWarning" class="performance-warning-toast">
+        <t-icon name="info-circle" size="1.2rem" />
+        <span>检测到性能问题，已自动降低背景效果以提升流畅度</span>
+        <button class="close-btn" @click="showPerformanceWarning = false">
+          <t-icon name="close" size="1rem" />
+        </button>
+      </div>
+    </Transition>
     <!-- 全屏按钮 -->
     <button
       class="fullscreen-btn"
@@ -681,6 +886,55 @@ onUnmounted(() => {
   z-index: 0;
   pointer-events: none;
 }
+
+.performance-warning-toast {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: rgba(255, 152, 0, 0.95);
+  border-radius: 0.75rem;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  pointer-events: auto;
+  max-width: 600px;
+
+  .close-btn {
+    margin-left: auto;
+    padding: 0.25rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 0.25rem;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
 .fade-nav-enter-active,
 .fade-nav-leave-active {
   transition: all 0.6s cubic-bezier(0.8, 0, 0.8, 0.43);

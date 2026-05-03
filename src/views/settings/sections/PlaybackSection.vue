@@ -7,6 +7,7 @@ import AudioOutputSettings from '@/components/Settings/AudioOutputSettings.vue'
 import DlnaDeviceSettings from '@/components/Settings/DlnaDeviceSettings.vue'
 import EqualizerSettings from '@/components/Settings/EqualizerSettings.vue'
 import AudioEffectSettings from '@/components/Settings/AudioEffectSettings.vue'
+import BackgroundRenderSettings from '@/components/Settings/BackgroundRenderSettings.vue'
 
 const playSettingStore = usePlaySetting()
 const { isJumpLyric, bgPlaying, isAudioVisualizer } = storeToRefs(playSettingStore)
@@ -38,6 +39,11 @@ const { settings } = storeToRefs(settingsStore)
     <div id="playback-audio-effect" class="setting-group">
       <h3>高级音效处理</h3>
       <AudioEffectSettings />
+    </div>
+
+    <!-- 背景效果 -->
+    <div id="playback-background" class="setting-group">
+      <BackgroundRenderSettings />
     </div>
 
     <!-- 播放显示 -->

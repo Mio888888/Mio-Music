@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { BackgroundRenderSettings } from '@/types/background'
+import { DEFAULT_BACKGROUND_RENDER_SETTINGS } from '@/types/background'
 
 export interface TagWriteOptions {
   basicInfo: boolean
@@ -39,6 +41,7 @@ export interface SettingsState {
   springFestivalDisabled?: boolean
   routePreloadEnabled?: boolean
   globalBackground?: GlobalBackgroundSettings
+  backgroundRender?: BackgroundRenderSettings
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -60,7 +63,8 @@ export const useSettingsStore = defineStore('settings', () => {
     isDarkMode: false,
     springFestivalDisabled: false,
     routePreloadEnabled: true,
-    globalBackground: { enable: false, type: 'none', url: '', opacity: 0.5, blur: 10, brightness: 0.8 }
+    globalBackground: { enable: false, type: 'none', url: '', opacity: 0.5, blur: 10, brightness: 0.8 },
+    backgroundRender: DEFAULT_BACKGROUND_RENDER_SETTINGS
   }
 
   const loadSettings = (): SettingsState => {
@@ -77,6 +81,16 @@ export const useSettingsStore = defineStore('settings', () => {
             lyrics: parsed.tagWriteOptions?.lyrics ?? (defaultSettings.tagWriteOptions as TagWriteOptions).lyrics,
             downloadLyrics: parsed.tagWriteOptions?.downloadLyrics ?? (defaultSettings.tagWriteOptions as TagWriteOptions).downloadLyrics,
             lyricFormat: parsed.tagWriteOptions?.lyricFormat ?? (defaultSettings.tagWriteOptions as TagWriteOptions).lyricFormat
+          },
+          backgroundRender: {
+            fullPlay: {
+              ...(DEFAULT_BACKGROUND_RENDER_SETTINGS.fullPlay),
+              ...(parsed.backgroundRender?.fullPlay ?? {})
+            },
+            desktopLyric: {
+              ...(DEFAULT_BACKGROUND_RENDER_SETTINGS.desktopLyric),
+              ...(parsed.backgroundRender?.desktopLyric ?? {})
+            }
           }
         }
       }
@@ -105,6 +119,9 @@ export const useSettingsStore = defineStore('settings', () => {
     }
     if (!settings.value.tagWriteOptions) {
       settings.value.tagWriteOptions = { basicInfo: true, cover: true, lyrics: true, downloadLyrics: false, lyricFormat: 'word-by-word' }
+    }
+    if (!settings.value.backgroundRender) {
+      settings.value.backgroundRender = DEFAULT_BACKGROUND_RENDER_SETTINGS
     }
     localStorage.setItem('appSettings', JSON.stringify(settings.value))
   }
