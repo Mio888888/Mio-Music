@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
 import type { BackgroundRenderPreset } from '@/types/background'
@@ -19,15 +19,6 @@ if (!settings.value.backgroundRender) {
       flowSpeed: 1.0,
       staticMode: false,
       fps: 30
-    },
-    desktopLyric: {
-      preset: 'performance',
-      enabled: false,
-      audioResponse: false,
-      renderScale: 0.3,
-      flowSpeed: 0.5,
-      staticMode: true,
-      fps: 15
     }
   }
 }
@@ -36,10 +27,6 @@ const bgSettings = computed(() => settings.value.backgroundRender!)
 
 // FullPlay 配置
 const fullPlayConfig = computed(() => bgSettings.value.fullPlay)
-
-// 桌面歌词配置（可折叠）
-const showDesktopLyricSettings = ref(false)
-const desktopLyricConfig = computed(() => bgSettings.value.desktopLyric)
 
 // 预设选项
 const presetOptions = computed(() => [
@@ -62,51 +49,22 @@ const updateFullPlayConfig = (key: string, value: any) => {
   })
 }
 
-// 更新桌面歌词配置
-const updateDesktopLyricConfig = (key: string, value: any) => {
-  settingsStore.updateSettings({
-    backgroundRender: {
-      ...bgSettings.value,
-      desktopLyric: {
-        ...desktopLyricConfig.value,
-        [key]: value
-      }
-    }
-  })
-}
-
 // 应用预设
-const applyPreset = (preset: BackgroundRenderPreset, target: 'fullPlay' | 'desktopLyric') => {
+const applyPreset = (preset: BackgroundRenderPreset) => {
   if (preset === 'auto' || preset === 'custom') {
-    // auto 和 custom 只更新 preset 字段
-    if (target === 'fullPlay') {
-      updateFullPlayConfig('preset', preset)
-    } else {
-      updateDesktopLyricConfig('preset', preset)
-    }
+    updateFullPlayConfig('preset', preset)
     return
   }
 
-  // 应用预设配置
   const presetConfig = BACKGROUND_PRESETS[preset]
-  const updateFunc = target === 'fullPlay' ? updateFullPlayConfig : updateDesktopLyricConfig
 
-  updateFunc('preset', preset)
-  updateFunc('enabled', presetConfig.enabled)
-  updateFunc('audioResponse', presetConfig.audioResponse)
-  updateFunc('renderScale', presetConfig.renderScale)
-  updateFunc('flowSpeed', presetConfig.flowSpeed)
-  updateFunc('staticMode', presetConfig.staticMode)
-  updateFunc('fps', presetConfig.fps)
-}
-
-// 重置配置
-const resetConfig = (target: 'fullPlay' | 'desktopLyric') => {
-  if (target === 'fullPlay') {
-    applyPreset('auto', 'fullPlay')
-  } else {
-    applyPreset('performance', 'desktopLyric')
-  }
+  updateFullPlayConfig('preset', preset)
+  updateFullPlayConfig('enabled', presetConfig.enabled)
+  updateFullPlayConfig('audioResponse', presetConfig.audioResponse)
+  updateFullPlayConfig('renderScale', presetConfig.renderScale)
+  updateFullPlayConfig('flowSpeed', presetConfig.flowSpeed)
+  updateFullPlayConfig('staticMode', presetConfig.staticMode)
+  updateFullPlayConfig('fps', presetConfig.fps)
 }
 </script>
 
@@ -125,7 +83,7 @@ const resetConfig = (target: 'fullPlay' | 'desktopLyric') => {
         <t-select
           :value="fullPlayConfig.preset"
           :options="presetOptions"
-          @change="(val) => applyPreset(val as BackgroundRenderPreset, 'fullPlay')"
+          @change="(val) => applyPreset(val as BackgroundRenderPreset)"
           style="width: 200px"
         />
       </div>
@@ -230,129 +188,9 @@ const resetConfig = (target: 'fullPlay' | 'desktopLyric') => {
           <div class="item-title">重置配置</div>
           <div class="item-desc">恢复到默认预设</div>
         </div>
-        <t-button size="small" variant="outline" @click="resetConfig('fullPlay')">
+        <t-button size="small" variant="outline" @click="applyPreset('auto')">
           重置
         </t-button>
-      </div>
-    </div>
-
-    <!-- 桌面歌词背景效果（可折叠） -->
-    <div class="settings-section">
-      <div class="section-header" @click="showDesktopLyricSettings = !showDesktopLyricSettings">
-        <h3>桌面歌词 - 背景效果</h3>
-        <t-icon :name="showDesktopLyricSettings ? 'chevron-up' : 'chevron-down'" />
-      </div>
-
-      <div v-if="showDesktopLyricSettings" class="section-content">
-        <!-- 预设选择 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">预设模式</div>
-          </div>
-          <t-select
-            :value="desktopLyricConfig.preset"
-            :options="presetOptions"
-            @change="(val) => applyPreset(val as BackgroundRenderPreset, 'desktopLyric')"
-            style="width: 200px"
-          />
-        </div>
-
-        <!-- 总开关 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">启用背景效果</div>
-            <div class="item-desc">桌面歌词窗口显示动态背景</div>
-          </div>
-          <t-switch
-            :value="desktopLyricConfig.enabled"
-            @change="updateDesktopLyricConfig('enabled', $event)"
-          />
-        </div>
-
-        <!-- 音频响应 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">音频响应</div>
-          </div>
-          <t-switch
-            :value="desktopLyricConfig.audioResponse"
-            @change="updateDesktopLyricConfig('audioResponse', $event)"
-            :disabled="!desktopLyricConfig.enabled"
-          />
-        </div>
-
-        <!-- 渲染强度 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">效果强度</div>
-            <div class="item-desc">
-              渲染缩放比例 ({{ desktopLyricConfig.renderScale.toFixed(1) }})
-            </div>
-          </div>
-          <t-slider
-            :value="desktopLyricConfig.renderScale"
-            :min="0.1"
-            :max="1.0"
-            :step="0.1"
-            @change="updateDesktopLyricConfig('renderScale', $event)"
-            :disabled="!desktopLyricConfig.enabled || desktopLyricConfig.preset !== 'custom'"
-            style="width: 200px"
-          />
-        </div>
-
-        <!-- 流动速度 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">流动速度</div>
-          </div>
-          <t-slider
-            :value="desktopLyricConfig.flowSpeed"
-            :min="0.1"
-            :max="5.0"
-            :step="0.1"
-            @change="updateDesktopLyricConfig('flowSpeed', $event)"
-            :disabled="!desktopLyricConfig.enabled || desktopLyricConfig.preset !== 'custom'"
-            style="width: 200px"
-          />
-        </div>
-
-        <!-- 静态模式 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">静态模式</div>
-          </div>
-          <t-switch
-            :value="desktopLyricConfig.staticMode"
-            @change="updateDesktopLyricConfig('staticMode', $event)"
-            :disabled="!desktopLyricConfig.enabled || desktopLyricConfig.preset !== 'custom'"
-          />
-        </div>
-
-        <!-- FPS 限制 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">帧率限制</div>
-          </div>
-          <t-slider
-            :value="desktopLyricConfig.fps"
-            :min="15"
-            :max="60"
-            :step="5"
-            @change="updateDesktopLyricConfig('fps', $event)"
-            :disabled="!desktopLyricConfig.enabled || desktopLyricConfig.preset !== 'custom'"
-            style="width: 200px"
-          />
-        </div>
-
-        <!-- 重置按钮 -->
-        <div class="setting-item">
-          <div class="item-info">
-            <div class="item-title">重置配置</div>
-          </div>
-          <t-button size="small" variant="outline" @click="resetConfig('desktopLyric')">
-            重置
-          </t-button>
-        </div>
       </div>
     </div>
 
@@ -379,22 +217,6 @@ const resetConfig = (target: 'fullPlay' | 'desktopLyric') => {
       font-size: 1.125rem;
       font-weight: 600;
       color: var(--settings-text-primary);
-    }
-
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-
-      h3 {
-        margin: 0;
-      }
-    }
-
-    .section-content {
-      margin-top: 1rem;
     }
   }
 

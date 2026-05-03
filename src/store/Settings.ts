@@ -86,10 +86,6 @@ export const useSettingsStore = defineStore('settings', () => {
             fullPlay: {
               ...(DEFAULT_BACKGROUND_RENDER_SETTINGS.fullPlay),
               ...(parsed.backgroundRender?.fullPlay ?? {})
-            },
-            desktopLyric: {
-              ...(DEFAULT_BACKGROUND_RENDER_SETTINGS.desktopLyric),
-              ...(parsed.backgroundRender?.desktopLyric ?? {})
             }
           }
         }

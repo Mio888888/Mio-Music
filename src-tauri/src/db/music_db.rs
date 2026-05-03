@@ -18,6 +18,7 @@ pub struct TrackRow {
     pub year: i64,
     pub lrc: Option<String>,
     pub types: String,
+    #[serde(rename = "_types")]
     pub _types: String,
     pub type_url: String,
     pub bitrate: i64,

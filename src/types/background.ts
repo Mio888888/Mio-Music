@@ -33,8 +33,6 @@ export interface BackgroundRenderConfig {
 export interface BackgroundRenderSettings {
   /** FullPlay 页面配置 */
   fullPlay: BackgroundRenderConfig
-  /** 桌面歌词配置 */
-  desktopLyric: BackgroundRenderConfig
 }
 
 /**
@@ -75,14 +73,5 @@ export const DEFAULT_BACKGROUND_RENDER_SETTINGS: BackgroundRenderSettings = {
     flowSpeed: 1.0,
     staticMode: false,
     fps: 30
-  },
-  desktopLyric: {
-    preset: 'performance',
-    enabled: false, // 桌面歌词默认关闭背景
-    audioResponse: false,
-    renderScale: 0.3,
-    flowSpeed: 0.5,
-    staticMode: true,
-    fps: 15
   }
 }
