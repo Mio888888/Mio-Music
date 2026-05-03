@@ -584,7 +584,9 @@ const onDownload = async () => {
 // 进度条相关
 const progressRef = ref<HTMLDivElement | null>(null)
 const isDraggingProgress = ref(false)
+const hasDragged = ref(false)
 const tempProgressPercentage = ref(Audio.value.currentTime || 0)
+
 const progressPercentage = computed(() => {
   if (isDraggingProgress.value) {
     return tempProgressPercentage.value
@@ -649,6 +651,11 @@ const handleProgressClick = (event: MouseEvent) => {
     MessagePlugin.warning('投屏模式下不支持拖拽进度')
     return
   }
+  // 如果刚刚发生了拖动，忽略点击事件（避免重复 seek）
+  if (hasDragged.value) {
+    hasDragged.value = false
+    return
+  }
   if (!progressRef.value) return
 
   const rect = progressRef.value.getBoundingClientRect()
@@ -684,6 +691,9 @@ const handleProgressDragMove = (event: MouseEvent) => {
   const rect = progressRef.value.getBoundingClientRect()
   const offsetX = Math.max(0, Math.min(event.clientX - rect.left, rect.width))
   const percentage = (offsetX / rect.width) * 100
+
+  // 标记发生了拖动（用于区分点击和拖动）
+  hasDragged.value = true
 
   // 拖动时只更新UI，不频繁设置audio.currentTime
   tempProgressPercentage.value = percentage
@@ -736,6 +746,7 @@ const handleProgressDragStart = (event: MouseEvent) => {
   event.preventDefault()
   document.querySelector('.progress-handle')?.classList.add('dragging')
 
+  hasDragged.value = false
   isDraggingProgress.value = true
   window.addEventListener('mousemove', handleProgressDragMove)
   window.addEventListener('mouseup', handleProgressDragEnd)

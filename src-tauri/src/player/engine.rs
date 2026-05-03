@@ -97,7 +97,9 @@ impl SlotPipeline {
 
     pub fn pause(&self) { self.sink.pause() }
     pub fn resume(&self) { self.sink.play() }
-    pub fn seek(&self, pos: Duration) { let _ = self.sink.try_seek(pos); }
+    pub fn seek(&self, pos: Duration) -> bool {
+        self.sink.try_seek(pos).is_ok()
+    }
     pub fn set_volume(&self, vol: f64) { self.sink.set_volume(vol as f32) }
     pub fn position(&self) -> f64 { self.position_state.position_secs() }
     pub fn duration(&self) -> f64 { self.position_state.duration_secs() }
@@ -548,10 +550,88 @@ impl PlayerEngine {
         self.emit_state();
     }
 
-    pub fn seek(&self, position_secs: f64) {
+    pub fn seek(&mut self, position_secs: f64) {
+        let pos = Duration::from_secs_f64(position_secs);
+
+        // 先尝试直接 seek
         if let Some(ref p) = self.primary {
-            p.seek(Duration::from_secs_f64(position_secs));
+            if p.seek(pos) {
+                return;
+            }
         }
+
+        // try_seek 失败（如 rodio FLAC 解码器），使用 symphonia 重建管线
+        let url = match self.primary.as_ref() {
+            Some(p) => p.url().to_string(),
+            None => return,
+        };
+        let was_playing = self.primary.as_ref().map(|p| p.is_playing()).unwrap_or(false);
+        let volume = self.volume / 100.0;
+
+        // 销毁旧管线
+        self.primary = None;
+
+        let file_path = match resolve_audio_file(&url) {
+            Ok(path) => path,
+            Err(_) => return,
+        };
+
+        // 强制使用 symphonia 解码器（支持 seek）
+        let new_pipeline = match Self::build_pipeline_symphonia(&self.stream_handle, &file_path, &url, volume) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
+                return;
+            }
+        };
+
+        // 在新管线上 seek
+        let _ = new_pipeline.sink.try_seek(pos);
+        if !was_playing {
+            new_pipeline.sink.pause();
+        }
+        self.primary = Some(new_pipeline);
+        self.emit_state();
+    }
+
+    /// 使用 symphonia 解码器构建管线（确保支持 seek）
+    fn build_pipeline_symphonia(
+        stream_handle: &OutputStreamHandle,
+        file_path: &std::path::Path,
+        url: &str,
+        volume: f64,
+    ) -> Result<SlotPipeline, String> {
+        let (channels, sample_rate, duration, source) = decode_streaming_symphonia(file_path)?;
+
+        let eq_state = Arc::new(EqState::new(channels, sample_rate));
+        let spectrum_state = Arc::new(SpectrumState::new());
+        let position_state = Arc::new(PositionState::new());
+        let balance = Arc::new(AtomicF64::new(0.0));
+        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
+
+        position_state.set_initial(sample_rate, channels, duration);
+
+        let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
+        let source = EqSource::new(source, eq_state.clone());
+        let source = BalanceSource::new(source, balance.clone());
+        let source = SpectrumSource::new(source, spectrum_state.clone());
+        let source = PositionSource::new(source, position_state.clone());
+
+        let sink = Sink::try_new(stream_handle)
+            .map_err(|e| format!("创建 Sink 失败: {e}"))?;
+        sink.set_volume(volume as f32);
+        sink.append(source);
+
+        Ok(SlotPipeline {
+            sink,
+            url: url.to_string(),
+            eq_state,
+            spectrum_state,
+            position_state,
+            balance,
+            bass_boost_gain,
+            temp_file: None,
+        })
     }
 
     pub fn set_volume(&mut self, vol: f64) {
