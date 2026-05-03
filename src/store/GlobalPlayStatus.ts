@@ -348,6 +348,7 @@ interface PlayerState {
   lyrics: { lines: LyricLine[]; trans?: string; source?: string }
   isLoading: boolean
   comments: CommentsState
+  _lyricsTrigger: number
 }
 
 const DEFAULT_SONG_INFO = {
@@ -390,6 +391,7 @@ export const useGlobalPlayStatusStore = defineStore(
       },
       lyrics: { lines: [] },
       isLoading: false,
+      _lyricsTrigger: 0,
       comments: {
         hotList: [],
         latestList: [],
@@ -428,7 +430,7 @@ export const useGlobalPlayStatusStore = defineStore(
           currentBlobUrl = null
         }
         const info: any = player.songInfo
-        if (!newImg && info?.source === 'local' && info?.hasCover && info?.songmid) {
+        if (!newImg && info?.source === 'local' && info?.hasCover !== false && info?.songmid) {
           try {
             const res = await (window as any).api?.localMusic?.getCoverBase64?.(String(info.songmid))
             const coverData = res?.success ? res.data : null
@@ -518,7 +520,7 @@ export const useGlobalPlayStatusStore = defineStore(
     }
 
     watch(
-      [() => player.songInfo?.songmid, () => (player.songInfo as any)?.source],
+      [() => player.songInfo?.songmid, () => (player.songInfo as any)?.source, () => player._lyricsTrigger],
       async ([newSongmid, newSource], _oldVals, onCleanup) => {
         if (!newSongmid || !player.songInfo) {
           player.lyrics.lines = []

@@ -74,7 +74,14 @@ export const LocalUserDetailStore = defineStore('Local', () => {
     if (isWatchStarted.value) return
     isWatchStarted.value = true
     const saveList = debounce((val: SongList[]) => {
-      localStorage.setItem('songList', JSON.stringify(toRaw(val)))
+      const cleaned = toRaw(val).map(s => {
+        if ((s as any).source === 'local' && (s as any).img && String((s as any).img).startsWith('data:')) {
+          const { img, ...rest } = s as any
+          return rest as SongList
+        }
+        return s
+      })
+      localStorage.setItem('songList', JSON.stringify(cleaned))
     }, 500)
     const saveUserInfo = debounce((val: UserInfo) => {
       localStorage.setItem('userInfo', JSON.stringify(toRaw(val)))

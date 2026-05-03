@@ -348,6 +348,7 @@ export async function playSong(song: SongList) {
     console.log('[playSong] updating state:', song.name, song.singer, 'img:', !!song.img)
     store.userInfo.lastPlaySongId = song.songmid
     globalPlayStatus.player.songInfo = toRaw(song) as any
+    globalPlayStatus.player._lyricsTrigger++
 
     // 解析真实播放 URL（失败时自动换源）
     let url: string | undefined
@@ -479,6 +480,7 @@ function updateSeamlessState() {
   }
   store.userInfo.lastPlaySongId = song.songmid
   globalPlayStatus.player.songInfo = toRaw(song) as any
+  globalPlayStatus.player._lyricsTrigger++
 
   try {
     invoke('player__update_now_playing', {

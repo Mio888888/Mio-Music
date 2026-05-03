@@ -148,7 +148,7 @@ const handlePlay = (track: any) => {
     songmid: track.songmid, name: track.name, singer: track.singer,
     albumName: track.albumName, img: coverCache.value[track.songmid] || '',
     source: 'local', url: track.url || '', interval: track.interval,
-    path: track.path
+    path: track.path, hasCover: !!track.hasCover
   }
   playStatus.updatePlayerInfo(song)
   playSong(song)
@@ -160,9 +160,9 @@ const playAll = () => {
   if (displayTracks.value.length === 0) return
   const songList = displayTracks.value.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
-    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
+    albumName: track.albumName, img: '',
     source: 'local', url: track.url || '', interval: track.interval,
-    path: track.path
+    path: track.path, hasCover: !!track.hasCover
   }))
   localUserStore.replaceSongList(songList as any)
   playSong(songList[0] as any)
@@ -176,8 +176,9 @@ const addAllToPlaylist = () => {
   displayTracks.value.forEach(track => {
     const song = {
       songmid: track.songmid, name: track.name, singer: track.singer,
-      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-      source: 'local', url: track.url || '', interval: track.interval
+      albumName: track.albumName, img: '',
+      source: 'local', url: track.url || '', interval: track.interval,
+      hasCover: !!track.hasCover
     }
     localUserStore.addSong(song)
   })
@@ -207,8 +208,9 @@ const batchPlay = () => {
   if (selected.length === 0) return
   const songList = selected.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
-    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-    source: 'local', url: track.url || '', interval: track.interval
+    albumName: track.albumName, img: '',
+    source: 'local', url: track.url || '', interval: track.interval,
+    hasCover: !!track.hasCover
   }))
   localUserStore.replaceSongList(songList as any)
   playSong(songList[0] as any)
@@ -220,8 +222,9 @@ const batchAddToPlaylist = () => {
   if (selected.length === 0) return
   songsToAdd.value = selected.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
-    albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-    source: 'local', url: track.url || '', interval: track.interval
+    albumName: track.albumName, img: '',
+    source: 'local', url: track.url || '', interval: track.interval,
+    hasCover: !!track.hasCover
   }))
   showAddToPlaylist.value = true
 }
@@ -248,16 +251,18 @@ const handleMenuAction = (action: string) => {
   else if (action === 'addToEnd') {
     const song = {
       songmid: track.songmid, name: track.name, singer: track.singer,
-      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-      source: 'local', url: track.url || '', interval: track.interval
+      albumName: track.albumName, img: '',
+      source: 'local', url: track.url || '', interval: track.interval,
+      hasCover: !!track.hasCover
     }
     localUserStore.addSong(song)
     MessagePlugin.success('已添加到播放列表')
   } else if (action === 'addToList') {
     songsToAdd.value = [{
       songmid: track.songmid, name: track.name, singer: track.singer,
-      albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-      source: 'local', url: track.url || '', interval: track.interval
+      albumName: track.albumName, img: '',
+      source: 'local', url: track.url || '', interval: track.interval,
+      hasCover: !!track.hasCover
     }]
     showAddToPlaylist.value = true
   } else if (action === 'editTags') {
