@@ -247,13 +247,13 @@ const handleKeyDown = () => {
                 >
                   <template #suffix>
                     <t-button
-                      theme="primary"
+                      theme="default"
                       variant="text"
                       shape="circle"
                       style="display: flex; align-items: center; justify-content: center"
                       @click="handleSearch"
                     >
-                      <template #icon><i class="iconfont icon-faxian" style="font-size: 16px"></i></template>
+                      <template #icon><t-icon name="search" style="font-size: 16px" /></template>
                     </t-button>
                   </template>
                 </t-input>

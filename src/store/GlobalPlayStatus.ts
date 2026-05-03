@@ -466,28 +466,7 @@ export const useGlobalPlayStatusStore = defineStore(
             } catch {}
           }
         }
-        const coverUrl = newImg || '/default-cover.png'
-        if (coverUrl.startsWith('http')) {
-          try {
-            const res = await (window as any).api.httpProxy(coverUrl, { raw: true, timeout: 10000 })
-            if (res?.isBase64 && res?.body) {
-              const mime = coverUrl.includes('.png')
-                ? 'image/png'
-                : coverUrl.includes('.webp')
-                  ? 'image/webp'
-                  : coverUrl.includes('.gif')
-                    ? 'image/gif'
-                    : 'image/jpeg'
-              player.cover = `data:${mime};base64,${res.body}`
-            } else {
-              player.cover = coverUrl
-            }
-          } catch {
-            player.cover = coverUrl
-          }
-        } else {
-          player.cover = coverUrl
-        }
+        player.cover = newImg || '/default-cover.png'
       },
       { immediate: true }
     )
