@@ -21,6 +21,7 @@ export interface GlobalBackgroundSettings {
 export interface SettingsState {
   showFloatBall: boolean
   autoCacheMusic?: boolean
+  cacheSizeLimit?: number
   directories?: { cacheDir: string; downloadDir: string }
   filenameTemplate?: string
   tagWriteOptions?: TagWriteOptions
@@ -44,6 +45,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const defaultSettings: SettingsState = {
     showFloatBall: true,
     autoCacheMusic: true,
+    cacheSizeLimit: 1073741824,
     filenameTemplate: '%t - %s',
     tagWriteOptions: { basicInfo: true, cover: true, lyrics: true, downloadLyrics: false, lyricFormat: 'word-by-word' },
     autoUpdate: true,

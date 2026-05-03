@@ -27,6 +27,7 @@ pub fn player__play(
     player: State<'_, SharedPlayer>,
     url: String,
     slot: Option<String>,
+    cache_key: Option<String>,
 ) -> CmdResult<()> {
     let audio_slot = slot.and_then(|s| match s.to_uppercase().as_str() {
         "A" => Some(AudioSlot::A),
@@ -34,7 +35,7 @@ pub fn player__play(
         _ => None,
     });
     let mut engine = player.lock();
-    match engine.play_async(&url, audio_slot) {
+    match engine.play_async(&url, audio_slot, cache_key) {
         Ok(()) => Ok(CommandResult::ok(())),
         Err(e) => Ok(CommandResult::err(e)),
     }
@@ -177,8 +178,9 @@ pub fn player__shutdown(player: State<'_, SharedPlayer>) -> CmdResult<()> {
 pub fn player__preload(
     player: State<'_, SharedPlayer>,
     url: String,
+    cache_key: Option<String>,
 ) -> CmdResult<()> {
-    player.lock().preload(url);
+    player.lock().preload(url, cache_key);
     Ok(CommandResult::ok(()))
 }
 
@@ -206,5 +208,16 @@ pub fn player__set_seamless_config(
     let auto_crossfade = mode == "crossfade";
     let duration = crossfade_duration_ms.unwrap_or(3000);
     player.lock().set_seamless_config(auto_crossfade, duration);
+    Ok(CommandResult::ok(()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__set_cache_config(
+    player: State<'_, SharedPlayer>,
+    cache_dir: Option<String>,
+    max_size: Option<u64>,
+) -> CmdResult<()> {
+    player.lock().set_cache_config(cache_dir, max_size.unwrap_or(1073741824));
     Ok(CommandResult::ok(()))
 }

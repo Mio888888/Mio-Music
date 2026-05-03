@@ -11,11 +11,12 @@ use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::DecoderOptions;
-use symphonia::core::formats::FormatOptions;
+use symphonia::core::codecs::{DecoderOptions, Decoder as SymphoniaDecoderTrait};
+use symphonia::core::formats::{FormatOptions, FormatReader, SeekTo};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
+use symphonia::core::units::Time;
 
 pub struct SlotPipeline {
     sink: Sink,
@@ -30,12 +31,13 @@ pub struct SlotPipeline {
 }
 
 impl SlotPipeline {
-    pub fn new(
+    /// 从已解析的文件路径创建管线
+    pub fn from_file(
         stream_handle: &OutputStreamHandle,
+        file_path: &std::path::Path,
         url: &str,
         volume: f64,
     ) -> Result<Self, String> {
-        let file_path = resolve_audio_file(url)?;
 
         // AAC/M4A (ISO BMFF / ftyp) 直接走 symphonia，避免 rodio symphonia 解码器的 seek panic
         // 其他格式先尝试 rodio，失败再回退 symphonia
@@ -51,12 +53,14 @@ impl SlotPipeline {
             }
         };
 
-        let (channels, sample_rate, duration, source): (u16, u32, f64, PcmSource) = if needs_symphonia_direct {
-            decode_with_symphonia(&file_path)?
+        type StreamSource = Box<dyn Source<Item = f32> + Send>;
+
+        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) = if needs_symphonia_direct {
+            decode_streaming_symphonia(&file_path)?
         } else {
-            match decode_with_rodio(&file_path) {
+            match decode_streaming_rodio(&file_path) {
                 Ok(result) => result,
-                Err(_) => decode_with_symphonia(&file_path)?,
+                Err(_) => decode_streaming_symphonia(&file_path)?,
             }
         };
 
@@ -108,11 +112,12 @@ impl SlotPipeline {
     pub fn take_spectrum(&self) -> Option<Vec<f64>> { self.spectrum_state.lock().take_spectrum() }
 
     /// 创建管线后立即暂停（用于预加载）
-    pub fn new_paused(
+    pub fn from_file_paused(
         stream_handle: &OutputStreamHandle,
+        file_path: &std::path::Path,
         url: &str,
     ) -> Result<Self, String> {
-        let pipeline = Self::new(stream_handle, url, 0.0)?;
+        let pipeline = Self::from_file(stream_handle, file_path, url, 0.0)?;
         pipeline.sink.pause();
         Ok(pipeline)
     }
@@ -134,6 +139,32 @@ fn resolve_audio_file(url: &str) -> Result<PathBuf, String> {
         return download_to_temp(url);
     }
     Ok(PathBuf::from(url))
+}
+
+/// Resolve audio file with cache support.
+/// For HTTP URLs with cache_key: check cache first, download and cache on miss.
+fn resolve_audio_file_cached(
+    url: &str,
+    cache_dir: Option<&str>,
+    cache_key: Option<&str>,
+    max_size: u64,
+) -> Result<PathBuf, String> {
+    // Only cache HTTP(S) URLs when both cache_dir and cache_key are provided
+    if url.starts_with("http://") || url.starts_with("https://") {
+        if let (Some(dir), Some(key)) = (cache_dir, cache_key) {
+            let dir_path = std::path::Path::new(dir);
+            if let Some(cached) = crate::player::cache::lookup(dir_path, key) {
+                return Ok(cached);
+            }
+            // Cache miss: download
+            let temp = download_to_temp(url)?;
+            if let Ok(cached) = crate::player::cache::insert(dir_path, key, &temp, max_size) {
+                return Ok(cached);
+            }
+            return Ok(temp);
+        }
+    }
+    resolve_audio_file(url)
 }
 
 fn download_to_temp(url: &str) -> Result<PathBuf, String> {
@@ -201,35 +232,11 @@ fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-// ==================== 通用 PCM 源（rodio::Source 包装） ====================
+// ==================== 流式解码：rodio 路径（MP3/WAV/FLAC/OGG） ====================
 
-type DecodeResult = (u16, u32, f64, PcmSource);
+type StreamDecodeResult = (u16, u32, f64, Box<dyn Source<Item = f32> + Send>);
 
-struct PcmSource {
-    samples: std::vec::IntoIter<f32>,
-    channels: u16,
-    sample_rate: u32,
-    duration_secs: f64,
-}
-
-impl Iterator for PcmSource {
-    type Item = f32;
-    fn next(&mut self) -> Option<f32> { self.samples.next() }
-    fn size_hint(&self) -> (usize, Option<usize>) { self.samples.size_hint() }
-}
-
-impl rodio::Source for PcmSource {
-    fn current_frame_len(&self) -> Option<usize> { Some(self.samples.len()) }
-    fn channels(&self) -> u16 { self.channels }
-    fn sample_rate(&self) -> u32 { self.sample_rate }
-    fn total_duration(&self) -> Option<Duration> {
-        if self.duration_secs > 0.0 { Some(Duration::from_secs_f64(self.duration_secs)) } else { None }
-    }
-}
-
-// ==================== rodio 解码（MP3/WAV/FLAC/OGG） ====================
-
-fn decode_with_rodio(file_path: &std::path::Path) -> Result<DecodeResult, String> {
+fn decode_streaming_rodio(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
     let file = std::fs::File::open(file_path)
         .map_err(|e| format!("打开音频文件失败: {e}"))?;
     let reader = BufReader::new(file);
@@ -240,19 +247,129 @@ fn decode_with_rodio(file_path: &std::path::Path) -> Result<DecodeResult, String
     let sample_rate = decoder.sample_rate();
     let duration_secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
 
-    let samples: Vec<f32> = decoder.convert_samples().collect();
+    // rodio Decoder 输出 i16，通过 convert_samples 转为 f32 流式输出
+    let source: Box<dyn Source<Item = f32> + Send> = Box::new(decoder.convert_samples());
 
-    Ok((channels, sample_rate, duration_secs, PcmSource {
-        samples: samples.into_iter(),
-        channels,
-        sample_rate,
-        duration_secs,
-    }))
+    Ok((channels, sample_rate, duration_secs, source))
 }
 
-// ==================== symphonia 解码（AAC/M4A 等） ====================
+// ==================== 流式解码：symphonia 路径（AAC/M4A 等） ====================
 
-fn decode_with_symphonia(file_path: &std::path::Path) -> Result<DecodeResult, String> {
+/// 流式 symphonia 解码器，按需解码 packet 而非全量加载到内存
+struct SymphoniaStreamSource {
+    format: Box<dyn FormatReader>,
+    decoder: Box<dyn SymphoniaDecoderTrait>,
+    track_id: u32,
+    channels: u16,
+    sample_rate: u32,
+    duration_secs: f64,
+    sample_buffer: Vec<f32>,
+    buffer_pos: usize,
+    eof: bool,
+}
+
+// Safety: IsoMp4Reader, AacDecoder 等具体实现都是 Send 的
+// FormatReader 和 Decoder trait 本身没有 Send bound，但实际使用的实现都是线程安全的
+unsafe impl Send for SymphoniaStreamSource {}
+
+impl Iterator for SymphoniaStreamSource {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        // 从缓冲区返回下一个采样
+        if self.buffer_pos < self.sample_buffer.len() {
+            let sample = self.sample_buffer[self.buffer_pos];
+            self.buffer_pos += 1;
+            return Some(sample);
+        }
+
+        // 缓冲区耗尽且已到 EOF
+        if self.eof {
+            return None;
+        }
+
+        // 解码下一个 packet 填充缓冲区
+        loop {
+            match self.format.next_packet() {
+                Ok(packet) => {
+                    if packet.track_id() != self.track_id {
+                        continue;
+                    }
+                    match self.decoder.decode(&packet) {
+                        Ok(decoded) => {
+                            let spec = *decoded.spec();
+                            let mut buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                            buf.copy_interleaved_ref(decoded);
+                            self.sample_buffer = buf.samples().to_vec();
+                            self.buffer_pos = 0;
+                            if self.sample_buffer.is_empty() {
+                                continue;
+                            }
+                            return self.next();
+                        }
+                        Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
+                        Err(_) => {
+                            self.eof = true;
+                            return None;
+                        }
+                    }
+                }
+                Err(symphonia::core::errors::Error::IoError(e))
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                        self.eof = true;
+                        return None;
+                    }
+                Err(symphonia::core::errors::Error::IoError(_)) => {
+                    self.eof = true;
+                    return None;
+                }
+                Err(_) => {
+                    self.eof = true;
+                    return None;
+                }
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.eof {
+            (0, Some(0))
+        } else {
+            (0, None)
+        }
+    }
+}
+
+impl Source for SymphoniaStreamSource {
+    fn current_frame_len(&self) -> Option<usize> {
+        // 返回当前缓冲区中剩余的采样数
+        Some(self.sample_buffer.len().saturating_sub(self.buffer_pos))
+    }
+    fn channels(&self) -> u16 { self.channels }
+    fn sample_rate(&self) -> u32 { self.sample_rate }
+    fn total_duration(&self) -> Option<Duration> {
+        if self.duration_secs > 0.0 {
+            Some(Duration::from_secs_f64(self.duration_secs))
+        } else {
+            None
+        }
+    }
+    fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
+        let seek_to = SeekTo::Time {
+            time: Time::from(pos.as_secs_f64()),
+            track_id: Some(self.track_id),
+        };
+        self.format
+            .seek(symphonia::core::formats::SeekMode::Accurate, seek_to)
+            .map_err(|_| rodio::source::SeekError::NotSupported { underlying_source: "SymphoniaStreamSource" })?;
+        // seek 后清空缓冲区
+        self.sample_buffer.clear();
+        self.buffer_pos = 0;
+        Ok(())
+    }
+}
+
+fn decode_streaming_symphonia(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
     let file = std::fs::File::open(file_path)
         .map_err(|e| format!("打开音频文件失败: {e}"))?;
 
@@ -272,56 +389,46 @@ fn decode_with_symphonia(file_path: &std::path::Path) -> Result<DecodeResult, St
         )
         .map_err(|e| format!("探测音频格式失败: {e}"))?;
 
-    let mut format = probed.format;
+    let format = probed.format;
     let track = format.default_track()
         .ok_or_else(|| "音频文件无默认音轨".to_string())?
         .to_owned();
+
     let channels = track.codec_params.channels
         .map(|c| c.count() as u16)
         .unwrap_or(2);
     let sample_rate = track.codec_params.sample_rate
         .unwrap_or(44100);
 
-    let mut decoder = symphonia::default::get_codecs()
+    // 从元数据计算时长，无需全量解码
+    let duration_secs = if let Some(tb) = track.codec_params.time_base {
+        track.codec_params.n_frames
+            .map(|n| n as f64 * tb.numer as f64 / tb.denom as f64)
+            .unwrap_or(0.0)
+    } else {
+        0.0
+    };
+
+    let track_id = track.id;
+    let decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| format!("创建 symphonia 解码器失败: {e}"))?;
 
-    let mut all_samples: Vec<f32> = Vec::new();
-
-    loop {
-        match format.next_packet() {
-            Ok(packet) => {
-                match decoder.decode(&packet) {
-                    Ok(decoded) => {
-                        let spec = *decoded.spec();
-                        let mut buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
-                        buf.copy_interleaved_ref(decoded);
-                        all_samples.extend_from_slice(buf.samples());
-                    }
-                    Err(symphonia::core::errors::Error::DecodeError(_)) => continue,
-                    Err(e) => return Err(format!("symphonia 解码失败: {e}")),
-                }
-            }
-            Err(symphonia::core::errors::Error::IoError(e))
-                if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-            Err(symphonia::core::errors::Error::IoError(_)) => break,
-            Err(e) => return Err(format!("读取音频包失败: {e}")),
-        }
-    }
-
-    if all_samples.is_empty() {
-        return Err("symphonia 解码得到空音频数据".to_string());
-    }
-
-    // 从总采样数反算时长（AAC 容器中 n_frames 通常为 None）
-    let duration_secs = all_samples.len() as f64 / channels as f64 / sample_rate as f64;
-
-    Ok((channels, sample_rate, duration_secs, PcmSource {
-        samples: all_samples.into_iter(),
+    let source = SymphoniaStreamSource {
+        format,
+        decoder,
+        track_id,
         channels,
         sample_rate,
         duration_secs,
-    }))
+        sample_buffer: Vec::new(),
+        buffer_pos: 0,
+        eof: false,
+    };
+
+    let source: Box<dyn Source<Item = f32> + Send> = Box::new(source);
+
+    Ok((channels, sample_rate, duration_secs, source))
 }
 
 // ==================== 交叉淡入淡出 ====================
@@ -363,6 +470,9 @@ pub struct PlayerEngine {
     auto_crossfade_enabled: bool,
     // player:ended 防重复
     ended_emitted: bool,
+    // 音频缓存配置
+    cache_dir: Option<String>,
+    cache_max_size: u64,
 }
 
 impl PlayerEngine {
@@ -390,11 +500,13 @@ impl PlayerEngine {
             crossfade_duration_ms: 3000,
             auto_crossfade_enabled: false,
             ended_emitted: false,
+            cache_dir: None,
+            cache_max_size: 1073741824, // 1GB default
         }
     }
 
     /// 异步播放：在后台线程下载 + 解码，完成后自动赋值 primary 并发出事件
-    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>) -> Result<(), String> {
+    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>, cache_key: Option<String>) -> Result<(), String> {
         self.primary = None;
         self.secondary = None;
         self.crossfade = None;
@@ -404,10 +516,16 @@ impl PlayerEngine {
         let url = url.to_string();
         let volume = self.volume / 100.0;
         let tx = self.play_tx.clone();
+        let cache_dir = self.cache_dir.clone();
+        let cache_max_size = self.cache_max_size;
 
         std::thread::spawn(move || {
-            let result = match SlotPipeline::new(&stream_handle, &url, volume) {
-                Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+            let file_path = resolve_audio_file_cached(&url, cache_dir.as_deref(), cache_key.as_deref(), cache_max_size);
+            let result = match file_path {
+                Ok(path) => match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
+                    Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                    Err(e) => AsyncPipelineResult::Error(e),
+                },
                 Err(e) => AsyncPipelineResult::Error(e),
             };
             let _ = tx.send(result);
@@ -453,7 +571,8 @@ impl PlayerEngine {
     pub fn volume(&self) -> f64 { self.volume }
 
     pub fn crossfade_to(&mut self, url: &str, duration_ms: u64) -> Result<(), String> {
-        let pipeline = SlotPipeline::new(&self.stream_handle, url, 0.0)?;
+        let file_path = resolve_audio_file(url)?;
+        let pipeline = SlotPipeline::from_file(&self.stream_handle, &file_path, url, 0.0)?;
         self.secondary = Some(pipeline);
         self.crossfade = Some(CrossfadeState { active: true, start: Instant::now(), duration_ms });
         Ok(())
@@ -486,16 +605,22 @@ impl PlayerEngine {
     }
 
     /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
-    pub fn preload(&mut self, url: String) {
+    pub fn preload(&mut self, url: String, cache_key: Option<String>) {
         // 清除旧的预加载
         self.secondary = None;
 
         let stream_handle = self.stream_handle.clone();
         let tx = self.preload_tx.clone();
+        let cache_dir = self.cache_dir.clone();
+        let cache_max_size = self.cache_max_size;
 
         std::thread::spawn(move || {
-            let result = match SlotPipeline::new_paused(&stream_handle, &url) {
-                Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+            let file_path = resolve_audio_file_cached(&url, cache_dir.as_deref(), cache_key.as_deref(), cache_max_size);
+            let result = match file_path {
+                Ok(path) => match SlotPipeline::from_file_paused(&stream_handle, &path, &url) {
+                    Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                    Err(e) => AsyncPipelineResult::Error(e),
+                },
                 Err(e) => AsyncPipelineResult::Error(e),
             };
             let _ = tx.send(result);
@@ -543,6 +668,12 @@ impl PlayerEngine {
     pub fn set_seamless_config(&mut self, auto_crossfade: bool, duration_ms: u64) {
         self.auto_crossfade_enabled = auto_crossfade;
         self.crossfade_duration_ms = duration_ms.max(500);
+    }
+
+    /// 配置音频缓存
+    pub fn set_cache_config(&mut self, cache_dir: Option<String>, max_size: u64) {
+        self.cache_dir = cache_dir;
+        self.cache_max_size = max_size;
     }
 
     pub fn snapshot(&self) -> PlayerSnapshot {

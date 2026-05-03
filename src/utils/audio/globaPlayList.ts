@@ -2,6 +2,7 @@ import { ref, toRaw } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { useSettingsStore } from '@/store/Settings'
 import { playSetting } from '@/store/playSetting'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
@@ -30,6 +31,27 @@ const qualityMap: Record<string, string> = {
   '128k': '128kbps', '320k': '320kbps', flac: 'FLAC 无损',
   flac24bit: '24bit FLAC', hires: 'Hi-Res 高解析度', atmos: '杜比全景声',
   master: '母带音质'
+}
+
+/**
+ * 计算歌曲的最佳音质（用于 URL 解析和缓存键）
+ */
+function getSongQuality(song: SongList): string {
+  if (song.source === 'local') return 'local'
+  const localUserStore = LocalUserDetailStore()
+  let quality =
+    (localUserStore.userInfo.sourceQualityMap || {})[song.source || ''] ||
+    (localUserStore.userSource.quality as string)
+  return calculateBestQuality(song.types, quality) || '128k'
+}
+
+/**
+ * 构造缓存键：{source}_{songmid}_{quality}
+ */
+function buildCacheKey(song: SongList): string | undefined {
+  if (song.source === 'local' || !song.songmid) return undefined
+  const quality = getSongQuality(song)
+  return `${song.source}_${song.songmid}_${quality}`
 }
 
 /**
@@ -189,6 +211,24 @@ function syncSeamlessConfig() {
   })
 }
 
+let cacheConfigSynced = false
+
+async function syncCacheConfig() {
+  if (cacheConfigSynced) return
+  try {
+    const dirs = await invoke<{ cacheDir: string; downloadDir: string }>('get_directories')
+    const settingsStore = useSettingsStore()
+    const maxSize = settingsStore.settings.cacheSizeLimit || 1073741824
+    await invoke('player__set_cache_config', {
+      cacheDir: settingsStore.settings.autoCacheMusic !== false ? dirs.cacheDir : null,
+      maxSize,
+    })
+    cacheConfigSynced = true
+  } catch (e) {
+    console.warn('同步缓存配置失败:', e)
+  }
+}
+
 async function ensurePreloadListener() {
   if (unlistenPreload) return
   unlistenPreload = await listen('player:preload_ready', () => {
@@ -207,7 +247,8 @@ async function doPrefetchNext() {
     const url = await getSongRealUrl(toRaw(nextSong) as any)
     if (requestId !== prefetchRequestId) return
 
-    await invoke('player__preload', { url })
+    const cacheKey = buildCacheKey(toRaw(nextSong) as any)
+    await invoke('player__preload', { url, cacheKey })
     preloadedSong = nextSong
   } catch (e) {
     console.warn('预加载下一曲失败:', e)
@@ -290,6 +331,9 @@ export async function playSong(song: SongList) {
   try {
     isLoadingSong.value = true
 
+    // 首次播放时同步缓存配置
+    await syncCacheConfig()
+
     const idx = store.list.findIndex((s) => s.songmid === song.songmid)
     if (idx === -1) {
       store.addSongToFirst(song)
@@ -326,7 +370,8 @@ export async function playSong(song: SongList) {
     }
 
     // 调用 Rust 原生播放器
-    const result: any = await invoke('player__play', { url })
+    const cacheKey = buildCacheKey(actualSong)
+    const result: any = await invoke('player__play', { url, cacheKey })
     if (currentPlayRequestId !== requestId) return
 
     if (result && !result.success) {

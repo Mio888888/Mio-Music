@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/store/Settings'
 import DirectorySettings from '@/components/Settings/DirectorySettings.vue'
 import MusicCache from '@/components/Settings/MusicCache.vue'
 import { formatMusicInfo } from '@/utils/format'
+import { invoke } from '@tauri-apps/api/core'
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
@@ -21,6 +22,42 @@ const handleDirectoryChanged = () => {
 const handleCacheCleared = () => {
   if (directorySettingsRef.value?.refreshDirectorySizes) {
     directorySettingsRef.value.refreshDirectorySizes()
+  }
+}
+
+// Cache size limit options (bytes)
+const cacheSizeOptions = [
+  { label: '500 MB', value: 524288000 },
+  { label: '1 GB', value: 1073741824 },
+  { label: '2 GB', value: 2147483648 },
+  { label: '5 GB', value: 5368709120 },
+]
+
+const updateCacheSizeLimit = async (value: any) => {
+  const size = Number(value) || 1073741824
+  settingsStore.updateSettings({ cacheSizeLimit: size })
+  try {
+    const dirs = await invoke<{ cacheDir: string; downloadDir: string }>('get_directories')
+    await invoke('player__set_cache_config', {
+      cacheDir: settings.value.autoCacheMusic !== false ? dirs.cacheDir : null,
+      maxSize: size,
+    })
+  } catch (e) {
+    console.warn('更新缓存配置失败:', e)
+  }
+}
+
+const updateAutoCache = async (enabled: any) => {
+  const val = !!enabled
+  settingsStore.updateSettings({ autoCacheMusic: val })
+  try {
+    const dirs = await invoke<{ cacheDir: string; downloadDir: string }>('get_directories')
+    await invoke('player__set_cache_config', {
+      cacheDir: val ? dirs.cacheDir : null,
+      maxSize: settings.value.cacheSizeLimit || 1073741824,
+    })
+  } catch (e) {
+    console.warn('更新缓存配置失败:', e)
   }
 }
 
@@ -91,8 +128,23 @@ const getTagOptionsStatus = () => {
         </div>
         <t-switch
           v-model="settings.autoCacheMusic"
-          @change="settingsStore.updateSettings({ autoCacheMusic: settings.autoCacheMusic })"
+          @change="updateAutoCache"
         />
+      </div>
+      <div class="setting-item" v-if="settings.autoCacheMusic !== false">
+        <div class="item-info">
+          <div class="item-title">缓存大小上限</div>
+          <div class="item-desc">超过上限时自动清理最久未播放的缓存</div>
+        </div>
+        <t-radio-group
+          :value="settings.cacheSizeLimit || 1073741824"
+          variant="default-filled"
+          @change="updateCacheSizeLimit"
+        >
+          <t-radio-button v-for="opt in cacheSizeOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </t-radio-button>
+        </t-radio-group>
       </div>
     </div>
 

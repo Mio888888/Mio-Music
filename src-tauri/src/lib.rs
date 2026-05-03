@@ -246,6 +246,7 @@ pub fn run() {
             player::commands::player__gapless_swap,
             player::commands::player__clear_secondary,
             player::commands::player__set_seamless_config,
+            player::commands::player__set_cache_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
