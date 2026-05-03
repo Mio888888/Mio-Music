@@ -92,8 +92,9 @@ pub async fn get_batch_quality_info(
                 "320" => ("320k", 2),
                 "flac" => ("flac", 3),
                 "high" => ("hires", 4),
-                "viper_clear" => ("master", 5),
-                "viper_atmos" => ("atmos", 6),
+                "viper_atmos" => ("atmos", 5),
+                "viper_clear" => ("master", 6),
+                "viper_tape" => ("atmos_plus", 7),
                 _ => continue,
             };
 
@@ -112,7 +113,7 @@ pub async fn get_batch_quality_info(
             );
         }
 
-        types.sort_by_key(|t| t.0);
+        types.sort_by_key(|t| std::cmp::Reverse(t.0));
         let types_vec: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
         map.insert(hash, (types_vec, types_map));
     }

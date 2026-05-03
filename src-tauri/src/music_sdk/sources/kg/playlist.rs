@@ -1,4 +1,5 @@
 use super::helpers::*;
+use super::playback::get_batch_quality_info;
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult};
 
 pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -243,39 +244,65 @@ async fn fetch_kg_song_details(hashes: &[String]) -> Result<Vec<MusicItem>, Stri
         .json().await.map_err(|e| e.to_string())?;
 
     let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-    let list: Vec<MusicItem> = data.iter().filter_map(|item| {
+
+    let mut hashes: Vec<String> = Vec::new();
+    let mut list: Vec<MusicItem> = data.iter().filter_map(|item| {
         let info = item.as_array()?.first()?;
         let audio_info = info.get("audio_info")?;
         let album_info = info.get("album_info");
 
         let hash = audio_info.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
         if hash.is_empty() { return None; }
-        let songmid = hash.clone();
+        // Use audio_id as songmid (matches TS quality_detail.js filterData), NOT hash
+        let songmid = audio_info.get("audio_id")
+            .map(|v| match v {
+                serde_json::Value::Number(n) => n.to_string(),
+                serde_json::Value::String(s) => s.clone(),
+                _ => hash.clone(),
+            })
+            .unwrap_or_else(|| hash.clone());
         let name = info.get("songname").or_else(|| info.get("ori_audio_name"))
             .and_then(|v| v.as_str()).unwrap_or("").to_string();
         let singer = info.get("author_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let album_name = album_info.and_then(|a| a.get("album_name")).and_then(|v| v.as_str()).unwrap_or("").to_string();
         let album_id = album_info.and_then(|a| a.get("album_id")).cloned().unwrap_or(serde_json::Value::Null);
-        let img = album_info.and_then(|a| a.get("imgurl")).or_else(|| audio_info.get("img"))
-            .and_then(|v| v.as_str()).unwrap_or("").to_string();
         let duration_ms = audio_info.get("timelength").and_then(|v| v.as_i64()).unwrap_or(0);
         let interval = format_play_time(duration_ms / 1000);
 
-        let mut types = Vec::new();
-        if audio_info.get("filesize_flac").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("flac".to_string()); }
-        if audio_info.get("filesize_320").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("320k".to_string()); }
-        if audio_info.get("filesize").and_then(|v| v.as_i64()).unwrap_or(0) > 0 { types.push("128k".to_string()); }
-        types.reverse();
+        // Try to extract cover from API response
+        let img = album_info
+            .and_then(|a| a.get("imgurl").or_else(|| a.get("img")).or_else(|| a.get("image")))
+            .and_then(|v| v.as_str())
+            .or_else(|| audio_info.get("img").and_then(|v| v.as_str()))
+            .unwrap_or("")
+            .to_string();
+
+        hashes.push(hash.clone());
 
         Some(MusicItem {
             songmid: serde_json::Value::String(songmid), singer, name, album_name, album_id,
             source: "kg".into(), interval, img, lrc: None,
-            types: Some(types), types_map: None, type_url: Some(serde_json::json!({})),
+            types: Some(vec!["128k".into()]), types_map: None, type_url: Some(serde_json::json!({})),
             hash: Some(hash),
             song_id: None, str_media_mid: None, album_mid: None,
         })
     }).collect();
+
+    // Batch fetch quality info
+    let quality_map = get_batch_quality_info(&hashes).await.unwrap_or_default();
+
+    // Backfill quality types
+    for item in &mut list {
+        if let Some(hash) = &item.hash {
+            if let Some((types, types_map)) = quality_map.get(hash) {
+                if !types.is_empty() {
+                    item.types = Some(types.clone());
+                }
+                item.types_map = Some(types_map.clone());
+            }
+        }
+    }
 
     Ok(list)
 }

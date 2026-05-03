@@ -132,6 +132,20 @@ const fetchSongs = async (reset = false) => {
     const newSongs = res?.list || []
     songs.value = reset ? newSongs : [...songs.value, ...newSongs]
     totalCount.value = res?.total || 0
+
+    // 按需获取封面（参考 songlist.vue 实现）
+    const songsNeedPic = newSongs.filter(s => !s.img)
+    if (songsNeedPic.length > 0) {
+      const batch = songsNeedPic.slice(0, 50)
+      Promise.all(batch.map(async (song) => {
+        try {
+          const url = await musicSdk.getPic(song)
+          if (url) song.img = url
+        } catch {}
+      })).then(() => {
+        songs.value = [...songs.value]
+      })
+    }
     if (res?.info) {
       playlistInfo.value.desc = res.info.desc || ''
     }
