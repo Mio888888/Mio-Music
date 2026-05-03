@@ -63,6 +63,14 @@ pub struct MusicItem {
     pub str_media_mid: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub album_mid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copyright_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lrc_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mrc_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trc_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -352,6 +352,7 @@ const jumpTime = (e: any) => {
 watch(
   () => actualCoverImage.value,
   async (newImage) => {
+    console.log('[FullPlay] cover changed:', newImage?.substring(0, 80))
     if (bgRef.value) {
       const renderer = bgRef.value as any
       const oldTexture = renderer.curContainer?.children?.[0]?.texture

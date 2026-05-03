@@ -1,18 +1,49 @@
 use super::helpers::*;
 use crate::music_sdk::client::{PlaylistItem, PlaylistResult};
+use std::collections::HashSet;
 
-const BOARD_LIST: &[(&str, &str, &str, &str)] = &[
-    ("24960262", "尖叫新歌榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960262/1200x1200.jpg"),
-    ("24960284", "尖叫原创榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960284/1200x1200.jpg"),
-    ("24960287", "尖叫热歌榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960287/1200x1200.jpg"),
-    ("24960285", "尖叫飙升榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960285/1200x1200.jpg"),
-    ("24960259", "内地榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960259/1200x1200.jpg"),
-    ("24960260", "港台榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960260/1200x1200.jpg"),
-    ("24960261", "欧美榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960261/1200x1200.jpg"),
-    ("24960257", "日韩榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960257/1200x1200.jpg"),
-    ("24960258", "彩铃榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960258/1200x1200.jpg"),
-    ("24960255", "KTV榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960255/1200x1200.jpg"),
-    ("24960256", "网络榜", "7.1 更新", "https://cdnmusic.migu.cn/v3/music/songlist/24960256/1200x1200.jpg"),
+fn filter_list_recursive(
+    contents: &[serde_json::Value],
+    list: &mut Vec<PlaylistItem>,
+    ids: &mut HashSet<String>,
+) {
+    for item in contents {
+        if let Some(sub) = item.get("contents").and_then(|v| v.as_array()) {
+            filter_list_recursive(sub, list, ids);
+        } else {
+            let res_type = item.get("resType").and_then(|v| v.as_str()).unwrap_or("");
+            if res_type != "2021" { continue; }
+            let id = item.get("resId").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            if id.is_empty() || ids.contains(&id) { continue; }
+            ids.insert(id.clone());
+            let name = item.get("txt").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let img = item.get("img").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let desc = item.get("txt2").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            list.push(PlaylistItem {
+                id: serde_json::json!(id),
+                name,
+                img,
+                source: "mg".into(),
+                desc,
+                play_count: serde_json::Value::Null,
+                author: String::new(),
+                total: serde_json::Value::Null,
+            });
+        }
+    }
+}
+
+const BOARD_LIST: &[(&str, &str)] = &[
+    ("27553319", "新歌榜"),
+    ("27186466", "热歌榜"),
+    ("27553408", "原创榜"),
+    ("75959118", "音乐风向榜"),
+    ("76557036", "彩铃分贝榜"),
+    ("76557745", "会员臻爱榜"),
+    ("23189800", "港台榜"),
+    ("23189399", "内地榜"),
+    ("19190036", "欧美榜"),
+    ("83176390", "国风金曲榜"),
 ];
 
 pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -98,28 +129,38 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
         return Err("MG playlist list API error".into());
     }
 
-    let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
-
+    let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
     let mut list: Vec<PlaylistItem> = Vec::new();
-    for item in &data {
-        if let Some(content) = item.get("content").and_then(|c| c.as_array()) {
-            for pl in content {
-                let texts = pl.get("texts").and_then(|t| t.as_array());
-                let name = texts.and_then(|t| t.first()).and_then(|v| v.as_str()).unwrap_or("");
-                let id = texts.and_then(|t| t.get(1)).and_then(|v| v.as_str()).unwrap_or("");
-                let img = pl.get("img").and_then(|i| i.get("url")).and_then(|v| v.as_str()).unwrap_or("");
-                if id.is_empty() { continue; }
-                list.push(PlaylistItem {
-                    id: serde_json::json!(id),
-                    name: name.to_string(),
-                    img: img.to_string(),
-                    source: "mg".into(),
-                    desc: String::new(),
-                    play_count: serde_json::Value::Null,
-                    author: String::new(),
-                    total: serde_json::Value::Null,
-                });
-            }
+
+    // Format A: data.contents (recursive structure, resType: '2021')
+    if let Some(contents) = data.get("contents").and_then(|v| v.as_array()) {
+        let mut ids = std::collections::HashSet::new();
+        filter_list_recursive(contents, &mut list, &mut ids);
+    // Format B: data.contentItemList[1].itemList (flat structure)
+    } else if let Some(item_list) = data.get("contentItemList")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.get(1))
+        .and_then(|v| v.get("itemList"))
+        .and_then(|v| v.as_array())
+    {
+        for item in item_list {
+            let id = item.get("logEvent")
+                .and_then(|l| l.get("contentId"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let name = item.get("title").and_then(|v| v.as_str()).unwrap_or("");
+            let img = item.get("imageUrl").and_then(|v| v.as_str()).unwrap_or("");
+            if id.is_empty() { continue; }
+            list.push(PlaylistItem {
+                id: serde_json::json!(id),
+                name: name.to_string(),
+                img: img.to_string(),
+                source: "mg".into(),
+                desc: String::new(),
+                play_count: serde_json::Value::Null,
+                author: String::new(),
+                total: serde_json::Value::Null,
+            });
         }
     }
 
@@ -132,15 +173,11 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
 }
 
 pub async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let list: Vec<serde_json::Value> = BOARD_LIST.iter().map(|(id, name, freq, img)| {
+    let list: Vec<serde_json::Value> = BOARD_LIST.iter().map(|(id, name)| {
         serde_json::json!({
             "id": format!("mg__{}", id),
             "name": name,
             "bangid": id,
-            "img": img,
-            "pic": img,
-            "listen": 0,
-            "update_frequency": freq,
             "source": "mg"
         })
     }).collect();
@@ -191,7 +228,8 @@ pub async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_jso
     };
 
     let list: Vec<crate::music_sdk::client::MusicItem> = page_contents.iter()
-        .filter_map(mg_parse_music_item)
+        .filter_map(|item| item.get("objectInfo").cloned())
+        .filter_map(|obj| mg_parse_music_item(&obj))
         .collect();
 
     Ok(serde_json::json!({
@@ -226,10 +264,13 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
         .send().await.map_err(|e| e.to_string())?
         .json().await.map_err(|e| e.to_string())?;
 
-    let playlist_info = info_resp.get("playlist").cloned().unwrap_or(serde_json::json!({}));
-    let name = playlist_info.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let img = playlist_info.get("coverImgUrl").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let desc = playlist_info.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let info_data = info_resp.get("data").cloned().unwrap_or(serde_json::json!({}));
+    let name = info_data.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let img = info_data.get("imgItem")
+        .and_then(|i| i.get("img"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("").to_string();
+    let desc = info_data.get("summary").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
     // Get playlist songs
     let url = format!(
@@ -247,8 +288,9 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
         return Err("MG playlist detail API error".into());
     }
 
-    let total = resp.get("totalCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let contents = resp.get("list").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let data = resp.get("data").cloned().unwrap_or(serde_json::json!({}));
+    let total = data.get("totalCount").and_then(|v| v.as_i64()).unwrap_or(0);
+    let contents = data.get("songList").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
     let list: Vec<crate::music_sdk::client::MusicItem> = contents.iter()
         .filter_map(mg_parse_music_item)

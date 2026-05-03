@@ -181,10 +181,19 @@ const fetchSdkLyrics = async (
   useStrictMode: boolean
 ): Promise<LyricLine[] | null> => {
   let lyricData: any
+  const cleanInfo = getCleanSongInfo(songInfo)
   try {
+    console.log('[Lyrics] SDK request:', source, {
+      songmid: cleanInfo?.songmid,
+      copyrightId: cleanInfo?.copyrightId,
+      lrcUrl: cleanInfo?.lrcUrl,
+      mrcUrl: cleanInfo?.mrcUrl,
+      trcUrl: cleanInfo?.trcUrl,
+      img: cleanInfo?.img?.substring(0, 60)
+    })
     lyricData = await (window as any).api?.music?.requestSdk?.('getLyric', {
       source,
-      songInfo: getCleanSongInfo(songInfo),
+      songInfo: cleanInfo,
       grepLyricInfo,
       useStrictMode
     })
@@ -455,15 +464,36 @@ export const useGlobalPlayStatusStore = defineStore(
             }
           } catch {}
         }
+        // For MG source, call backend SDK directly to bypass plugin CORS issue
+        if (info?.source === 'mg') {
+          try {
+            const res = await (window as any).api?.music?.requestSdk?.('getPic', {
+              source: 'mg',
+              songInfo: getCleanSongInfo(info)
+            })
+            const picUrl = res?.url || res
+            if (picUrl && typeof picUrl === 'string' && picUrl.length > 0) {
+              player.cover = picUrl
+              return
+            }
+          } catch (e) {
+            console.warn('[Cover] MG SDK getPic failed:', e)
+          }
+          player.cover = '/default-cover.png'
+          return
+        }
         if (!newImg && info?.source && info?.source !== 'local') {
           const pluginId = getLikelyServicePluginId(info) || LocalUserDetailStore().userSource.pluginId
           if (pluginId) {
             try {
               const picUrl = await PluginRunner.getPic(pluginId, info.source, getCleanSongInfo(info))
+              console.log('[Cover] getPic result:', info.source, picUrl?.substring(0, 60))
               if (picUrl && player.songInfo && !player.songInfo.img) {
                 newImg = picUrl
               }
-            } catch {}
+            } catch (e) {
+              console.warn('[Cover] getPic failed:', info.source, e)
+            }
           }
         }
         player.cover = newImg || '/default-cover.png'
@@ -475,6 +505,9 @@ export const useGlobalPlayStatusStore = defineStore(
       () => player.cover,
       async (newCover) => {
         if (!newCover) return
+        if (newCover.startsWith('http')) {
+          console.warn('[Cover→color] raw HTTP URL detected, will fail CORS:', newCover.substring(0, 80))
+        }
         try {
           const { dominantColor, useBlackText } = await analyzeImageColors(newCover)
           player.coverDetail.ColorObject = dominantColor

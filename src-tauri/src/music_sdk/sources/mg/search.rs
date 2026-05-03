@@ -54,10 +54,7 @@ pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, 
             if song_id.is_empty() || copyright_id.is_empty() || seen.contains(copyright_id) { continue; }
             seen.insert(copyright_id.to_string());
 
-            let types_info = parse_quality_types_from_info(data);
-            let types: Vec<String> = types_info.iter()
-                .filter_map(|t| t.get("type").and_then(|v| v.as_str()).map(|s| s.to_string()))
-                .collect();
+            let (types, types_map) = parse_quality(data);
 
             let img = get_song_img(data);
 
@@ -72,8 +69,9 @@ pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, 
                 source: "mg".into(),
                 interval: data.get("duration").and_then(|v| v.as_i64()).map(format_play_time).unwrap_or_default(),
                 img, lrc: None,
-                types: Some(types), types_map: None, type_url: Some(serde_json::json!({})),
+                types: Some(types), types_map: Some(types_map), type_url: Some(serde_json::json!({})),
                 hash: None, song_id: None, str_media_mid: None, album_mid: None,
+        copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
             });
         }
     }

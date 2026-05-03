@@ -90,6 +90,7 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
             song_id: Some(serde_json::json!(song_id)),
             str_media_mid: Some(media_mid.to_string()),
             album_mid: Some(album_mid),
+        copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
         })
     }).collect();
 

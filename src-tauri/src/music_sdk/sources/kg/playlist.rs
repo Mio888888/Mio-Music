@@ -286,6 +286,7 @@ async fn fetch_kg_song_details(hashes: &[String]) -> Result<Vec<MusicItem>, Stri
             types: Some(vec!["128k".into()]), types_map: None, type_url: Some(serde_json::json!({})),
             hash: Some(hash),
             song_id: None, str_media_mid: None, album_mid: None,
+        copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
         })
     }).collect();
 
