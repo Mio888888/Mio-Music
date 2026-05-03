@@ -4,9 +4,6 @@ import { ref, shallowRef, computed, onMounted, onBeforeUnmount, markRaw, watch, 
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { LyricLine } from '@/types/lyric'
-import { useBackgroundRender } from '@/composables/useBackgroundRender'
-import { useSettingsStore } from '@/store/Settings'
-import { storeToRefs } from 'pinia'
 
 const LyricPlayerComp = shallowRef<Component | null>(null)
 const lyricPlayerError = ref(false)
@@ -27,38 +24,7 @@ const isPlaying = ref(false)
 const isLocked = ref(false)
 const isHovering = ref(false)
 
-// 背景渲染
-const backgroundContainer = ref<HTMLDivElement | null>(null)
-const settingsStore = useSettingsStore()
-const { settings } = storeToRefs(settingsStore)
-
-const backgroundConfig = computed(() => settings.value.backgroundRender?.desktopLyric)
-const coverImage = ref('/src/assets/images/Default.jpg')
 const isDragging = ref(false)
-
-// 使用背景渲染 composable
-const {
-  isInitialized: bgInitialized,
-  init: initBgRender,
-  pause: pauseBgRender,
-  resume: resumeBgRender,
-  dispose: disposeBgRender
-} = useBackgroundRender({
-  container: backgroundContainer,
-  enabled: computed(() => backgroundConfig.value?.enabled ?? false),
-  config: computed(() => backgroundConfig.value ?? {
-    preset: 'performance',
-    enabled: false,
-    audioResponse: false,
-    renderScale: 0.3,
-    flowSpeed: 0.5,
-    staticMode: true,
-    fps: 15
-  }),
-  coverImage,
-  hasLyric: computed(() => lyricLines.value.length > 10),
-  isPlaying
-})
 
 let baseMs = 0
 let anchorTick = 0
@@ -238,22 +204,14 @@ function onClose() { emitControl('close') }
 async function onDragStart(e: MouseEvent) {
   if (isLocked.value) return
   isDragging.value = true
-  // 拖动时暂停背景渲染以节省资源
-  if (bgInitialized.value) {
-    pauseBgRender()
-  }
   e.preventDefault()
   try {
     await getCurrentWindow().startDragging()
   } catch {}
 }
 
-async function onDragEnd() {
+function onDragEnd() {
   isDragging.value = false
-  // 拖动结束后恢复背景渲染
-  if (bgInitialized.value && backgroundConfig.value?.enabled) {
-    resumeBgRender()
-  }
 }
 
 // Lifecycle
@@ -284,15 +242,6 @@ onMounted(async () => {
     })
   )
 
-  // 监听封面变化事件
-  unlisteners.push(
-    await listen<string>('desktop-cover-change', (event) => {
-      if (event.payload) {
-        coverImage.value = event.payload
-      }
-    })
-  )
-
   unlisteners.push(
     await listen<{ currentMs: number; timestamp: number }>('desktop-lyric-progress', (event) => {
       handleProgress(event.payload)
@@ -312,8 +261,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopRafLoop()
-  // 清理背景渲染
-  disposeBgRender()
   unlisteners.forEach((fn) => {
     try { fn() } catch {}
   })
@@ -328,12 +275,6 @@ onBeforeUnmount(() => {
     @mouseleave="isHovering = false"
     @pointerup="onDragEnd"
   >
-    <!-- 背景渲染容器 -->
-    <div
-      v-if="backgroundConfig?.enabled"
-      ref="backgroundContainer"
-      class="desktop-lyric-background"
-    ></div>
     <!-- AMLL LyricPlayer -->
     <component
       :is="LyricPlayerComp"
@@ -444,16 +385,6 @@ onBeforeUnmount(() => {
     pointer-events: none;
     opacity: 0.4;
   }
-}
-
-.desktop-lyric-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-  pointer-events: none;
 }
 
 .desktop-lyric-player {
