@@ -289,7 +289,7 @@ const handleClearConfirm = () => {
   if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
   emit('close')
   nextTick(() => {
-    DialogPlugin.confirm({
+    const dialog = DialogPlugin.confirm({
       header: '清空播放列表',
       body: '确定要清空播放列表吗？此操作不可撤销。',
       confirmBtn: { content: '确认清空', theme: 'danger' },
@@ -297,6 +297,7 @@ const handleClearConfirm = () => {
       onConfirm: () => {
         localUserStore.clearList()
         MessagePlugin.success('播放列表已清空')
+        dialog.destroy()
       }
     })
   })
