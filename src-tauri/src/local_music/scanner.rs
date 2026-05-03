@@ -1,6 +1,6 @@
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
-use lofty::tag::Accessor;
+use lofty::tag::{Accessor, ItemKey};
 use std::path::Path;
 use std::time::SystemTime;
 use walkdir::WalkDir;
@@ -15,16 +15,42 @@ fn is_audio_file(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+fn read_sidecar_lrc(path: &Path) -> Option<String> {
+    let stem = path.file_stem()?.to_string_lossy();
+    let dir = path.parent()?;
+    let lrc_path = dir.join(format!("{}.lrc", stem));
+    let bytes = std::fs::read(&lrc_path).ok().filter(|b| !b.is_empty())?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+pub fn read_lyrics_from_file(path: &Path) -> Option<String> {
+    if let Ok(tagged_file) = lofty::read_from_path(path) {
+        if let Some(lrc) = tagged_file.primary_tag()
+            .and_then(|t| t.get_string(&ItemKey::Lyrics).map(|s| s.to_owned()))
+            .filter(|s: &String| !s.trim().is_empty())
+        {
+            return Some(lrc);
+        }
+    }
+    read_sidecar_lrc(path)
+}
+
 fn read_tags(path: &Path) -> Option<TrackRow> {
     let tagged_file = lofty::read_from_path(path).ok()?;
     let properties = tagged_file.properties();
-    let tag = tagged_file.primary_tag()?;
+    let tag = tagged_file.primary_tag();
 
     let file_name = path.file_stem()?.to_string_lossy().to_string();
-    let singer = tag.artist().map(|s| s.to_string()).unwrap_or_default();
-    let name = tag.title().map(|s| s.to_string()).unwrap_or_else(|| file_name.clone());
-    let album_name = tag.album().map(|s| s.to_string()).unwrap_or_default();
-    let year = tag.year().unwrap_or(0) as i64;
+    let (singer, name, album_name, year, has_cover) = match tag {
+        Some(t) => (
+            t.artist().map(|s| s.to_string()).unwrap_or_default(),
+            t.title().map(|s| s.to_string()).unwrap_or_else(|| file_name.clone()),
+            t.album().map(|s| s.to_string()).unwrap_or_default(),
+            t.year().unwrap_or(0) as i64,
+            t.pictures().first().is_some(),
+        ),
+        None => (String::new(), file_name.clone(), String::new(), 0, false),
+    };
     let duration = properties.duration().as_secs_f64();
     let bitrate = properties.audio_bitrate().unwrap_or(0) as i64;
     let sample_rate = properties.sample_rate().unwrap_or(0) as i64;
@@ -38,10 +64,14 @@ fn read_tags(path: &Path) -> Option<TrackRow> {
         .unwrap_or(0);
 
     let file_size = path.metadata().map(|m| m.len() as i64).unwrap_or(0);
-    let has_cover = tag.pictures().first().is_some();
 
-    // Generate a unique songmid from path hash
     let songmid = format!("local_{}", md5_hash(path.to_string_lossy().as_bytes()));
+
+    // Read lyrics from tag, fall back to sidecar .lrc file
+    let lrc = tag
+        .and_then(|t| t.get_string(&ItemKey::Lyrics).map(|s| s.to_owned()))
+        .filter(|s: &String| !s.trim().is_empty())
+        .or_else(|| read_sidecar_lrc(path));
 
     Some(TrackRow {
         songmid,
@@ -56,7 +86,7 @@ fn read_tags(path: &Path) -> Option<TrackRow> {
         has_cover: if has_cover { 1 } else { 0 },
         cover_key: None,
         year,
-        lrc: None,
+        lrc,
         types: "[]".to_string(),
         _types: "{}".to_string(),
         type_url: "{}".to_string(),

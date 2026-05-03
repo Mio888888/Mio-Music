@@ -362,34 +362,24 @@ const api = {
   // Local music
   localMusic: {
     selectDirs: () => ipcInvoke('local_music__select_dirs'),
-    scan: async (dirs: string[]) => {
-      const res = await ipcInvoke('local_music__scan', dirs)
-      if (typeof res === 'string') {
-        try {
-          return JSON.parse(res)
-        } catch {
-          return []
-        }
-      }
-      return Array.isArray(res) ? res : []
-    },
+    scan: (dirs: string[]) => ipcInvoke('local_music__scan', { dirs }),
     writeTags: (filePath: string, songInfo: any, tagWriteOptions: any) =>
       ipcInvoke('local_music__write_tags', { filePath, songInfo, tagWriteOptions }),
     getDirs: () => ipcInvoke('dir__get_all'),
-    setDirs: (dirs: string[]) => ipcInvoke('dir__set', dirs),
+    setDirs: (dirs: string[]) => ipcInvoke('dir__set', { dirs }),
     getList: () => ipcInvoke('track__get_all'),
-    getUrlById: (id: string | number) => ipcInvoke('track__get_by_id', id),
+    getUrlById: (id: string | number) => ipcInvoke('track__get_by_id', { songmid: id }),
     clearIndex: () => ipcInvoke('track__clear'),
     getCoverBase64: async (trackId: string) => {
       try {
-        return await ipcInvoke('local_music__get_cover', trackId)
+        return await ipcInvoke('local_music__get_cover', { trackId })
       } catch {
         return ''
       }
     },
     getCoversBase64: async (trackIds: string[]) => {
       try {
-        return await ipcInvoke('local_music__get_covers', trackIds)
+        return await ipcInvoke('local_music__get_covers', { trackIds })
       } catch {
         return {}
       }
@@ -403,7 +393,7 @@ const api = {
     },
     getLyric: async (songmid: string) => {
       try {
-        return await ipcInvoke('local_music__get_lyric', songmid)
+        return await ipcInvoke('local_music__get_lyric', { songmid })
       } catch {
         return ''
       }

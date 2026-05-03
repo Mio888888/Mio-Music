@@ -246,10 +246,11 @@ const fetchServicePluginLyrics = async (servicePluginId: string, songInfo: any):
 }
 
 const fetchLocalLyrics = async (songInfo: any): Promise<LyricLine[] | null> => {
-  let text = songInfo?.lrc as string | null
+  let text: string | null = songInfo?.lrc as string | null
   if (!text) {
     try {
-      text = await (window as any).api?.localMusic?.getLyric?.(String(songInfo?.songmid ?? ''))
+      const res = await (window as any).api?.localMusic?.getLyric?.(String(songInfo?.songmid ?? ''))
+      text = res?.success ? res.data : null
     } catch {
       text = null
     }
@@ -429,14 +430,15 @@ export const useGlobalPlayStatusStore = defineStore(
         const info: any = player.songInfo
         if (!newImg && info?.source === 'local' && info?.hasCover && info?.songmid) {
           try {
-            const data = await (window as any).api?.localMusic?.getCoverBase64?.(String(info.songmid))
+            const res = await (window as any).api?.localMusic?.getCoverBase64?.(String(info.songmid))
+            const coverData = res?.success ? res.data : null
             if (
-              data &&
+              coverData &&
               player.songInfo &&
               String(player.songInfo.songmid) === String(info.songmid) &&
               !player.songInfo.img
             ) {
-              player.songInfo.img = data
+              player.songInfo.img = coverData
             }
           } catch {}
         }

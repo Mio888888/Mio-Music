@@ -60,11 +60,14 @@ function buildCacheKey(song: SongList): string | undefined {
 export async function getSongRealUrl(song: SongList): Promise<string> {
   try {
     if (song.source === 'local') {
-      const id = song.songmid
-      const url = await (window as any).api.localMusic.getUrlById(id)
-      if (typeof url === 'object' && url?.error) throw new Error(url.error)
-      if (typeof url === 'string') return url
-      throw new Error('本地歌曲URL获取失败')
+      let path = (song as any).path
+      if (!path) {
+        const res = await (window as any).api?.localMusic?.getUrlById?.(song.songmid)
+        const data = res?.success ? res.data : null
+        path = data?.path
+      }
+      if (!path) throw new Error('本地歌曲缺少文件路径')
+      return path
     }
     if (song.url && typeof song.url === 'string') {
       return song.url

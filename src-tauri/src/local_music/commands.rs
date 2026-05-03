@@ -98,10 +98,23 @@ pub fn local_music__get_tags(state: State<'_, AppDb>, songmid: String, include_l
 
 #[tauri::command]
 pub fn local_music__get_lyric(state: State<'_, AppDb>, songmid: String) -> Result<serde_json::Value, String> {
-    let conn = state.music.lock().map_err(|e| e.to_string())?;
-    let track = music_db::get_track_by_id(&conn, &songmid)
-        .map_err(|e| e.to_string())?;
-    let lrc = track.and_then(|t| t.lrc).unwrap_or_default();
+    let (stored_lrc, file_path) = {
+        let conn = state.music.lock().map_err(|e| e.to_string())?;
+        let track = music_db::get_track_by_id(&conn, &songmid)
+            .map_err(|e| e.to_string())?;
+        match track {
+            Some(t) => (t.lrc, t.path),
+            None => return Ok(serde_json::json!({ "success": true, "data": "" })),
+        }
+    };
+
+    if let Some(lrc) = stored_lrc {
+        if !lrc.is_empty() {
+            return Ok(serde_json::json!({ "success": true, "data": lrc }));
+        }
+    }
+
+    let lrc = scanner::read_lyrics_from_file(std::path::Path::new(&file_path)).unwrap_or_default();
     Ok(serde_json::json!({ "success": true, "data": lrc }))
 }
 

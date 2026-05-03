@@ -147,7 +147,8 @@ const handlePlay = (track: any) => {
   const song = {
     songmid: track.songmid, name: track.name, singer: track.singer,
     albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-    source: 'local', url: track.url || '', interval: track.interval
+    source: 'local', url: track.url || '', interval: track.interval,
+    path: track.path
   }
   playStatus.updatePlayerInfo(song)
   playSong(song)
@@ -160,7 +161,8 @@ const playAll = () => {
   const songList = displayTracks.value.map(track => ({
     songmid: track.songmid, name: track.name, singer: track.singer,
     albumName: track.albumName, img: coverCache.value[track.songmid] || '',
-    source: 'local', url: track.url || '', interval: track.interval
+    source: 'local', url: track.url || '', interval: track.interval,
+    path: track.path
   }))
   localUserStore.replaceSongList(songList as any)
   playSong(songList[0] as any)
