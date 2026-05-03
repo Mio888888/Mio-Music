@@ -8,12 +8,43 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import PluginRunner from '@/utils/plugin/PluginRunner'
+import { withIpcPerformance } from '@/utils/performanceMonitor'
 
 // ============================================================
 // IPC Core: wraps Tauri invoke / event into Electron-like API
 // ============================================================
 
 const listeners = new Map<string, Set<UnlistenFn>>()
+const listenerByHandler = new Map<string, Map<Function, Set<UnlistenFn>>>()
+
+// ============================================================
+// IPC Response Cache — avoids redundant IPC calls for same params
+// ============================================================
+
+const ipcCache = new Map<string, { data: any; expire: number }>()
+
+function cacheKey(channel: string, params: Record<string, any>): string {
+  return channel + ':' + JSON.stringify(params)
+}
+
+function cachedInvoke(channel: string, params: Record<string, any>, ttlMs: number): Promise<any> {
+  const key = cacheKey(channel, params)
+  const now = Date.now()
+  const entry = ipcCache.get(key)
+  if (entry && entry.expire > now) return Promise.resolve(entry.data)
+
+  // Periodically purge expired entries
+  if (ipcCache.size > 200) {
+    for (const [k, v] of ipcCache) {
+      if (v.expire <= now) ipcCache.delete(k)
+    }
+  }
+
+  return ipcInvoke(channel, params).then((data) => {
+    ipcCache.set(key, { data, expire: now + ttlMs })
+    return data
+  })
+}
 
 /** Electron ipcRenderer.invoke equivalent */
 async function ipcInvoke(channel: string, ...args: any[]): Promise<any> {
@@ -29,7 +60,9 @@ async function ipcInvoke(channel: string, ...args: any[]): Promise<any> {
     params.args = args
   }
   try {
-    return await invoke(channel.replace(/:/g, '__').replace(/-/g, '_'), params)
+    return await withIpcPerformance(() =>
+      invoke(channel.replace(/:/g, '__').replace(/-/g, '_'), params)
+    )
   } catch (e: any) {
     console.warn(`[IPC] invoke "${channel}" failed:`, e)
     throw e
@@ -51,13 +84,19 @@ async function ipcOn(
   const unlisten = await listen(channel, (event) => {
     callback({ ...event }, event.payload)
   })
-  if (!listeners.has(channel)) {
-    listeners.set(channel, new Set())
-  }
+  if (!listeners.has(channel)) listeners.set(channel, new Set())
   listeners.get(channel)!.add(unlisten)
+
+  if (!listenerByHandler.has(channel)) listenerByHandler.set(channel, new Map())
+  const byHandler = listenerByHandler.get(channel)!
+  if (!byHandler.has(callback as any)) byHandler.set(callback as any, new Set())
+  byHandler.get(callback as any)!.add(unlisten)
+
   return () => {
     unlisten()
     listeners.get(channel)?.delete(unlisten)
+    byHandler.get(callback as any)?.delete(unlisten)
+    if (byHandler.get(callback as any)?.size === 0) byHandler.delete(callback as any)
   }
 }
 
@@ -102,9 +141,9 @@ const api = {
     invoke: (channel: string, ...args: any[]) => ipcInvoke(channel, ...args)
   },
 
-  // HTTP Proxy — bypasses CORS for plugin cross-origin requests
+  // HTTP Proxy — bypasses CORS for plugin cross-origin requests (cached 5 min)
   httpProxy: (url: string, options?: any) =>
-    ipcInvoke('http_proxy', { args: { url, ...(options || {}) } }),
+    cachedInvoke('http_proxy', { args: { url, ...(options || {}) } }, 300_000),
 
   // Audio Proxy — fetches remote audio via Rust backend, returns data: URI
   audioProxy: (url: string) => ipcInvoke('audio_proxy', { url }),
@@ -300,6 +339,10 @@ const api = {
     set: (payload: any) => ipcInvoke('hotkeys__set', payload)
   },
 
+  performance: {
+    getMemory: () => ipcInvoke('performance__memory')
+  },
+
   // Auto updater
   autoUpdater: {
     checkForUpdates: () => ipcInvoke('auto-updater__check-for-updates'),
@@ -372,7 +415,7 @@ const api = {
     clearIndex: () => ipcInvoke('track__clear'),
     getCoverBase64: async (trackId: string) => {
       try {
-        return await ipcInvoke('local_music__get_cover', { trackId })
+        return await cachedInvoke('local_music__get_cover', { trackId }, 600_000)
       } catch {
         return ''
       }
@@ -483,8 +526,16 @@ const electronCompat = {
     send: ipcSend,
     on: ipcOn,
     removeAllListeners: ipcRemoveAllListeners,
-    removeListener: async (_channel: string, _handler: Function) => {
-      // Best-effort removal — Tauri events use UnlistenFn pattern
+    removeListener: async (channel: string, handler: Function) => {
+      const byHandler = listenerByHandler.get(channel)
+      const set = byHandler?.get(handler)
+      if (!set) return
+      for (const unlisten of set) {
+        try { unlisten() } catch {}
+        listeners.get(channel)?.delete(unlisten)
+      }
+      byHandler?.delete(handler)
+      if (byHandler && byHandler.size === 0) listenerByHandler.delete(channel)
     }
   }
 }

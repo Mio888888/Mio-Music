@@ -222,6 +222,8 @@ pub fn run() {
             commands::http_proxy,
             // Audio Proxy (fetch remote audio → data URI, bypasses CORS for <audio>)
             commands::audio_proxy,
+            // Performance telemetry
+            commands::performance__memory,
             // Desktop lyric window
             commands::change_desktop_lyric,
             commands::toogle_desktop_lyric_lock,

@@ -9,6 +9,7 @@ use crate::db::AppDb;
 use base64::Engine;
 use serde_json::Value;
 use std::sync::Mutex;
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 pub type DbState<'a> = State<'a, AppDb>;
@@ -249,13 +250,11 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
 
-    // 从 URL 推导 Referer 和 Origin
     let referer_origin = url.split("://").nth(1)
         .and_then(|host_port| host_port.split('/').next())
         .map(|host| format!("https://{}", host))
         .unwrap_or_default();
 
-    // 构建请求（带重试）
     let max_attempts = 3u32;
     let mut last_status: u16 = 0;
     let mut resp: Option<reqwest::Response> = None;
@@ -269,7 +268,6 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
             _ => client.get(url),
         };
 
-        // 默认浏览器请求头（插件可覆盖）
         req_builder = req_builder
             .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .header("Accept", "*/*")
@@ -292,7 +290,6 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         let r = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
         last_status = r.status().as_u16();
 
-        // 只有 5xx 才重试
         if r.status().is_server_error() && attempt + 1 < max_attempts {
             tokio::time::sleep(std::time::Duration::from_millis(500 * (attempt as u64 + 1))).await;
             continue;
@@ -328,4 +325,37 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         "headers": resp_headers,
         "body": body_value
     }))
+}
+
+#[derive(Serialize)]
+pub struct MemorySnapshot {
+    pub rss_mb: Option<f64>,
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub async fn performance__memory() -> Result<MemorySnapshot, String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        let pid = std::process::id().to_string();
+        let output = Command::new("ps")
+            .args(["-o", "rss=", "-p", &pid])
+            .output()
+            .map_err(|e| format!("读取内存失败: {}", e))?;
+
+        if !output.status.success() {
+            return Ok(MemorySnapshot { rss_mb: None });
+        }
+
+        let text = String::from_utf8_lossy(&output.stdout);
+        let kb = text.trim().parse::<f64>().ok();
+        let rss_mb = kb.map(|v| v / 1024.0);
+        return Ok(MemorySnapshot { rss_mb });
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(MemorySnapshot { rss_mb: None })
+    }
 }

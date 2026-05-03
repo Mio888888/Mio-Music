@@ -3,13 +3,13 @@ import {
   ref,
   computed,
   onMounted,
-  onUnmounted,
   watch,
   nextTick,
   onActivated,
   onDeactivated,
   toRaw
 } from 'vue'
+import { useLifecycle } from '@/composables/useEventListener'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import {
   installDesktopLyricBridge,
@@ -57,6 +57,7 @@ const dlnaStore = useDlnaStore()
 const controlAudio = ControlAudioStore()
 const localUserStore = LocalUserDetailStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
+const lifecycle = useLifecycle()
 const { Audio } = storeToRefs(controlAudio)
 const { list, userInfo } = storeToRefs(localUserStore)
 const { player } = storeToRefs(globalPlayStatus)
@@ -72,29 +73,23 @@ watch(
   { immediate: true }
 )
 
-let dlnaSyncInterval: any = null
+let clearDlnaSync: (() => void) | null = null
 
 watch(
   () => dlnaStore.currentDevice,
   (device) => {
+    if (clearDlnaSync) { clearDlnaSync(); clearDlnaSync = null }
     if (device) {
-      if (!dlnaSyncInterval) {
-        dlnaSyncInterval = setInterval(async () => {
-          if (Audio.value.isPlay) {
-            const position = await dlnaStore.getPosition()
-            if (position && typeof position === 'number') {
-              if (Math.abs(Audio.value.currentTime - position) > 2) {
-                invoke('player__seek', { position })
-              }
+      clearDlnaSync = lifecycle.addInterval(async () => {
+        if (Audio.value.isPlay) {
+          const position = await dlnaStore.getPosition()
+          if (position && typeof position === 'number') {
+            if (Math.abs(Audio.value.currentTime - position) > 2) {
+              invoke('player__seek', { position })
             }
           }
-        }, 1000)
-      }
-    } else {
-      if (dlnaSyncInterval) {
-        clearInterval(dlnaSyncInterval)
-        dlnaSyncInterval = null
-      }
+        }
+      }, 1000)
     }
   }
 )
@@ -359,38 +354,29 @@ function globalControls(e: Event) {
 }
 
 onMounted(async () => {
-  // 监听来自主进程的锁定状态广播（Tauri 无此后端，静默忽略）
-  try {
-    window.electron?.ipcRenderer?.on?.('toogleDesktopLyricLock', (_, lock) => {
-      desktopLyricLocked.value = !!lock
-    })
-  } catch {}
-  try {
-    window.electron?.ipcRenderer?.on?.(
-      'desktop-lyric-open-change',
-      async (_: any, visible: boolean) => {
-        desktopLyricOpen.value = !!visible
-        if (desktopLyricOpen.value) {
-          installDesktopLyricBridge()
-          try {
-            const lock = await window.electron?.ipcRenderer?.invoke?.('get-lyric-lock-state')
-            desktopLyricLocked.value = !!lock
-          } catch {}
-        } else {
-          desktopLyricLocked.value = false
-          uninstallDesktopLyricBridge()
-        }
-      }
-    )
-  } catch {}
-  // 监听主进程通知关闭桌面歌词
-  try {
-    window.electron?.ipcRenderer?.on?.('closeDesktopLyric', () => {
-      desktopLyricOpen.value = false
+  // Electron IPC 监听器（精确注册/清理，不用 removeAllListeners）
+  lifecycle.addIpcListener('toogleDesktopLyricLock', (_, lock) => {
+    desktopLyricLocked.value = !!lock
+  })
+  lifecycle.addIpcListener('desktop-lyric-open-change', async (_: any, visible: boolean) => {
+    desktopLyricOpen.value = !!visible
+    if (desktopLyricOpen.value) {
+      installDesktopLyricBridge()
+      try {
+        const lock = await window.electron?.ipcRenderer?.invoke?.('get-lyric-lock-state')
+        desktopLyricLocked.value = !!lock
+      } catch {}
+    } else {
       desktopLyricLocked.value = false
       uninstallDesktopLyricBridge()
-    })
-  } catch {}
+    }
+  })
+  lifecycle.addIpcListener('closeDesktopLyric', () => {
+    desktopLyricOpen.value = false
+    desktopLyricLocked.value = false
+    uninstallDesktopLyricBridge()
+  })
+
   // 初始化同步当前打开与锁定状态（Tauri 无此后端，静默降级）
   try {
     const open = await window.electron?.ipcRenderer?.invoke?.('get-lyric-open-state')
@@ -398,7 +384,9 @@ onMounted(async () => {
     const lock = await window.electron?.ipcRenderer?.invoke?.('get-lyric-lock-state')
     desktopLyricLocked.value = !!lock
   } catch {}
-  window.addEventListener('global-music-control', globalControls)
+
+  // Window 事件监听器（自动清理）
+  lifecycle.addEventListener(window, 'global-music-control', globalControls)
   const openPlaylistHandler = () => {
     showPlaylist.value = true
     nextTick(() => {
@@ -408,58 +396,35 @@ onMounted(async () => {
   const closePlaylistHandler = () => {
     showPlaylist.value = false
   }
-  window.addEventListener('open-playlist', openPlaylistHandler)
-  window.addEventListener('close-playlist', closePlaylistHandler)
-  // stash handler for removal
-  ;(window as any).__open_playlist_handler__ = openPlaylistHandler
-  ;(window as any).__close_playlist_handler__ = closePlaylistHandler
+  lifecycle.addEventListener(window, 'open-playlist', openPlaylistHandler)
+  lifecycle.addEventListener(window, 'close-playlist', closePlaylistHandler)
 
-  // 监听来自桌面歌词窗口的控制事件
-  listen('desktop-lyric-control', (event) => {
-    const { name, value } = event.payload as any
-    if (name === 'close') {
-      window.electron?.ipcRenderer?.send?.('change-desktop-lyric', false)
-      desktopLyricOpen.value = false
-      uninstallDesktopLyricBridge()
-      return
-    }
-    if (name === 'lock') {
-      window.electron?.ipcRenderer?.send?.('toogleDesktopLyricLock', value)
-      desktopLyricLocked.value = !!value
-      return
-    }
-    window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name } }))
-  }).then((unlistenFn) => {
-    ;(window as any).__desktop_lyric_control_unlisten__ = unlistenFn
-  }).catch(() => {})
-})
+  // Tauri 事件监听（自动清理）
+  lifecycle.addTauriListen(
+    listen('desktop-lyric-control', (event) => {
+      const { name, value } = event.payload as any
+      if (name === 'close') {
+        window.electron?.ipcRenderer?.send?.('change-desktop-lyric', false)
+        desktopLyricOpen.value = false
+        uninstallDesktopLyricBridge()
+        return
+      }
+      if (name === 'lock') {
+        window.electron?.ipcRenderer?.send?.('toogleDesktopLyricLock', value)
+        desktopLyricLocked.value = !!value
+        return
+      }
+      window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name } }))
+    })
+  )
 
-// 组件卸载时清理
-onUnmounted(() => {
-  try { window.electron?.ipcRenderer?.removeAllListeners?.('toogleDesktopLyricLock') } catch {}
-  try { window.electron?.ipcRenderer?.removeAllListeners?.('desktop-lyric-open-change') } catch {}
-  try { window.electron?.ipcRenderer?.removeAllListeners?.('closeDesktopLyric') } catch {}
-  window.removeEventListener('global-music-control', globalControls)
-  try {
-    const h = (window as any).__open_playlist_handler__
-    if (h) window.removeEventListener('open-playlist', h)
-  } catch {}
-  try {
-    const h2 = (window as any).__close_playlist_handler__
-    if (h2) window.removeEventListener('close-playlist', h2)
-  } catch {}
-
-  // 清理可能存在的拖动监听器
-  window.removeEventListener('mousemove', handleVolumeDragMove)
-  window.removeEventListener('mouseup', handleVolumeDragEnd)
-  window.removeEventListener('mousemove', handleProgressDragMove)
-  window.removeEventListener('mouseup', handleProgressDragEnd)
-
-  // 清理桌面歌词控制事件监听
-  try {
-    const unlistenDesktopLyric = (window as any).__desktop_lyric_control_unlisten__
-    if (unlistenDesktopLyric) unlistenDesktopLyric()
-  } catch {}
+  // 拖动监听器兜底清理（拖动开始时添加，拖动结束时应已自清理，此处兜底）
+  lifecycle.addCleanup(() => {
+    window.removeEventListener('mousemove', handleVolumeDragMove)
+    window.removeEventListener('mouseup', handleVolumeDragEnd)
+    window.removeEventListener('mousemove', handleProgressDragMove)
+    window.removeEventListener('mouseup', handleProgressDragEnd)
+  })
 })
 
 // 组件被激活时（从缓存中恢复）
@@ -785,14 +750,14 @@ watch(
 )
 
 watch(
-  songInfo,
-  async (newVal) => {
+  () => player.value.songInfo?.songmid,
+  (songmid) => {
     bg.value = bg.value === 'var(--player-bg-idle)' ? 'var(--player-bg-default)' : toRaw(bg.value)
-    if (!newVal.songmid) {
+    if (!songmid) {
       bg.value = 'var(--player-bg-idle)'
     }
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
 watch(showFullPlay, (val) => {

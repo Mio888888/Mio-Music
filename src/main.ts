@@ -9,6 +9,7 @@ import router from './router'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import LogtoClient from '@logto/browser'
+import { performanceTelemetry } from '@/utils/performanceMonitor'
 
 // IPC adapter layer
 import './bridge'
@@ -23,6 +24,11 @@ if (!window.location.hash.includes('/desktop-lyric')) {
     appId: config.appId,
     endpoint: config.endpoint,
   })
+}
+
+if (import.meta.env.DEV) {
+  performanceTelemetry.startMemorySampling()
+  performanceTelemetry.startDevPanel()
 }
 
 const app = createApp(App)

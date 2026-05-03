@@ -9,9 +9,8 @@ export class PerformanceMonitor {
   private frameCount: number = 0
   private lastFpsUpdate: number = performance.now()
 
-  // 配置
-  private readonly fpsThreshold: number = 20 // 低 FPS 阈值
-  private readonly lowFpsFrames: number = 300 // 连续低帧数阈值（约 5 秒 @ 60fps）
+  private readonly fpsThreshold: number = 20
+  private readonly lowFpsFrames: number = 300
   private readonly degradeCallback: () => void
   private readonly enabled: boolean
 
@@ -27,32 +26,25 @@ export class PerformanceMonitor {
     this.enabled = options.enabled ?? true
   }
 
-  /**
-   * 在每帧调用此方法以更新性能数据
-   * @returns 'ok' | 'degrade' | 'disabled'
-   */
   tick(): 'ok' | 'degrade' | 'disabled' {
     if (!this.enabled) return 'disabled'
 
     const now = performance.now()
-    const delta = now - this.lastTime
     this.lastTime = now
-
-    // 计算当前 FPS
     this.frameCount++
 
-    // 每 500ms 更新一次 FPS
     if (now - this.lastFpsUpdate >= 500) {
       this.fps = (this.frameCount * 1000) / (now - this.lastFpsUpdate)
       this.frameCount = 0
       this.lastFpsUpdate = now
+      performanceTelemetry.recordFps(this.fps)
     }
 
-    // 检查是否低于阈值
     if (this.fps < this.fpsThreshold) {
       this.lowFpsCount++
       if (this.lowFpsCount >= this.lowFpsFrames) {
-        return 'degrade' // 触发降级
+        this.degradeCallback()
+        return 'degrade'
       }
     } else {
       this.lowFpsCount = 0
@@ -61,16 +53,10 @@ export class PerformanceMonitor {
     return 'ok'
   }
 
-  /**
-   * 获取当前 FPS
-   */
   getFPS(): number {
     return this.fps
   }
 
-  /**
-   * 重置计数器（用于降级后重新开始监控）
-   */
   reset(): void {
     this.lowFpsCount = 0
     this.frameCount = 0
@@ -78,29 +64,17 @@ export class PerformanceMonitor {
     this.lastTime = performance.now()
   }
 
-  /**
-   * 检查是否处于低性能状态
-   */
   isLowPerformance(): boolean {
     return this.lowFpsCount > this.lowFpsFrames * 0.5
   }
 }
 
-/**
- * 性能降级管理器
- * 管理配置降级和用户提示
- */
 export class PerformanceDegrader {
   private hasDegraded: boolean = false
   private monitor: PerformanceMonitor | null = null
   private rafId: number | null = null
   private onDegradeCallback?: (newConfig: any) => void
 
-  constructor() {}
-
-  /**
-   * 启动性能监控
-   */
   start(options: {
     onTick?: (fps: number) => void
     onDegrade: (newConfig: any) => void
@@ -132,9 +106,6 @@ export class PerformanceDegrader {
     this.rafId = requestAnimationFrame(tick)
   }
 
-  /**
-   * 停止性能监控
-   */
   stop() {
     if (this.rafId) {
       cancelAnimationFrame(this.rafId)
@@ -143,15 +114,11 @@ export class PerformanceDegrader {
     this.monitor = null
   }
 
-  /**
-   * 处理性能降级
-   */
   private handleDegrade() {
     if (this.hasDegraded || !this.onDegradeCallback) return
 
     this.hasDegraded = true
 
-    // 生成降级配置
     const degradedConfig = {
       renderScale: 0.3,
       fps: 15,
@@ -162,23 +129,161 @@ export class PerformanceDegrader {
     }
 
     this.onDegradeCallback(degradedConfig)
-
-    // 停止监控（避免重复降级）
     this.stop()
   }
 
-  /**
-   * 重置降级状态
-   */
   reset() {
     this.hasDegraded = false
     this.monitor?.reset()
   }
 
-  /**
-   * 是否已经降级
-   */
   hasDegradedConfig(): boolean {
     return this.hasDegraded
   }
+}
+
+export interface PerfSnapshot {
+  fps: number
+  ipcAvgMs: number
+  ipcP95Ms: number
+  renderAvgMs: number
+  memoryMb: number | null
+  ipcCount: number
+  renderCount: number
+}
+
+class PerformanceTelemetry {
+  private ipcDurations: number[] = []
+  private renderDurations: number[] = []
+  private fpsHistory: number[] = []
+  private memoryHistory: number[] = []
+  private memoryTimer: number | null = null
+  private panelTimer: number | null = null
+  private panelEl: HTMLDivElement | null = null
+
+  recordIpc(durationMs: number) {
+    this.ipcDurations.push(durationMs)
+    if (this.ipcDurations.length > 500) this.ipcDurations.shift()
+  }
+
+  recordRender(durationMs: number) {
+    this.renderDurations.push(durationMs)
+    if (this.renderDurations.length > 500) this.renderDurations.shift()
+  }
+
+  recordFps(fps: number) {
+    this.fpsHistory.push(fps)
+    if (this.fpsHistory.length > 120) this.fpsHistory.shift()
+  }
+
+  startMemorySampling(intervalMs: number = 3000) {
+    if (this.memoryTimer) return
+    this.memoryTimer = window.setInterval(async () => {
+      let mb: number | null = null
+
+      const mem = (performance as any).memory
+      if (mem && typeof mem.usedJSHeapSize === 'number') {
+        mb = mem.usedJSHeapSize / 1024 / 1024
+      } else {
+        try {
+          const res = await (window as any).api?.performance?.getMemory?.()
+          if (res && typeof res.rss_mb === 'number') {
+            mb = res.rss_mb
+          }
+        } catch {}
+      }
+
+      if (typeof mb === 'number' && Number.isFinite(mb)) {
+        this.memoryHistory.push(mb)
+        if (this.memoryHistory.length > 120) this.memoryHistory.shift()
+      }
+    }, intervalMs)
+  }
+
+  stopMemorySampling() {
+    if (this.memoryTimer) {
+      clearInterval(this.memoryTimer)
+      this.memoryTimer = null
+    }
+  }
+
+  getSnapshot(): PerfSnapshot {
+    const ipc = this.ipcDurations
+    const render = this.renderDurations
+    const fps = this.fpsHistory
+
+    const ipcAvgMs = ipc.length ? ipc.reduce((a, b) => a + b, 0) / ipc.length : 0
+    const renderAvgMs = render.length ? render.reduce((a, b) => a + b, 0) / render.length : 0
+    const fpsAvg = fps.length ? fps.reduce((a, b) => a + b, 0) / fps.length : 60
+
+    const sortedIpc = [...ipc].sort((a, b) => a - b)
+    const p95Index = sortedIpc.length ? Math.floor(sortedIpc.length * 0.95) : 0
+    const ipcP95Ms = sortedIpc.length ? sortedIpc[p95Index] : 0
+
+    const memoryMb = this.memoryHistory.length
+      ? this.memoryHistory[this.memoryHistory.length - 1]
+      : null
+
+    return {
+      fps: fpsAvg,
+      ipcAvgMs,
+      ipcP95Ms,
+      renderAvgMs,
+      memoryMb,
+      ipcCount: ipc.length,
+      renderCount: render.length
+    }
+  }
+
+  startDevPanel() {
+    if (!import.meta.env.DEV || typeof document === 'undefined' || this.panelEl) return
+
+    const el = document.createElement('div')
+    el.style.position = 'fixed'
+    el.style.right = '12px'
+    el.style.bottom = '12px'
+    el.style.zIndex = '999999'
+    el.style.background = 'rgba(0,0,0,0.72)'
+    el.style.color = '#fff'
+    el.style.padding = '8px 10px'
+    el.style.borderRadius = '8px'
+    el.style.fontSize = '12px'
+    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    el.style.lineHeight = '1.5'
+    el.style.pointerEvents = 'none'
+    document.body.appendChild(el)
+    this.panelEl = el
+
+    this.panelTimer = window.setInterval(() => {
+      const s = this.getSnapshot()
+      if (!this.panelEl) return
+      this.panelEl.textContent = `FPS ${s.fps.toFixed(1)} | IPC ${s.ipcAvgMs.toFixed(1)}ms (p95 ${s.ipcP95Ms.toFixed(1)}ms) | Render ${s.renderAvgMs.toFixed(1)}ms | Mem ${s.memoryMb?.toFixed(1) ?? '-'}MB`
+    }, 1000)
+  }
+
+  stopDevPanel() {
+    if (this.panelTimer) {
+      clearInterval(this.panelTimer)
+      this.panelTimer = null
+    }
+    if (this.panelEl?.parentNode) {
+      this.panelEl.parentNode.removeChild(this.panelEl)
+    }
+    this.panelEl = null
+  }
+}
+
+export const performanceTelemetry = new PerformanceTelemetry()
+
+export async function withIpcPerformance<T>(fn: () => Promise<T>): Promise<T> {
+  const start = performance.now()
+  try {
+    return await fn()
+  } finally {
+    performanceTelemetry.recordIpc(performance.now() - start)
+  }
+}
+
+export function markRenderPerformance(startTime: number) {
+  performanceTelemetry.recordRender(performance.now() - startTime)
 }

@@ -538,8 +538,8 @@ export const useGlobalPlayStatusStore = defineStore(
           return
         }
 
-        // 延迟调度：让播放状态先渲染，避免与封面/URL 解析并发争抢 IPC
-        await new Promise(r => setTimeout(r, 300))
+        // 让播放状态先渲染一帧再加载歌词
+        await new Promise(r => requestAnimationFrame(r))
 
         player.isLoading = true
         const targetSongId = String(newSongmid)

@@ -148,6 +148,13 @@ class AudioManager {
   cleanupAudioElement(audioElement: HTMLAudioElement): void {
     const context = this.audioContexts.get(audioElement)
     if (context && context.state !== 'closed') context.close()
+    // 清理关联的 analysers
+    for (const [id, entry] of this.analysers) {
+      if (entry.element === audioElement) {
+        try { entry.node.disconnect() } catch {}
+        this.analysers.delete(id)
+      }
+    }
     for (const map of [this.splitters, this.equalizers, this.bassBoostFilters, this.convolverNodes, this.surroundGainNodes, this.balanceNodes, this.crossfadeGains, this.crossfadeLowpasses, this.audioSources, this.audioContexts] as any[]) {
       if (map.delete) map.delete(audioElement)
     }

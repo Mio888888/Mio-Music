@@ -64,6 +64,16 @@ export default defineConfig(async () => ({
     }
   },
   build: {
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-vue': ['vue', 'vue-router', 'pinia'],
+          'vendor-tdesign': ['tdesign-vue-next', 'tdesign-icons-vue-next'],
+          'vendor-utils': ['lodash', 'axios', 'marked', 'dompurify'],
+          'vendor-lyrics': ['@applemusic-like-lyrics/lyric', '@applemusic-like-lyrics/vue', '@lrc-player/core', '@lrc-player/parse']
+        }
+      }
+    }
   }
 }))

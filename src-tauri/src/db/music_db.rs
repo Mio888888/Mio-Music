@@ -67,6 +67,9 @@ pub fn init_tables(conn: &Connection) -> Result<()> {
             updated_at   INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_tracks_path ON tracks(path);
+        CREATE INDEX IF NOT EXISTS idx_tracks_name ON tracks(name COLLATE NOCASE);
+        CREATE INDEX IF NOT EXISTS idx_tracks_source ON tracks(source);
+        CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(albumName COLLATE NOCASE);
 
         CREATE TABLE IF NOT EXISTS dirs (
             path TEXT PRIMARY KEY

@@ -117,24 +117,26 @@ const handleSort = (column: 'title' | 'album' | 'duration') => {
   }
 }
 
+const SORT_CLEAN_RE = /[^\w\s一-龥]/g
+const cleanStr = (s: string | undefined) => (s || '').replace(SORT_CLEAN_RE, '').trim()
+const charPriority = (s: string) => {
+  if (!s) return 4
+  const f = s.charAt(0)
+  if (f >= '0' && f <= '9') return 0
+  if (f >= 'A' && f <= 'Z') return 1
+  if (f >= 'a' && f <= 'z') return 2
+  return 3
+}
+const customCompare = (a: string | undefined, b: string | undefined, asc: boolean) => {
+  const c1 = cleanStr(a); const c2 = cleanStr(b)
+  const p1 = charPriority(c1); const p2 = charPriority(c2)
+  if (p1 !== p2) return asc ? p1 - p2 : p2 - p1
+  return asc ? c1.localeCompare(c2, 'zh-CN') : c2.localeCompare(c1, 'zh-CN')
+}
+
 const sortedSongs = computed(() => {
   if (!props.enableSort || sortType.value === 'default') return props.songs
   const list = [...props.songs]
-  const customCompare = (a: string | undefined, b: string | undefined, asc: boolean) => {
-    const clean = (s: string | undefined) => (s || '').replace(/[^\w\s一-龥]/g, '').trim()
-    const c1 = clean(a); const c2 = clean(b)
-    const pri = (s: string) => {
-      if (!s) return 4
-      const f = s.charAt(0)
-      if (/[0-9]/.test(f)) return 0
-      if (/[A-Z]/.test(f)) return 1
-      if (/[a-z]/.test(f)) return 2
-      return 3
-    }
-    const p1 = pri(c1); const p2 = pri(c2)
-    if (p1 !== p2) return asc ? p1 - p2 : p2 - p1
-    return asc ? c1.localeCompare(c2, 'zh-CN') : c2.localeCompare(c1, 'zh-CN')
-  }
   list.sort((a, b) => {
     switch (sortType.value) {
       case 'title_asc': return customCompare(a.name, b.name, true)
