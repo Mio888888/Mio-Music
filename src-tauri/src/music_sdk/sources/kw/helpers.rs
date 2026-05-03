@@ -74,6 +74,8 @@ pub fn parse_quality_types(minfo: &str) -> Vec<String> {
             .unwrap_or(0);
         let quality = match bitrate {
             20900 => Some("master"),
+            20501 => Some("atmos_plus"),
+            20201 => Some("atmos"),
             4000 => Some("hires"),
             2000 => Some("flac"),
             320 => Some("320k"),
@@ -90,7 +92,9 @@ pub fn parse_quality_types(minfo: &str) -> Vec<String> {
 
 pub fn quality_rank(q: &str) -> u8 {
     match q {
-        "master" => 5,
+        "master" => 7,
+        "atmos_plus" => 6,
+        "atmos" => 5,
         "hires" => 4,
         "flac" => 3,
         "320k" => 2,

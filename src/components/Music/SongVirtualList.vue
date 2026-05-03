@@ -554,7 +554,7 @@ watch(() => props.songs, (newSongs) => {
                     v-if="getSong(virtualRow.index)?.types?.length"
                     class="quality-tag"
                   >
-                    {{ getQualityDisplayName(getSong(virtualRow.index)!.types![getSong(virtualRow.index)!.types!.length - 1]) }}
+                    {{ getQualityDisplayName(getSong(virtualRow.index)!.types![0]) }}
                   </span>
                   <span
                     v-else-if="getLocalQualityLabel(getSong(virtualRow.index)!)"

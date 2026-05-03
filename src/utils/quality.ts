@@ -1,5 +1,6 @@
 export const QUALITY_ORDER = [
   'master',
+  'atmos_plus',
   'atmos',
   'hires',
   'flac24bit',
@@ -18,6 +19,7 @@ const DISPLAY_NAME_MAP: Record<string, string> = {
   flac24bit: '24bit FLAC',
   hires: 'Hi-Res 高解析度',
   atmos: '杜比全景声',
+  atmos_plus: '杜比全景声+',
   master: '母带音质'
 }
 
