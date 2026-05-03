@@ -183,14 +183,6 @@ const fetchSdkLyrics = async (
   let lyricData: any
   const cleanInfo = getCleanSongInfo(songInfo)
   try {
-    console.log('[Lyrics] SDK request:', source, {
-      songmid: cleanInfo?.songmid,
-      copyrightId: cleanInfo?.copyrightId,
-      lrcUrl: cleanInfo?.lrcUrl,
-      mrcUrl: cleanInfo?.mrcUrl,
-      trcUrl: cleanInfo?.trcUrl,
-      img: cleanInfo?.img?.substring(0, 60)
-    })
     lyricData = await (window as any).api?.music?.requestSdk?.('getLyric', {
       source,
       songInfo: cleanInfo,
@@ -476,8 +468,7 @@ export const useGlobalPlayStatusStore = defineStore(
               player.cover = picUrl
               return
             }
-          } catch (e) {
-            console.warn('[Cover] MG SDK getPic failed:', e)
+          } catch {
           }
           player.cover = '/default-cover.png'
           return
@@ -487,12 +478,10 @@ export const useGlobalPlayStatusStore = defineStore(
           if (pluginId) {
             try {
               const picUrl = await PluginRunner.getPic(pluginId, info.source, getCleanSongInfo(info))
-              console.log('[Cover] getPic result:', info.source, picUrl?.substring(0, 60))
               if (picUrl && player.songInfo && !player.songInfo.img) {
                 newImg = picUrl
               }
-            } catch (e) {
-              console.warn('[Cover] getPic failed:', info.source, e)
+            } catch {
             }
           }
         }
@@ -505,9 +494,6 @@ export const useGlobalPlayStatusStore = defineStore(
       () => player.cover,
       async (newCover) => {
         if (!newCover) return
-        if (newCover.startsWith('http')) {
-          console.warn('[Cover→color] raw HTTP URL detected, will fail CORS:', newCover.substring(0, 80))
-        }
         try {
           const { dominantColor, useBlackText } = await analyzeImageColors(newCover)
           player.coverDetail.ColorObject = dominantColor

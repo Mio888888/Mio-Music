@@ -94,10 +94,7 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
         .map(|s| s.to_string())
         .unwrap_or_else(|| get_song_img(&song_info));
 
-    println!("[MG getPic] img_url={}, songmid={:?}", img_url, song_info.get("songmid"));
-
     if img_url.is_empty() {
-        println!("[MG getPic] no image URL found");
         return Ok(serde_json::json!({ "url": "" }));
     }
 
@@ -108,19 +105,16 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
 
     match resp {
         Ok(response) => {
-            let status = response.status();
             let content_type = response.headers()
                 .get("content-type")
                 .and_then(|v| v.to_str().ok())
                 .unwrap_or("image/jpeg")
                 .to_string();
             let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-            println!("[MG getPic] fetched OK, status={}, content_type={}, size={} bytes", status, content_type, bytes.len());
             let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes);
             Ok(serde_json::json!({ "url": format!("data:{};base64,{}", content_type, b64) }))
         }
-        Err(e) => {
-            println!("[MG getPic] backend fetch failed: {}, returning raw URL", e);
+        Err(_) => {
             Ok(serde_json::json!({ "url": img_url }))
         }
     }
@@ -141,28 +135,19 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
         .unwrap_or("")
         .to_string();
 
-    println!("[MG getLyric] songmid={}, copyrightId={}, songInfo keys={:?}",
-        songmid, copyright_id,
-        song_info.as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()).unwrap_or_default()
-    );
-
     // Try MRC (encrypted lyric) first
     let mrc_url = song_info.get("mrcUrl")
         .and_then(|v| v.as_str()).unwrap_or("");
     if !mrc_url.is_empty() {
-        println!("[MG getLyric] trying mrcUrl: {}", mrc_url);
         if let Ok(text) = get_text_from_url(mrc_url).await {
             let decrypted = decrypt_mrc(&text);
             let parsed = parse_mrc_lyrics(&decrypted);
             let lyric = parsed.get("lyric").and_then(|v| v.as_str()).unwrap_or("");
             let crlyric = parsed.get("crlyric").and_then(|v| v.as_str()).unwrap_or("");
-            println!("[MG getLyric] MRC success, lyric={} chars, crlyric={} chars", lyric.len(), crlyric.len());
             let tlyric = get_optional_text(song_info.get("trcUrl").and_then(|v| v.as_str()).unwrap_or("")).await;
             return Ok(serde_json::json!({
                 "lyric": lyric, "crlyric": crlyric, "tlyric": tlyric, "source": "mg"
             }));
-        } else {
-            println!("[MG getLyric] mrcUrl fetch failed");
         }
     }
 
@@ -170,15 +155,11 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
     let lrc_url = song_info.get("lrcUrl")
         .and_then(|v| v.as_str()).unwrap_or("");
     if !lrc_url.is_empty() {
-        println!("[MG getLyric] trying lrcUrl: {}", lrc_url);
         if let Ok(text) = get_text_from_url(lrc_url).await {
-            println!("[MG getLyric] LRC success, {} chars", text.len());
             let tlyric = get_optional_text(song_info.get("trcUrl").and_then(|v| v.as_str()).unwrap_or("")).await;
             return Ok(serde_json::json!({
                 "lyric": text, "crlyric": "", "tlyric": tlyric, "source": "mg"
             }));
-        } else {
-            println!("[MG getLyric] lrcUrl fetch failed");
         }
     }
 
@@ -189,36 +170,23 @@ pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, Str
             "https://music.migu.cn/v3/api/music/audioPlayer/getLyric?copyrightId={}",
             lyric_id
         );
-        println!("[MG getLyric] trying web API, lyric_id={}, url={}", lyric_id, url);
         if let Ok(resp) = get_http().get(&url)
             .header("Referer", "https://music.migu.cn/v3/music/player/audio?from=migu")
             .send().await
         {
-            let status = resp.status();
             if let Ok(json) = resp.json::<serde_json::Value>().await {
                 let return_code = json.get("returnCode").and_then(|v| v.as_str()).unwrap_or("");
-                println!("[MG getLyric] web API response: status={}, returnCode={}", status, return_code);
                 if return_code == "000000" {
                     if let Some(lyric) = json.get("lyric").and_then(|v| v.as_str()) {
-                        println!("[MG getLyric] web API success, lyric={} chars", lyric.len());
                         return Ok(serde_json::json!({
                             "lyric": lyric, "crlyric": "", "tlyric": "", "source": "mg"
                         }));
-                    } else {
-                        println!("[MG getLyric] web API returned 000000 but no lyric field, keys={:?}", json.as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()));
                     }
-                } else {
-                    println!("[MG getLyric] web API returnCode={}", return_code);
                 }
-            } else {
-                println!("[MG getLyric] web API JSON parse failed, status={}", status);
             }
-        } else {
-            println!("[MG getLyric] web API request failed");
         }
     }
 
-    println!("[MG getLyric] all methods failed, returning empty for songmid={}", songmid);
     Ok(serde_json::json!({ "lyric": "", "crlyric": "", "tlyric": "", "source": "mg" }))
 }
 

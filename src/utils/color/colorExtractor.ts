@@ -63,20 +63,11 @@ function getImagePixels(imageSrc: string): Promise<Uint8ClampedArray | null> {
         canvas.height = size
         ctx.drawImage(img, 0, 0, size, size)
         resolve(ctx.getImageData(0, 0, size, size).data)
-      } catch (e) {
-        const isCors = e instanceof DOMException && e.name === 'SecurityError'
-        if (isCors) {
-          console.warn(`[colorExtractor] CORS tainted canvas for: ${imageSrc.substring(0, 80)}... — img needs backend proxy`)
-        } else {
-          console.warn('[colorExtractor] canvas read failed:', e)
-        }
+      } catch {
         resolve(null)
       }
     }
-    img.onerror = () => {
-      console.warn(`[colorExtractor] image load failed: ${imageSrc.substring(0, 80)}`)
-      resolve(null)
-    }
+    img.onerror = () => resolve(null)
     img.src = imageSrc
     if (img.complete) img.onload!(new Event('load'))
   })
