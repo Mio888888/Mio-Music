@@ -5,7 +5,6 @@ import {
   PixiRenderer
 } from '@applemusic-like-lyrics/core'
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/vue'
-import LyricAdapter from './Lyric/LyricAdapter.vue'
 import type { SongList } from '@/types/audio'
 import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
@@ -333,8 +332,7 @@ const jumpTime = (e: any) => {
     MessagePlugin.warning('投屏模式下不支持拖拽进度')
     return
   }
-  // LyricPlayer: e.line.getLine().startTime; LyricAdapter: e.time
-  const startTime = e?.line?.getLine?.()?.startTime ?? e?.time ?? 0
+  const startTime = e?.line?.getLine?.()?.startTime ?? 0
   if (Audio.value.isPlay) invoke('player__seek', { position: startTime / 1000 })
 }
 
@@ -615,28 +613,11 @@ onUnmounted(() => {
           <span>暂无歌词</span>
         </div>
         <LyricPlayer
-          v-if="playSetting.getUseAmlLyricRenderer && player.lyrics.lines.length > 0"
+          v-if="player.lyrics.lines.length > 0"
           ref="lyricPlayerRef"
           :lyric-lines="safeLyricLines"
           :current-time="state.currentTime"
           :word-fade-width="0.5"
-          :playing="isAudioPlaying"
-          class="lyric-player"
-          :align-position="
-            playSetting.getLayoutMode === 'cd' && playSetting.getShowLeftPanel ? 0.5 : 0.34
-          "
-          :enable-blur="playSetting.getIsBlurLyric"
-          :enable-spring="playSetting.getisJumpLyric"
-          :enable-scale="playSetting.getisJumpLyric"
-          :text-align="!playSetting.getShowLeftPanel ? 'center' : 'left'"
-          :style="playSetting.getShowLeftPanel ? '' : 'text-align: center;'"
-          @line-click="jumpTime"
-        />
-        <LyricAdapter
-          v-else-if="player.lyrics.lines.length > 0"
-          ref="lyricPlayerRef"
-          :lyric-lines="safeLyricLines"
-          :current-time="state.currentTime"
           :playing="isAudioPlaying"
           class="lyric-player"
           :align-position="

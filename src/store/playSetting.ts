@@ -14,7 +14,6 @@ export const playSetting = defineStore('playSetting', {
     isSeamlessTransition: false,
     seamlessMode: 'gapless' as 'gapless' | 'crossfade',
     crossfadeDuration: 3000,
-    useAmlLyricRenderer: true,
     isGrepLyricInfo: false,
     strictGrep: false
   }),
@@ -31,7 +30,6 @@ export const playSetting = defineStore('playSetting', {
     getIsSeamlessTransition: (state) => state.isSeamlessTransition,
     getSeamlessMode: (state) => state.seamlessMode,
     getCrossfadeDuration: (state) => state.crossfadeDuration,
-    getUseAmlLyricRenderer: (state) => state.useAmlLyricRenderer,
     getIsGrepLyricInfo: (state) => state.isGrepLyricInfo,
     getStrictGrep: (state) => state.strictGrep
   },
@@ -48,7 +46,6 @@ export const playSetting = defineStore('playSetting', {
     setIsSeamlessTransition(isSeamlessTransition: boolean) { this.isSeamlessTransition = isSeamlessTransition },
     setSeamlessMode(seamlessMode: 'gapless' | 'crossfade') { this.seamlessMode = seamlessMode },
     setCrossfadeDuration(crossfadeDuration: number) { this.crossfadeDuration = crossfadeDuration },
-    setUseAmlLyricRenderer(use: boolean) { this.useAmlLyricRenderer = use },
     setIsGrepLyricInfo(isGrepLyricInfo: boolean) { this.isGrepLyricInfo = isGrepLyricInfo },
     setStrictGrep(strictGrep: boolean) { this.strictGrep = strictGrep }
   },

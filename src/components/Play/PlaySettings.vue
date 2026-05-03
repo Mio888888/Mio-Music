@@ -57,11 +57,6 @@ const settingSections = computed(() => [
         update: (val: boolean) => playSetting.setIsPauseTransition(val)
       },
       // 无感过渡单独渲染
-      {
-        label: '使用 Apple 风格歌词',
-        value: playSetting.getUseAmlLyricRenderer,
-        update: (val: boolean) => playSetting.setUseAmlLyricRenderer(val)
-      }
     ]
   },
   {
