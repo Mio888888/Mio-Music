@@ -11,7 +11,12 @@ import {
   toRaw
 } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
+import {
+  installDesktopLyricBridge,
+  uninstallDesktopLyricBridge
+} from '@/utils/lyrics/desktopLyricBridge'
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import icons from '@/assets/icon_font/icons'
@@ -182,6 +187,7 @@ const toggleDesktopLyric = async () => {
     if (!desktopLyricOpen.value) {
       window.electron?.ipcRenderer?.send?.('change-desktop-lyric', true)
       desktopLyricOpen.value = true
+      installDesktopLyricBridge()
       // 恢复最新锁定状态
       const lock = await window.electron?.ipcRenderer?.invoke?.('get-lyric-lock-state')
       desktopLyricLocked.value = !!lock
@@ -199,6 +205,7 @@ const toggleDesktopLyric = async () => {
     // 未锁定则关闭
     window.electron?.ipcRenderer?.send?.('change-desktop-lyric', false)
     desktopLyricOpen.value = false
+    uninstallDesktopLyricBridge()
   } catch (e) {
     console.error('切换桌面歌词失败:', e)
   }
@@ -358,12 +365,14 @@ onMounted(async () => {
       async (_: any, visible: boolean) => {
         desktopLyricOpen.value = !!visible
         if (desktopLyricOpen.value) {
+          installDesktopLyricBridge()
           try {
             const lock = await window.electron?.ipcRenderer?.invoke?.('get-lyric-lock-state')
             desktopLyricLocked.value = !!lock
           } catch {}
         } else {
           desktopLyricLocked.value = false
+          uninstallDesktopLyricBridge()
         }
       }
     )
@@ -373,6 +382,7 @@ onMounted(async () => {
     window.electron?.ipcRenderer?.on?.('closeDesktopLyric', () => {
       desktopLyricOpen.value = false
       desktopLyricLocked.value = false
+      uninstallDesktopLyricBridge()
     })
   } catch {}
   // 初始化同步当前打开与锁定状态（Tauri 无此后端，静默降级）
@@ -397,6 +407,25 @@ onMounted(async () => {
   // stash handler for removal
   ;(window as any).__open_playlist_handler__ = openPlaylistHandler
   ;(window as any).__close_playlist_handler__ = closePlaylistHandler
+
+  // 监听来自桌面歌词窗口的控制事件
+  listen('desktop-lyric-control', (event) => {
+    const { name, value } = event.payload as any
+    if (name === 'close') {
+      window.electron?.ipcRenderer?.send?.('change-desktop-lyric', false)
+      desktopLyricOpen.value = false
+      uninstallDesktopLyricBridge()
+      return
+    }
+    if (name === 'lock') {
+      window.electron?.ipcRenderer?.send?.('toogleDesktopLyricLock', value)
+      desktopLyricLocked.value = !!value
+      return
+    }
+    window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name } }))
+  }).then((unlistenFn) => {
+    ;(window as any).__desktop_lyric_control_unlisten__ = unlistenFn
+  }).catch(() => {})
 })
 
 // 组件卸载时清理
@@ -419,6 +448,12 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', handleVolumeDragEnd)
   window.removeEventListener('mousemove', handleProgressDragMove)
   window.removeEventListener('mouseup', handleProgressDragEnd)
+
+  // 清理桌面歌词控制事件监听
+  try {
+    const unlistenDesktopLyric = (window as any).__desktop_lyric_control_unlisten__
+    if (unlistenDesktopLyric) unlistenDesktopLyric()
+  } catch {}
 })
 
 // 组件被激活时（从缓存中恢复）

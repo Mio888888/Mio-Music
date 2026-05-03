@@ -1,55 +1,145 @@
 import { storeToRefs } from 'pinia'
-import { emit } from '@tauri-apps/api/event'
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { watch } from 'vue'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { findCurrentLine, getLineText } from '@/types/lyric'
+import type { LyricLine } from '@/types/lyric'
 
 let rafId: number | null = null
-let isRunning = false
+let installed = false
+let readyUnlisten: UnlistenFn | null = null
 
-export function startDesktopLyricSync() {
-  if (isRunning) return
-  isRunning = true
+// IPC 节流：行索引/播放状态变化时才发送对应事件
+let lastIdx = -1
+let lastPlayState = false
+
+// 时间同步节流：每 ~100ms 发送一次进度，桌面端用本地 RAF 时钟插值
+const SYNC_INTERVAL_MS = 100
+let lastSyncTime = 0
+
+function computeLyricIndex(lines: LyricLine[], timeMs: number): number {
+  if (!lines.length) return -1
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (timeMs >= lines[i].startTime) return i
+  }
+  return -1
+}
+
+function pushLyricChange(lines: LyricLine[]) {
+  emit('desktop-lyric-change', lines).catch(() => {})
+}
+
+function pushSongChange(name: string, singer: string) {
+  emit('desktop-song-change', { name, singer }).catch(() => {})
+}
+
+function pushProgress(currentMs: number) {
+  emit('desktop-lyric-progress', {
+    currentMs,
+    timestamp: performance.now()
+  }).catch(() => {})
+}
+
+function pushIndexChange(index: number) {
+  emit('desktop-lyric-index', index).catch(() => {})
+}
+
+function pushPlayStateChange(isPlaying: boolean) {
+  emit('desktop-lyric-play-state', isPlaying).catch(() => {})
+}
+
+function pushSnapshot(audioStore: ReturnType<typeof ControlAudioStore>, playStatus: ReturnType<typeof useGlobalPlayStatusStore>) {
+  const { Audio } = storeToRefs(audioStore)
+  const { player } = storeToRefs(playStatus)
+
+  const lines = player.value.lyrics?.lines || []
+  pushLyricChange(lines)
+
+  const song = player.value.songInfo as any
+  if (song?.name || song?.singer) pushSongChange(song.name, song.singer)
+
+  const currentTimeMs = (Audio.value.currentTime || 0) * 1000
+  const idx = computeLyricIndex(lines, currentTimeMs)
+  lastIdx = idx
+  pushIndexChange(idx)
+  pushProgress(currentTimeMs)
+  pushPlayStateChange(Audio.value.isPlay)
+}
+
+export function installDesktopLyricBridge() {
+  if (installed) return
+  installed = true
 
   const audioStore = ControlAudioStore()
   const playStatus = useGlobalPlayStatusStore()
   const { Audio } = storeToRefs(audioStore)
   const { player } = storeToRefs(playStatus)
 
-  let lastIdx = -1
-  let lastPlayState = false
+  // 歌词数据变化 → 发送完整 LyricLine[]
+  watch(
+    () => player.value.lyrics.lines,
+    (lines) => {
+      lastIdx = -1
+      pushLyricChange(lines)
+    },
+    { immediate: true }
+  )
 
+  // 歌曲信息变化 → 发送歌名/歌手
+  watch(
+    () => player.value.songInfo,
+    (song) => {
+      const name = (song as any)?.name || ''
+      const singer = (song as any)?.singer || ''
+      if (name || singer) pushSongChange(name, singer)
+    },
+    { immediate: true }
+  )
+
+  // 播放状态变化
+  watch(
+    () => Audio.value.isPlay,
+    (isPlay) => {
+      pushPlayStateChange(isPlay)
+    },
+    { immediate: true }
+  )
+
+  // 桌面歌词窗口准备好后，补发一次快照
+  listen('desktop-lyric-ready', () => {
+    console.log('[DesktopLyricBridge] Received ready event, pushing snapshot...')
+    pushSnapshot(audioStore, playStatus)
+  }).then((unlisten) => {
+    readyUnlisten = unlisten
+  }).catch(() => {})
+
+  // RAF 循环：周期性发送时间同步 + 行索引变化检测
   const tick = () => {
-    if (!isRunning) return
+    if (!installed) return
 
     const lines = player.value.lyrics?.lines || []
     const currentTimeMs = (Audio.value.currentTime || 0) * 1000
-    const currentIdx = findCurrentLine(lines, currentTimeMs)
+    const currentIdx = computeLyricIndex(lines, currentTimeMs)
     const isPlaying = Audio.value.isPlay
 
-    // 只在歌词行变化或播放状态变化时发送 IPC，从 60fps 降至按需发送
-    if (currentIdx !== lastIdx || isPlaying !== lastPlayState) {
+    // 行索引变化 → 立即发送
+    if (currentIdx !== lastIdx) {
       lastIdx = currentIdx
+      pushIndexChange(currentIdx)
+    }
+
+    // 播放状态变化 → 立即发送
+    if (isPlaying !== lastPlayState) {
       lastPlayState = isPlaying
+      pushPlayStateChange(isPlaying)
+    }
 
-      const currentLine = currentIdx >= 0 ? lines[currentIdx] : null
-      const nextLine = currentIdx + 1 < lines.length ? lines[currentIdx + 1] : null
-
-      emit('desktop-lyric-update', {
-        currentLine: currentLine ? {
-          text: getLineText(currentLine),
-          translation: currentLine.translatedLyric,
-          time: currentLine.startTime,
-          duration: currentLine.endTime - currentLine.startTime
-        } : null,
-        nextLine: nextLine ? { text: getLineText(nextLine), translation: nextLine.translatedLyric } : null,
-        currentIndex: currentIdx,
-        totalLines: lines.length,
-        currentTime: currentTimeMs,
-        isPlaying,
-        songName: player.value.songInfo?.name || '',
-        songSinger: player.value.songInfo?.singer || ''
-      }).catch(() => {})
+    // 周期性时间同步（桌面端用此锚定本地时钟）
+    const now = performance.now()
+    if (now - lastSyncTime >= SYNC_INTERVAL_MS) {
+      lastSyncTime = now
+      pushProgress(currentTimeMs)
     }
 
     rafId = requestAnimationFrame(tick)
@@ -58,10 +148,18 @@ export function startDesktopLyricSync() {
   rafId = requestAnimationFrame(tick)
 }
 
-export function stopDesktopLyricSync() {
-  isRunning = false
+export function uninstallDesktopLyricBridge() {
+  installed = false
   if (rafId !== null) {
     cancelAnimationFrame(rafId)
     rafId = null
   }
+  if (readyUnlisten) {
+    readyUnlisten()
+    readyUnlisten = null
+  }
 }
+
+// 兼容旧接口
+export const startDesktopLyricSync = installDesktopLyricBridge
+export const stopDesktopLyricSync = uninstallDesktopLyricBridge

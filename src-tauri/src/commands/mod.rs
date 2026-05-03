@@ -8,20 +8,120 @@ pub mod power_save;
 use crate::db::AppDb;
 use base64::Engine;
 use serde_json::Value;
-use tauri::State;
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 pub type DbState<'a> = State<'a, AppDb>;
 
-/// Stub: desktop lyric window open state (not yet implemented)
-#[tauri::command]
-pub async fn get_lyric_open_state() -> Result<bool, String> {
-    Ok(false)
+/// Shared state for the desktop lyric window
+pub struct DesktopLyricState {
+    pub is_open: Mutex<bool>,
+    pub is_locked: Mutex<bool>,
 }
 
-/// Stub: desktop lyric lock state (not yet implemented)
+/// Open or close the desktop lyric window.
+///
+/// Called via `ipcSend('change-desktop-lyric', bool)` which maps to
+/// `invoke('change_desktop_lyric', { args: [bool] })`.
 #[tauri::command]
-pub async fn get_lyric_lock_state() -> Result<bool, String> {
-    Ok(false)
+pub async fn change_desktop_lyric(
+    app: AppHandle,
+    state: State<'_, DesktopLyricState>,
+    args: Vec<bool>,
+) -> Result<(), String> {
+    let open = args.first().copied().unwrap_or(false);
+
+    if open {
+        // If window already exists, just show/focus it
+        if let Some(existing) = app.get_webview_window("desktop-lyric") {
+            let _ = existing.show();
+            let _ = existing.set_focus();
+            *state.is_open.lock().map_err(|e| e.to_string())? = true;
+            return Ok(());
+        }
+
+        // Create a new desktop lyric window
+        let label = "desktop-lyric";
+        let win_width = 800.0_f64;
+        let win_height = 180.0_f64;
+
+        let mut builder = WebviewWindowBuilder::new(
+            &app,
+            label,
+            WebviewUrl::App("#/desktop-lyric".into()),
+        )
+        .title("Desktop Lyric")
+        .inner_size(win_width, win_height)
+        .always_on_top(true)
+        .decorations(false)
+        .transparent(true)
+        .skip_taskbar(true)
+        .resizable(true);
+
+        // Position the window at bottom-center of the primary monitor
+        if let Ok(monitor) = app.primary_monitor() {
+            if let Some(m) = monitor {
+                let scale = m.scale_factor();
+                let screen_w = m.size().width as f64 / scale;
+                let screen_h = m.size().height as f64 / scale;
+                let x = (screen_w - win_width) / 2.0;
+                let y = screen_h - win_height - 100.0;
+                builder = builder.position(x, y);
+            }
+        }
+
+        builder
+            .build()
+            .map_err(|e| format!("创建桌面歌词窗口失败: {}", e))?;
+
+        *state.is_open.lock().map_err(|e| e.to_string())? = true;
+    } else {
+        // Close the desktop lyric window
+        if let Some(window) = app.get_webview_window("desktop-lyric") {
+            window.close().map_err(|e| format!("关闭桌面歌词窗口失败: {}", e))?;
+        }
+        *state.is_open.lock().map_err(|e| e.to_string())? = false;
+    }
+
+    Ok(())
+}
+
+/// Toggle the desktop lyric window's cursor-events-ignore (lock) state.
+///
+/// When locked the window ignores mouse events (click-through);
+/// when unlocked it accepts pointer events normally.
+///
+/// Called via `ipcSend('toogleDesktopLyricLock', bool)`.
+#[tauri::command]
+pub async fn toogle_desktop_lyric_lock(
+    app: AppHandle,
+    state: State<'_, DesktopLyricState>,
+    args: Vec<bool>,
+) -> Result<(), String> {
+    let locked = args.first().copied().unwrap_or(false);
+
+    if let Some(window) = app.get_webview_window("desktop-lyric") {
+        window
+            .set_ignore_cursor_events(locked)
+            .map_err(|e| format!("设置桌面歌词锁定状态失败: {}", e))?;
+    }
+
+    *state.is_locked.lock().map_err(|e| e.to_string())? = locked;
+    Ok(())
+}
+
+/// Return whether the desktop lyric window is currently open.
+#[tauri::command]
+pub async fn get_lyric_open_state(state: State<'_, DesktopLyricState>) -> Result<bool, String> {
+    let is_open = state.is_open.lock().map_err(|e| e.to_string())?;
+    Ok(*is_open)
+}
+
+/// Return whether the desktop lyric window is currently locked (ignoring cursor events).
+#[tauri::command]
+pub async fn get_lyric_lock_state(state: State<'_, DesktopLyricState>) -> Result<bool, String> {
+    let is_locked = state.is_locked.lock().map_err(|e| e.to_string())?;
+    Ok(*is_locked)
 }
 
 /// 获取系统已安装字体列表

@@ -30,6 +30,10 @@ pub fn run() {
         .manage(app_db)
         .manage(plugin_manager)
         .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
+        .manage(commands::DesktopLyricState {
+            is_open: Mutex::new(false),
+            is_locked: Mutex::new(false),
+        })
         .setup(|app| {
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("音乐")
@@ -218,7 +222,9 @@ pub fn run() {
             commands::http_proxy,
             // Audio Proxy (fetch remote audio → data URI, bypasses CORS for <audio>)
             commands::audio_proxy,
-            // Desktop lyric window state stub (not yet implemented)
+            // Desktop lyric window
+            commands::change_desktop_lyric,
+            commands::toogle_desktop_lyric_lock,
             commands::get_lyric_open_state,
             commands::get_lyric_lock_state,
             commands::get_font_list,
