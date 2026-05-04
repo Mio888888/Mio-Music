@@ -38,6 +38,7 @@
     "mitt": "^3.0.1",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
+    "pixi.js": "^7.4.3",
     "tdesign-icons-vue-next": "^0.4.4",
     "tdesign-vue-next": "^1.19.1",
     "three": "^0.184.0",
