@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import '@applemusic-like-lyrics/core/style.css'
-import { ref, shallowRef, computed, onMounted, onBeforeUnmount, markRaw, watch, type Component } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, markRaw, type Component } from 'vue'
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { LyricLine } from '@/types/lyric'
 
 const LyricPlayerComp = shallowRef<Component | null>(null)
@@ -24,8 +23,6 @@ const isPlaying = ref(false)
 const isLocked = ref(false)
 const isHovering = ref(false)
 
-const isDragging = ref(false)
-
 let baseMs = 0
 let anchorTick = 0
 const playSeekMs = ref(0)
@@ -36,23 +33,18 @@ const unlisteners: UnlistenFn[] = []
 interface StyleOption {
   fontSize?: number
   mainColor?: string
-  shadowColor?: string
   fontWeight?: number
   fontFamily?: string
   position?: 'left' | 'center' | 'right' | 'both'
   showYrc?: boolean
-  textBackgroundMask?: boolean
-  backgroundMaskColor?: string
 }
 
 const styleOptions = ref<StyleOption>({})
 const fontSize = computed(() => styleOptions.value.fontSize || 30)
-const fontWeight = computed(() => styleOptions.value.fontWeight || 700)
+const fontWeight = computed(() => styleOptions.value.fontWeight || 800)
 const fontFamily = computed(() => styleOptions.value.fontFamily || '')
 const resolvedFontFamily = computed(() => fontFamily.value || '-apple-system, BlinkMacSystemFont, sans-serif')
 const lyricViewColor = computed(() => styleOptions.value.mainColor || 'rgba(255, 255, 255, 1)')
-const lyricShadowColor = computed(() => styleOptions.value.shadowColor || 'rgba(0, 0, 0, 0.7)')
-const lyricTextShadow = computed(() => `0 0 4px ${lyricShadowColor.value}, 0 0 10px ${lyricShadowColor.value}`)
 
 const lyricPosition = computed(() => styleOptions.value.position || 'center')
 const alignAnchor = computed(() => {
@@ -72,10 +64,6 @@ const lyricTextAlign = computed(() => {
 })
 
 const showYrc = computed(() => styleOptions.value.showYrc !== false)
-const textBackgroundMask = computed(() => styleOptions.value.textBackgroundMask === true)
-const backgroundMaskColor = computed(() => styleOptions.value.backgroundMaskColor || 'rgba(0,0,0,0.5)')
-const lyricLineBackground = computed(() => (textBackgroundMask.value ? backgroundMaskColor.value : 'transparent'))
-const lyricLineShadow = computed(() => (textBackgroundMask.value ? `0 2px 12px ${backgroundMaskColor.value}` : 'none'))
 
 const safeLyricLines = computed(() => {
   if (showYrc.value) return lyricLines.value
@@ -106,7 +94,7 @@ const currentTimeMs = computed(() => Math.floor(playSeekMs.value))
 const placeholderText = computed(() => {
   if (lyricLines.value.length > 0) return ''
   if (songInfo.value.name) return `${songInfo.value.name} - ${songInfo.value.singer}`
-  return 'Ceru Desktop Lyric'
+  return 'Mio Desktop Lyric'
 })
 
 // RAF Clock
@@ -132,7 +120,6 @@ function stopRafLoop() {
 
 // IPC handlers
 function handleLyricChange(lines: LyricLine[]) {
-  console.log('[DeskTopLyric] Received lyric change, raw lines:', lines?.length, lines?.[0])
   const normalized = (lines || []).map((l: any) => ({
     ...l,
     translatedLyric: l.translatedLyric ?? '',
@@ -151,7 +138,6 @@ function handleLyricChange(lines: LyricLine[]) {
     endTime: Number(l?.endTime ?? 0),
   }))
   lyricLines.value = markRaw(normalized)
-  console.log('[DeskTopLyric] Processed lyricLines:', lyricLines.value.length, lyricLines.value[0])
 }
 
 function handleSongChange(data: { name: string; singer: string }) {
@@ -201,22 +187,8 @@ function onToggleLock() {
 
 function onClose() { emitControl('close') }
 
-async function onDragStart(e: MouseEvent) {
-  if (isLocked.value) return
-  isDragging.value = true
-  e.preventDefault()
-  try {
-    await getCurrentWindow().startDragging()
-  } catch {}
-}
-
-function onDragEnd() {
-  isDragging.value = false
-}
-
 // Lifecycle
 onMounted(async () => {
-  // Load AMLL LyricPlayer component (may fail in some WebView contexts)
   loadLyricPlayer()
 
   try {
@@ -254,8 +226,14 @@ onMounted(async () => {
     })
   )
 
+  // Listen for force-unlock from system tray
+  unlisteners.push(
+    await listen<boolean>('desktop-lyric-force-unlock', () => {
+      isLocked.value = false
+    })
+  )
+
   startRafLoop()
-  console.log('[DeskTopLyric] Component mounted, emitting ready event')
   emit('desktop-lyric-ready', {}).catch(() => {})
 })
 
@@ -271,9 +249,9 @@ onBeforeUnmount(() => {
 <template>
   <div
     :class="['desktop-lyric', { locked: isLocked, hovered: isHovering }]"
+    data-tauri-drag-region
     @mouseenter="isHovering = true"
     @mouseleave="isHovering = false"
-    @pointerup="onDragEnd"
   >
     <!-- AMLL LyricPlayer -->
     <component
@@ -282,7 +260,7 @@ onBeforeUnmount(() => {
       :lyric-lines="safeLyricLines"
       :current-time="currentTimeMs"
       :playing="isPlaying"
-      :enable-blur="false"
+      :enable-blur="true"
       :enable-spring="false"
       :enable-scale="false"
       :align-anchor="alignAnchor"
@@ -290,17 +268,6 @@ onBeforeUnmount(() => {
       :style="{ textAlign: lyricTextAlign }"
       class="desktop-lyric-player"
     />
-
-    <!-- Drag handle (top area, visible on hover when not locked) -->
-    <div
-      v-if="isHovering && !isLocked"
-      class="drag-handle"
-      @pointerdown="onDragStart"
-    >
-      <div class="drag-dots">
-        <span></span><span></span><span></span>
-      </div>
-    </div>
 
     <!-- Error state -->
     <div v-else-if="lyricPlayerError" class="lyric-placeholder">
@@ -312,7 +279,7 @@ onBeforeUnmount(() => {
       <span>{{ placeholderText }}</span>
     </div>
 
-    <!-- Control bar (shown on hover, not when locked) -->
+    <!-- Control bar (outside drag region, shown on hover when not locked) -->
     <Transition name="controls">
       <div v-if="isHovering && !isLocked" class="controls-bar" @pointerdown.stop>
         <div class="song-info" v-if="songInfo.name">
@@ -371,60 +338,52 @@ onBeforeUnmount(() => {
   user-select: none;
   position: relative;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'lyricfont', 'Segoe UI', Roboto,
-    sans-serif;
+  font-family: v-bind(resolvedFontFamily);
   font-weight: v-bind(fontWeight);
-  opacity: 0.6;
-  transition: opacity 0.3s ease;
-
-  &.hovered {
-    opacity: 1;
-  }
-
   &.locked {
     pointer-events: none;
-    opacity: 0.4;
   }
 }
 
 .desktop-lyric-player {
   width: 100%;
   height: 100%;
+  pointer-events: none;
   --amll-lyric-view-color: v-bind(lyricViewColor);
   --amll-lp-color: v-bind(lyricViewColor);
   --amll-lyric-player-font-size: v-bind(fontSize + 'px');
   --amll-lp-font-size: v-bind(fontSize + 'px');
   --amll-lyric-player-font-weight: v-bind(fontWeight);
   font-family: v-bind(resolvedFontFamily);
-  text-shadow: v-bind(lyricTextShadow);
 
-  :deep(.FmKaba_lyricMainLine),
-  :deep(.FmKaba_lyricSubLine),
-  :deep([class*='lyricMainLine']),
-  :deep([class*='lyricSubLine']) {
-    text-shadow: v-bind(lyricTextShadow) !important;
+  // Active lyric line only: larger + tracking
+  :deep(.FmKaba_active .FmKaba_lyricMainLine),
+  :deep([class*='_active'] [class*='lyricMainLine']) {
+    font-size: calc(var(--amll-lp-font-size) * 1.2) !important;
+    line-height: 1.3 !important;
+    letter-spacing: 0.08em !important;
     font-weight: v-bind(fontWeight) !important;
   }
 
-  :deep(.FmKaba_lyricLine),
-  :deep(.amll-lyric-player),
-  :deep([class*='lyricLine']) {
-    background-color: v-bind(lyricLineBackground) !important;
-    box-shadow: v-bind(lyricLineShadow) !important;
+  // Non-active lines: smaller + dimmed
+  :deep(.FmKaba_lyricLine:not(.FmKaba_active) .FmKaba_lyricMainLine),
+  :deep([class*='lyricLine']:not([class*='_active']) [class*='lyricMainLine']) {
+    font-size: calc(var(--amll-lp-font-size) * 0.85) !important;
+    opacity: 0.5 !important;
   }
 
-  :deep(.FmKaba_lyricBgLine),
-  :deep([class*='lyricBgLine']) {
-    opacity: 0 !important;
+  // Sub lyric line (translation)
+  :deep(.FmKaba_lyricSubLine),
+  :deep([class*='lyricSubLine']) {
+    font-weight: v-bind(fontWeight) !important;
+    pointer-events: none;
   }
 
+  // Roman word styling
   :deep([class*='romanWord']) {
     font-size: calc(var(--amll-lp-font-size) * 0.5) !important;
     font-family: v-bind(resolvedFontFamily) !important;
     opacity: 0.8;
-  }
-  :deep([class*='lyricSubLine']) {
-    font-weight: v-bind(fontWeight) !important;
   }
 }
 
@@ -437,40 +396,9 @@ onBeforeUnmount(() => {
   font-size: v-bind(fontSize + 'px');
   font-weight: v-bind(fontWeight);
   color: v-bind(lyricViewColor);
-  text-shadow: v-bind(lyricTextShadow);
+  letter-spacing: 0.08em;
   font-family: v-bind(resolvedFontFamily);
-}
-
-/* Drag handle */
-.drag-handle {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  z-index: 10;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), transparent);
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-.drag-dots {
-  display: flex;
-  gap: 3px;
-  padding: 4px 8px;
-
-  span {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-  }
+  pointer-events: none;
 }
 
 /* Controls bar */
@@ -486,6 +414,7 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(10px);
   padding: 8px 16px;
   border-radius: 20px;
+  z-index: 10;
 }
 
 .song-info {

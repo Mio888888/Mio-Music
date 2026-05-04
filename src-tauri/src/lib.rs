@@ -13,7 +13,7 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::{Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
 use commands::hotkey_commands;
 use std::sync::Mutex;
 
@@ -104,6 +104,61 @@ pub fn run() {
                 let config = hotkey_commands::load_config_from_db(&conn);
                 drop(conn);
                 hotkey_commands::re_register_shortcuts(&app_handle, &config);
+            }
+
+            // Auto-open desktop lyric if it was open on last exit
+            {
+                let state_path = db::get_app_data_dir().join("desktop_lyric_window.json");
+                let should_open = std::fs::read_to_string(&state_path)
+                    .ok()
+                    .and_then(|data| serde_json::from_str::<serde_json::Value>(&data).ok())
+                    .and_then(|val| val.get("is_open").and_then(|v| v.as_bool()))
+                    .unwrap_or(false);
+
+                if should_open {
+                    if commands::create_desktop_lyric_window(&app_handle).is_ok() {
+                        let desktop_state = app_handle.state::<commands::DesktopLyricState>();
+                        if let Ok(mut is_open) = desktop_state.is_open.lock() {
+                            *is_open = true;
+                        };
+                    }
+                }
+            }
+
+            // Setup system tray for desktop lyric unlock
+            {
+                use tauri::menu::{Menu, MenuItem};
+                use tauri::tray::TrayIconBuilder;
+
+                let unlock_item = MenuItem::with_id(app, "unlock", "解锁歌词", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+                let tray_menu = Menu::with_items(app, &[&unlock_item, &quit_item])?;
+
+                let tray = TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .menu(&tray_menu)
+                    .tooltip("Mio Music")
+                    .on_menu_event(|app_handle, event| {
+                        match event.id().as_ref() {
+                            "unlock" => {
+                                if let Some(window) = app_handle.get_webview_window("desktop-lyric") {
+                                    let _ = window.set_ignore_cursor_events(false);
+                                }
+                                let state = app_handle.state::<commands::DesktopLyricState>();
+                                if let Ok(mut locked) = state.is_locked.lock() {
+                                    *locked = false;
+                                }
+                                let _ = app_handle.emit("desktop-lyric-force-unlock", true);
+                            }
+                            "quit" => {
+                                app_handle.cleanup_before_exit();
+                                std::process::exit(0);
+                            }
+                            _ => {}
+                        }
+                    })
+                    .build(app)?;
+                std::mem::forget(tray);
             }
 
             Ok(())

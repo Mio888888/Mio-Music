@@ -4,7 +4,6 @@ import { ref, onMounted } from 'vue'
 interface LyricOption {
   fontSize: number
   mainColor: string
-  shadowColor: string
   fontWeight: number
   position: 'left' | 'center' | 'right' | 'both'
   alwaysShowPlayInfo: boolean
@@ -12,15 +11,12 @@ interface LyricOption {
   showYrc: boolean
   showTran: boolean
   isDoubleLine: boolean
-  textBackgroundMask: boolean
-  backgroundMaskColor: string
   fontFamily: string
 }
 
 const defaultOptions: LyricOption = {
   fontSize: 36,
   mainColor: '#ffffff',
-  shadowColor: '#000000',
   fontWeight: 700,
   position: 'center',
   alwaysShowPlayInfo: false,
@@ -28,8 +24,6 @@ const defaultOptions: LyricOption = {
   showYrc: true,
   showTran: true,
   isDoubleLine: false,
-  textBackgroundMask: false,
-  backgroundMaskColor: 'rgba(0,0,0,0.5)',
   fontFamily: 'lyricfont'
 }
 
@@ -121,13 +115,6 @@ onMounted(() => {
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">阴影颜色</div>
-        </div>
-        <t-color-picker :value="options.shadowColor" @change="(v: string) => updateOption('shadowColor', v)" />
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-info">
           <div class="setting-title">歌词位置</div>
         </div>
         <t-select :value="options.position" style="width: 120px;" @change="(v: any) => updateOption('position', v)">
@@ -151,14 +138,6 @@ onMounted(() => {
           <div class="setting-title">显示翻译</div>
         </div>
         <t-switch :value="options.showTran" @change="(v: any) => updateOption('showTran', Boolean(v))" />
-      </div>
-
-      <div class="setting-item">
-        <div class="setting-info">
-          <div class="setting-title">背景遮罩</div>
-          <div class="setting-desc">在歌词文字下方显示半透明背景</div>
-        </div>
-        <t-switch :value="options.textBackgroundMask" @change="(v: any) => updateOption('textBackgroundMask', Boolean(v))" />
       </div>
     </div>
   </t-card>

@@ -10,7 +10,7 @@ use base64::Engine;
 use serde_json::Value;
 use std::sync::Mutex;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub type DbState<'a> = State<'a, AppDb>;
 
@@ -24,6 +24,90 @@ pub struct DesktopLyricState {
 ///
 /// Called via `ipcSend('change-desktop-lyric', bool)` which maps to
 /// `invoke('change_desktop_lyric', { args: [bool] })`.
+fn lyric_window_state_path() -> std::path::PathBuf {
+    crate::db::get_app_data_dir().join("desktop_lyric_window.json")
+}
+
+fn save_lyric_window_state(is_open: bool, x: i32, y: i32) {
+    let path = lyric_window_state_path();
+    let json = serde_json::json!({"is_open": is_open, "x": x, "y": y});
+    let _ = std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap_or_default());
+}
+
+/// Create the desktop lyric window with saved or default position.
+pub fn create_desktop_lyric_window(app: &AppHandle) -> Result<(), String> {
+    let win_width = 600.0_f64;
+    let win_height = 180.0_f64;
+
+    let mut builder = WebviewWindowBuilder::new(
+        app,
+        "desktop-lyric",
+        WebviewUrl::App("#/desktop-lyric".into()),
+    )
+    .title("Desktop Lyric")
+    .inner_size(win_width, win_height)
+    .always_on_top(true)
+    .decorations(false)
+    .transparent(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .shadow(false);
+
+    // Try to restore saved position
+    let mut has_saved_pos = false;
+    let state_path = lyric_window_state_path();
+    if let Ok(data) = std::fs::read_to_string(&state_path) {
+        if let Ok(val) = serde_json::from_str::<Value>(&data) {
+            if let (Some(px), Some(py)) = (
+                val.get("x").and_then(|v| v.as_i64()),
+                val.get("y").and_then(|v| v.as_i64()),
+            ) {
+                let scale = app.primary_monitor()
+                    .ok()
+                    .flatten()
+                    .map(|m| m.scale_factor())
+                    .unwrap_or(1.0);
+                builder = builder.position(px as f64 / scale, py as f64 / scale);
+                has_saved_pos = true;
+            }
+        }
+    }
+
+    // Default position: bottom-center
+    if !has_saved_pos {
+        if let Ok(monitor) = app.primary_monitor() {
+            if let Some(m) = monitor {
+                let scale = m.scale_factor();
+                let screen_w = m.size().width as f64 / scale;
+                let screen_h = m.size().height as f64 / scale;
+                let x = (screen_w - win_width) / 2.0;
+                let y = screen_h - win_height - 100.0;
+                builder = builder.position(x, y);
+            }
+        }
+    }
+
+    let window = builder
+        .build()
+        .map_err(|e| format!("创建桌面歌词窗口失败: {}", e))?;
+
+    #[cfg(debug_assertions)]
+    {
+        let _ = window.close_devtools();
+    }
+
+    // Save position on every move
+    let save_path = lyric_window_state_path();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Moved(pos) = event {
+            let json = serde_json::json!({"is_open": true, "x": pos.x, "y": pos.y});
+            let _ = std::fs::write(&save_path, serde_json::to_string_pretty(&json).unwrap_or_default());
+        }
+    });
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn change_desktop_lyric(
     app: AppHandle,
@@ -41,44 +125,14 @@ pub async fn change_desktop_lyric(
             return Ok(());
         }
 
-        // Create a new desktop lyric window
-        let label = "desktop-lyric";
-        let win_width = 800.0_f64;
-        let win_height = 180.0_f64;
-
-        let mut builder = WebviewWindowBuilder::new(
-            &app,
-            label,
-            WebviewUrl::App("#/desktop-lyric".into()),
-        )
-        .title("Desktop Lyric")
-        .inner_size(win_width, win_height)
-        .always_on_top(true)
-        .decorations(false)
-        .transparent(true)
-        .skip_taskbar(true)
-        .resizable(true);
-
-        // Position the window at bottom-center of the primary monitor
-        if let Ok(monitor) = app.primary_monitor() {
-            if let Some(m) = monitor {
-                let scale = m.scale_factor();
-                let screen_w = m.size().width as f64 / scale;
-                let screen_h = m.size().height as f64 / scale;
-                let x = (screen_w - win_width) / 2.0;
-                let y = screen_h - win_height - 100.0;
-                builder = builder.position(x, y);
-            }
-        }
-
-        builder
-            .build()
-            .map_err(|e| format!("创建桌面歌词窗口失败: {}", e))?;
-
+        create_desktop_lyric_window(&app)?;
         *state.is_open.lock().map_err(|e| e.to_string())? = true;
     } else {
-        // Close the desktop lyric window
+        // Close the desktop lyric window and save state
         if let Some(window) = app.get_webview_window("desktop-lyric") {
+            if let Ok(pos) = window.outer_position() {
+                save_lyric_window_state(false, pos.x, pos.y);
+            }
             window.close().map_err(|e| format!("关闭桌面歌词窗口失败: {}", e))?;
         }
         *state.is_open.lock().map_err(|e| e.to_string())? = false;
