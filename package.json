@@ -16,6 +16,7 @@
     "@logto/vue": "^3.0.13",
     "@lrc-player/core": "^1.1.5",
     "@lrc-player/parse": "^1.0.0",
+    "@pixi/filter-bulge-pinch": "^5.1.1",
     "@tanstack/vue-virtual": "^3.13.24",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",

@@ -473,6 +473,11 @@
   resolved "https://registry.npmmirror.com/@pixi/filter-blur/-/filter-blur-7.4.3.tgz#94311e0d44946f1aa2df102d538fcc77c94011ea"
   integrity sha512-ZFzS9L/whdRbs5A/EUgF3yQaBcxNarmbuwaMgrfnpQ84mRczkGByqDLGToadiufyals07ufTrXBGRle9lbtEDA==
 
+"@pixi/filter-bulge-pinch@^5.1.1":
+  version "5.1.1"
+  resolved "https://registry.npmmirror.com/@pixi/filter-bulge-pinch/-/filter-bulge-pinch-5.1.1.tgz#b0c821b07902acf7c6ccb9046ae0dfc16c847107"
+  integrity sha512-80I3g813td7Fnzi7IJSiR3z8gZlKblk6WN+5z6WnscQROcNEpck6lgWS/Lf/IdeHB/FtUKJCbx7RzxkUhiRTvA==
+
 "@pixi/filter-color-matrix@7.4.3":
   version "7.4.3"
   resolved "https://registry.npmmirror.com/@pixi/filter-color-matrix/-/filter-color-matrix-7.4.3.tgz#dba366262dc5fa850c2dec8feb5b9da60e491bfa"
