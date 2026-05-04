@@ -54,7 +54,7 @@ export const useSettingsStore = defineStore('settings', () => {
     autoUpdate: true,
     autoImportPlaylistOnOpen: false,
     suppressImportPrompt: false,
-    lyricFontFamily: 'PingFangSC-Semibold',
+    lyricFontFamily: 'lyricfont',
     lyricFontSize: 36,
     lyricFontWeight: 700,
     closeToTray: true,
@@ -100,7 +100,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const saveSettings = () => {
     if (typeof settings.value.autoCacheMusic === 'undefined') settings.value.autoCacheMusic = true
-    if (!settings.value.lyricFontFamily) settings.value.lyricFontFamily = 'PingFangSC-Semibold'
+    if (!settings.value.lyricFontFamily) settings.value.lyricFontFamily = 'lyricfont'
     if (!settings.value.lyricFontSize) settings.value.lyricFontSize = 36
     if (!settings.value.FullPlayLyricFontRate) settings.value.FullPlayLyricFontRate = 1
     if (!settings.value.lyricFontWeight) settings.value.lyricFontWeight = 700

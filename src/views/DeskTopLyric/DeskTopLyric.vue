@@ -371,7 +371,7 @@ onBeforeUnmount(() => {
   user-select: none;
   position: relative;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFangSC-Semibold', 'Segoe UI', Roboto,
+  font-family: -apple-system, BlinkMacSystemFont, 'lyricfont', 'Segoe UI', Roboto,
     sans-serif;
   font-weight: v-bind(fontWeight);
   opacity: 0.6;

@@ -41,7 +41,7 @@ const lyricFontSize = computed(() => {
 })
 const lyricFontWeight = computed(() => settingsStore.settings.lyricFontWeight || 600)
 const lyricFontFamily = computed(
-  () => settingsStore.settings.lyricFontFamily || 'PingFangSC-Semibold'
+  () => settingsStore.settings.lyricFontFamily || 'lyricfont'
 )
 
 const safeLyricLines = computed(() => player.value.lyrics.lines || [])

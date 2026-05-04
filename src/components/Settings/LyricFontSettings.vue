@@ -9,7 +9,7 @@ const loading = ref(false)
 
 const fontFamilyArray = computed({
   get: () => {
-    const val = settingsStore.settings.lyricFontFamily || 'PingFangSC-Semibold'
+    const val = settingsStore.settings.lyricFontFamily || 'lyricfont'
     return val.split(',').map(f => f.trim()).filter(Boolean)
   },
   set: (val: string[]) => {
@@ -30,13 +30,13 @@ const loadFonts = async () => {
       if (fonts) fontList.value = fonts
     } else {
       fontList.value = [
-        'PingFangSC-Semibold', 'PingFang SC', 'Helvetica Neue', 'Arial',
+        'lyricfont', 'PingFang SC', 'Helvetica Neue', 'Arial',
         'Microsoft YaHei', 'SimHei', 'SimSun', 'KaiTi', 'FangSong',
         'STHeiti', 'STKaiti', 'STSong', 'STFangsong'
       ]
     }
   } catch (error) {
-    fontList.value = ['PingFangSC-Semibold', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Arial']
+    fontList.value = ['lyricfont', 'PingFang SC', 'Microsoft YaHei', 'SimHei', 'Arial']
   } finally {
     loading.value = false
   }
@@ -109,7 +109,7 @@ onMounted(() => {
         <div
           class="preview-text"
           :style="{
-            fontFamily: settingsStore.settings.lyricFontFamily || 'PingFangSC-Semibold',
+            fontFamily: settingsStore.settings.lyricFontFamily || 'lyricfont',
             fontSize: previewFontSize,
             fontWeight: settingsStore.settings.lyricFontWeight || 700
           }"

@@ -30,7 +30,7 @@ const defaultOptions: LyricOption = {
   isDoubleLine: false,
   textBackgroundMask: false,
   backgroundMaskColor: 'rgba(0,0,0,0.5)',
-  fontFamily: 'PingFangSC-Semibold'
+  fontFamily: 'lyricfont'
 }
 
 const options = ref<LyricOption>({ ...defaultOptions })
