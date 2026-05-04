@@ -193,7 +193,7 @@ const toggleDesktopLyric = async () => {
     desktopLyricLocked.value = !!lock
     if (desktopLyricLocked.value) {
       // 先解锁，本次不关闭
-      window.electron?.ipcRenderer?.send?.('toogleDesktopLyricLock', false)
+      window.electron?.ipcRenderer?.send?.('toogle-desktop-lyric-lock', false)
       desktopLyricLocked.value = false
       return
     }
@@ -355,7 +355,7 @@ function globalControls(e: Event) {
 
 onMounted(async () => {
   // Electron IPC 监听器（精确注册/清理，不用 removeAllListeners）
-  lifecycle.addIpcListener('toogleDesktopLyricLock', (_, lock) => {
+  lifecycle.addIpcListener('toogle-desktop-lyric-lock', (_, lock) => {
     desktopLyricLocked.value = !!lock
   })
   lifecycle.addIpcListener('desktop-lyric-open-change', async (_: any, visible: boolean) => {
@@ -410,7 +410,7 @@ onMounted(async () => {
         return
       }
       if (name === 'lock') {
-        window.electron?.ipcRenderer?.send?.('toogleDesktopLyricLock', value)
+        window.electron?.ipcRenderer?.send?.('toogle-desktop-lyric-lock', value)
         desktopLyricLocked.value = !!value
         return
       }
