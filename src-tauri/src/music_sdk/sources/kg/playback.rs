@@ -141,6 +141,8 @@ pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value,
     let quality = get_str(&args, "quality");
 
     // Use hash if available, otherwise use songmid
+
+    // Use hash if available, otherwise use songmid
     let target_hash = if !hash.is_empty() {
         hash
     } else {
@@ -484,8 +486,6 @@ async fn get_lyric_download(
         "http://lyrics.kugou.com/download?ver=1&client=pc&id={}&accesskey={}&fmt={}&charset=utf8",
         id, access_key, fmt
     );
-
-    println!("[KG Lyrics] download_url: {}", download_url);
 
     for _ in 0..=5 {
         let resp = match get_http()

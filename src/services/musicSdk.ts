@@ -132,17 +132,17 @@ export const musicSdk = {
   },
 
   async getMusicUrl(songInfo: MusicItem, quality?: string): Promise<string> {
-    const res = await this.request('getMusicUrl', { songInfo, quality })
+    const res = await this.request('getMusicUrl', { songInfo, quality, source: songInfo.source })
     return res?.url || ''
   },
 
   async getPic(songInfo: MusicItem): Promise<string> {
-    const res = await this.request('getPic', { songInfo })
+    const res = await this.request('getPic', { songInfo, source: songInfo.source })
     return res?.url || ''
   },
 
   async getLyric(songInfo: MusicItem): Promise<string> {
-    const res = await this.request('getLyric', { songInfo })
+    const res = await this.request('getLyric', { songInfo, source: songInfo.source })
     return res?.lyric || res?.lrc || ''
   },
 

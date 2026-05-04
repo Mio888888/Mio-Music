@@ -6,7 +6,7 @@ import { Edit2Icon, PlayCircleIcon, DeleteIcon, ViewListIcon, DownloadIcon } fro
 import { LocalUserDetailStore, type PlaylistRow } from '@/store/LocalUserDetail'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
-import { downloadSong } from '@/utils/downloadHelper'
+import { downloadSingleSong } from '@/utils/audio/download'
 import type { SongList } from '@/types/audio'
 import defaultCover from '/default-cover.png'
 
@@ -205,7 +205,7 @@ const downloadPlaylist = async (playlist: PlaylistRow) => {
       }
     })
     MessagePlugin.info(`开始下载 ${songs.length} 首歌曲`)
-    songs.forEach(s => downloadSong(s))
+    songs.forEach(s => downloadSingleSong(s as any))
   } catch {
     MessagePlugin.error('下载失败')
   }

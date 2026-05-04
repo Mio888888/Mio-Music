@@ -71,6 +71,15 @@ export function buildQualityFormats(
   return list.sort((a, b) => compareQuality(a.type, b.type))
 }
 
+export function filterByPluginQualities(
+  qualities: Array<{ type: string; size?: string }>,
+  pluginQualities: string[] | undefined
+): Array<{ type: string; size?: string }> {
+  if (!pluginQualities || pluginQualities.length === 0) return qualities
+  const filtered = qualities.filter(q => pluginQualities.includes(q.type))
+  return filtered.length > 0 ? filtered : qualities
+}
+
 export function calculateBestQuality(
   availableTypes: Array<string | { type: string; size?: string }> | null | undefined,
   targetQuality: string

@@ -5,7 +5,7 @@ import { musicSdk, type MusicItem } from '@/services/musicSdk'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
-import { downloadSong } from '@/utils/downloadHelper'
+import { downloadSingleSong } from '@/utils/audio/download'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { EllipsisIcon, SearchIcon, MapAimingIcon } from 'tdesign-icons-vue-next'
 import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
@@ -212,17 +212,17 @@ const handleShufflePlay = () => {
 const handleDownloadAll = () => {
   if (songs.value.length === 0) return
   MessagePlugin.info(`开始下载 ${songs.value.length} 首歌曲`)
-  songs.value.forEach(song => downloadSong(song))
+  songs.value.forEach(song => downloadSingleSong(song as any))
 }
 
 const handleDownloadSong = (song: MusicItem) => {
-  downloadSong(song)
+  downloadSingleSong(song as any)
 }
 
 const handleDownloadBatch = (batchSongs: MusicItem[]) => {
   if (!batchSongs.length) return
   MessagePlugin.info(`开始下载 ${batchSongs.length} 首歌曲`)
-  batchSongs.forEach(s => downloadSong(s))
+  batchSongs.forEach(s => downloadSingleSong(s as any))
 }
 
 const handlePlayBatch = (batchSongs: MusicItem[]) => {
