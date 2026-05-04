@@ -322,19 +322,25 @@ pub async fn get_pic(args: serde_json::Value) -> Result<serde_json::Value, Strin
 /// 从 m.kuwo.cn H5 API 获取歌词
 async fn get_lyric_from_h5(songmid: &str) -> Result<serde_json::Value, String> {
     let url = format!(
-        "http://m.kuwo.cn/newh5/singles/songinfoandlrc?musicId={}&type=music&httpsStatus=1",
+        "https://m.kuwo.cn/newh5/singles/songinfoandlrc?musicId={}&type=music&httpsStatus=1",
         songmid
     );
 
     let resp: serde_json::Value = get_http()
         .get(&url)
-        .header("Referer", "http://m.kuwo.cn/")
+        .header("Referer", "https://m.kuwo.cn/")
+        .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
         .send()
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("http: {}", e))?
         .json()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("json: {}", e))?;
+
+    let status = resp.get("status").and_then(|v| v.as_i64()).unwrap_or(-1);
+    if status != 200 {
+        return Err(format!("status={}", status));
+    }
 
     let lrclist = resp
         .get("data")
@@ -370,33 +376,98 @@ async fn get_lyric_from_h5(songmid: &str) -> Result<serde_json::Value, String> {
     }))
 }
 
+/// 尝试从 newlyric API 获取歌词
+async fn get_lyric_from_newlyric(songmid: &str) -> Result<serde_json::Value, String> {
+    for is_lyricx in [true, false] {
+        let params = build_params(songmid, is_lyricx);
+        let url = format!("http://newlyric.kuwo.cn/newlyric.lrc?{}", params);
+        if let Ok(resp) = get_http()
+            .get(&url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .header("Referer", "http://www.kuwo.cn/")
+            .send()
+            .await
+        {
+            if let Ok(bytes) = resp.bytes().await {
+                if bytes.len() > 15 {
+                    if let Ok(lrc_text) = decode_lyric(&bytes, is_lyricx) {
+                        if !lrc_text.is_empty() {
+                            return build_lyric_result(&lrc_text);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Err("newlyric failed".into())
+}
+
 pub async fn get_lyric(args: serde_json::Value) -> Result<serde_json::Value, String> {
     let songmid = get_songmid(&args);
     let empty = serde_json::json!({
         "lyric": "", "tlyric": "", "crlyric": "", "source": "kw"
     });
 
-    // 方案1: newlyric.kuwo.cn 加密 API（未来可能恢复）
-    let params = build_params(&songmid, true);
-    let url = format!("http://newlyric.kuwo.cn/newlyric.lrc?{}", params);
-    if let Ok(resp) = get_http().get(&url).send().await {
-        if let Ok(bytes) = resp.bytes().await {
-            if bytes.len() > 15 {
-                if let Ok(lrc_text) = decode_lyric(&bytes, true) {
-                    if !lrc_text.is_empty() {
-                        return build_lyric_result(&lrc_text);
-                    }
+    // 方案1: H5 API (HTTPS + 移动端 UA)
+    if let Ok(result) = get_lyric_from_h5(&songmid).await {
+        return Ok(result);
+    }
+
+    // 方案2: newlyric 加密 API
+    if let Ok(result) = get_lyric_from_newlyric(&songmid).await {
+        return Ok(result);
+    }
+
+    // 方案3: 搜索同歌名不同版本
+    let song_info = args.get("songInfo").cloned().unwrap_or(serde_json::json!({}));
+    let name = song_info.get("name").and_then(|v| v.as_str()).unwrap_or("");
+    let singer = song_info.get("singer").and_then(|v| v.as_str()).unwrap_or("");
+    if !name.is_empty() {
+        let keyword = format!("{} {}", singer, name).trim().to_string();
+        if let Ok(mids) = search_songmids(&keyword, 10).await {
+            for mid in mids {
+                if mid == songmid { continue; }
+                if let Ok(result) = get_lyric_from_h5(&mid).await {
+                    return Ok(result);
+                }
+                if let Ok(result) = get_lyric_from_newlyric(&mid).await {
+                    return Ok(result);
                 }
             }
         }
     }
 
-    // 方案2: m.kuwo.cn H5 API
-    if let Ok(result) = get_lyric_from_h5(&songmid).await {
-        return Ok(result);
-    }
-
     Ok(empty)
+}
+
+async fn search_songmids(keyword: &str, count: usize) -> Result<Vec<String>, String> {
+    let url = format!(
+        "http://search.kuwo.cn/r.s?client=kt&all={}&pn=0&rn={}&uid=794762570&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newver=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1&issubtitle=1",
+        urlencoding::encode(keyword),
+        count
+    );
+    let resp: serde_json::Value = get_http()
+        .get(&url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mids: Vec<String> = resp
+        .get("abslist")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|s| s.get("MUSICRID").and_then(|v| v.as_str()))
+                .map(|rid| rid.replace("MUSIC_", ""))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(mids)
 }
 
 fn build_lyric_result(lrc_text: &str) -> Result<serde_json::Value, String> {

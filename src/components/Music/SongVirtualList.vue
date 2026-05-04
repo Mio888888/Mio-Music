@@ -13,7 +13,7 @@ import {
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { MusicItem } from '@/services/musicSdk'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
-import { getQualityDisplayName } from '@/utils/quality'
+import { getQualityDisplayName, compareQuality } from '@/utils/quality'
 
 interface Props {
   songs: MusicItem[]
@@ -66,6 +66,16 @@ const getLocalQualityLabel = (song: MusicItem): string => {
     if (ext === 'flac' || ext === 'wav' || ext === 'ape' || ext === 'dsd' || ext === 'dff') return 'FLAC 无损'
   }
   return ''
+}
+
+const getFilteredQualityLabel = (song: MusicItem): string => {
+  if (!song.types?.length) return ''
+  const pluginQualities = localUserStore.userInfo.supportedSources?.[song.source]?.qualitys
+  if (!pluginQualities?.length) return getQualityDisplayName(song.types[0])
+  const intersection = song.types.filter(t => pluginQualities.includes(t))
+  if (!intersection.length) return ''
+  intersection.sort(compareQuality)
+  return getQualityDisplayName(intersection[0])
 }
 
 // --- Sorting (must be before virtualizerOptions which reads sortedSongs) ---
@@ -551,10 +561,10 @@ watch(() => props.songs, (newSongs) => {
                 </div>
                 <div class="song-artist" :title="getSong(virtualRow.index)?.singer">
                   <span
-                    v-if="getSong(virtualRow.index)?.types?.length"
+                    v-if="getSong(virtualRow.index)?.types?.length && getFilteredQualityLabel(getSong(virtualRow.index)!)"
                     class="quality-tag"
                   >
-                    {{ getQualityDisplayName(getSong(virtualRow.index)!.types![0]) }}
+                    {{ getFilteredQualityLabel(getSong(virtualRow.index)!) }}
                   </span>
                   <span
                     v-else-if="getLocalQualityLabel(getSong(virtualRow.index)!)"

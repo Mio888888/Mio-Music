@@ -71,7 +71,10 @@ export const usePluginStore = defineStore('plugin', () => {
       const userStore = LocalUserDetailStore()
       if (currentPluginId.value) {
         const plugin = plugins.value.find(p => p.plugin_id === currentPluginId.value)
+        console.warn('plugin', plugin)
         if (plugin && plugin.supported_sources && plugin.supported_sources.length > 0) {
+          console.log(`[PluginStore] 插件 "${plugin.plugin_info.name}" 支持的音源列表:`,
+            plugin.supported_sources.map(src => ({ source_id: src.source_id, name: src.name, qualities: src.qualities })))
           const supportedSourcesForStore: Record<string, any> = {}
           for (const src of plugin.supported_sources) {
             const key = src.source_id || src.name

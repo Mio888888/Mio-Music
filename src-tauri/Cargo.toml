@@ -56,6 +56,7 @@ rustfft = "6"
 parking_lot = "0.12"
 lazy_static = "1"
 symphonia = { version = "0.5.5", features = ["aac", "isomp4", "mp3", "flac", "wav", "ogg"] }
+flacenc = "0.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 coreaudio-sys = "0.2"

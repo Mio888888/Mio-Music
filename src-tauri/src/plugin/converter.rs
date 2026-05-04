@@ -89,39 +89,48 @@ function getSourceName(sourceId) {{
 
 // 提取默认音源配置作为备用
 function extractDefaultSources() {{
-  // 尝试从 MUSIC_QUALITY 常量中提取音源信息
-  const qualityMatch = originalPluginCode.match(/const\s+MUSIC_QUALITY\s*=\s*JSON\.parse\(([^)]+)\)/);
-  if (qualityMatch) {{
+  function buildSources(qualityData) {{
+    const extractedSources = {{}};
+    Object.keys(qualityData).forEach(sourceId => {{
+      extractedSources[sourceId] = {{
+        name: getSourceName(sourceId),
+        type: 'music',
+        qualitys: qualityData[sourceId] || ['128k', '320k']
+      }};
+    }});
+    return extractedSources;
+  }}
+
+  // 尝试从 MUSIC_QUALITY 常量中提取音源信息 - JSON.parse 格式
+  const jsonParseMatch = originalPluginCode.match(/const\s+MUSIC_QUALITY\s*=\s*JSON\.parse\(([^)]+)\)/);
+  if (jsonParseMatch) {{
     try {{
-      let qualityStr = qualityMatch[1].trim();
+      let qualityStr = jsonParseMatch[1].trim();
       if (qualityStr.startsWith("'") && qualityStr.endsWith("'")) {{
         qualityStr = qualityStr.slice(1, -1);
       }} else if (qualityStr.startsWith('"') && qualityStr.endsWith('"')) {{
         qualityStr = qualityStr.slice(1, -1);
       }}
 
-      const qualityData = JSON.parse(qualityStr);
-      const extractedSources = {{}};
-      Object.keys(qualityData).forEach(sourceId => {{
-        extractedSources[sourceId] = {{
-          name: getSourceName(sourceId),
-          type: 'music',
-          qualitys: qualityData[sourceId] || ['128k', '320k']
-        }};
-      }});
-
-      return extractedSources;
-    }} catch (e) {{
-      // 解析失败，使用默认配置
-    }}
+      return buildSources(JSON.parse(qualityStr));
+    }} catch (e) {{}}
   }}
 
+  // 尝试直接提取对象字面量格式: {{ kw: ['128k', '320k'], ... }}
+  const objectMatch = originalPluginCode.match(/const\s+MUSIC_QUALITY\s*=\s*(\{{[^;]*\}})\s*;?/);
+  if (objectMatch) {{
+    try {{
+      return buildSources((new Function('return ' + objectMatch[1]))());
+    }} catch (e) {{}}
+  }}
+
+  // 解析失败，使用默认配置
   return {{
-    kw: {{ name: "酷我音乐", type: "music", qualitys: ['128k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'master'] }},
-    kg: {{ name: "酷狗音乐", type: "music", qualitys: ['128k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'master'] }},
-    tx: {{ name: "QQ音乐", type: "music", qualitys: ['128k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'master'] }},
-    wy: {{ name: "网易云音乐", type: "music", qualitys: ['128k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'master'] }},
-    mg: {{ name: "咪咕音乐", type: "music", qualitys: ['128k', '320k', 'flac', 'flac24bit', 'hires', 'atmos', 'master'] }}
+    kw: {{ name: "酷我音乐", type: "music", qualitys: ['128k', '320k'] }},
+    kg: {{ name: "酷狗音乐", type: "music", qualitys: ['128k', '320k'] }},
+    tx: {{ name: "QQ音乐", type: "music", qualitys: ['128k', '320k'] }},
+    wy: {{ name: "网易云音乐", type: "music", qualitys: ['128k', '320k'] }},
+    mg: {{ name: "咪咕音乐", type: "music", qualitys: ['128k', '320k'] }}
   }};
 }}
 

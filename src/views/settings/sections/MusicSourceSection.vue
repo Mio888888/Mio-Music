@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { TreeRoundDotIcon } from 'tdesign-icons-vue-next'
 import fonts from '@/assets/icon_font/icons'
-import type { MusicSource } from '@/types/userInfo'
 
 const emit = defineEmits(['switch-category'])
 
@@ -31,17 +30,8 @@ const currentPluginName = computed(() => {
 const currentSourceQualities = computed(() => {
   if (!hasPluginData.value || !userInfo.value.selectSources) return []
   const selectedSource = userInfo.value.supportedSources?.[userInfo.value.selectSources]
+  console.log('当前插件支持的音质：', userInfo.value.supportedSources)
   return sortQualities(selectedSource?.qualitys || [])
-})
-
-const qualitySliderValue = ref(0)
-
-const qualityMarks = computed(() => {
-  const marks: Record<number, string> = {}
-  currentSourceQualities.value.forEach((quality: string, index: number) => {
-    marks[index] = String(getQualityDisplayName(quality))
-  })
-  return marks
 })
 
 const globalQualityOptions = computed(() => {
@@ -65,6 +55,18 @@ watch(() => globalQualityOptions.value, (opts) => {
   if (!opts.includes(globalQualitySelected.value)) { globalQualitySelected.value = opts[opts.length - 1] }
 }, { immediate: true })
 
+const getSourceQuality = (sourceKey: string) => {
+  return userInfo.value.sourceQualityMap?.[sourceKey]
+    || (userInfo.value.selectSources === sourceKey ? userInfo.value.selectQuality : undefined)
+}
+
+const selectQualityTag = (quality: string) => {
+  userInfo.value.selectQuality = quality
+  if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
+  const key = userInfo.value.selectSources as string
+  userInfo.value.sourceQualityMap[key] = quality
+}
+
 const applyGlobalQuality = (q: string) => {
   if (!q) return
   if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
@@ -80,21 +82,6 @@ const applyGlobalQuality = (q: string) => {
   if (arr.includes(q)) userInfo.value.selectQuality = q
 }
 
-watch(
-  [() => userInfo.value.selectQuality, () => currentSourceQualities.value],
-  ([newQuality, qualities]) => {
-    if (qualities.length > 0 && newQuality) {
-      const index = qualities.indexOf(newQuality)
-      if (index !== -1) {
-        qualitySliderValue.value = index
-      } else {
-        userInfo.value.selectQuality = qualities[qualities.length - 1]
-      }
-    }
-  },
-  { immediate: true }
-)
-
 const selectSource = (sourceKey: string) => {
   if (!hasPluginData.value) return
   userInfo.value.selectSources = sourceKey
@@ -105,17 +92,6 @@ const selectSource = (sourceKey: string) => {
     const useQuality = saved && source.qualitys.includes(saved) ? saved : source.qualitys[source.qualitys.length - 1]
     userInfo.value.sourceQualityMap[sourceKey] = useQuality
     userInfo.value.selectQuality = useQuality
-  }
-}
-
-const onQualityChange = (value: number | number[]) => {
-  const v = Array.isArray(value) ? value[0] : value
-  if (currentSourceQualities.value.length > 0 && v >= 0 && v < currentSourceQualities.value.length) {
-    const q = currentSourceQualities.value[v]
-    userInfo.value.selectQuality = q
-    if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
-    const key = userInfo.value.selectSources as string
-    userInfo.value.sourceQualityMap[key] = q
   }
 }
 
@@ -177,7 +153,18 @@ const getSourceIcon = (key: string) => {
             </div>
             <div class="source-info">
               <div class="source-name">{{ source.name }}</div>
-              <div class="source-type">{{ source.type || '音乐源' }}</div>
+              <div class="source-type">
+                <span>{{ source.type || '音乐源' }}</span>
+                <t-tag
+                  v-if="getSourceQuality(String(key))"
+                  size="small"
+                  theme="primary"
+                  variant="light"
+                  class="source-quality-tag"
+                >
+                  {{ getQualityDisplayName(getSourceQuality(String(key))) }}
+                </t-tag>
+              </div>
             </div>
             <div v-if="userInfo.selectSources === String(key)" class="source-check">
               <i class="iconfont icon-check" />
@@ -187,31 +174,28 @@ const getSourceIcon = (key: string) => {
       </div>
 
       <div v-if="currentSourceQualities.length > 0" id="music-quality" class="setting-group">
-        <h3>音质选择</h3>
-        <div class="quality-slider-container">
-          <t-slider
-            v-model="qualitySliderValue"
-            :min="0"
-            :max="currentSourceQualities.length - 1"
-            :step="1"
-            :marks="qualityMarks"
-            class="quality-slider"
-            @change="onQualityChange"
-          />
+        <h3>音质选择 <span class="quality-source-hint">— {{ getCurrentSourceName() }}</span></h3>
+        <div class="quality-tags-container">
+          <div
+            v-for="quality in currentSourceQualities"
+            :key="quality"
+            class="quality-tag"
+            :class="{ active: userInfo.selectQuality === quality }"
+            @click="selectQualityTag(quality)"
+          >
+            <span class="quality-tag-name">{{ getQualityDisplayName(quality) }}</span>
+          </div>
         </div>
-        <div class="quality-description">
-          <p>当前选择: <strong>{{ getQualityDisplayName(userInfo.selectQuality || '') }}</strong></p>
-          <p class="quality-hint">{{ getQualityDescription(userInfo.selectQuality || '') }}</p>
+        <div v-if="userInfo.selectQuality" class="quality-description">
+          <p class="quality-hint">{{ getQualityDescription(userInfo.selectQuality) }}</p>
         </div>
       </div>
 
       <div v-if="globalQualityOptions.length > 0" class="setting-group">
         <h3>全局音质（支持交集）</h3>
-        <div class="quality-slider-container">
-          <t-select v-model="globalQualitySelected" @change="(v: any) => applyGlobalQuality(String(v))">
-            <t-option v-for="q in globalQualityOptions" :key="q" :value="q" :label="getQualityDisplayName(q)" />
-          </t-select>
-        </div>
+        <t-select v-model="globalQualitySelected" @change="(v: any) => applyGlobalQuality(String(v))">
+          <t-option v-for="q in globalQualityOptions" :key="q" :value="q" :label="getQualityDisplayName(q)" />
+        </t-select>
       </div>
 
       <div class="setting-group">
@@ -278,14 +262,38 @@ const getSourceIcon = (key: string) => {
     }
     .source-info { flex: 1;
       .source-name { font-weight: 600; font-size: 0.875rem; color: var(--settings-text-primary, var(--td-text-color-primary)); margin-bottom: 0.125rem; }
-      .source-type { font-size: 0.75rem; color: var(--settings-text-secondary, var(--td-text-color-secondary)); }
+      .source-type {
+        font-size: 0.75rem; color: var(--settings-text-secondary, var(--td-text-color-secondary));
+        display: flex; align-items: center; gap: 0.375rem;
+      }
+    }
+    .source-quality-tag {
+      font-size: 0.625rem;
+      line-height: 1;
+      padding: 0 0.25rem;
+      border-radius: 0.25rem;
     }
     .source-check { color: var(--td-brand-color-5); font-size: 1.125rem; }
   }
-  .quality-slider-container {
-    background: var(--settings-quality-container-bg, var(--td-bg-color-page)); padding: 1.5rem; border-radius: 0.75rem;
-    border: 1px solid var(--settings-quality-container-border, var(--td-border-level-1-color));
-    .quality-slider { margin-bottom: 1rem; }
+  .quality-source-hint {
+    font-size: 0.875rem; font-weight: 400; color: var(--settings-text-secondary, var(--td-text-color-secondary));
+  }
+  .quality-tags-container {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem 0;
+  }
+  .quality-tag {
+    padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
+    border: 1.5px solid var(--td-border-level-2-color);
+    background: var(--td-bg-color-container);
+    transition: all 0.2s ease;
+    user-select: none;
+    .quality-tag-name { font-size: 0.8125rem; font-weight: 500; color: var(--td-text-color-primary); }
+    &:hover { border-color: var(--td-brand-color-3); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+    &.active {
+      border-color: var(--td-brand-color); background: var(--td-brand-color-1);
+      box-shadow: 0 0 0 2px var(--td-brand-color-2);
+      .quality-tag-name { color: var(--td-brand-color); font-weight: 600; }
+    }
   }
   .quality-description { text-align: center; margin-top: 1rem;
     p { margin: 0.5rem 0;

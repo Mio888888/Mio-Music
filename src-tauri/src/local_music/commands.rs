@@ -42,41 +42,89 @@ pub fn local_music__get_covers(state: State<'_, AppDb>, track_ids: Vec<String>) 
 }
 
 #[tauri::command]
-pub fn local_music__write_tags(
+pub async fn local_music__write_tags(
     _state: State<'_, AppDb>,
     file_path: String,
     song_info: serde_json::Value,
-    _tag_write_options: serde_json::Value,
+    tag_write_options: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let path = std::path::Path::new(&file_path);
-    let track = music_db::TrackRow {
-        songmid: String::new(),
-        path: file_path.clone(),
-        url: None,
-        singer: song_info["singer"].as_str().unwrap_or("").to_string(),
-        name: song_info["name"].as_str().unwrap_or("").to_string(),
-        album_name: song_info["albumName"].as_str().unwrap_or("").to_string(),
-        album_id: 0,
-        source: "local".to_string(),
-        interval: String::new(),
-        has_cover: 0,
-        cover_key: None,
-        year: song_info["year"].as_i64().unwrap_or(0),
-        lrc: None,
-        types: "[]".to_string(),
-        _types: "{}".to_string(),
-        type_url: "{}".to_string(),
-        bitrate: 0,
-        sample_rate: 0,
-        channels: 0,
-        duration: 0.0,
-        size: 0,
-        mtime_ms: 0,
-        hash: None,
-        updated_at: 0,
+
+    // Convert to FLAC first
+    let actual_path = match scanner::convert_to_flac(path) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[write_tags] FLAC转换失败，保留原文件: {}", e);
+            path.to_path_buf()
+        }
     };
-    scanner::write_tags(path, &track)?;
-    Ok(serde_json::json!({ "success": true, "data": true }))
+
+    let has_options = tag_write_options.as_object().map(|o| !o.is_empty()).unwrap_or(false);
+    if has_options {
+        // Fetch cover if needed
+        let cover_data = if tag_write_options.get("cover").and_then(|v| v.as_bool()).unwrap_or(false) {
+            let img_url = song_info.get("img").and_then(|v| v.as_str()).unwrap_or("");
+            if !img_url.is_empty() {
+                let resp = crate::music_sdk::client::get_client()
+                    .get(img_url)
+                    .send().await;
+                match resp {
+                    Ok(r) => r.bytes().await.ok().map(|b| b.to_vec()),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let lyrics = if tag_write_options.get("lyrics").and_then(|v| v.as_bool()).unwrap_or(false)
+            || tag_write_options.get("downloadLyrics").and_then(|v| v.as_bool()).unwrap_or(false)
+        {
+            song_info.get("lrc").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(|s| s.to_string())
+        } else {
+            None
+        };
+
+        scanner::write_download_tags(
+            &actual_path,
+            &song_info,
+            &tag_write_options,
+            cover_data.as_deref(),
+            lyrics.as_deref(),
+        )?;
+    } else {
+        let track = music_db::TrackRow {
+            songmid: String::new(),
+            path: actual_path.to_string_lossy().to_string(),
+            url: None,
+            singer: song_info["singer"].as_str().unwrap_or("").to_string(),
+            name: song_info["name"].as_str().unwrap_or("").to_string(),
+            album_name: song_info["albumName"].as_str().unwrap_or("").to_string(),
+            album_id: 0,
+            source: "local".to_string(),
+            interval: String::new(),
+            has_cover: 0,
+            cover_key: None,
+            year: song_info["year"].as_i64().unwrap_or(0),
+            lrc: None,
+            types: "[]".to_string(),
+            _types: "{}".to_string(),
+            type_url: "{}".to_string(),
+            bitrate: 0,
+            sample_rate: 0,
+            channels: 0,
+            duration: 0.0,
+            size: 0,
+            mtime_ms: 0,
+            hash: None,
+            updated_at: 0,
+        };
+        scanner::write_tags(&actual_path, &track)?;
+    }
+
+    Ok(serde_json::json!({ "success": true, "data": { "filePath": actual_path.to_string_lossy().to_string() } }))
 }
 
 #[tauri::command]
