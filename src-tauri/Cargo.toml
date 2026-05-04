@@ -1,5 +1,5 @@
 [package]
-name = "Music"
+name = "mio"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -9,7 +9,7 @@ edition = "2021"
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
 
 [lib]
-name = "lanyin_lib"
+name = "mio_lib"
 crate-type = ["cdylib", "rlib"]
 
 [build-dependencies]

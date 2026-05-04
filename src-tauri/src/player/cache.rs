@@ -133,7 +133,7 @@ mod tests {
     use std::io::Write;
 
     fn tmp_dir() -> PathBuf {
-        let d = std::env::temp_dir().join("lanyin_cache_test");
+        let d = std::env::temp_dir().join("mio_cache_test");
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d

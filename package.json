@@ -1,5 +1,5 @@
 {
-  "name": "Music",
+  "name": "mio",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -28,6 +28,7 @@
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@tdesign-vue-next/auto-import-resolver": "^0.1.6",
+    "@types/three": "^0.184.0",
     "animate.css": "^4.1.1",
     "axios": "^1.15.2",
     "crypto-js": "^4.2.0",
@@ -39,6 +40,7 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "tdesign-icons-vue-next": "^0.4.4",
     "tdesign-vue-next": "^1.19.1",
+    "three": "^0.184.0",
     "uuid": "^14.0.0",
     "vue": "^3.5.13",
     "vue-router": "4"

@@ -43,18 +43,15 @@ const openLink = async (url: string) => {
 
 <template>
   <div class="settings-section">
-    <div class="setting-group">
+    <div class="setting-group app-header-group">
       <div class="app-header">
-        <div class="app-logo"><img src="/logo_2026.svg" alt="Ceru Music" /></div>
+        <div class="app-logo"><img src="/icon.png" alt="Mio Music" /></div>
         <div class="app-info">
-          <div class="app-title-row">
-            <h2>Cerulean Music</h2>
-            <span class="app-version">v{{ appVersion }}</span>
-          </div>
-          <p class="app-subtitle">澜音 播放器</p>
-          <p class="app-description">澜音是一个跨平台的音乐播放器应用，支持基于合规插件获取公开音乐信息与播放功能。基于 Tauri 构建。</p>
+          <h2 class="app-name">Mio Music</h2>
+          <span class="app-version">v{{ appVersion }}</span>
         </div>
       </div>
+      <p class="app-description">一款简洁优雅的跨平台音乐播放器，支持基于合规插件获取公开音乐信息与播放功能。</p>
     </div>
 
     <div id="about-version" class="setting-group">
@@ -76,38 +73,18 @@ const openLink = async (url: string) => {
       <h3>技术栈</h3>
       <div class="tech-stack">
         <div class="tech-item"><span class="tech-name">Tauri 2</span><span class="tech-desc">跨平台桌面应用框架</span></div>
-        <div class="tech-item"><span class="tech-name">Rust</span><span class="tech-desc">高性能后端语言</span></div>
-        <div class="tech-item"><span class="tech-name">Vue 3</span><span class="tech-desc">响应式前端框架</span></div>
+        <div class="tech-item"><span class="tech-name">Rust</span><span class="tech-desc">后端核心语言</span></div>
+        <div class="tech-item"><span class="tech-name">Vue 3</span><span class="tech-desc">前端响应式框架</span></div>
         <div class="tech-item"><span class="tech-name">TypeScript</span><span class="tech-desc">类型安全的 JavaScript</span></div>
-        <div class="tech-item"><span class="tech-name">Pinia</span><span class="tech-desc">Vue 状态管理工具</span></div>
-        <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">快速前端构建工具</span></div>
-        <div class="tech-item link" style="cursor:pointer" @click="openLink('https://github.com/Steve-xmh/applemusic-like-lyrics')"><span class="tech-name">AMLL</span><span class="tech-desc">歌词组件</span></div>
-      </div>
-    </div>
-
-    <div id="about-team" class="setting-group">
-      <h3>开发团队</h3>
-      <div class="developer-list">
-        <div class="developer-item link" @click="openLink('https://shiqianjiang.cn/')">
-          <div class="developer-avatar"><img src="/head.jpg" alt="时迁酱" /></div>
-          <div class="developer-info"><h4>时迁酱</h4><p>产品总体设计与开发</p></div>
-        </div>
-        <div class="developer-item link" @click="openLink('https://wldss.cn/')">
-          <div class="developer-avatar"><img src="/wldss.png" alt="无聊的霜霜" /></div>
-          <div class="developer-info"><h4>无聊的霜霜</h4><p>首页设计 & AI助手</p></div>
-        </div>
-        <div class="developer-item">
-          <div class="developer-avatar"><img src="/star.png" alt="Star" /></div>
-          <div class="developer-info"><h4>Star</h4><p>插件管理相关功能 & 部分接口封装</p></div>
-        </div>
-        <div class="developer-item">
-          <div class="developer-avatar"><img src="/lemon.jpg" alt="lemon" /></div>
-          <div class="developer-info"><h4>lemon</h4><p>修复部分bug & 新增部分功能（简称：打杂）</p></div>
-        </div>
-        <div class="developer-item link" @click="openLink('https://github.com/ITManCHINA/')">
-          <div class="developer-avatar"><img src="/furina.jpg" alt="ITMan_CHINA" /></div>
-          <div class="developer-info"><h4>ITMan_CHINA</h4><p>神秘的AI驾驶员<br/>开源社区街溜子<br/>某不知名TTML歌词作者</p></div>
-        </div>
+        <div class="tech-item"><span class="tech-name">Pinia</span><span class="tech-desc">状态管理</span></div>
+        <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">前端构建工具</span></div>
+        <div class="tech-item"><span class="tech-name">TDesign</span><span class="tech-desc">UI 组件库</span></div>
+        <div class="tech-item"><span class="tech-name">Three.js</span><span class="tech-desc">3D 粒子动画渲染</span></div>
+        <div class="tech-item"><span class="tech-name">Rodio</span><span class="tech-desc">Rust 音频播放引擎</span></div>
+        <div class="tech-item"><span class="tech-name">Symphonia</span><span class="tech-desc">音频解码 (FLAC/MP3/AAC)</span></div>
+        <div class="tech-item"><span class="tech-name">Lofty</span><span class="tech-desc">音频元数据读写</span></div>
+        <div class="tech-item"><span class="tech-name">Rusqlite</span><span class="tech-desc">本地数据库存储</span></div>
+        <div class="tech-item link" style="cursor:pointer" @click="openLink('https://github.com/Steve-xmh/applemusic-like-lyrics')"><span class="tech-name">AMLL</span><span class="tech-desc">Apple Music 风格歌词</span></div>
       </div>
     </div>
 
@@ -119,37 +96,25 @@ const openLink = async (url: string) => {
         <div class="notice-item"><h4>🚫 使用限制</h4><p>本项目仅允许用于非商业、纯技术学习目的，禁止用于任何商业运营、盈利活动，禁止修改后用于侵犯第三方权益的场景。</p></div>
       </div>
       <h3 style="margin-top: 2rem">关于我们</h3>
-      <div class="legal-notice">
-        <div class="notice-item">
-          <h4>😊 时迁酱</h4>
-          <p>
-            你好呀好呀～我是 (时迁酱)<br />
-            一枚普普通通的高中生，因为好奇+喜欢，悄悄自学了一点编程✨！<br /><br />
-            没想到今天你能用上我做的软件——「澜音」，它其实是我学 Electron 时孵出来的小demo！<br />
-            看到它真的能运行、还有人愿意用，我真的超级开心＋骄傲的！💖<br /><br />
-            当然啦，平时还是要乖乖写作业上课哒～但我还是会继续挤出时间，让澜音慢慢长大，越走越远哒！💪<br /><br />
-            如果你也喜欢它，或者想给我加点零食鼓励🧋，欢迎打赏赞助哟～谢谢可爱的你！！
+      <div class="about-us">
+        <p class="about-intro">
+          Mio Music 基于
+          <a class="about-link" @click="openLink('https://github.com/timeshiftsauce/CeruMusic')">CeruMusic</a>
+          项目复刻开发，感谢原作者
+          <strong>时迁酱</strong>
+          的开源贡献与持续维护。如果你也喜欢原项目，欢迎访问
+          <a class="about-link" @click="openLink('https://ceru.docs.shiqianjiang.cn/')">CeruMusic 官方文档</a>
+          了解更多。
+        </p>
+        <div class="sponsor-card">
+          <p class="sponsor-text">以下是原项目作者的赞助二维码，如果你愿意支持 CeruMusic 的开发，可以请作者喝杯奶茶 ☕</p>
+          <div class="sponsor-qr">
             <img
               src="https://oss.shiqianjiang.cn/storage/default/20250907/image-2025082711173bb1bba3608ef15d0e1fb485f80f29c728186.png"
-              alt="赞赏"
-              style="width: 100%; padding: 20px 30%"
+              alt="原项目作者赞赏码"
             />
-            什么你也想学习编程？我教你吖！QQ:2115295703
-          </p>
-          <br />
-          <h4>...待补充</h4>
-        </div>
-      </div>
-    </div>
-
-    <div class="setting-group">
-      <h3>联系方式</h3>
-      <div class="contact-info">
-        <p>如有技术问题或合作意向（仅限技术交流），请通过以下方式联系：</p>
-        <div class="contact-actions">
-          <t-button theme="primary" @click="openLink('https://qm.qq.com/q/8c25dPfylG')">官方QQ群(1057783951)</t-button>
-          <t-button theme="primary" variant="outline" @click="openLink('https://ceru.docs.shiqianjiang.cn/')">官方网站</t-button>
-          <t-button theme="default" @click="openLink('https://github.com/timeshiftsauce/CeruMusic/issues')">问题反馈</t-button>
+          </div>
+          <p class="sponsor-hint">所有赞助将直接支持原项目作者时迁酱</p>
         </div>
       </div>
     </div>
@@ -167,18 +132,26 @@ const openLink = async (url: string) => {
   h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--td-text-color-primary); }
   > p { margin: 0 0 1.5rem; color: var(--td-text-color-secondary); font-size: 0.875rem; }
 }
-.app-header {
-  display: flex; align-items: center; gap: 1.5rem; padding: 1rem 0;
-  .app-logo { width: 4rem; height: 4rem; flex-shrink: 0; img { width: 100%; height: 100%; object-fit: contain; } }
-  .app-info {
-    flex: 1;
-    .app-title-row {
-      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem;
-      h2 { margin: 0; font-size: 1.5rem; font-weight: 700; color: var(--td-text-color-primary); }
-      .app-version { background: var(--td-brand-color-1); color: var(--td-brand-color-6); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--td-brand-color-3); }
+.app-header-group {
+  display: flex; flex-direction: column; align-items: center; text-align: center; padding: 2.5rem 1.5rem;
+  .app-header {
+    display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;
+    .app-logo {
+      width: 3.5rem; height: 3.5rem; flex-shrink: 0;
+      img { width: 100%; height: 100%; object-fit: contain; border-radius: 0.75rem; }
     }
-    .app-subtitle { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; color: var(--td-brand-color); }
-    .app-description { margin: 0; color: var(--td-text-color-secondary); line-height: 1.5; }
+    .app-info {
+      display: flex; align-items: baseline; gap: 0.75rem;
+      .app-name { margin: 0; font-size: 1.75rem; font-weight: 800; color: var(--td-text-color-primary); letter-spacing: -0.5px; }
+    }
+  }
+  .app-version {
+    background: var(--td-brand-color-1); color: var(--td-brand-color-6);
+    padding: 0.2rem 0.6rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600;
+    border: 1px solid var(--td-brand-color-3);
+  }
+  .app-description {
+    margin: 0; color: var(--td-text-color-secondary); line-height: 1.6; font-size: 0.9rem; max-width: 420px;
   }
 }
 .tech-stack {
@@ -192,18 +165,6 @@ const openLink = async (url: string) => {
     &.link:hover { background-color: var(--td-brand-color-1); border-color: var(--td-brand-color); }
   }
 }
-.developer-list {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;
-  .developer-item {
-    display: flex; align-items: center; gap: 1rem; padding: 1rem;
-    background: var(--td-bg-color-page); border-radius: 0.75rem;
-    border: 1px solid var(--td-border-level-1-color); transition: all 0.2s ease;
-    &:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-    &.link:hover { background-color: var(--td-brand-color-1); border-color: var(--td-brand-color); }
-    .developer-avatar { width: 3rem; height: 3rem; border-radius: 50%; overflow: hidden; flex-shrink: 0; img { width: 100%; height: 100%; object-fit: cover; } }
-    .developer-info { flex: 1; h4 { margin: 0 0 0.25rem; font-size: 1rem; font-weight: 600; color: var(--td-text-color-primary); } p { margin: 0; font-size: 0.875rem; color: var(--td-text-color-secondary); } }
-  }
-}
 .legal-notice {
   .notice-item {
     margin-bottom: 1.5rem; &:last-child { margin-bottom: 0; }
@@ -211,16 +172,34 @@ const openLink = async (url: string) => {
     p { margin: 0; font-size: 0.875rem; color: var(--td-text-color-secondary); line-height: 1.5; }
   }
 }
-.version-section { .update-actions { display: flex; justify-content: space-between; align-items: center; .update-option { display: flex; align-items: center; gap: 0.5rem; } } }
-.contact-info {
-  p { margin: 0 0 1rem; color: var(--td-text-color-secondary); line-height: 1.5; }
-  .contact-actions { display: flex; gap: 0.75rem; }
+.about-us {
+  margin-top: 0.5rem;
+  .about-intro {
+    margin: 0 0 1.25rem; color: var(--td-text-color-secondary); font-size: 0.9rem; line-height: 1.7;
+    .about-link {
+      color: var(--td-brand-color); cursor: pointer; font-weight: 500;
+      text-decoration: underline; text-decoration-color: var(--td-brand-color-3);
+      text-underline-offset: 2px;
+      &:hover { text-decoration-color: var(--td-brand-color); }
+    }
+  }
+  .sponsor-card {
+    background: var(--td-bg-color-page); border: 1px solid var(--td-border-level-1-color);
+    border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; align-items: center;
+    .sponsor-text { margin: 0 0 1rem; color: var(--td-text-color-secondary); font-size: 0.85rem; line-height: 1.5; text-align: center; }
+    .sponsor-qr {
+      width: 180px; height: 180px; border-radius: 0.75rem; overflow: hidden;
+      border: 1px solid var(--td-border-level-1-color);
+      img { width: 100%; height: 100%; object-fit: cover; }
+    }
+    .sponsor-hint { margin: 0.75rem 0 0; font-size: 0.75rem; color: var(--td-text-color-disabled); }
+  }
 }
+.version-section { .update-actions { display: flex; justify-content: space-between; align-items: center; .update-option { display: flex; align-items: center; gap: 0.5rem; } } }
 @media (max-width: 768px) {
-  .app-header { flex-direction: column; text-align: center; gap: 1rem; }
+  .app-header-group .app-header { flex-direction: column; gap: 0.75rem; }
+  .app-header-group .app-info { flex-direction: column; align-items: center; }
   .tech-stack { grid-template-columns: 1fr; }
-  .developer-list { grid-template-columns: 1fr; }
-  .contact-actions { flex-direction: column; }
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

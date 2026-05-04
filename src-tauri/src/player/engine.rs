@@ -198,7 +198,7 @@ fn download_to_temp(url: &str) -> Result<PathBuf, String> {
     let bytes = resp.bytes()
         .map_err(|e| format!("读取音频数据失败: {e}"))?;
 
-    let temp_dir = std::env::temp_dir().join("lanyin_player");
+    let temp_dir = std::env::temp_dir().join("mio_player");
     std::fs::create_dir_all(&temp_dir)
         .map_err(|e| format!("创建临时目录失败: {e}"))?;
 
@@ -217,7 +217,7 @@ fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
         .decode(parts[1].trim())
         .map_err(|e| format!("解码 base64 失败: {e}"))?;
 
-    let temp_dir = std::env::temp_dir().join("lanyin_player");
+    let temp_dir = std::env::temp_dir().join("mio_player");
     std::fs::create_dir_all(&temp_dir)
         .map_err(|e| format!("创建临时目录失败: {e}"))?;
 
@@ -913,7 +913,7 @@ pub fn create_output_stream() -> Result<(OutputStreamHandle, std::sync::mpsc::Se
 
 /// 清理上次运行遗留的临时音频文件
 pub fn cleanup_temp_files() {
-    let temp_dir = std::env::temp_dir().join("lanyin_player");
+    let temp_dir = std::env::temp_dir().join("mio_player");
     if !temp_dir.exists() { return }
     let threshold = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
     if let Ok(entries) = std::fs::read_dir(&temp_dir) {

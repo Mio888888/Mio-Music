@@ -162,7 +162,7 @@ const getSourceIcon = (key: string) => {
                   variant="light"
                   class="source-quality-tag"
                 >
-                  {{ getQualityDisplayName(getSourceQuality(String(key))) }}
+                  {{ getQualityDisplayName(getSourceQuality(String(key))!) }}
                 </t-tag>
               </div>
             </div>

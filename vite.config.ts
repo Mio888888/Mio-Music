@@ -71,7 +71,8 @@ export default defineConfig(async () => ({
           'vendor-vue': ['vue', 'vue-router', 'pinia'],
           'vendor-tdesign': ['tdesign-vue-next', 'tdesign-icons-vue-next'],
           'vendor-utils': ['lodash', 'axios', 'marked', 'dompurify'],
-          'vendor-lyrics': ['@applemusic-like-lyrics/lyric', '@applemusic-like-lyrics/vue', '@lrc-player/core', '@lrc-player/parse']
+          'vendor-lyrics': ['@applemusic-like-lyrics/lyric', '@applemusic-like-lyrics/vue', '@lrc-player/core', '@lrc-player/parse'],
+          'vendor-three': ['three']
         }
       }
     }

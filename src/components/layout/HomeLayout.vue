@@ -168,10 +168,10 @@ const handleKeyDown = () => {
       <div class="sidebar-content">
         <div class="logo-section" data-tauri-drag-region>
           <div class="logo-icon" :class="{ 'spring-logo': showNewYear }">
-            <i class="iconfont icon-music"></i>
+            <img src="/icon.png" alt="Mio Music" />
           </div>
           <p class="app-title">
-            <span style="font-weight: 800">澜音 Music</span>
+            <span style="font-weight: 800">Mio Music</span>
           </p>
         </div>
 
@@ -346,16 +346,18 @@ const handleKeyDown = () => {
 .logo-icon {
   width: 2rem;
   height: 2rem;
-  background-color: var(--td-brand-color-4);
-  border-radius: 0.625rem;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.logo-icon .iconfont {
+.logo-icon .iconfont,
+.logo-icon img {
   font-size: 1.25rem;
   color: #fff;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.625rem;
 }
 
 .app-title {

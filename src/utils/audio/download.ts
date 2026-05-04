@@ -236,7 +236,7 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
     )
 
     // 监听下载完成后写入标签
-    const tagOptions = toRaw(settingsStore.settings.tagWriteOptions || {})
+    const tagOptions = (settingsStore.settings.tagWriteOptions ?? {}) as Record<string, any>
     const needsTags = tagOptions.basicInfo || tagOptions.cover || tagOptions.lyrics || tagOptions.downloadLyrics
     if (needsTags) {
       const unlisten = await listen('download:task-completed', async (event: any) => {

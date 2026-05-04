@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Music",
+  "productName": "Mio Music",
   "version": "0.1.0",
-  "identifier": "com.vant.Music",
+  "identifier": "com.vant.Mio",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
