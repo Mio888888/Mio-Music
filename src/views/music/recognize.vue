@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onUnmounted, nextTick, onMounted, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { ControlAudioStore } from '@/store/ControlAudio'
@@ -11,7 +11,9 @@ import {
   PlayCircleIcon,
   SearchIcon,
   RefreshIcon,
-  PlayIcon
+  PlayIcon,
+  DeleteIcon,
+  TimeIcon
 } from 'tdesign-icons-vue-next'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { playSong } from '@/utils/audio/globaPlayList'
@@ -24,7 +26,6 @@ const searchStore = searchValue()
 const router = useRouter()
 
 const MAX_DURATION = 15
-const SLICE_DURATION = 3000
 
 const running = ref(false)
 const status = ref('')
@@ -34,7 +35,75 @@ const wasPlaying = ref(false)
 
 let unlistenChunk: UnlistenFn | null = null
 let unlistenLevel: UnlistenFn | null = null
+let unlistenError: UnlistenFn | null = null
 let timer: any = null
+
+// --- Recognition History ---
+const HISTORY_KEY = 'mio-recognition-history'
+const MAX_HISTORY = 20
+
+interface HistoryItem {
+  name: string
+  singer: string
+  img: string
+  songmid: string
+  albumName: string
+  timestamp: number
+}
+
+const recognitionHistory = ref<HistoryItem[]>([])
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (raw) recognitionHistory.value = JSON.parse(raw)
+  } catch {}
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(recognitionHistory.value))
+  } catch {}
+}
+
+function addToHistory(songs: any[]) {
+  if (!songs.length) return
+  const now = Date.now()
+  const items: HistoryItem[] = songs.map((s) => ({
+    name: s.name,
+    singer: s.singer,
+    img: s.img,
+    songmid: s.songmid,
+    albumName: s.albumName || '',
+    timestamp: now
+  }))
+  recognitionHistory.value = [...items, ...recognitionHistory.value].slice(0, MAX_HISTORY)
+  saveHistory()
+}
+
+function clearHistory() {
+  recognitionHistory.value = []
+  saveHistory()
+}
+
+function formatHistoryTime(ts: number): string {
+  const diff = Date.now() - ts
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}天前`
+  const d = new Date(ts)
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+const showHistory = computed(() => recognitionHistory.value.length > 0 && !running.value && status.value !== 'success')
+
+onMounted(() => {
+  loadHistory()
+})
 
 // --- Canvas visualizer ---
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -53,7 +122,7 @@ function drawVisualizer() {
   if (!ctx) return
 
   const dpr = window.devicePixelRatio || 1
-  const size = 280
+  const size = 320
   canvas.width = size * dpr
   canvas.height = size * dpr
   canvas.style.width = `${size}px`
@@ -62,8 +131,8 @@ function drawVisualizer() {
 
   const cx = size / 2
   const cy = size / 2
-  const innerR = 52
-  const maxBarH = 50
+  const innerR = 68
+  const maxBarH = 60
 
   ctx.clearRect(0, 0, size, size)
 
@@ -77,7 +146,6 @@ function drawVisualizer() {
     const angle = (i / BAR_COUNT) * Math.PI * 2 - Math.PI / 2
     const phase = barPhases[i]
 
-    // Simulate spectrum: mix base pattern with audio level
     const baseH = 0.15 + 0.25 * Math.abs(Math.sin(phase + now * 1.2))
     const levelH = smoothLevel * (0.3 + 0.7 * Math.abs(Math.sin(phase * 2.3 + now * 0.8)))
     const h = baseH + levelH
@@ -92,8 +160,8 @@ function drawVisualizer() {
     ctx.beginPath()
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y2)
-    ctx.strokeStyle = `rgba(var(--td-brand-color-rgb, 0, 82, 204), ${alpha})`
-    ctx.lineWidth = 2.2
+    ctx.strokeStyle = `rgba(var(--td-brand-color-rgb, 3, 222, 109), ${alpha})`
+    ctx.lineWidth = 2.5
     ctx.lineCap = 'round'
     ctx.stroke()
   }
@@ -103,9 +171,9 @@ function drawVisualizer() {
     const glowAlpha = smoothLevel * 0.5
     ctx.beginPath()
     ctx.arc(cx, cy, innerR + 2, 0, Math.PI * 2)
-    ctx.strokeStyle = `rgba(var(--td-brand-color-rgb, 0, 82, 204), ${glowAlpha})`
+    ctx.strokeStyle = `rgba(var(--td-brand-color-rgb, 3, 222, 109), ${glowAlpha})`
     ctx.lineWidth = 2
-    ctx.shadowColor = `rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.6)`
+    ctx.shadowColor = `rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.6)`
     ctx.shadowBlur = 15 * smoothLevel
     ctx.stroke()
     ctx.shadowBlur = 0
@@ -180,21 +248,48 @@ async function queryNetease(fp: string, duration: number) {
     decrypt: '1'
   })
   const url = `https://interface.music.163.com/api/music/audio/match?${params.toString()}`
-  const resp = await fetch(url, { method: 'POST' })
-  return resp.json()
+
+  // Use Tauri http_proxy to bypass CORS
+  const resp = await invoke<any>('http_proxy', {
+    args: {
+      url,
+      method: 'POST',
+      timeout: 15000
+    }
+  })
+
+  // http_proxy wraps response in { statusCode, headers, body }
+  const json = resp.body ?? resp
+  return json
 }
 
 function parseResult(resp: any): any[] {
-  const list = resp?.data?.result
+  const code = resp?.code
+  const data = resp?.data
+  const list = data?.result
   if (!Array.isArray(list) || list.length === 0) return []
-  return list.map((item: any) => ({
-    songmid: String(item?.song?.id || ''),
-    name: String(item?.song?.name || ''),
-    singer: (item?.song?.artists || []).map((a: any) => a.name).join(' / '),
-    albumName: String(item?.song?.album?.name || ''),
-    img: (item?.song?.album?.cover || '').replace(/^http:/, 'https:') + '?param=100y100',
-    startTime: item?.startTime || 0
-  }))
+  return list.map((item: any) => {
+    const album = item?.song?.album
+    let img =
+      album?.picUrl ||
+      album?.cover ||
+      album?.img1v1Url ||
+      ''
+    if (img && !img.startsWith('http')) {
+      img = `https://p1.music.126.net/${img}/${img}.jpg`
+    }
+    if (img && !img.includes('param=')) {
+      img += '?param=100y100'
+    }
+    return {
+      songmid: String(item?.song?.id || ''),
+      name: String(item?.song?.name || ''),
+      singer: (item?.song?.artists || []).map((a: any) => a.name).join(' / '),
+      albumName: String(album?.name || ''),
+      img: img.replace(/^http:/, 'https:'),
+      startTime: item?.startTime || 0
+    }
+  })
 }
 
 async function start() {
@@ -203,6 +298,13 @@ async function start() {
   try {
     status.value = 'initializing'
     await ensureAFP()
+
+    const granted = await invoke<boolean>('request_mic_permission')
+    if (!granted) {
+      MessagePlugin.error('需要麦克风权限才能使用听歌识曲')
+      reset()
+      return
+    }
 
     if (audioStore.Audio.isPlay) {
       wasPlaying.value = true
@@ -216,21 +318,33 @@ async function start() {
     currentDuration.value = 0
     recognizedSongs.value = []
 
-    // Listen for audio level updates (~15fps)
+    // Listen for Rust capture errors
+    unlistenError = await listen<{ error: string }>('audio-capture:error', (event) => {
+      stopRecording(false)
+      const msg = event.payload.error
+      if (msg.includes('未找到') || msg.includes('麦克风设备')) {
+        MessagePlugin.warning('未检测到麦克风，请连接音频输入设备后重试')
+      } else {
+        MessagePlugin.error(msg)
+      }
+    })
+
+    // Listen for audio level updates
     unlistenLevel = await listen<{ level: number }>('audio-capture:level', (event) => {
       audioLevel = event.payload.level
     })
 
-    // Listen for PCM chunks
+    let chunkCount = 0
     unlistenChunk = await listen<{ data: number[]; sampleRate: number }>(
       'audio-capture:chunk',
       async (event) => {
+        chunkCount++
         const pcm8k = new Float32Array(event.payload.data)
         await tryRecognizePCM(pcm8k)
       }
     )
 
-    await invoke('audio_capture_start', { chunkDurationMs: SLICE_DURATION })
+    await invoke('audio_capture_start', { chunkDurationMs: 3000 })
 
     await nextTick()
     startVisualizerLoop()
@@ -243,8 +357,7 @@ async function start() {
         stopRecording(false)
       }
     }, 1000)
-  } catch (err) {
-    console.error('启动录音失败', err)
+  } catch {
     MessagePlugin.error('启动录音失败，请检查麦克风权限')
     reset()
   }
@@ -254,11 +367,16 @@ async function tryRecognizePCM(pcm8k: Float32Array) {
   if (!running.value) return
 
   try {
+    // Sound detection
     let hasSound = false
+    let maxAmp = 0
+    let soundSamples = 0
     for (let i = 0; i < pcm8k.length; i += 100) {
-      if (Math.abs(pcm8k[i]) > 0.01) {
+      const amp = Math.abs(pcm8k[i])
+      if (amp > maxAmp) maxAmp = amp
+      if (amp > 0.002) soundSamples++
+      if (amp > 0.002) {
         hasSound = true
-        break
       }
     }
     if (!hasSound) return
@@ -267,6 +385,8 @@ async function tryRecognizePCM(pcm8k: Float32Array) {
     if (typeof gen !== 'function') return
 
     const fp = await gen(pcm8k)
+    if (!fp) return
+
     const duration = pcm8k.length / 8000
     const resp = await queryNetease(fp, duration)
     const result = parseResult(resp)
@@ -274,11 +394,10 @@ async function tryRecognizePCM(pcm8k: Float32Array) {
     if (result.length > 0) {
       recognizedSongs.value = result
       status.value = 'success'
+      addToHistory(result)
       stopRecording(true)
     }
-  } catch (e) {
-    console.error('Recognition attempt failed', e)
-  }
+  } catch {}
 }
 
 async function stopRecording(success: boolean = false) {
@@ -292,29 +411,16 @@ async function stopRecording(success: boolean = false) {
   audioLevel = 0
   smoothLevel = 0
 
-  if (unlistenLevel) {
-    unlistenLevel()
-    unlistenLevel = null
-  }
-  if (unlistenChunk) {
-    unlistenChunk()
-    unlistenChunk = null
-  }
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
+  if (unlistenLevel) { unlistenLevel(); unlistenLevel = null }
+  if (unlistenChunk) { unlistenChunk(); unlistenChunk = null }
+  if (unlistenError) { unlistenError(); unlistenError = null }
+  if (timer) { clearInterval(timer); timer = null }
 
   running.value = false
-
-  if (!success) {
-    status.value = 'failed'
-  }
+  if (!success) status.value = 'failed'
 
   if (wasPlaying.value) {
-    setTimeout(() => {
-      audioStore.start()
-    }, 500)
+    setTimeout(() => audioStore.start(), 500)
     wasPlaying.value = false
   }
 }
@@ -341,7 +447,9 @@ async function onFilePicked(e: Event) {
 
     try {
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+
       const pcm8k = await resampleTo8kMono(audioBuffer)
+
       const targetLength = MAX_DURATION * 8000
       const slice = new Float32Array(Math.min(pcm8k.length, targetLength))
       slice.set(pcm8k.subarray(0, slice.length))
@@ -349,21 +457,29 @@ async function onFilePicked(e: Event) {
       const gen = (window as any).GenerateFP
       if (typeof gen === 'function') {
         const fp = await gen(slice)
+        if (!fp) {
+          status.value = 'failed'
+          MessagePlugin.warning('未识别到歌曲')
+          return
+        }
         const resp = await queryNetease(fp, slice.length / 8000)
         const result = parseResult(resp)
         if (result.length > 0) {
           recognizedSongs.value = result
           status.value = 'success'
+          addToHistory(result)
         } else {
           status.value = 'failed'
           MessagePlugin.warning('未识别到歌曲')
         }
+      } else {
+        status.value = 'failed'
+        MessagePlugin.error('音频指纹模块未加载')
       }
     } finally {
       ctx.close()
     }
-  } catch (e) {
-    console.error('File recognition failed', e)
+  } catch {
     status.value = 'failed'
     MessagePlugin.error('识别失败')
   } finally {
@@ -380,22 +496,11 @@ function reset() {
 
   stopVisualizerLoop()
 
-  try {
-    invoke('audio_capture_stop')
-  } catch {}
-
-  if (unlistenLevel) {
-    unlistenLevel()
-    unlistenLevel = null
-  }
-  if (unlistenChunk) {
-    unlistenChunk()
-    unlistenChunk = null
-  }
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
+  try { invoke('audio_capture_stop') } catch {}
+  if (unlistenLevel) { unlistenLevel(); unlistenLevel = null }
+  if (unlistenChunk) { unlistenChunk(); unlistenChunk = null }
+  if (unlistenError) { unlistenError(); unlistenError = null }
+  if (timer) { clearInterval(timer); timer = null }
 }
 
 function backToInitial() {
@@ -420,16 +525,26 @@ async function handlePlayResult(song: any) {
   }
 }
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
 function handleSearchResult(song: any) {
   if (!song) return
   searchStore.setValue(song.name)
   router.push({ name: 'search' })
+}
+
+function handlePlayHistory(item: HistoryItem) {
+  handlePlayResult({
+    songmid: item.songmid,
+    name: item.name,
+    singer: item.singer,
+    img: item.img,
+    albumName: item.albumName
+  })
+}
+
+function formatTime(seconds: number) {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
 onUnmounted(() => {
@@ -440,172 +555,285 @@ onUnmounted(() => {
 <template>
   <div class="recognize-page">
     <div class="recognize-container">
-      <div class="header">
-        <h2>听歌识曲</h2>
-        <p class="subtitle">识别电脑正在播放的声音或上传音频文件</p>
-      </div>
-
-      <div v-if="!recognizedSongs.length || running" class="visualizer-section">
-        <div class="viz-wrapper" :class="{ 'is-active': running }">
+      <!-- Recognition Stage -->
+      <section class="recognition-stage">
+        <div class="viz-area" :class="{ 'is-active': running }">
+          <!-- Background glow -->
+          <div class="viz-glow"></div>
+          <!-- Ping ring -->
+          <div class="viz-ring ping-ring"></div>
+          <!-- Static ring -->
+          <div class="viz-ring static-ring"></div>
+          <!-- Ripple waves -->
+          <div class="viz-wave w1"></div>
+          <div class="viz-wave w2"></div>
+          <div class="viz-wave w3"></div>
+          <!-- Canvas visualizer -->
           <canvas ref="canvasRef" class="viz-canvas"></canvas>
-          <div class="icon-container">
-            <MicrophoneIcon size="48px" />
-          </div>
-          <!-- Outer ripple waves -->
-          <div class="wave w1"></div>
-          <div class="wave w2"></div>
-          <div class="wave w3"></div>
-          <div class="wave w4"></div>
+          <!-- Center button -->
+          <button
+            class="center-btn"
+            :class="{
+              'is-recording': running,
+              'is-loading': status === 'initializing' || status === 'processing'
+            }"
+            :disabled="status === 'initializing' || status === 'processing'"
+            @click="running ? stopRecording(false) : start()"
+          >
+            <StopCircleIcon v-if="running" size="48px" />
+            <t-loading v-else-if="status === 'initializing' || status === 'processing'" size="48px" />
+            <MicrophoneIcon v-else size="48px" />
+          </button>
         </div>
-      </div>
 
-      <div class="status-display">
-        <template v-if="running">
-          <p class="status-text recording-text">
-            <span class="recording-dot"></span>
-            正在识别中... {{ currentDuration }}s / {{ MAX_DURATION }}s
-          </p>
-          <t-progress
-            :percentage="(currentDuration / MAX_DURATION) * 100"
-            size="small"
-            :label="false"
-            :color="'var(--td-brand-color)'"
-          />
-        </template>
-        <template v-else-if="recognizedSongs.length > 0">
-          <div class="result-list">
-            <div
-              v-for="(song, idx) in recognizedSongs"
-              :key="song.songmid"
-              class="result-item"
-              :style="{ animationDelay: `${idx * 0.1}s` }"
-            >
-              <div class="result-cover-wrapper">
-                <img :src="song.img" class="result-cover" />
-              </div>
-              <div class="result-content">
-                <h3>{{ song.name }}</h3>
-                <p>{{ song.singer }}</p>
-                <div v-if="song.startTime > 0" class="result-meta">
-                  <span>识别片段: {{ formatTime(song.startTime / 1000) }}</span>
-                </div>
-              </div>
-              <div class="result-actions">
-                <t-button theme="primary" shape="circle" @click="handlePlayResult(song)">
-                  <template #icon><PlayCircleIcon /></template>
-                </t-button>
-                <t-button
-                  theme="default"
-                  variant="outline"
-                  shape="circle"
-                  @click="handleSearchResult(song)"
-                >
-                  <template #icon><SearchIcon /></template>
-                </t-button>
-              </div>
+        <!-- Status text -->
+        <div class="status-area">
+          <template v-if="running">
+            <h3 class="status-title">
+              <span class="recording-dot"></span>
+              正在识别中...
+            </h3>
+            <p class="status-desc">请尽量靠近音源，以便更精准地捕捉旋律</p>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: `${(currentDuration / MAX_DURATION) * 100}%` }"></div>
             </div>
-          </div>
-          <div class="result-footer">
-            <t-button theme="primary" variant="text" @click="backToInitial">
-              <template #icon><RefreshIcon /></template>
-              继续识别
-            </t-button>
-          </div>
-        </template>
-        <template v-else-if="status === 'failed'">
-          <div class="failed-section">
-            <p class="status-text error">未能识别到歌曲</p>
-            <t-button theme="default" variant="outline" size="small" @click="start">
-              <template #icon><RefreshIcon /></template>
-              重试
-            </t-button>
-          </div>
-        </template>
-        <template v-else>
-          <p class="status-text">点击下方按钮开始</p>
-        </template>
-      </div>
-
-      <div v-if="recognizedSongs.length === 0" class="actions">
-        <t-button
-          shape="circle"
-          size="large"
-          theme="primary"
-          class="main-btn"
-          :class="{ 'is-recording': running }"
-          :loading="status === 'initializing' || status === 'processing'"
-          @click="running ? stopRecording(false) : start()"
-        >
-          <template #icon>
-            <StopCircleIcon v-if="running" size="36px" />
-            <PlayIcon v-else size="36px" />
+            <span class="progress-time">{{ currentDuration }}s / {{ MAX_DURATION }}s</span>
           </template>
-        </t-button>
-
-        <div class="sub-actions">
-          <t-button variant="text" theme="default" :disabled="running" @click="triggerUpload">
-            <template #icon><UploadIcon /></template>
-            上传文件
-          </t-button>
+          <template v-else-if="status === 'failed'">
+            <h3 class="status-title error">未能识别到歌曲</h3>
+            <div class="failed-actions">
+              <button class="action-chip" @click="start">
+                <RefreshIcon size="16px" /> 重试
+              </button>
+            </div>
+          </template>
+          <template v-else-if="!recognizedSongs.length">
+            <h3 class="status-title">点击开始识别</h3>
+            <p class="status-desc">识别电脑正在播放的声音</p>
+            <div class="upload-chip" @click="triggerUpload">
+              <UploadIcon size="16px" /> 或上传音频文件
+            </div>
+          </template>
         </div>
         <input ref="fileInput" type="file" accept="audio/*" hidden @change="onFilePicked" />
-      </div>
+      </section>
+
+      <!-- Results Section -->
+      <section v-if="recognizedSongs.length > 0" class="results-section">
+        <div class="result-list">
+          <div
+            v-for="(song, idx) in recognizedSongs"
+            :key="song.songmid"
+            class="result-card"
+            :style="{ animationDelay: `${idx * 0.1}s` }"
+          >
+            <div class="result-cover-wrapper">
+              <img :src="song.img" class="result-cover" :alt="song.name" />
+            </div>
+            <div class="result-info">
+              <h4 class="result-name">{{ song.name }}</h4>
+              <p class="result-artist">{{ song.singer }}</p>
+              <span v-if="song.startTime > 0" class="result-tag">
+                识别片段: {{ formatTime(song.startTime / 1000) }}
+              </span>
+            </div>
+            <div class="result-actions">
+              <button class="result-btn primary" @click="handlePlayResult(song)">
+                <PlayCircleIcon size="22px" />
+              </button>
+              <button class="result-btn" @click="handleSearchResult(song)">
+                <SearchIcon size="18px" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="result-footer">
+          <button class="action-chip" @click="backToInitial">
+            <RefreshIcon size="16px" /> 继续识别
+          </button>
+        </div>
+      </section>
+
+      <!-- History Section -->
+      <section v-if="showHistory" class="history-section">
+        <div class="history-header">
+          <h4 class="history-title">
+            <TimeIcon size="18px" />
+            识别历史
+          </h4>
+          <button class="history-clear" @click="clearHistory">
+            <DeleteIcon size="14px" />
+            清空
+          </button>
+        </div>
+        <div class="history-grid">
+          <div
+            v-for="(item, idx) in recognitionHistory.slice(0, 6)"
+            :key="`${item.songmid}-${idx}`"
+            class="history-card"
+            @click="handlePlayHistory(item)"
+          >
+            <div class="history-cover-wrapper">
+              <img :src="item.img" class="history-cover" :alt="item.name" />
+            </div>
+            <div class="history-info">
+              <h5 class="history-name">{{ item.name }}</h5>
+              <p class="history-artist">{{ item.singer }}</p>
+            </div>
+            <div class="history-meta">
+              <span class="history-time">{{ formatHistoryTime(item.timestamp) }}</span>
+              <PlayCircleIcon size="20px" class="history-play" />
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* ===== Page Layout ===== */
 .recognize-page {
   height: 100%;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  border-radius: 8px;
   overflow: hidden;
 }
 
 .recognize-container {
   width: 100%;
   height: 100%;
-  padding: 24px;
-  text-align: center;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 32px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  overflow: hidden;
-  align-items: center;
+  gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.header h2 {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--td-text-color-primary);
-  letter-spacing: -0.5px;
+.recognize-container::-webkit-scrollbar {
+  width: 6px;
+}
+.recognize-container::-webkit-scrollbar-thumb {
+  background-color: var(--td-scrollbar-color);
+  border-radius: 3px;
+}
+.recognize-container::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.subtitle {
-  font-size: 14px;
-  color: var(--td-text-color-secondary);
-}
-
-/* --- Visualizer --- */
-.visualizer-section {
+/* ===== Recognition Stage ===== */
+.recognition-stage {
   display: flex;
-  justify-content: center;
-  padding: 8px 0;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0 16px;
   flex-shrink: 0;
 }
 
-.viz-wrapper {
+/* ===== Visualizer Area ===== */
+.viz-area {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: 280px;
+  height: 280px;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 24px;
 }
 
+.viz-glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(
+    circle,
+    rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.08) 0%,
+    transparent 70%
+  );
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.is-active .viz-glow {
+  opacity: 1;
+}
+
+.viz-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.ping-ring {
+  inset: 0;
+  border: 3px solid rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.15);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.is-active .ping-ring {
+  opacity: 1;
+  animation: viz-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.static-ring {
+  inset: 16px;
+  border: 2px solid rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.25);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.is-active .static-ring {
+  opacity: 1;
+}
+
+@keyframes viz-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  75%,
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+/* Ripple waves */
+.viz-wave {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.3);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.is-active .viz-wave {
+  animation: wave-ripple 3s ease-out infinite;
+}
+.is-active .w2 { animation-delay: 0.75s; }
+.is-active .w3 { animation-delay: 1.5s; }
+
+@keyframes wave-ripple {
+  0% {
+    width: 120px;
+    height: 120px;
+    opacity: 0.4;
+  }
+  100% {
+    width: 280px;
+    height: 280px;
+    opacity: 0;
+  }
+}
+
+/* Canvas */
 .viz-canvas {
   position: absolute;
   top: 50%;
@@ -621,95 +849,86 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-.icon-container {
+/* Center button */
+.center-btn {
   position: relative;
   z-index: 10;
-  width: 88px;
-  height: 88px;
-  background: var(--td-brand-color);
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
+  border: none;
+  background: var(--td-brand-color);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
-  transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  box-shadow: 0 8px 32px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.3);
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  outline: none;
 }
 
-.is-active .icon-container {
+.center-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 40px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.4);
+}
+
+.center-btn:active {
+  transform: scale(0.95);
+}
+
+.center-btn.is-recording {
   transform: scale(1.08);
   box-shadow:
-    0 0 0 3px rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.15),
-    0 6px 30px rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.35);
+    0 0 0 4px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.15),
+    0 8px 40px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.35);
+  animation: btn-breathe 2s ease-in-out infinite;
 }
 
-/* Ripple waves */
-.wave {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  border: 1.5px solid var(--td-brand-color);
-  opacity: 0;
-  z-index: 0;
+.center-btn.is-loading {
   pointer-events: none;
+  opacity: 0.8;
 }
 
-.is-active .wave {
-  animation: ripple-out 3s ease-out infinite;
-}
-.is-active .w2 { animation-delay: 0.75s; }
-.is-active .w3 { animation-delay: 1.5s; }
-.is-active .w4 { animation-delay: 2.25s; }
-
-@keyframes ripple-out {
-  0% {
-    width: 88px;
-    height: 88px;
-    opacity: 0.35;
-  }
-  100% {
-    width: 200px;
-    height: 200px;
-    opacity: 0;
-  }
+.center-btn:disabled {
+  cursor: not-allowed;
 }
 
-/* --- Status --- */
-.status-display {
-  width: 100%;
-  max-width: 600px;
-  min-height: 0;
+@keyframes btn-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0); }
+}
+
+/* ===== Status Area ===== */
+.status-area {
+  text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 4px;
+  gap: 8px;
 }
 
-.status-display::-webkit-scrollbar {
-  width: 6px;
-}
-.status-display::-webkit-scrollbar-thumb {
-  background-color: var(--td-scrollbar-color);
-  border-radius: 3px;
-}
-.status-display::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.status-text {
-  font-size: 15px;
-  color: var(--td-text-color-secondary);
+.status-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--td-text-color-primary);
+  margin: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  letter-spacing: -0.3px;
+}
+
+.status-title.error {
+  color: var(--td-error-color);
+}
+
+.status-desc {
+  font-size: 14px;
+  color: var(--td-text-color-secondary);
+  margin: 0;
+  max-width: 320px;
 }
 
 .recording-dot {
@@ -726,47 +945,111 @@ onUnmounted(() => {
   50% { opacity: 0.4; transform: scale(0.8); }
 }
 
-.status-text.error {
-  color: var(--td-error-color);
+.progress-bar {
+  width: 200px;
+  height: 4px;
+  background: var(--td-bg-color-component);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
 }
 
-.failed-section {
+.progress-fill {
+  height: 100%;
+  background: var(--td-brand-color);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+.progress-time {
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
+  margin-top: 2px;
+}
+
+/* Action chips */
+.action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--td-border-level-2-color);
+  background: var(--td-bg-color-container);
+  color: var(--td-brand-color);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-chip:hover {
+  background: var(--td-brand-color-light);
+  border-color: var(--td-brand-color-light);
+}
+
+.upload-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px dashed var(--td-border-level-2-color);
+  color: var(--td-text-color-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upload-chip:hover {
+  border-color: var(--td-brand-color);
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+}
+
+.failed-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* ===== Results Section ===== */
+.results-section {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
+  gap: 16px;
   animation: fadeIn 0.4s ease;
 }
 
-/* --- Result list --- */
 .result-list {
-  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.result-item {
+.result-card {
   display: flex;
   align-items: center;
-  background: var(--td-bg-color-secondary);
-  padding: 12px;
-  border-radius: 12px;
   gap: 16px;
-  transition: all 0.2s ease;
+  padding: 16px;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-border-level-1-color);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.result-item:hover {
-  background: var(--td-bg-color-component-hover);
+.result-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 4px 16px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.1);
+  border-color: rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.2);
 }
 
 .result-cover-wrapper {
-  width: 60px;
-  height: 60px;
-  border-radius: 8px;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -775,25 +1058,30 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.4s ease;
 }
 
-.result-content {
+.result-card:hover .result-cover {
+  transform: scale(1.08);
+}
+
+.result-info {
   flex: 1;
-  text-align: left;
   min-width: 0;
+  text-align: left;
 }
 
-.result-content h3 {
+.result-name {
   font-size: 16px;
   font-weight: 600;
   color: var(--td-text-color-primary);
-  margin: 0 0 4px 0;
+  margin: 0 0 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.result-content p {
+.result-artist {
   font-size: 14px;
   color: var(--td-text-color-secondary);
   margin: 0;
@@ -802,22 +1090,195 @@ onUnmounted(() => {
   text-overflow: ellipsis;
 }
 
-.result-meta {
-  margin-top: 4px;
+.result-tag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
   font-size: 12px;
   color: var(--td-brand-color);
   background: var(--td-brand-color-light);
-  display: inline-block;
-  padding: 2px 8px;
   border-radius: 4px;
 }
 
 .result-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
 
+.result-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--td-border-level-2-color);
+  background: var(--td-bg-color-container);
+  color: var(--td-text-color-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.result-btn:hover {
+  color: var(--td-brand-color);
+  border-color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+}
+
+.result-btn.primary {
+  width: 42px;
+  height: 42px;
+  background: var(--td-brand-color);
+  color: #fff;
+  border: none;
+}
+
+.result-btn.primary:hover {
+  background: var(--td-brand-color-hover);
+  color: #fff;
+}
+
+.result-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+/* ===== History Section ===== */
+.history-section {
+  padding-top: 8px;
+  border-top: 1px solid var(--td-border-level-1-color);
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--td-text-color-primary);
+  margin: 0;
+}
+
+.history-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-clear:hover {
+  color: var(--td-error-color);
+  background: rgba(var(--td-error-color-rgb, 180, 26, 26), 0.06);
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.history-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--td-bg-color-container);
+  border: 1px solid var(--td-border-level-1-color);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.history-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.history-cover-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.history-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.history-card:hover .history-cover {
+  transform: scale(1.1);
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-artist {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--td-text-color-placeholder);
+  white-space: nowrap;
+}
+
+.history-play {
+  color: var(--td-brand-color);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.history-card:hover .history-play {
+  opacity: 1;
+}
+
+/* ===== Animations ===== */
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -832,46 +1293,5 @@ onUnmounted(() => {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* --- Actions --- */
-.actions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  margin-top: auto;
-  padding-bottom: 20px;
-}
-
-.main-btn {
-  width: 72px;
-  height: 72px;
-  font-size: 36px;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.main-btn.is-recording {
-  animation: btn-breathe 2s ease-in-out infinite;
-}
-
-.main-btn:active {
-  transform: scale(0.92);
-}
-
-@keyframes btn-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.3); }
-  50% { box-shadow: 0 0 0 10px rgba(var(--td-brand-color-rgb, 0, 82, 204), 0); }
-}
-
-.sub-actions {
-  display: flex;
-  gap: 16px;
-}
-
-.result-footer {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
 }
 </style>

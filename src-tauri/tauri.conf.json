@@ -24,7 +24,8 @@
     "active": true,
     "targets": "all",
     "macOS": {
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "entitlements": "Mio Music.entitlements"
     },
     "icon": [
       "icons/32x32.png",

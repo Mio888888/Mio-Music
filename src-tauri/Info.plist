@@ -7,5 +7,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Mio Music 需要使用麦克风来识别正在播放的音乐</string>
 </dict>
 </plist>

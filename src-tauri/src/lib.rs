@@ -275,6 +275,7 @@ pub fn run() {
             // Audio Capture (microphone)
             audio_capture::audio_capture_start,
             audio_capture::audio_capture_stop,
+            audio_capture::request_mic_permission,
             audio_device::audio__set_output_device,
             audio_device::audio__get_device_volume,
             audio_device::audio__set_device_volume,
