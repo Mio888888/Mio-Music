@@ -1,4 +1,6 @@
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::State;
 

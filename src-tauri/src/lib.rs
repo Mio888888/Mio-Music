@@ -13,7 +13,9 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::{Emitter, Manager, TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(target_os = "macos")]
+use tauri::TitleBarStyle;
 use commands::hotkey_commands;
 use std::sync::Mutex;
 
@@ -43,7 +45,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             let win_builder = win_builder.title_bar_style(TitleBarStyle::Overlay);
 
-            let window = win_builder.build().expect("Failed to create main window");
+            let _window = win_builder.build().expect("Failed to create main window");
 
             #[cfg(target_os = "macos")]
             {
@@ -56,7 +58,7 @@ pub fn run() {
                     let _: () = msg_send![button as *mut Object, setHidden: YES];
                 }
 
-                let ns_window = window.ns_window().expect("Failed to get NSWindow") as id;
+                let ns_window = _window.ns_window().expect("Failed to get NSWindow") as id;
                 unsafe {
                     let bg_color = NSColor::colorWithRed_green_blue_alpha_(
                         nil,
