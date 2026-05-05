@@ -2,6 +2,10 @@
 import { ref } from 'vue'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
+import { platform as getPlatform } from '@tauri-apps/plugin-os'
+import { MessagePlugin } from 'tdesign-vue-next'
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
@@ -12,7 +16,20 @@ const updateAutoUpdate = () => {
 }
 
 const appVersion = ref('1.0.0')
-const isCheckingUpdate = ref(false)
+
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'
+const updateStatus = ref<UpdateStatus>('idle')
+const isChecking = ref(false)
+const newVersion = ref('')
+const updateBody = ref('')
+const downloadPercent = ref(0)
+const downloadDetail = ref('')
+const errorMsg = ref('')
+
+const isMacOS = ref(false)
+try {
+  isMacOS.value = getPlatform() === 'macos'
+} catch {}
 
 const getAppVersion = async () => {
   try {
@@ -23,14 +40,81 @@ const getAppVersion = async () => {
 getAppVersion()
 
 const handleCheckUpdate = async () => {
-  isCheckingUpdate.value = true
+  isChecking.value = true
+  updateStatus.value = 'checking'
+  errorMsg.value = ''
+  newVersion.value = ''
+  downloadPercent.value = 0
+  downloadDetail.value = ''
+
   try {
-    if ((window as any).api?.autoUpdater?.checkForUpdates) {
-      await (window as any).api.autoUpdater.checkForUpdates()
+    const update = await check()
+    if (!update) {
+      updateStatus.value = 'up-to-date'
+      return
     }
-  } catch (error) {
-    console.error('检查更新失败:', error)
-  } finally { isCheckingUpdate.value = false }
+
+    newVersion.value = update.version
+    updateBody.value = update.body || ''
+    updateStatus.value = 'available'
+  } catch (e: any) {
+    console.error('检查更新错误:', e)
+    updateStatus.value = 'error'
+    errorMsg.value = e?.message || e?.toString?.() || JSON.stringify(e) || '检查更新失败，请稍后重试'
+  } finally {
+    isChecking.value = false
+  }
+}
+
+const handleDownloadAndInstall = async () => {
+  if (isMacOS.value) return
+
+  updateStatus.value = 'downloading'
+  downloadPercent.value = 0
+  downloadDetail.value = ''
+
+  try {
+    const update = await check()
+    if (!update) {
+      updateStatus.value = 'up-to-date'
+      return
+    }
+
+    let contentLength = 0
+    let downloaded = 0
+
+    await update.downloadAndInstall((event) => {
+      switch (event.event) {
+        case 'Started':
+          contentLength = event.data.contentLength ?? 0
+          break
+        case 'Progress':
+          downloaded += event.data.chunkLength
+          if (contentLength > 0) {
+            downloadPercent.value = Math.round(downloaded / contentLength * 100)
+            const mb = (downloaded / 1024 / 1024).toFixed(1)
+            const total = (contentLength / 1024 / 1024).toFixed(1)
+            downloadDetail.value = `${mb} MB / ${total} MB`
+          }
+          break
+        case 'Finished':
+          break
+      }
+    })
+
+    updateStatus.value = 'downloaded'
+  } catch (e: any) {
+    updateStatus.value = 'error'
+    errorMsg.value = e?.message || '下载更新失败'
+  }
+}
+
+const handleRelaunch = async () => {
+  try {
+    await relaunch()
+  } catch {
+    MessagePlugin.error('重启失败，请手动重启应用')
+  }
 }
 
 const openLink = async (url: string) => {
@@ -62,9 +146,72 @@ const openLink = async (url: string) => {
             <t-switch v-model:value="autoUpdate" @change="updateAutoUpdate"></t-switch>
             <div>应用启动时检查更新</div>
           </div>
-          <t-button theme="primary" :loading="isCheckingUpdate" @click="handleCheckUpdate">
-            {{ isCheckingUpdate ? '检查中...' : '检查更新' }}
+          <t-button
+            theme="primary"
+            :loading="isChecking"
+            :disabled="updateStatus === 'downloading'"
+            @click="handleCheckUpdate"
+          >
+            {{ isChecking ? '检查中...' : '检查更新' }}
           </t-button>
+        </div>
+
+        <!-- 已是最新版本 -->
+        <div v-if="updateStatus === 'up-to-date'" class="update-card success">
+          <span class="update-icon">✓</span> 当前已是最新版本
+        </div>
+
+        <!-- 发现新版本 -->
+        <div v-if="updateStatus === 'available'" class="update-card">
+          <div class="update-header">
+            <span class="update-icon new">↑</span>
+            <span>发现新版本 <strong>v{{ newVersion }}</strong></span>
+          </div>
+          <div v-if="updateBody" class="update-notes">{{ updateBody }}</div>
+
+          <div class="update-actions-row">
+            <!-- macOS: 引导手动下载 -->
+            <t-button
+              v-if="isMacOS"
+              theme="primary"
+              @click="openLink('https://github.com/Mio888888/Mio-Music/releases/latest')"
+            >
+              前往 GitHub 下载
+            </t-button>
+            <!-- Windows/Linux: 自动下载安装 -->
+            <t-button
+              v-else
+              theme="primary"
+              @click="handleDownloadAndInstall"
+            >
+              下载并安装
+            </t-button>
+            <t-button variant="text" @click="updateStatus = 'idle'">稍后提醒</t-button>
+          </div>
+        </div>
+
+        <!-- 下载中 -->
+        <div v-if="updateStatus === 'downloading'" class="update-card">
+          <div class="update-header">
+            <span class="update-icon downloading">↓</span>
+            <span>正在下载更新 v{{ newVersion }}...</span>
+          </div>
+          <t-progress :percentage="downloadPercent" theme="plump" :label="`${downloadPercent}%`" />
+          <div v-if="downloadDetail" class="progress-detail">{{ downloadDetail }}</div>
+        </div>
+
+        <!-- 下载完成 -->
+        <div v-if="updateStatus === 'downloaded'" class="update-card success">
+          <div class="update-header">
+            <span class="update-icon">✓</span>
+            <span>更新已下载完成，重启应用即可安装</span>
+          </div>
+          <t-button theme="primary" @click="handleRelaunch">立即重启安装</t-button>
+        </div>
+
+        <!-- 错误 -->
+        <div v-if="updateStatus === 'error'" class="update-card error">
+          <span class="update-icon err">!</span> {{ errorMsg }}
         </div>
       </div>
     </div>
@@ -154,6 +301,53 @@ const openLink = async (url: string) => {
     margin: 0; color: var(--td-text-color-secondary); line-height: 1.6; font-size: 0.9rem; max-width: 420px;
   }
 }
+.version-section {
+  .update-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    .update-option { display: flex; align-items: center; gap: 0.5rem; }
+  }
+}
+.update-card {
+  margin-top: 0.75rem; padding: 1rem 1.25rem;
+  background: var(--td-bg-color-page); border: 1px solid var(--td-border-level-1-color);
+  border-radius: 0.75rem; font-size: 0.875rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+
+  &.success {
+    border-color: var(--td-success-color);
+    color: var(--td-success-color);
+    flex-direction: row; align-items: center; gap: 0.5rem;
+  }
+  &.error {
+    border-color: var(--td-error-color);
+    color: var(--td-error-color);
+    flex-direction: row; align-items: center; gap: 0.5rem;
+  }
+}
+.update-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25rem; height: 1.25rem; border-radius: 50%; font-size: 0.75rem;
+  font-weight: 700; flex-shrink: 0;
+  background: var(--td-success-color); color: #fff;
+
+  &.new { background: var(--td-brand-color); }
+  &.downloading { background: var(--td-brand-color); animation: pulse 1.5s infinite; }
+  &.err { background: var(--td-error-color); }
+}
+.update-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  strong { color: var(--td-brand-color); }
+}
+.update-notes {
+  color: var(--td-text-color-secondary); font-size: 0.8rem; line-height: 1.5;
+  margin: 0.25rem 0 0.25rem 1.75rem; white-space: pre-wrap;
+}
+.update-actions-row {
+  display: flex; gap: 0.5rem; margin-top: 0.25rem; padding-left: 1.75rem;
+}
+.progress-detail {
+  font-size: 0.75rem; color: var(--td-text-color-secondary); margin-top: 0.25rem;
+}
 .tech-stack {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;
   .tech-item {
@@ -195,11 +389,12 @@ const openLink = async (url: string) => {
     .sponsor-hint { margin: 0.75rem 0 0; font-size: 0.75rem; color: var(--td-text-color-disabled); }
   }
 }
-.version-section { .update-actions { display: flex; justify-content: space-between; align-items: center; .update-option { display: flex; align-items: center; gap: 0.5rem; } } }
 @media (max-width: 768px) {
   .app-header-group .app-header { flex-direction: column; gap: 0.75rem; }
   .app-header-group .app-info { flex-direction: column; align-items: center; }
   .tech-stack { grid-template-columns: 1fr; }
+  .version-section .update-actions { flex-direction: column; gap: 0.75rem; align-items: stretch; }
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 </style>
