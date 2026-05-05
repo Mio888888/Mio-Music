@@ -143,7 +143,7 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
   display: flex;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
-  .t-button { transition: all 0.2s ease; &:hover { transform: translateY(-1px); } }
+  .t-button { transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease; &:hover { transform: translateY(-1px); } }
 }
 
 .style-preview {

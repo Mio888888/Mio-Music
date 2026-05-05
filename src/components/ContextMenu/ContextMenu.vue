@@ -54,14 +54,14 @@ onUnmounted(() => window.removeEventListener('mousedown', handleGlobalMouseDown,
 <style scoped>
 .context-menu {
   position: fixed; background: #fff; border: 1px solid #e0e0e0;
-  border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   backdrop-filter: blur(10px); overflow: auto;
   animation: contextMenuEnter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .context-menu__list { list-style: none; margin: 0; padding: 4px 0; }
 .context-menu__item {
   display: flex; align-items: center; padding: 8px 12px; margin: 0 4px;
-  border-radius: 4px; cursor: pointer; user-select: none; transition: all 0.2s ease; min-height: 32px;
+  border-radius: 4px; cursor: pointer; user-select: none; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease; min-height: 32px;
 }
 .context-menu__item:hover:not(.context-menu__item--disabled) { background: #f5f5f5; }
 .context-menu__item--disabled { opacity: 0.5; cursor: not-allowed; }
@@ -76,7 +76,7 @@ onUnmounted(() => window.removeEventListener('mousedown', handleGlobalMouseDown,
 }
 
 html[data-theme='dark'] .context-menu {
-  background: #2d2d2d; border-color: #404040; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  background: #2d2d2d; border-color: #404040; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 html[data-theme='dark'] .context-menu__item:hover:not(.context-menu__item--disabled) { background: #404040; }
 html[data-theme='dark'] .context-menu__label { color: #e0e0e0; }

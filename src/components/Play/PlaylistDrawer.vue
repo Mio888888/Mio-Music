@@ -405,8 +405,8 @@ defineExpose({ scrollToCurrentSong })
   height: calc(100vh - var(--play-bottom-height) - 80px);
   transition: background-color 0.3s ease, color 0.3s ease;
   background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(20px);
-  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  box-shadow: -3px 0 12px rgba(0, 0, 0, 0.15);
   z-index: 9001;
   display: flex;
   flex-direction: column;
@@ -483,7 +483,7 @@ defineExpose({ scrollToCurrentSong })
 }
 .playlist-songs { display: flex; flex-direction: column; position: relative; }
 .playlist-songs.drag-sorting .playlist-song:not(.dragging) { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-.playlist-songs.drag-sorting .playlist-song.dragging { transition: none; z-index: 1000; opacity: 0.8; transform: scale(1.02); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+.playlist-songs.drag-sorting .playlist-song.dragging { transition: none; z-index: 1000; opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
 
 .playlist-song {
   display: flex;
@@ -501,7 +501,7 @@ defineExpose({ scrollToCurrentSong })
 }
 .playlist-song:hover { background-color: rgba(123, 123, 123, 0.384); }
 .playlist-song.active { background-color: rgba(255, 255, 255, 0.15); }
-.playlist-song.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3); z-index: 1000; background-color: rgba(255, 255, 255, 0.2) !important; }
+.playlist-song.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; background-color: rgba(255, 255, 255, 0.2) !important; }
 
 .drag-handle {
   display: flex;

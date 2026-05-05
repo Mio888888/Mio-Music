@@ -1120,7 +1120,7 @@ watch(() => props.songs, (newSongs) => {
   min-width: 180px;
   background: var(--td-bg-color-container);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
   padding: 4px;
   animation: ctxMenuIn 0.15s ease;
 }

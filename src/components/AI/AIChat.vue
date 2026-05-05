@@ -474,7 +474,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  transition: all 0.3s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   user-select: none;
 }
 
@@ -490,7 +490,7 @@ onBeforeUnmount(() => {
   font-size: 14px;
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.3s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   padding: 2px;
   background-image: linear-gradient(45deg, #409eff, #ff6600);
 }
@@ -532,7 +532,7 @@ video {
   justify-content: center;
   cursor: pointer;
   z-index: 10002;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   box-shadow: 0 2px 8px rgba(255, 71, 87, 0.3);
   color: #fff;
 }
@@ -553,12 +553,12 @@ video {
   height: auto;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   z-index: 10001;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 
 .ask-window.on-left {
@@ -719,7 +719,7 @@ video {
 
 .ball-fade-enter-active,
 .ball-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 
 .ball-fade-enter-from,
@@ -736,7 +736,7 @@ video {
 
 .window-scale-enter-active,
 .window-scale-leave-active {
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: background-color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .window-scale-enter-from,
@@ -886,7 +886,7 @@ video {
   text-decoration: none;
   font-weight: 500;
   border-bottom: 2px solid transparent;
-  transition: all 0.3s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 
 .message-content a:hover {

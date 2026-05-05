@@ -252,7 +252,7 @@ onActivated(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(30px) brightness(0.4);
+  filter: blur(12px) brightness(0.4);
   transform: scale(1.2);
   opacity: 0;
   transition: opacity 0.5s;
@@ -386,7 +386,7 @@ onActivated(() => {
   color: var(--td-text-color-secondary);
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .tab.active {

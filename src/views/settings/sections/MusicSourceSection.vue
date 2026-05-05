@@ -253,7 +253,7 @@ const getSourceIcon = (key: string) => {
     display: flex; align-items: center; gap: 1rem; padding: 1rem;
     background: var(--settings-source-card-bg, var(--td-bg-color-container));
     border: 2px solid var(--settings-source-card-border, var(--td-border-level-1-color));
-    border-radius: 0.75rem; cursor: pointer; transition: all 0.2s ease;
+    border-radius: 0.75rem; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     &:hover { border-color: var(--settings-source-card-hover-border, var(--td-brand-color-3)); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
     &.active { border-color: var(--settings-source-card-active-border, var(--td-brand-color)); background: var(--settings-source-card-active-bg, var(--td-brand-color-1)); box-shadow: 0 0 0 3px var(--td-brand-color-2); }
     .source-icon {
@@ -285,7 +285,7 @@ const getSourceIcon = (key: string) => {
     padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
     border: 1.5px solid var(--td-border-level-2-color);
     background: var(--td-bg-color-container);
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     user-select: none;
     .quality-tag-name { font-size: 0.8125rem; font-weight: 500; color: var(--td-text-color-primary); }
     &:hover { border-color: var(--td-brand-color-3); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }

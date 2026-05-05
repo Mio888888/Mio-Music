@@ -331,7 +331,7 @@ const openLink = async (url: string) => {
   background: var(--td-success-color); color: #fff;
 
   &.new { background: var(--td-brand-color); }
-  &.downloading { background: var(--td-brand-color); animation: pulse 1.5s infinite; }
+  &.downloading { background: var(--td-brand-color); will-change: opacity, transform; animation: pulse 1.5s infinite; }
   &.err { background: var(--td-error-color); }
 }
 .update-header {

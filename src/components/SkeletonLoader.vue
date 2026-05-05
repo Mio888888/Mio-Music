@@ -74,7 +74,8 @@ const widths = computed(() =>
     var(--td-bg-color-component) 75%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.4s ease infinite;
+  will-change: background-position; animation: shimmer 1.4s ease infinite;
+  will-change: background-position;
   border-radius: 6px;
 }
 

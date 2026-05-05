@@ -306,7 +306,7 @@ onDeactivated(() => {
   color: var(--td-text-color-secondary);
   cursor: pointer;
   font-size: 13px;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .tag-chip:hover {
@@ -352,7 +352,7 @@ onDeactivated(() => {
 .panel-inner {
   background: var(--td-bg-color-container);
   border-radius: 12px;
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--td-border-level-1-color);
   padding: 8px 16px 16px;
 }
@@ -368,7 +368,7 @@ onDeactivated(() => {
 
 .dropdown-enter-active,
 .dropdown-leave-active {
-  transition: all 0.16s ease;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 .dropdown-enter-from,
 .dropdown-leave-to {
@@ -450,7 +450,7 @@ onDeactivated(() => {
   border-radius: 1rem;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   position: relative;
   content-visibility: auto;
@@ -459,7 +459,7 @@ onDeactivated(() => {
 
 .playlist-card:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
 .playlist-card:hover .playlist-cover::after {
@@ -507,7 +507,7 @@ onDeactivated(() => {
   padding: 1.25rem 1rem;
   position: relative;
   background: var(--td-bg-color-container);
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 
 .playlist-title {

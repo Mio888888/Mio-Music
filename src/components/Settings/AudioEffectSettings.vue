@@ -163,7 +163,7 @@ onMounted(() => { applyEffects() })
   border: 1px solid var(--td-component-border);
   border-radius: 8px;
   padding: 16px;
-  transition: all 0.3s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 .effect-card:hover {
   border-color: var(--td-brand-color);

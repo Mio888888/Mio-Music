@@ -89,7 +89,7 @@ watch([isEnabled, () => settings.value.isDarkMode], ([enabled, isDark]) => {
       }
       .player-container {
         background: rgba(${containerColor}, 0.25) !important;
-        backdrop-filter: blur(20px) !important;
+        backdrop-filter: blur(8px) !important;
       }
       .scrollable-content {
         background: rgba(${containerColor}, 0.3) !important;
@@ -121,7 +121,7 @@ watch([isEnabled, () => settings.value.isDarkMode], ([enabled, isDark]) => {
 }
 .global-background-media {
   position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
 }
 .bg-video { width: 100%; height: 100%; object-fit: cover; }
 .bg-image { width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; }

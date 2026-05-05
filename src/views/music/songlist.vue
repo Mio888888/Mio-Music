@@ -1059,7 +1059,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   background: var(--td-bg-color-container);
 }
 
@@ -1187,7 +1187,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
   min-width: 156px;
   background: var(--td-bg-color-container);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
   padding: 4px;
   animation: menuIn 0.15s ease;
 }

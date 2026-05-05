@@ -474,7 +474,6 @@ const handleKeyDown = () => {
 .search-input {
   display: flex;
   align-items: center;
-  transition: width 0.3s;
   padding: 0 0.5rem;
   width: min(18.75rem, 400px);
   margin-right: 0.5rem;
@@ -482,6 +481,7 @@ const handleKeyDown = () => {
   background-color: var(--td-bg-color-container);
   overflow: visible;
   position: relative;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .search-input:has(input:focus) {
@@ -620,7 +620,7 @@ const handleKeyDown = () => {
   inset: -40% -60%;
   background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0 1px, transparent 2px);
   opacity: 0.3;
-  animation: bannerSparkle 2.5s linear infinite;
+  will-change: transform, opacity; animation: bannerSparkle 2.5s linear infinite;
 }
 
 .spring-banner-text {

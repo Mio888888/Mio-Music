@@ -324,11 +324,11 @@ const onLeave = (el: Element) => {
   width: 80vw;
   height: 80vh;
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(60px);
-  -webkit-backdrop-filter: blur(60px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -355,7 +355,7 @@ const onLeave = (el: Element) => {
   font-weight: 600;
   cursor: pointer;
   opacity: 0.6;
-  transition: all 0.3s;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   position: relative;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   display: flex;

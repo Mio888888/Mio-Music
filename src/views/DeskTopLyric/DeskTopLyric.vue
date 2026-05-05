@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 4px;
   border-radius: 50%;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 
   &:hover {
     color: #fff;
@@ -457,7 +457,7 @@ onBeforeUnmount(() => {
 /* Controls transition */
 .controls-enter-active,
 .controls-leave-active {
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .controls-enter-from,

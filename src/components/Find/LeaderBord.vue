@@ -108,7 +108,7 @@ onMounted(() => fetchBoards())
   height: 100%;
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 25%, rgba(0, 0, 0, 0.12) 37%, rgba(0, 0, 0, 0.06) 63%);
   background-size: 400% 100%;
-  animation: shimmer 1.4s ease infinite;
+  will-change: background-position; animation: shimmer 1.4s ease infinite;
 }
 
 .empty-state {

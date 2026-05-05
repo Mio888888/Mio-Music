@@ -607,7 +607,7 @@ onUnmounted(() => {
             </h3>
             <p class="status-desc">请尽量靠近音源，以便更精准地捕捉旋律</p>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: `${(currentDuration / MAX_DURATION) * 100}%` }"></div>
+              <div class="progress-fill" :style="{ transform: `scaleX(${currentDuration / MAX_DURATION})` }"></div>
             </div>
             <span class="progress-time">{{ currentDuration }}s / {{ MAX_DURATION }}s</span>
           </template>
@@ -789,7 +789,7 @@ onUnmounted(() => {
 
 .is-active .ping-ring {
   opacity: 1;
-  animation: viz-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  will-change: transform, opacity; animation: viz-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .static-ring {
@@ -827,7 +827,7 @@ onUnmounted(() => {
 }
 
 .is-active .viz-wave {
-  animation: wave-ripple 3s ease-out infinite;
+  will-change: transform, opacity; animation: wave-ripple 3s ease-out infinite;
 }
 .is-active .w2 { animation-delay: 0.75s; }
 .is-active .w3 { animation-delay: 1.5s; }
@@ -875,14 +875,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 32px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.3);
-  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 16px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.3);
+  transition: background-color 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   outline: none;
 }
 
 .center-btn:hover {
   transform: scale(1.05);
-  box-shadow: 0 12px 40px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.4);
+  box-shadow: 0 6px 16px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.4);
 }
 
 .center-btn:active {
@@ -893,8 +893,8 @@ onUnmounted(() => {
   transform: scale(1.08);
   box-shadow:
     0 0 0 4px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.15),
-    0 8px 40px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.35);
-  animation: btn-breathe 2s ease-in-out infinite;
+    0 6px 16px rgba(var(--td-brand-color-rgb, 3, 222, 109), 0.35);
+  will-change: transform, opacity; animation: btn-breathe 2s ease-in-out infinite;
 }
 
 .center-btn.is-loading {
@@ -949,7 +949,7 @@ onUnmounted(() => {
   height: 8px;
   border-radius: 50%;
   background: var(--td-error-color);
-  animation: pulse-dot 1.2s ease-in-out infinite;
+  will-change: opacity; animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse-dot {
@@ -967,10 +967,12 @@ onUnmounted(() => {
 }
 
 .progress-fill {
+  width: 100%;
   height: 100%;
   background: var(--td-brand-color);
   border-radius: 2px;
-  transition: width 1s linear;
+  transform-origin: left center;
+  transition: transform 1s linear;
 }
 
 .progress-time {
@@ -992,7 +994,7 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .action-chip:hover {
@@ -1010,7 +1012,7 @@ onUnmounted(() => {
   color: var(--td-text-color-secondary);
   font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .upload-chip:hover {
@@ -1048,7 +1050,7 @@ onUnmounted(() => {
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 16px;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
   animation: slideUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -1130,7 +1132,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .result-btn:hover {
@@ -1192,7 +1194,7 @@ onUnmounted(() => {
   color: var(--td-text-color-placeholder);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .history-clear:hover {
@@ -1215,7 +1217,7 @@ onUnmounted(() => {
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 14px;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
 }
 
 .history-card:hover {

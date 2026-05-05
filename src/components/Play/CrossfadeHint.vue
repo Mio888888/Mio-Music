@@ -42,8 +42,8 @@ const visible = computed(() => crossfadeState.active)
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 12px;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   pointer-events: none;
   user-select: none;
   will-change: opacity, transform;
@@ -61,7 +61,7 @@ const visible = computed(() => crossfadeState.active)
       background: currentColor;
       border-radius: 2px;
       transform-origin: center;
-      animation: cf-wave 1s ease-in-out infinite;
+      will-change: transform; animation: cf-wave 1s ease-in-out infinite;
     }
 
     span:nth-child(1) {
@@ -84,7 +84,7 @@ const visible = computed(() => crossfadeState.active)
 
     .ch {
       display: inline-block;
-      animation: cf-text-wave 2.4s ease-in-out infinite;
+      will-change: transform; animation: cf-text-wave 2.4s ease-in-out infinite;
     }
   }
 }

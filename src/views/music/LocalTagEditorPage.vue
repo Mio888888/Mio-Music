@@ -101,7 +101,7 @@ onMounted(() => fetchTags())
 .file-path { font-size: 12px; color: var(--td-text-color-placeholder); word-break: break-all; padding: 8px; background: var(--td-bg-color-page); border-radius: 6px; }
 .form-actions { margin-top: 24px; }
 .loading-state { display: flex; flex-direction: column; align-items: center; padding: 60px; }
-.loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
+.loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; will-change: transform; animation: spin 1s linear infinite; margin-bottom: 12px; }
 .loading-state p { color: var(--td-text-color-secondary); }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

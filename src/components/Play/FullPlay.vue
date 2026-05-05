@@ -950,7 +950,7 @@ onUnmounted(() => {
 
 .fade-nav-enter-active,
 .fade-nav-leave-active {
-  transition: all 0.6s cubic-bezier(0.8, 0, 0.8, 0.43);
+  transition: background-color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), border-color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), box-shadow 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), opacity 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), transform 0.6s cubic-bezier(0.8, 0, 0.8, 0.43);
 }
 .fade-nav-enter-from,
 .fade-nav-leave-to {
@@ -1048,7 +1048,7 @@ onUnmounted(() => {
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.256);
-    -webkit-drop-filter: blur(80px);
+    -webkit-drop-filter: blur(8px);
     padding: 0 10vw;
     overflow: hidden;
     display: flex;
@@ -1057,7 +1057,7 @@ onUnmounted(() => {
 
     .left {
       width: 40%;
-      transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       opacity: 1;
       transform: translateX(0);
       display: flex;
@@ -1087,7 +1087,7 @@ onUnmounted(() => {
         display: flex;
         align-items: center;
         justify-content: center;
-        animation: rotateRecord 33s linear infinite;
+        will-change: transform; animation: rotateRecord 33s linear infinite;
         transition: filter 0.3s ease;
         filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.6));
         &:hover { filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.7)); }
@@ -1123,7 +1123,7 @@ onUnmounted(() => {
             background: radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.01) 75%, transparent 100%);
             border-radius: 50%;
             z-index: 2;
-            animation: vinylShine 6s ease-in-out infinite;
+            will-change: opacity; animation: vinylShine 6s ease-in-out infinite;
           }
         }
 
@@ -1160,7 +1160,7 @@ onUnmounted(() => {
             border-radius: 50%;
             z-index: 5;
             pointer-events: none;
-            animation: labelShine 8s ease-in-out infinite;
+            will-change: opacity; animation: labelShine 8s ease-in-out infinite;
           }
         }
 
@@ -1178,7 +1178,7 @@ onUnmounted(() => {
 
     .right {
       width: 60%;
-      transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
       mask: linear-gradient(rgba(255,255,255,0) 0px, rgba(255,255,255,0.6) 5%, rgb(255,255,255) 15%, rgb(255,255,255) 75%, rgba(255,255,255,0.6) 85%, rgba(255,255,255,0));
 
       .lyric-empty {
@@ -1274,7 +1274,7 @@ onUnmounted(() => {
         aspect-ratio: 1/1;
         border-radius: 24px;
         overflow: hidden;
-        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
+        box-shadow: 0 12px 16px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
         transition: transform 0.44s cubic-bezier(0.44, 2, 0.64, 1);
         margin: 0 auto;
         transform: scale(0.8);
@@ -1315,7 +1315,7 @@ onUnmounted(() => {
           }
           .text-scroll-wrapper {
             display: inline-flex;
-            &.animate-scroll { animation: scroll 15s linear infinite; }
+            &.animate-scroll { will-change: transform; animation: scroll 15s linear infinite; }
           }
           .text-scroll-item {
             font-weight: 800;
@@ -1379,7 +1379,7 @@ onUnmounted(() => {
 
   .skin-btn {
     position: relative;
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(8px);
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.628);
     height: 50px;
@@ -1405,7 +1405,7 @@ onUnmounted(() => {
       opacity: 1;
     }
     cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: background-color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1416,12 +1416,12 @@ onUnmounted(() => {
 
     &:hover {
       background-color: rgba(255,255,255,0.25);
-      box-shadow: 0 12px 40px 0 rgba(0,0,0,0.15), 0 0 30px v-bind(lightMainColor), inset 0 0 0 1px rgba(255,255,255,0.4);
+      box-shadow: 0 6px 16px 0 rgba(0,0,0,0.15), 0 0 16px v-bind(lightMainColor), inset 0 0 0 1px rgba(255,255,255,0.4);
     }
     &:active {
       transform: translateY(1px) scale(0.92);
       box-shadow: 0 4px 10px 0 rgba(0,0,0,0.1), 0 0 10px v-bind(lightMainColor), inset 0 0 0 1px rgba(255,255,255,0.1);
-      transition: all 0.1s ease;
+      transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
     }
   }
 
@@ -1438,7 +1438,7 @@ onUnmounted(() => {
     -webkit-backdrop-filter: blur(6px);
     border-radius: 24px;
     padding: 20px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
     transform-origin: bottom right;
     z-index: 100;
   }

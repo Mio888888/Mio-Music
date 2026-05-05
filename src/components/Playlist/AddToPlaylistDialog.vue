@@ -218,8 +218,8 @@ const handleClose = () => {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
 }
 
 .overlay-drag-bar {
@@ -248,13 +248,13 @@ const handleClose = () => {
     rgba(255, 255, 255, 0.58) 35%,
     rgba(255, 255, 255, 0.65) 100%
   );
-  backdrop-filter: blur(80px) saturate(200%);
-  -webkit-backdrop-filter: blur(80px) saturate(200%);
+  backdrop-filter: blur(8px) saturate(200%);
+  -webkit-backdrop-filter: blur(8px) saturate(200%);
 
   border: 1.5px solid rgba(255, 255, 255, 0.45);
   box-shadow:
-    0 32px 64px rgba(0, 0, 0, 0.22),
-    0 12px 28px rgba(0, 0, 0, 0.12),
+    0 16px 32px rgba(0, 0, 0, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.12),
     0 2px 6px rgba(0, 0, 0, 0.06),
     inset 0 2px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
@@ -283,7 +283,7 @@ const handleClose = () => {
   mask-composite: exclude;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  animation: rotate-border 12s linear infinite;
+  will-change: transform; animation: rotate-border 12s linear infinite;
   pointer-events: none;
   z-index: 0;
 
@@ -313,7 +313,7 @@ const handleClose = () => {
     rgba(255, 255, 255, 0.08) 56%,
     transparent 65%
   );
-  animation: light-sweep 9s ease-in-out infinite;
+  will-change: background-position; animation: light-sweep 9s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
   border-radius: 22px;
@@ -411,7 +411,7 @@ const handleClose = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 
   &:hover {
     background: rgba(255, 80, 80, 0.15);
@@ -447,7 +447,7 @@ const handleClose = () => {
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
-    transition: all 0.2s;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     box-sizing: border-box;
 
     &::placeholder { color: var(--td-text-color-placeholder); }
@@ -518,7 +518,7 @@ const handleClose = () => {
   padding: 10px 12px;
   border-radius: 13px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   background: rgba(255, 255, 255, 0.15);
 
   &:hover {
@@ -621,7 +621,7 @@ const handleClose = () => {
   color: var(--td-text-color-primary);
   font-size: 13px;
   outline: none;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 
   &::placeholder { color: var(--td-text-color-placeholder); }
 
@@ -645,7 +645,7 @@ const handleClose = () => {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -700,7 +700,7 @@ const handleClose = () => {
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  will-change: transform; animation: spin 0.6s linear infinite;
   display: inline-block;
 }
 

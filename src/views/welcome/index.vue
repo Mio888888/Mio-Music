@@ -406,7 +406,7 @@ onUnmounted(() => {
   background: linear-gradient(to top, #00d26a, #00d28a);
   border-radius: 3px;
   box-shadow: 0 4px 8px rgba(0, 210, 106, 0.2);
-  animation: eqPulse 1s ease-in-out infinite alternate;
+  will-change: transform; animation: eqPulse 1s ease-in-out infinite alternate;
   transform-origin: bottom;
 }
 

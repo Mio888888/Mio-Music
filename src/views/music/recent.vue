@@ -26,7 +26,7 @@ const formatDuration = (interval?: string) => interval || '--:--'
     </div>
 
     <div v-if="recentList.length > 0" class="song-list">
-      <div v-for="(song, index) in recentList" :key="song.songmid || index" class="song-row" @click="handlePlay(song)">
+      <div v-for="(song, index) in recentList" :key="song.songmid" class="song-row" @click="handlePlay(song)">
         <span class="song-index">{{ index + 1 }}</span>
         <div class="song-info">
           <span class="song-name">{{ song.name }}</span>

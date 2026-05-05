@@ -155,7 +155,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
     <div class="result-content">
       <div v-show="activeTab === 'songs'" class="song-tab" @scroll="handleScroll">
         <div v-if="searchResults.length > 0" class="song-list">
-          <div v-for="(song, index) in searchResults" :key="song.songmid || index" class="song-item" @click="handlePlay(song)">
+          <div v-for="(song, index) in searchResults" :key="song.songmid" class="song-item" @click="handlePlay(song)">
             <span class="song-index">{{ index + 1 }}</span>
             <div class="song-info">
               <span class="song-name">{{ song.name }}</span>
@@ -214,7 +214,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
 .song-duration { font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; margin-left: 12px; }
 .grid-scroll-container { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
 .playlist-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-.playlist-card { background: var(--td-bg-color-container); border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 0.2s ease; }
+.playlist-card { background: var(--td-bg-color-container); border-radius: 12px; overflow: hidden; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease; }
 .playlist-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); }
 .playlist-cover { position: relative; aspect-ratio: 1; overflow: hidden; }
 .playlist-cover img { width: 100%; height: 100%; object-fit: cover; }
@@ -226,9 +226,9 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
 .empty-content h3 { font-size: 16px; color: var(--td-text-color-primary); margin: 0 0 8px; font-weight: normal; }
 .empty-content p { font-size: 12px; color: var(--td-text-color-secondary); margin: 0; }
 .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; }
-.loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 12px; }
+.loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; will-change: transform; animation: spin 1s linear infinite; margin-bottom: 12px; }
 .loading-state p { font-size: 14px; color: var(--td-text-color-secondary); margin: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.grid-fade-enter-active, .grid-fade-leave-active { transition: all 0.25s ease; }
+.grid-fade-enter-active, .grid-fade-leave-active { transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease, transform 0.25s ease; }
 .grid-fade-enter-from, .grid-fade-leave-to { opacity: 0; transform: translateY(6px) scale(0.98); }
 </style>

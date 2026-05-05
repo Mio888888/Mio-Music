@@ -804,7 +804,7 @@ watch(showFullPlay, (val) => {
           class="crossfade-fadein-mark"
           :style="{ left: '0%', width: crossfadeFadeInMarkWidth + '%' }"
         ></div>
-        <div class="progress-filled" :style="{ width: `${progressPercentage}%` }"></div>
+        <div class="progress-filled" :style="{ transform: `scaleX(${progressPercentage / 100})` }"></div>
         <div class="progress-handle" :style="{ left: `${progressPercentage}%` }"></div>
       </div>
     </div>
@@ -1092,7 +1092,7 @@ watch(showFullPlay, (val) => {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top: 2px solid v-bind(hoverColor);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  will-change: transform; animation: spin 1s linear infinite;
   display: inline-block;
   width: 1em;
   height: 1em;
@@ -1165,7 +1165,7 @@ watch(showFullPlay, (val) => {
 }
 
 .player-container {
-  box-shadow: 0px -2px 20px 0px #00000039;
+  box-shadow: 0px -1px 8px 0px #00000039;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -1175,7 +1175,7 @@ watch(showFullPlay, (val) => {
     background 0.3s;
   background: v-bind(bg);
   // border-top: 1px solid #e5e7eb;
-  backdrop-filter: blur(30px);
+  backdrop-filter: blur(12px);
   z-index: 1000;
   height: var(--play-bottom-height);
   display: flex;
@@ -1195,7 +1195,6 @@ watch(showFullPlay, (val) => {
   position: absolute;
   top: calc(var(--touch-range-height) / 2 * -1);
   cursor: pointer;
-  transition: height 0.2s ease-in-out;
 
   .progress-bar {
     width: 100%;
@@ -1220,6 +1219,7 @@ watch(showFullPlay, (val) => {
 
     .progress-filled {
       background: linear-gradient(to right, v-bind(startmaincolor), v-bind(maincolor) 80%);
+      transform-origin: left;
     }
 
     // 无感过渡预告区间：在进度条末尾以斜纹/半透明条块显示
@@ -1260,7 +1260,7 @@ watch(showFullPlay, (val) => {
         rgba(255, 255, 255, 0.85)
       );
       box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
-      animation: crossfade-pulse 1.2s ease-in-out infinite;
+      will-change: transform, opacity; animation: crossfade-pulse 1.2s ease-in-out infinite;
     }
 
     // 过渡完成后：新歌开头的淡入段标记（从左向右渐弱的条带 + 轻微辉光）
@@ -1539,7 +1539,7 @@ watch(showFullPlay, (val) => {
   /* 位置微调 */
   background: v-bind(contrastTextColor);
   /* 毛玻璃背景 */
-  backdrop-filter: blur(60px);
+  backdrop-filter: blur(16px);
   border-radius: 8px;
   padding: 15px 10px;
   width: 40px;

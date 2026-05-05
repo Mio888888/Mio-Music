@@ -573,7 +573,7 @@ onBeforeUnmount(() => {
   border: 4px solid var(--td-bg-color-component-hover);
   border-top: 4px solid var(--td-brand-color);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  will-change: transform; animation: spin 1s linear infinite;
   margin: 0 auto 16px;
 }
 
@@ -793,7 +793,7 @@ onBeforeUnmount(() => {
   min-width: 156px;
   background: var(--td-bg-color-container);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
   padding: 4px;
   animation: menuIn 0.15s ease;
 }
