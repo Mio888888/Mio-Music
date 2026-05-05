@@ -14,6 +14,7 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { MusicItem } from '@/services/musicSdk'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { getQualityDisplayName, compareQuality } from '@/utils/quality'
+import { useRouter } from 'vue-router'
 
 interface Props {
   songs: MusicItem[]
@@ -56,6 +57,12 @@ const emit = defineEmits([
   'moveToPosition'
 ])
 
+const router = useRouter()
+
+function handleSingerClick(song: MusicItem) {
+  if (!song.singerId || !song.source || song.source === 'local') return
+  router.push({ name: 'singer', params: { id: song.singerId }, query: { source: song.source } })
+}
 const localUserStore = LocalUserDetailStore()
 
 const getLocalQualityLabel = (song: MusicItem): string => {
@@ -578,7 +585,12 @@ watch(() => props.songs, (newSongs) => {
                   >
                     {{ getSong(virtualRow.index)!.source }}
                   </span>
-                  {{ getSong(virtualRow.index)?.singer }}
+                  <span
+                    v-if="getSong(virtualRow.index)?.singerId && getSong(virtualRow.index)?.source !== 'local'"
+                    class="singer-link"
+                    @click.stop="handleSingerClick(getSong(virtualRow.index)!)"
+                  >{{ getSong(virtualRow.index)?.singer }}</span>
+                  <template v-else>{{ getSong(virtualRow.index)?.singer }}</template>
                 </div>
               </div>
             </div>
@@ -950,6 +962,11 @@ watch(() => props.songs, (newSongs) => {
         display: flex;
         align-items: center;
         gap: 4px;
+
+        .singer-link {
+          cursor: pointer;
+          &:hover { color: var(--td-brand-color); }
+        }
 
         .source-tag {
           background: var(--song-list-source-bg, var(--td-brand-color-1));

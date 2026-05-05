@@ -4,6 +4,7 @@ pub mod search;
 pub mod playback;
 pub mod comment;
 pub mod playlist;
+pub mod singer;
 
 pub async fn handle(method: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
     match method {
@@ -22,6 +23,9 @@ pub async fn handle(method: &str, args: serde_json::Value) -> Result<serde_json:
         "getPlaylistDetail" | "getPlaylistDetailById" => playlist::get_playlist_detail(args).await,
         "getLeaderboardDetail" => playlist::get_leaderboard_detail(args).await,
         "searchPlaylist" => playlist::search_playlist(args).await,
+        "getSingerInfo" => singer::get_singer_info(args).await,
+        "getSingerSongList" => singer::get_singer_song_list(args).await,
+        "getSingerAlbumList" => singer::get_singer_album_list(args).await,
         _ => Err(format!("Unknown SDK method for wy: {}", method)),
     }
 }

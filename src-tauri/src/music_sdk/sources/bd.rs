@@ -120,6 +120,7 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
             hash: None,
             song_id: None, str_media_mid: None, album_mid: None,
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id: None,
         })
     }).collect();
 
@@ -182,6 +183,7 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
             hash: None,
             song_id: None, str_media_mid: None, album_mid: None,
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id: None,
         })
     }).collect();
 

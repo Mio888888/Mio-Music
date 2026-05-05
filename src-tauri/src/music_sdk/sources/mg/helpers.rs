@@ -169,6 +169,6 @@ pub fn mg_parse_music_item(item: &serde_json::Value) -> Option<MusicItem> {
         img: cover, lrc: None,
         types: Some(types), types_map: Some(types_map), type_url: Some(serde_json::json!({})),
         hash: None, song_id: None, str_media_mid: None, album_mid: None,
-        copyright_id, lrc_url, mrc_url, trc_url,
+        copyright_id, lrc_url, mrc_url, trc_url, singer_id: None,
     })
 }

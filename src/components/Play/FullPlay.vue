@@ -7,6 +7,7 @@ import {
 import { LyricPlayer, type LyricPlayerRef } from '@applemusic-like-lyrics/vue'
 import type { SongList } from '@/types/audio'
 import { ref, computed, onMounted, watch, reactive, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { PerformanceDegrader } from '@/utils/performanceMonitor'
 import { ControlAudioStore } from '@/store/ControlAudio'
@@ -34,6 +35,14 @@ const dlnaStore = useDlnaStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
 const { player } = storeToRefs(globalPlayStatus)
 const showSettings = ref(false)
+const router = useRouter()
+
+function goToSinger() {
+  const song = player.value.songInfo as any
+  if (song?.singerId && song?.source && song.source !== 'local') {
+    router.push({ name: 'singer', params: { id: song.singerId }, query: { source: song.source } })
+  }
+}
 
 const lyricFontSize = computed(() => {
   const rate = settingsStore.settings.FullPlayLyricFontRate || 1.0
@@ -800,7 +809,11 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="song-meta-large">
-                <span class="artist">{{ (player.songInfo as any)?.singer }}</span>
+                <span
+                  class="artist"
+                  :class="{ 'singer-link': (player.songInfo as any)?.singerId && (player.songInfo as any)?.source !== 'local' }"
+                  @click="goToSinger()"
+                >{{ (player.songInfo as any)?.singer }}</span>
                 <span
                   v-if="(player.songInfo as any)?.singer && (player.songInfo as any)?.albumName"
                   class="divider"
@@ -1322,6 +1335,7 @@ onUnmounted(() => {
           flex-wrap: wrap;
           opacity: 0.55;
           .artist { color: v-bind(lightMainColor); filter: brightness(1.2); }
+          .artist.singer-link { cursor: pointer; &:hover { filter: brightness(1.5); } }
           .divider { opacity: 0.4; }
         }
       }

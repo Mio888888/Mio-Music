@@ -56,6 +56,8 @@ pub struct MusicItem {
     pub type_url: Option<serde_json::Value>,
     #[serde(default)]
     pub hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub singer_id: Option<String>,
     // Provider-specific extra fields
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub song_id: Option<serde_json::Value>,
@@ -104,6 +106,69 @@ pub struct PlaylistItem {
 #[serde(rename_all = "camelCase")]
 pub struct PlaylistResult {
     pub list: Vec<PlaylistItem>,
+    pub all_page: i64,
+    pub limit: i64,
+    pub total: i64,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingerDetail {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub desc: String,
+    #[serde(default)]
+    pub avatar: String,
+    #[serde(default)]
+    pub gender: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingerCount {
+    #[serde(default)]
+    pub music: i64,
+    #[serde(default)]
+    pub album: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingerInfo {
+    pub id: serde_json::Value,
+    pub source: String,
+    pub info: SingerDetail,
+    pub count: SingerCount,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumBrief {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub img: String,
+    #[serde(default)]
+    pub desc: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingerAlbumItem {
+    pub id: serde_json::Value,
+    #[serde(default)]
+    pub count: i64,
+    pub info: AlbumBrief,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingerAlbumListResult {
+    pub list: Vec<SingerAlbumItem>,
     pub all_page: i64,
     pub limit: i64,
     pub total: i64,

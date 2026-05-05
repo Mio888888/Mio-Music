@@ -15,6 +15,7 @@ export interface MusicItem {
   _types?: Record<string, any>
   typeUrl?: Record<string, any>
   hash?: string
+  singerId?: string
 }
 
 export interface SearchResult {
@@ -46,6 +47,40 @@ export interface PlaylistResult {
 export interface PlaylistDetailResult {
   list: MusicItem[]
   info: any
+  allPage: number
+  limit: number
+  total: number
+  source: string
+}
+
+export interface SingerInfo {
+  id: string | number
+  source: string
+  info: {
+    name: string
+    desc: string
+    avatar: string
+    gender?: string
+  }
+  count: {
+    music: number
+    album: number
+  }
+}
+
+export interface SingerAlbumItem {
+  id: string | number
+  count: number
+  info: {
+    name: string
+    author: string
+    img: string
+    desc?: string
+  }
+}
+
+export interface SingerAlbumListResult {
+  list: SingerAlbumItem[]
   allPage: number
   limit: number
   total: number
@@ -152,5 +187,17 @@ export const musicSdk = {
 
   async getComment(songInfo: MusicItem, page = 1, limit = 30): Promise<any> {
     return this.request('getComment', { songInfo, page, limit })
+  },
+
+  async getSingerInfo(id: string | number, source?: string): Promise<SingerInfo> {
+    return this.request('getSingerInfo', { id, source })
+  },
+
+  async getSingerSongList(id: string | number, page = 1, limit = 30, source?: string): Promise<SearchResult> {
+    return this.request('getSingerSongList', { id, page, limit, source })
+  },
+
+  async getSingerAlbumList(id: string | number, page = 1, limit = 30, source?: string): Promise<SingerAlbumListResult> {
+    return this.request('getSingerAlbumList', { id, page, limit, source })
   }
 }

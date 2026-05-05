@@ -81,6 +81,7 @@ fn format_music_item(item: &serde_json::Value) -> Option<MusicItem> {
         hash: None,
         song_id: None, str_media_mid: None, album_mid: None,
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id: None,
     })
 }
 

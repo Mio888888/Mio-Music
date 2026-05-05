@@ -12,6 +12,7 @@ const routeDepths: Record<string, number> = {
   recognize: 2,
   recent: 2,
   list: 4,
+  singer: 4,
   'local-tag-editor': 5,
   profile: 2,
 }
@@ -35,6 +36,7 @@ const appRouter: RouteRecordRaw[] = [
       { path: 'search', name: 'search', component: () => import('@/views/music/search.vue') },
       { path: 'recognize', name: 'recognize', component: () => import('@/views/music/recognize.vue') },
       { path: 'list/:id', name: 'list', component: () => import('@/views/music/list.vue') },
+      { path: 'singer/:id', name: 'singer', component: () => import('@/views/music/singer.vue') },
       { path: 'download', name: 'download', component: () => import('@/views/download/index.vue') },
       { path: 'local/edit-tag', name: 'local-tag-editor', component: () => import('@/views/music/LocalTagEditorPage.vue') },
       { path: 'profile', name: 'profile', component: () => import('@/views/user/Profile.vue') }

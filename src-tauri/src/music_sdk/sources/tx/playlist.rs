@@ -323,6 +323,7 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
             str_media_mid: Some(item.get("file").and_then(|f| f.get("media_mid")).and_then(|v| v.as_str()).unwrap_or("").to_string()),
             album_mid: Some(album_mid),
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id: None,
         }
     }).collect();
 
@@ -364,5 +365,6 @@ fn tx_parse_music_item(item: &serde_json::Value) -> MusicItem {
         str_media_mid: Some(item.get("file").and_then(|f| f.get("media_mid")).and_then(|v| v.as_str()).unwrap_or("").to_string()),
         album_mid: Some(album_mid),
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id: None,
     }
 }

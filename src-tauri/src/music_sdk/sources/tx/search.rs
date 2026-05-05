@@ -80,6 +80,11 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
         let img = get_song_img(item, &album_mid);
         let (types, types_map) = parse_quality_types(file);
 
+        let singer_id = singer_list.first()
+            .and_then(|s| s.get("mid"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
         Some(MusicItem {
             songmid: serde_json::Value::String(songmid.clone()),
             singer, name, album_name,
@@ -91,6 +96,7 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
             str_media_mid: Some(media_mid.to_string()),
             album_mid: Some(album_mid),
         copyright_id: None, lrc_url: None, mrc_url: None, trc_url: None,
+        singer_id,
         })
     }).collect();
 

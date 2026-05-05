@@ -28,7 +28,6 @@ if (!window.location.hash.includes('/desktop-lyric')) {
 
 if (import.meta.env.DEV) {
   performanceTelemetry.startMemorySampling()
-  performanceTelemetry.startDevPanel()
 }
 
 const app = createApp(App)

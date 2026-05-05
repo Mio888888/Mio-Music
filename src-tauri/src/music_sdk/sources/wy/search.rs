@@ -67,11 +67,17 @@ pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, 
             (Vec::new(), std::collections::HashMap::new())
         };
 
+        let singer_id = singers.first()
+            .and_then(|s| s.get("id"))
+            .and_then(|v| v.as_i64())
+            .map(|id| id.to_string());
+
         list.push(serde_json::json!({
             "songmid": id, "singer": singer, "name": name,
             "albumName": album_name, "albumId": album_id,
             "source": "wy", "interval": format_play_time(dt / 1000),
-            "img": img, "types": types, "_types": types_map, "typeUrl": {}
+            "img": img, "types": types, "_types": types_map, "typeUrl": {},
+            "singerId": singer_id,
         }));
     }
 

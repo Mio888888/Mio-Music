@@ -36,7 +36,18 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
 
     let list: Vec<crate::music_sdk::client::MusicItem> = abslist
         .iter()
-        .filter_map(parse_music_item)
+        .filter_map(|info| {
+            let singer_id = info.get("ARTISTID")
+                .or_else(|| info.get("artistid"))
+                .and_then(|v| match v {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                });
+            let mut item = parse_music_item(info)?;
+            item.singer_id = singer_id;
+            Some(item)
+        })
         .collect();
 
     Ok(serde_json::to_value(SearchResult {

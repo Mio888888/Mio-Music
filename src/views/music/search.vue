@@ -159,7 +159,15 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
             <span class="song-index">{{ index + 1 }}</span>
             <div class="song-info">
               <span class="song-name">{{ song.name }}</span>
-              <span class="song-singer">{{ song.singer }} - {{ song.albumName }}</span>
+              <span class="song-singer">
+                <span
+                  v-if="song.singerId && song.source !== 'local'"
+                  class="singer-link"
+                  @click.stop="router.push({ name: 'singer', params: { id: song.singerId }, query: { source: song.source } })"
+                >{{ song.singer }}</span>
+                <template v-else>{{ song.singer }}</template>
+                <template v-if="song.albumName"> - {{ song.albumName }}</template>
+              </span>
             </div>
             <span class="song-duration">{{ song.interval || '--:--' }}</span>
           </div>
@@ -202,6 +210,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
 .song-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .song-name { font-size: 14px; color: var(--td-text-color-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .song-singer { font-size: 12px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.singer-link { cursor: pointer; &:hover { color: var(--td-brand-color); } }
 .song-duration { font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; margin-left: 12px; }
 .grid-scroll-container { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
 .playlist-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
