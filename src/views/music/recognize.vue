@@ -263,6 +263,16 @@ async function queryNetease(fp: string, duration: number) {
   return json
 }
 
+function parseNeteaseTypes(song: any): string[] {
+  const types: string[] = []
+  if (song?.hrMusic?.bitrate || song?.hrMusic?.id) types.push('hires')
+  if (song?.sqMusic?.bitrate || song?.sqMusic?.id) types.push('flac')
+  if (song?.hMusic?.bitrate || song?.hMusic?.id) types.push('320k')
+  if (song?.mMusic?.bitrate || song?.mMusic?.id) types.push('320k')
+  if (song?.lMusic?.bitrate || song?.lMusic?.id) types.push('128k')
+  return [...new Set(types)]
+}
+
 function parseResult(resp: any): any[] {
   const code = resp?.code
   const data = resp?.data
@@ -287,6 +297,8 @@ function parseResult(resp: any): any[] {
       singer: (item?.song?.artists || []).map((a: any) => a.name).join(' / '),
       albumName: String(album?.name || ''),
       img: img.replace(/^http:/, 'https:'),
+      source: 'wy',
+      types: parseNeteaseTypes(item?.song),
       startTime: item?.startTime || 0
     }
   })

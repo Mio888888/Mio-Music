@@ -6,7 +6,7 @@ import { useSettingsStore } from '@/store/Settings'
 import { playSetting } from '@/store/playSetting'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
-import { calculateBestQuality } from '@/utils/quality'
+import { calculateBestQuality, compareQuality, normalizeTypes } from '@/utils/quality'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -26,12 +26,6 @@ let prefetchTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 预加载提前量（秒）：剩余时长低于此值时开始预加载 */
 const PREFETCH_LEAD_TIME = 30
-
-const qualityMap: Record<string, string> = {
-  '128k': '128kbps', '320k': '320kbps', flac: 'FLAC 无损',
-  flac24bit: '24bit FLAC', hires: 'Hi-Res 高解析度', atmos: '杜比全景声',
-  master: '母带音质'
-}
 
 /**
  * 计算歌曲的最佳音质（用于 URL 解析和缓存键）
@@ -78,7 +72,15 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
       (localUserStore.userSource.quality as string)
     quality = calculateBestQuality(song.types, quality) || '128k'
 
-    console.log(`使用音质: ${quality} - ${qualityMap[quality] || quality}`)
+    const pluginQualities = localUserStore.userInfo.supportedSources?.[song.source || '']?.qualitys
+    if (pluginQualities?.length && !pluginQualities.includes(quality)) {
+      const songTypes = normalizeTypes(song.types)
+      const available = (songTypes.length ? songTypes : pluginQualities)
+        .filter(t => pluginQualities.includes(t))
+      if (available.length) {
+        quality = [...available].sort(compareQuality)[0]
+      }
+    }
 
     const pluginId = localUserStore.userSource.pluginId
     if (!pluginId) {
@@ -101,7 +103,6 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
 
     return rawUrl
   } catch (error: any) {
-    console.error('获取歌曲URL失败:', error)
     throw new Error('获取歌曲播放链接失败: ' + (error.message || ''))
   }
 }
@@ -125,8 +126,6 @@ interface FindMusicCandidate {
 export async function autoSwitchSource(song: SongList): Promise<{ url: string; song: SongList } | null> {
   if (song.source === 'local') return null
 
-  console.warn(`[自动换源] "${song.name} - ${song.singer}" 原源(${song.source})失败，正在跨源搜索...`)
-
   let candidates: FindMusicCandidate[] = []
   try {
     const result: any = await invoke('service_music_find_music', {
@@ -136,23 +135,16 @@ export async function autoSwitchSource(song: SongList): Promise<{ url: string; s
       interval: song.interval || '',
       source: song.source || '',
     })
-    console.log('[自动换源] find_music 返回:', result)
     if (Array.isArray(result)) {
       candidates = result
     } else if (result?.data && Array.isArray(result.data)) {
       candidates = result.data
     }
-  } catch (e) {
-    console.warn('[自动换源] 跨源搜索失败:', e)
+  } catch {
     return null
   }
 
-  if (candidates.length === 0) {
-    console.warn('[自动换源] 未找到其他源的匹配歌曲')
-    return null
-  }
-
-  console.log(`[自动换源] 找到 ${candidates.length} 个候选，逐个尝试...`)
+  if (candidates.length === 0) return null
 
   for (const candidate of candidates) {
     const newSource = candidate.source || '未知'
@@ -163,15 +155,12 @@ export async function autoSwitchSource(song: SongList): Promise<{ url: string; s
       }
       const url = await getSongRealUrl(candidateSong)
       if (url && typeof url === 'string') {
-        console.log(`[自动换源] 成功切换到 ${newSource} 源`)
         return { url, song: candidateSong }
       }
-    } catch (e) {
-      console.log(`[自动换源] ${newSource} 源获取 URL 失败:`, e)
+    } catch {
     }
   }
 
-  console.warn('[自动换源] 所有候选源均无法获取播放链接')
   return null
 }
 
@@ -257,8 +246,7 @@ async function doPrefetchNext() {
     const cacheKey = buildCacheKey(toRaw(nextSong) as any)
     await invoke('player__preload', { url, cacheKey })
     preloadedSong = nextSong
-  } catch (e) {
-    console.warn('预加载下一曲失败:', e)
+  } catch {
   }
 }
 
@@ -349,7 +337,6 @@ export async function playSong(song: SongList) {
       _playIndex = idx
     }
 
-    console.log('[playSong] updating state:', song.name, song.singer, 'img:', !!song.img)
     store.userInfo.lastPlaySongId = song.songmid
     globalPlayStatus.player.songInfo = toRaw(song) as any
     globalPlayStatus.player._lyricsTrigger++
@@ -361,7 +348,6 @@ export async function playSong(song: SongList) {
       url = await getSongRealUrl(toRaw(song) as any)
     } catch (originalError) {
       // 原源失败，尝试自动换源
-      console.warn(`[playSong] 原源(${song.source})播放失败，触发自动换源`)
       const switched = await autoSwitchSource(toRaw(song) as any)
       if (switched) {
         url = switched.url
@@ -406,7 +392,6 @@ export async function playSong(song: SongList) {
     scheduleNextPrefetch()
   } catch (error: any) {
     if (currentPlayRequestId !== requestId) return
-    console.error('播放失败:', error)
     isLoadingSong.value = false
     MessagePlugin.error(error.message || '播放失败')
   }
@@ -427,12 +412,10 @@ export function playNext(): SongList | null {
   // 无缝换曲模式：尝试使用预加载的下一曲
   const setting = playSetting()
   if (setting.isSeamlessTransition && preloadedSong && preloadedReady) {
-    console.log('[playNext] seamless path, preloadedSong:', preloadedSong.name, 'mode:', setting.seamlessMode)
     seamlessNext()
     return preloadedSong
   }
 
-  console.log('[playNext] normal path, seamless:', setting.isSeamlessTransition, 'preloaded:', !!preloadedSong, 'ready:', preloadedReady)
   if (playMode.value === PlayMode.SINGLE) {
     const song = store.list[_playIndex]
     if (song) { playSong(song); return song }

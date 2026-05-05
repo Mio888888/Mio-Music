@@ -68,6 +68,7 @@ function getImagePixels(imageSrc: string): Promise<Uint8ClampedArray | null> {
       }
     }
     img.onerror = () => resolve(null)
+    img.crossOrigin = 'anonymous'
     img.src = imageSrc
     if (img.complete) img.onload!(new Event('load'))
   })
