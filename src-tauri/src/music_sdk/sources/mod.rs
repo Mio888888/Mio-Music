@@ -44,6 +44,7 @@ fn stub_response(method: &str, source: &str) -> Result<serde_json::Value, String
         "getSingerSongList" | "getSingerAlbumList" =>
             Ok(json!(SearchResult { list: vec![], all_page: 0, limit: 30, total: 0, source: src })),
         "getAlbumInfo" => Ok(json!({ "list": [], "info": {} })),
+        "getArtistList" => Ok(json!({ "list": [], "total": 0, "allPage": 0, "limit": 60, "source": src })),
         _ => Err(format!("Unknown SDK method: {}", method)),
     }
 }
