@@ -192,7 +192,7 @@
                   min="1"
                   max="100"
                   placeholder="10"
-                  @input="store.maxBackups = Math.max(1, Math.min(100, parseInt($event.target.value, 10) || 10))"
+                  @input="store.maxBackups = Math.max(1, Math.min(100, parseInt(($event.target as HTMLInputElement)?.value, 10) || 10))"
                   @change="store.saveConfig()"
                 />
               </div>
