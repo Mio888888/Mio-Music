@@ -205,12 +205,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
 <style scoped lang="scss">
 .background-render-settings {
   .settings-section {
-    background: var(--settings-group-bg);
-    border-radius: 0.75rem;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    border: 1px solid var(--settings-group-border);
-    box-shadow: 0 1px 3px var(--settings-group-shadow);
+    padding: 0;
+    margin-bottom: 0;
 
     h3 {
       margin: 0 0 1rem;
