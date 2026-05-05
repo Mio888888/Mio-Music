@@ -98,11 +98,15 @@ function locateCurrentSong() {
 
 // 获取歌曲
 const fetchSongs = async (reset = false) => {
-  if (loading.value) return
-  if (reset) { currentPage.value = 1; songs.value = []; hasMore.value = true }
-  if (!hasMore.value) return
+  if (reset) {
+    if (loading.value) return
+    currentPage.value = 1; songs.value = []; hasMore.value = true
+    loading.value = true
+  } else {
+    if (loadingMore.value || !hasMore.value) return
+    loadingMore.value = true
+  }
 
-  loading.value = true
   try {
     if (isLocalPlaylist.value) {
       playlistInfo.value.id = playlistId.value
@@ -120,11 +124,6 @@ const fetchSongs = async (reset = false) => {
       hasMore.value = false
       return
     }
-
-    if (loadingMore.value) return
-    if (!reset && !hasMore.value) return
-    if (reset) loadingMore.value = false
-    else loadingMore.value = true
 
     const res = isLeaderboard.value
       ? await musicSdk.getLeaderboardDetail(playlistId.value, currentPage.value)
@@ -151,9 +150,11 @@ const fetchSongs = async (reset = false) => {
     }
     hasMore.value = songs.value.length < (res?.total || 0)
     currentPage.value += 1
-    loadingMore.value = false
   } catch (e) { console.error('获取歌单详情失败:', e) }
-  finally { loading.value = false }
+  finally {
+    loading.value = false
+    loadingMore.value = false
+  }
 }
 
 const handlePlay = (song: MusicItem) => {

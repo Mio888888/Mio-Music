@@ -53,6 +53,7 @@ pub fn songlist__create(state: DbState<'_>, name: String, description: Option<St
         meta: meta.map(|m| m.to_string()).unwrap_or_else(|| "{}".to_string()),
         create_time: now.clone(),
         update_time: now,
+        song_count: 0,
     };
     match playlist_db::insert_playlist(&conn, &p) {
         Ok(_) => Ok(serde_json::to_value(ApiResponse::ok(p)).unwrap()),

@@ -21,6 +21,7 @@ export interface PlaylistRow {
   meta: string
   createTime: string
   updateTime: string
+  songCount: number
 }
 
 export interface PlaylistSongRow {

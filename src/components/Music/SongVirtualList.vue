@@ -286,19 +286,10 @@ const onToggleLike = async (song: MusicItem) => {
   }
 }
 
-// --- Song click (single click = add to playlist, double click = play) ---
-let clickTimer: ReturnType<typeof setTimeout> | null = null
-let lastClickTime = 0
+// --- Song click (click = play) ---
 const handleSongClick = (song: MusicItem) => {
   if (isMultiSelect.value) { toggleSelect(song); return }
-  const now = Date.now()
-  if (clickTimer) { clearTimeout(clickTimer); clickTimer = null }
-  if (now - lastClickTime < 300 && now - lastClickTime > 0) {
-    emit('play', song); lastClickTime = 0
-  } else {
-    lastClickTime = now
-    clickTimer = setTimeout(() => { emit('addToPlaylist', song); clickTimer = null }, 300)
-  }
+  emit('play', song)
 }
 
 // --- Context menu ---
@@ -359,7 +350,6 @@ onUnmounted(() => {
   closeContextMenu()
   document.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('playlist-updated', loadFavorites)
-  if (clickTimer) clearTimeout(clickTimer)
 })
 
 watch(() => props.multiSelect, (val) => { if (!val) selectedSet.value.clear() })

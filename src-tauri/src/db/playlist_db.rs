@@ -2,6 +2,7 @@ use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlaylistRow {
     pub id: String,
     pub name: String,
@@ -11,6 +12,8 @@ pub struct PlaylistRow {
     pub meta: String,
     pub create_time: String,
     pub update_time: String,
+    #[serde(default)]
+    pub song_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,7 +70,8 @@ pub fn init_tables(conn: &Connection) -> Result<()> {
 
 pub fn list_playlists(conn: &Connection) -> Result<Vec<PlaylistRow>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists ORDER BY createTime"
+        "SELECT p.id, p.name, p.description, p.coverImgUrl, p.source, p.meta, p.createTime, p.updateTime, \
+         (SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = p.id) FROM playlists p ORDER BY p.createTime"
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(PlaylistRow {
@@ -79,6 +83,7 @@ pub fn list_playlists(conn: &Connection) -> Result<Vec<PlaylistRow>> {
             meta: row.get(5)?,
             create_time: row.get(6)?,
             update_time: row.get(7)?,
+            song_count: row.get(8)?,
         })
     })?;
     rows.collect()
@@ -86,7 +91,8 @@ pub fn list_playlists(conn: &Connection) -> Result<Vec<PlaylistRow>> {
 
 pub fn get_playlist(conn: &Connection, id: &str) -> Result<Option<PlaylistRow>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists WHERE id = ?1"
+        "SELECT p.id, p.name, p.description, p.coverImgUrl, p.source, p.meta, p.createTime, p.updateTime, \
+         (SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = p.id) FROM playlists p WHERE p.id = ?1"
     )?;
     let mut rows = stmt.query_map([id], |row| {
         Ok(PlaylistRow {
@@ -98,6 +104,7 @@ pub fn get_playlist(conn: &Connection, id: &str) -> Result<Option<PlaylistRow>> 
             meta: row.get(5)?,
             create_time: row.get(6)?,
             update_time: row.get(7)?,
+            song_count: row.get(8)?,
         })
     })?;
     match rows.next() {
@@ -253,11 +260,13 @@ pub fn search_playlists(conn: &Connection, keyword: &str, source: Option<&str>) 
     let pattern = format!("%{}%", keyword);
     let mut stmt = if source.is_some() {
         conn.prepare(
-            "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists WHERE name LIKE ?1 AND source = ?2 ORDER BY createTime"
+            "SELECT p.id, p.name, p.description, p.coverImgUrl, p.source, p.meta, p.createTime, p.updateTime, \
+             (SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = p.id) FROM playlists p WHERE p.name LIKE ?1 AND p.source = ?2 ORDER BY p.createTime"
         )?
     } else {
         conn.prepare(
-            "SELECT id, name, description, coverImgUrl, source, meta, createTime, updateTime FROM playlists WHERE name LIKE ?1 ORDER BY createTime"
+            "SELECT p.id, p.name, p.description, p.coverImgUrl, p.source, p.meta, p.createTime, p.updateTime, \
+             (SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = p.id) FROM playlists p WHERE p.name LIKE ?1 ORDER BY p.createTime"
         )?
     };
     let map_row = |row: &rusqlite::Row| -> Result<PlaylistRow> {
@@ -270,6 +279,7 @@ pub fn search_playlists(conn: &Connection, keyword: &str, source: Option<&str>) 
             meta: row.get(5)?,
             create_time: row.get(6)?,
             update_time: row.get(7)?,
+            song_count: row.get(8)?,
         })
     };
     let rows: Vec<PlaylistRow> = if let Some(s) = source {
