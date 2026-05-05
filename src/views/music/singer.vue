@@ -455,4 +455,93 @@ onActivated(() => {
   color: var(--td-text-color-placeholder);
   margin-top: 2px;
 }
+
+@media (max-width: 768px) {
+  .singer-page {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .singer-header {
+    min-height: auto;
+    padding: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter) + var(--mobile-touch-target)) var(--mobile-page-gutter) var(--mobile-page-top-gutter);
+  }
+
+  .back-btn {
+    top: calc(-1 * var(--mobile-touch-target));
+    left: 0;
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.18);
+    color: #fff;
+    touch-action: manipulation;
+  }
+
+  .singer-meta {
+    align-items: center;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .singer-cover {
+    width: 112px;
+    height: 112px;
+  }
+
+  .singer-name {
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+    white-space: normal;
+  }
+
+  .singer-desc {
+    -webkit-line-clamp: 3;
+    font-size: 0.85rem;
+  }
+
+  .header-actions {
+    display: flex;
+    justify-content: center;
+  }
+
+  .play-all-btn {
+    min-height: var(--mobile-touch-target);
+    padding: 0 24px;
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .singer-tabs {
+    padding: 0 var(--mobile-page-gutter);
+    gap: 0.75rem;
+    background: var(--mobile-glass-bg-strong);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .tab {
+    min-height: var(--mobile-touch-target);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    touch-action: manipulation;
+  }
+
+  .album-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 16px var(--mobile-page-gutter);
+  }
+
+  .album-cover {
+    border-radius: var(--mobile-card-radius-small);
+  }
+}
 </style>

@@ -1197,8 +1197,9 @@ watch(showFullPlay, (val) => {
     background-color var(--motion-duration-standard) var(--motion-ease-standard);
   background: v-bind(bg);
   // border-top: 1px solid #e5e7eb;
-  backdrop-filter: blur(var(--glass-blur-panel));
-  z-index: 1000;
+  backdrop-filter: saturate(var(--mobile-glass-saturate, 180%)) blur(var(--glass-blur-panel));
+  -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate, 180%)) blur(var(--glass-blur-panel));
+  z-index: var(--mobile-player-layer-z, 1000);
   height: var(--play-bottom-height);
   display: flex;
   flex-direction: column;
@@ -1655,11 +1656,13 @@ watch(showFullPlay, (val) => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .player-container {
-    bottom: calc(var(--mobile-nav-height, 50px) + env(safe-area-inset-bottom, 0px));
+    bottom: var(--mobile-player-bottom);
+    height: var(--mobile-player-height);
+    border-top: 0.5px solid var(--mobile-glass-border);
   }
 
   .player-content {
-    padding: 0 10px;
+    padding: 0 max(10px, calc(var(--mobile-page-gutter) - 6px));
     gap: 0;
   }
 
@@ -1703,7 +1706,7 @@ watch(showFullPlay, (val) => {
   .right-section {
     flex: 0 0 auto;
     gap: 0;
-    white-space: nowrap;
+    margin-left: 4px;
 
     .time-display {
       display: none;
@@ -1718,7 +1721,7 @@ watch(showFullPlay, (val) => {
   .mobile-play-controls {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 0;
     flex-shrink: 0;
 
     .control-btn {
@@ -1726,12 +1729,19 @@ watch(showFullPlay, (val) => {
       border: none;
       color: v-bind(contrastTextColor);
       cursor: pointer;
-      width: 36px;
-      height: 36px;
+      min-width: var(--mobile-touch-target);
+      width: var(--mobile-touch-target);
+      height: var(--mobile-touch-target);
       padding: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: var(--mobile-control-radius);
+      transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
+
+      &:active {
+        transform: scale(0.94);
+      }
 
       .iconfont {
         font-size: 20px;
@@ -1746,8 +1756,8 @@ watch(showFullPlay, (val) => {
       }
 
       &.play-btn {
-        width: 38px;
-        height: 38px;
+        width: var(--mobile-touch-target);
+        height: var(--mobile-touch-target);
         background-color: v-bind(playbg);
         border-radius: 50%;
 

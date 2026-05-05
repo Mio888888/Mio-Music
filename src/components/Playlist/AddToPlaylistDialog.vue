@@ -805,6 +805,99 @@ const handleClose = () => {
   .glass-spinner { border-color: rgba(255, 255, 255, 0.1); }
 }
 
+@media (max-width: 768px) {
+  .liquid-glass-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: calc(var(--mobile-safe-top) + 12px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 12px);
+    background: var(--mobile-scrim);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .overlay-drag-bar {
+    display: none;
+  }
+
+  .liquid-glass-panel {
+    width: 100%;
+    max-width: 420px;
+    max-height: min(76dvh, 620px);
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    border-radius: var(--mobile-card-radius);
+    background: var(--mobile-glass-bg-strong);
+    border-color: var(--mobile-glass-border);
+    box-shadow: var(--mobile-surface-shadow);
+  }
+
+  .liquid-glass-panel::before {
+    content: '';
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.36);
+    align-self: center;
+    margin: -8px 0 12px;
+    flex-shrink: 0;
+  }
+
+  .glass-header {
+    margin-bottom: 14px;
+  }
+
+  .glass-title-group {
+    min-width: 0;
+  }
+
+  .glass-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .glass-close-btn,
+  .search-clear {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .glass-search input,
+  .create-input {
+    min-height: var(--mobile-touch-target);
+    font-size: 16px;
+  }
+
+  .playlist-list {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .playlist-item {
+    min-height: 60px;
+    padding: 10px 12px;
+    border-radius: var(--mobile-card-radius-small);
+    touch-action: manipulation;
+  }
+
+  .create-entry {
+    padding-top: 12px;
+    margin-top: 12px;
+  }
+
+  .create-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .create-form .glass-btn,
+  .glass-btn {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glass-border-glow,
   .glass-light-sweep,

@@ -327,8 +327,8 @@ const handleKeyDown = () => {
 }
 
 .home-container {
-  height: calc(100vh - var(--play-bottom-height, 70px));
-  overflow-y: hidden;
+  height: calc(100dvh - var(--play-bottom-height, 70px));
+  overflow: hidden;
   position: relative;
 }
 
@@ -423,6 +423,7 @@ const handleKeyDown = () => {
 
 :deep(.t-layout__content) {
   height: 100%;
+  min-width: 0;
   display: flex;
 }
 
@@ -435,6 +436,8 @@ const handleKeyDown = () => {
   );
   display: flex;
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   flex-direction: column;
 }
 
@@ -585,6 +588,7 @@ const handleKeyDown = () => {
   overflow: hidden;
   position: relative;
   height: 0;
+  min-width: 0;
 }
 
 .settings-btn .iconfont {
@@ -667,15 +671,25 @@ const handleKeyDown = () => {
   }
 
   .home-container {
-    height: calc(100vh - var(--play-bottom-height, 70px) - var(--mobile-nav-height, 50px) - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - var(--mobile-content-bottom-inset));
+    min-height: 0;
   }
 
   .home-container:has(.header.detail-page) {
-    height: calc(100vh - var(--play-bottom-height, 70px) - var(--mobile-nav-height, 50px) - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - var(--mobile-content-bottom-inset));
+  }
+
+  .content {
+    background: var(--mobile-page-bg);
+  }
+
+  .mainContent {
+    overflow: hidden;
+    min-height: 0;
   }
 
   .header {
-    padding: 1rem;
+    padding: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter)) var(--mobile-page-gutter) var(--mobile-page-top-gutter);
   }
 
   .header.detail-page {
@@ -696,6 +710,25 @@ const handleKeyDown = () => {
     width: 100%;
   }
 
+  .source-selector {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    justify-content: center;
+  }
+
+  .source-item {
+    min-height: var(--mobile-touch-target);
+  }
+
+  :deep(.t-input) {
+    min-height: var(--mobile-touch-target);
+  }
+
+  :deep(.t-input__wrap),
+  :deep(.t-input__inner) {
+    min-height: var(--mobile-touch-target);
+  }
+
   :deep(.title-controls) {
     width: auto;
     flex-shrink: 0;
@@ -707,13 +740,16 @@ const handleKeyDown = () => {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 1001;
-    align-items: center;
+    z-index: var(--mobile-bottom-layer-z);
+    align-items: flex-start;
     justify-content: space-around;
-    height: var(--mobile-nav-height, 50px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: var(--td-bg-color-container);
-    border-top: 0.5px solid var(--td-border-level-1-color);
+    height: var(--mobile-nav-total-height);
+    padding: 6px max(10px, var(--mobile-page-gutter)) var(--mobile-safe-bottom);
+    background: var(--mobile-glass-bg);
+    border-top: 0.5px solid var(--mobile-glass-border);
+    box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
   }
 
   .mobile-nav-item {
@@ -721,15 +757,24 @@ const handleKeyDown = () => {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 3px;
     flex: 1;
-    height: 100%;
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    height: var(--mobile-nav-height);
     background: none;
     border: none;
+    border-radius: var(--mobile-control-radius);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    padding: 4px 0 2px;
+    padding: 5px 0 4px;
     position: relative;
+    transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
+
+    &:active {
+      transform: scale(0.96);
+      background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+    }
 
     .iconfont {
       font-size: 22px;
@@ -750,7 +795,7 @@ const handleKeyDown = () => {
       border-radius: 50%;
       background: transparent;
       margin-bottom: 1px;
-      transition: background 0.2s ease;
+      transition: background-color 0.2s ease, transform 0.2s ease;
     }
   }
 
@@ -766,13 +811,14 @@ const handleKeyDown = () => {
 
     .mobile-nav-dot {
       background: var(--td-brand-color);
+      transform: scale(1.15);
     }
   }
 
   /* 暗色模式 */
   :global([data-theme="dark"]) .mobile-bottom-nav {
-    background: var(--td-bg-color-container);
-    border-top-color: var(--td-border-level-1-color);
+    background: var(--mobile-glass-bg);
+    border-top-color: var(--mobile-glass-border);
   }
 }
 </style>

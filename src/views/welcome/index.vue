@@ -361,7 +361,8 @@ onUnmounted(() => {
 <style scoped>
 .splash-container {
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   background: radial-gradient(circle at center, #ffffff 0%, #eef3f0 100%);
@@ -388,7 +389,7 @@ onUnmounted(() => {
   justify-content: flex-end;
   align-items: center;
   pointer-events: none;
-  padding-bottom: 60px;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
 
@@ -427,7 +428,8 @@ onUnmounted(() => {
 
 .skip-section {
   margin-top: 1.5rem;
-  padding: 0.4rem 1.2rem;
+  min-height: 44px;
+  padding: 0 1.2rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(8px);
@@ -435,6 +437,10 @@ onUnmounted(() => {
   pointer-events: auto;
   transition: background 0.2s;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
 }
 
 .skip-section:hover {
@@ -460,6 +466,30 @@ onUnmounted(() => {
 
 .fade-enter-from {
   opacity: 0;
+}
+
+@media (max-width: 768px) {
+  .ui-layer {
+    padding-bottom: calc(var(--mobile-safe-bottom) + 48px);
+  }
+
+  .equalizer {
+    height: 26px;
+  }
+
+  .skip-section {
+    min-height: var(--mobile-touch-target);
+    background: var(--mobile-glass-bg, rgba(255, 255, 255, 0.72));
+    border: 0.5px solid var(--mobile-glass-border, rgba(0, 0, 0, 0.08));
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    animation: none;
+  }
 }
 
 /* 暗色模式 */

@@ -1,6 +1,18 @@
 @import './icon_font/iconfont.css';
 :root {
   --play-bottom-height: max(min(10vh, 80px), 70px);
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-nav-height: 58px;
+  --mobile-nav-total-height: calc(var(--mobile-nav-height) + var(--mobile-safe-bottom));
+  --mobile-player-height: var(--play-bottom-height);
+  --mobile-player-bottom: var(--mobile-nav-total-height);
+  --mobile-content-bottom-inset: calc(
+    var(--mobile-player-height) + var(--mobile-nav-total-height)
+  );
+  --mobile-page-gutter: clamp(16px, 4vw, 24px);
+  --mobile-page-top-gutter: clamp(14px, 3.5vw, 22px);
+  --mobile-touch-target: 44px;
 }
 @font-face {
   font-family: 'lyricfont';
@@ -22,6 +34,7 @@ html {
   font-size: min(max(1.4vw, 15px), 18px);
   background: transparent;
   overflow: hidden;
+  height: 100%;
 }
 body {
   background: transparent;
@@ -45,6 +58,30 @@ body:has(#app .desktop-lyric),
 #app:has(.desktop-lyric) {
   border-radius: 0 !important;
   overflow: visible !important;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 16px;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  body {
+    min-width: 0;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  #app {
+    height: 100dvh;
+    min-height: 100dvh;
+    border-radius: 0;
+    overflow: hidden;
+  }
 }
 
 .icon {
@@ -73,6 +110,7 @@ body {
     sans-serif;
   text-rendering: optimizeLegibility;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -104,4 +142,39 @@ body {
 }
 .t-dialog__mask {
   backdrop-filter: blur(5px);
+}
+
+@media (max-width: 768px) {
+  .t-dialog__mask {
+    z-index: var(--mobile-overlay-layer-z) !important;
+    background: var(--mobile-scrim) !important;
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .t-dialog {
+    width: calc(100vw - var(--mobile-page-gutter) * 2) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 32px);
+    margin: 0 !important;
+    border-radius: var(--mobile-card-radius) !important;
+    overflow: hidden;
+  }
+
+  .t-dialog__position {
+    padding: calc(var(--mobile-safe-top) + 16px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 16px) !important;
+  }
+
+  .t-dialog__body {
+    max-height: calc(100dvh - var(--mobile-safe-top) - var(--mobile-safe-bottom) - 180px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .t-dialog__footer .t-button,
+  .t-dialog__header .t-dialog__close {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    touch-action: manipulation;
+  }
 }

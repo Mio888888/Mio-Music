@@ -787,15 +787,112 @@ onBeforeUnmount(() => {
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .local-container { padding: 0 1rem; padding-top: 1rem; }
+  .local-container {
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    overflow: hidden;
+  }
 
-  .local-header .title { font-size: 22px; }
+  .local-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
 
-  .controls { flex-wrap: wrap; }
+  .local-header .title {
+    border-left: none;
+    padding-left: 0;
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
 
-  .controls .t-input { width: 100%; }
+  .local-header .title span {
+    display: block;
+    padding: 0.35rem 0 0;
+    font-size: 1rem !important;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
 
-  .col-album, .col-size { display: none; }
+  .right-container :deep(.t-button) {
+    min-height: var(--mobile-touch-target);
+  }
+
+  .controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .controls > div {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .controls :deep(.t-input) {
+    width: 100% !important;
+    min-height: var(--mobile-touch-target);
+  }
+
+  .local-btn {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .list-body {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .list-header {
+    padding: 8px 4px;
+  }
+
+  .row {
+    padding: 8px 4px;
+    border-radius: var(--mobile-card-radius-small);
+    touch-action: manipulation;
+  }
+
+  .col-check {
+    width: var(--mobile-touch-target);
+  }
+
+  .col-cover {
+    width: 48px;
+  }
+
+  .col-singer {
+    flex: 1;
+  }
+
+  .col-album,
+  .col-size {
+    display: none;
+  }
+
+  .col-duration {
+    width: 48px;
+  }
+
+  .col-actions,
+  .col-actions-header {
+    width: 52px;
+  }
+
+  .col-actions :deep(.t-button) {
+    min-height: 36px;
+  }
+
+  .batch-toolbar {
+    flex-wrap: wrap;
+    border-radius: var(--mobile-card-radius-small);
+  }
+
+  .batch-toolbar :deep(.t-button) {
+    min-height: 36px;
+  }
 }
 </style>
 

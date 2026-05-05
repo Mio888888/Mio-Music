@@ -236,4 +236,115 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 .task-progress { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .error-msg { color: var(--td-error-color); font-size: 12px; margin-top: 4px; }
 .task-actions { display: flex; gap: 4px; }
+
+@media (max-width: 768px) {
+  .download-manager {
+    min-width: 0;
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 12px;
+  }
+
+  .header h2 {
+    border-left: none;
+    padding-left: 0;
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .settings {
+    width: 100%;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings :deep(.t-input) {
+    width: 100% !important;
+    min-height: var(--mobile-touch-target);
+  }
+
+  .settings :deep(.t-input-number) {
+    width: 96px !important;
+    min-height: var(--mobile-touch-target);
+  }
+
+  .settings :deep(.t-button) {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .batch-actions {
+    gap: 4px;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .tabs {
+    margin-bottom: 12px;
+  }
+
+  .tabs :deep(.t-tabs__nav-item) {
+    min-height: var(--mobile-touch-target);
+  }
+
+  .task-list {
+    min-height: 0;
+    padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .task-item {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    border-radius: var(--mobile-card-radius-small);
+    box-shadow: var(--mobile-surface-shadow);
+  }
+
+  .task-info {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .task-name {
+    font-size: 15px;
+  }
+
+  .task-meta {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    line-height: 1.4;
+  }
+
+  .task-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .task-actions :deep(.t-button) {
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    touch-action: manipulation;
+  }
+
+  .empty-state {
+    height: 220px;
+  }
+}
 </style>

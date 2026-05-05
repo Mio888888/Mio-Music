@@ -1102,12 +1102,92 @@ watch(() => props.songs, (newSongs) => {
 /* --- Responsive --- */
 @media (max-width: 768px) {
   .list-header {
-    grid-template-columns: 50px 1fr 50px 60px;
+    grid-template-columns: var(--mobile-touch-target) minmax(0, 1fr) var(--mobile-touch-target) 52px;
+    min-height: var(--mobile-touch-target);
+    padding: 0 4px;
+
     .col-album { display: none; }
+    .col-title { padding-left: 4px; }
+    .col-duration { font-size: 0; }
   }
+
+  .list-header.multi {
+    min-height: var(--mobile-touch-target);
+    height: auto;
+    padding: 6px 4px;
+    gap: 8px;
+  }
+
+  .multi-left,
+  .multi-right {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .select-all {
+    padding-left: 4px;
+  }
+
+  .square-btn,
+  .action-btn-compact {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+  }
+
   .song-item {
-    grid-template-columns: 50px 1fr 50px 60px;
+    grid-template-columns: var(--mobile-touch-target) minmax(0, 1fr) var(--mobile-touch-target) 52px;
+    padding: 8px 4px;
+    touch-action: manipulation;
+
     .col-album { display: none; }
+
+    .col-title {
+      padding-left: 4px;
+    }
+
+    .col-index {
+      .play-btn-overlay {
+        width: var(--mobile-touch-target);
+        height: var(--mobile-touch-target);
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .track-number {
+        opacity: 0;
+      }
+    }
+
+    .col-like {
+      .like-btn {
+        width: var(--mobile-touch-target);
+        height: var(--mobile-touch-target);
+      }
+    }
+
+    .col-duration {
+      .duration-wrapper {
+        .duration {
+          display: none;
+        }
+
+        .action-buttons {
+          position: static;
+          opacity: 1;
+          pointer-events: auto;
+          gap: 0;
+
+          .action-btn-small {
+            width: 26px;
+            height: var(--mobile-touch-target);
+            padding: 0;
+          }
+        }
+      }
+    }
   }
 }
 </style>

@@ -15,6 +15,16 @@
   --glass-shadow-panel: 0 16px 32px rgba(0, 0, 0, 0.22), 0 6px 14px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
   --glass-shadow-panel-dark: 0 24px 48px rgba(0, 0, 0, 0.48), 0 8px 20px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
   --glass-shadow-control: 0 3px 12px rgba(0, 0, 0, 0.08);
+  --mobile-card-radius: 22px;
+  --mobile-card-radius-small: 16px;
+  --mobile-control-radius: 999px;
+  --mobile-glass-blur: 12px;
+  --mobile-glass-saturate: 180%;
+  --mobile-scrim: rgba(0, 0, 0, 0.28);
+  --mobile-surface-shadow: 0 18px 42px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08);
+  --mobile-bottom-layer-z: 1001;
+  --mobile-player-layer-z: 1000;
+  --mobile-overlay-layer-z: 1100;
 }
 
 :root[data-theme='light'],
@@ -416,6 +426,10 @@
   --player-text-hover-idle: var(--td-brand-color-5);
   --player-btn-bg-idle: var(--td-brand-color-2);
   --player-btn-bg-hover-idle: var(--td-brand-color-3);
+  --mobile-glass-bg: rgba(255, 255, 255, 0.78);
+  --mobile-glass-bg-strong: rgba(255, 255, 255, 0.9);
+  --mobile-glass-border: rgba(0, 0, 0, 0.08);
+  --mobile-page-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, #f5f7f8 100%);
 }
 
 :root[data-theme='dark'] {
@@ -792,6 +806,10 @@
   --player-text-hover-idle: var(--td-brand-color-7);
   --player-btn-bg-idle: rgba(255, 255, 255, 0.1);
   --player-btn-bg-hover-idle: rgba(255, 255, 255, 0.2);
+  --mobile-glass-bg: rgba(24, 24, 24, 0.72);
+  --mobile-glass-bg-strong: rgba(36, 36, 36, 0.9);
+  --mobile-glass-border: rgba(255, 255, 255, 0.12);
+  --mobile-page-bg: linear-gradient(180deg, rgba(24, 24, 24, 0.96) 0%, #111111 100%);
 }
 
 :root {

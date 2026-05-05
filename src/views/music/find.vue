@@ -113,4 +113,49 @@ const activeTab = ref<'songlist' | 'leaderboard'>('songlist')
   height: 100%;
   overflow-y: auto;
 }
+
+@media (max-width: 768px) {
+  .find-container {
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    overflow: hidden;
+  }
+
+  .page-header {
+    margin: 0 0 1rem;
+  }
+
+  .page-header h2 {
+    border-left: none;
+    padding-left: 0;
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .page-header p {
+    font-size: 1rem;
+  }
+
+  .segment-tabs {
+    margin: 0 0 1rem;
+    min-height: var(--mobile-touch-target);
+    padding: 4px;
+    border-radius: var(--mobile-control-radius);
+    background: var(--mobile-glass-bg-strong);
+    border: 0.5px solid var(--mobile-glass-border);
+  }
+
+  .segment-tab {
+    min-height: 36px;
+    border-radius: var(--mobile-control-radius);
+    font-size: 15px;
+    touch-action: manipulation;
+  }
+
+  .tab-content,
+  .leaderboard-pane {
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+}
 </style>

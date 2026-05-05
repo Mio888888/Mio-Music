@@ -1308,4 +1308,111 @@ onUnmounted(() => {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+@media (max-width: 768px) {
+  .recognize-page {
+    min-width: 0;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .recognize-container {
+    min-width: 0;
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    gap: 14px;
+    box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .recognition-stage {
+    padding: 8px 0 12px;
+  }
+
+  .viz-area {
+    width: min(74vw, 280px);
+    height: min(74vw, 280px);
+    margin-bottom: 18px;
+  }
+
+  .center-btn {
+    width: min(32vw, 120px);
+    height: min(32vw, 120px);
+    min-width: calc(var(--mobile-touch-target) * 2);
+    min-height: calc(var(--mobile-touch-target) * 2);
+    touch-action: manipulation;
+  }
+
+  .status-title {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+    line-height: 1.15;
+  }
+
+  .status-desc {
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .action-chip,
+  .upload-chip,
+  .history-clear {
+    min-height: var(--mobile-touch-target);
+    padding: 0 16px;
+    touch-action: manipulation;
+  }
+
+  .progress-bar {
+    width: min(72vw, 260px);
+  }
+
+  .result-card {
+    gap: 12px;
+    padding: 12px;
+    border-radius: var(--mobile-card-radius-small);
+    touch-action: manipulation;
+  }
+
+  .result-cover-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+  }
+
+  .result-actions {
+    gap: 6px;
+  }
+
+  .result-btn,
+  .result-btn.primary {
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    touch-action: manipulation;
+  }
+
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .history-card {
+    min-height: 72px;
+    border-radius: var(--mobile-card-radius-small);
+    touch-action: manipulation;
+  }
+
+  .history-play {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-active .ping-ring,
+  .is-active .viz-wave,
+  .center-btn.is-recording,
+  .recording-dot,
+  .result-card {
+    animation: none;
+  }
+}
 </style>

@@ -1237,6 +1237,125 @@ function formatTime(iso: string): string {
   }
 }
 
+@media (max-width: 768px) {
+  .liquid-glass-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: calc(var(--mobile-safe-top) + 12px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 12px);
+    background: var(--mobile-scrim);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .overlay-drag-bar {
+    display: none;
+  }
+
+  .liquid-glass-panel {
+    width: 100%;
+    max-width: 440px;
+    max-height: min(82dvh, 680px);
+    overflow-y: auto;
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    border-radius: var(--mobile-card-radius);
+    background: var(--mobile-glass-bg-strong);
+    border-color: var(--mobile-glass-border);
+    box-shadow: var(--mobile-surface-shadow);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .liquid-glass-panel::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.36);
+    margin: -8px auto 12px;
+  }
+
+  .glass-header {
+    margin-bottom: 14px;
+  }
+
+  .glass-title-group {
+    min-width: 0;
+  }
+
+  .glass-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .glass-close-btn,
+  .input-toggle {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .glass-tabs {
+    gap: 4px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .glass-tab {
+    min-width: max-content;
+    min-height: var(--mobile-touch-target);
+    padding: 0 12px;
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .form-grid,
+  .glass-field-group {
+    grid-template-columns: 1fr;
+  }
+
+  .glass-field-group .form-item:last-child {
+    width: 100%;
+  }
+
+  .form-item input,
+  .restore-field .input-wrapper input {
+    min-height: var(--mobile-touch-target);
+    font-size: 16px;
+  }
+
+  .input-toggle {
+    right: 0;
+    padding: 0;
+  }
+
+  .recommend-card,
+  .ops-card {
+    border-radius: var(--mobile-card-radius-small);
+  }
+
+  .recommend-card {
+    min-height: var(--mobile-touch-target);
+    touch-action: manipulation;
+  }
+
+  .glass-btn {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .restore-actions {
+    flex-direction: column;
+  }
+
+  .glass-hint {
+    line-height: 1.55;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glass-border-glow,
   .glass-light-sweep,

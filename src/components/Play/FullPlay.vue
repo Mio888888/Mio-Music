@@ -866,6 +866,30 @@ onUnmounted(() => {
             </div>
           </div>
         </template>
+        <div v-if="playSetting.getLayoutMode === 'cd'" class="mobile-song-info-area">
+          <div ref="titleRef" class="song-title-large text-scroll-container">
+            <div class="text-scroll-wrapper" :class="{ 'animate-scroll': shouldScrollTitle }">
+              <div ref="titleContentRef" class="text-scroll-item">
+                {{ songName }}
+              </div>
+              <div v-if="shouldScrollTitle" class="text-scroll-item">
+                {{ songName }}
+              </div>
+            </div>
+          </div>
+          <div class="song-meta-large">
+            <span
+              class="artist"
+              :class="{ 'singer-link': (player.songInfo as any)?.singerId && (player.songInfo as any)?.source !== 'local' }"
+              @click="goToSinger()"
+            >{{ (player.songInfo as any)?.singer }}</span>
+            <span
+              v-if="(player.songInfo as any)?.singer && (player.songInfo as any)?.albumName"
+              class="divider"
+            >/</span>
+            <span class="album">{{ (player.songInfo as any)?.albumName }}</span>
+          </div>
+        </div>
       </div>
       <div class="right">
         <div v-if="player.lyrics.lines.length <= 0 && !player.isLoading" class="lyric-empty">
@@ -1387,6 +1411,10 @@ onUnmounted(() => {
     }
   }
 
+  .mobile-song-info-area {
+    display: none;
+  }
+
   @keyframes scroll {
     0% { transform: translateX(0); }
     25% { transform: translateX(0); }
@@ -1516,6 +1544,290 @@ onUnmounted(() => {
   50% { opacity: 0.1; transform: rotate(180deg); }
   75% { opacity: 0.15; }
   100% { opacity: 0.05; transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .performance-warning-toast {
+    top: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter));
+    width: calc(100vw - var(--mobile-page-gutter) * 2);
+    max-width: none;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .fullscreen-btn,
+  .putawayscreen-btn {
+    top: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter));
+    left: var(--mobile-page-gutter);
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.18);
+    border: 0.5px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    touch-action: manipulation;
+
+    .icon {
+      width: 22px;
+      height: 22px;
+      color: rgba(255, 255, 255, 0.88);
+    }
+
+    &:hover {
+      transform: none;
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+
+  .putawayscreen-btn {
+    left: calc(var(--mobile-page-gutter) + var(--mobile-touch-target) + 8px);
+  }
+
+  .top {
+    display: none;
+  }
+
+  .full-play {
+    --height: 100dvh;
+    height: 100dvh;
+  }
+
+  .playbox {
+    height: 100dvh;
+    padding: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter) + var(--mobile-touch-target) + 10px) var(--mobile-page-gutter) calc(var(--play-bottom-height) + var(--mobile-safe-bottom) + 18px) !important;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background-color: rgba(0, 0, 0, 0.32);
+    box-sizing: border-box;
+    --cd-width-auto: min(72vw, 300px, 36vh);
+
+    .left {
+      width: 100%;
+      min-height: auto;
+      margin: 0;
+      padding: 0;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 1rem;
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+
+      .pointer {
+        display: none;
+      }
+
+      .cd-container {
+        width: var(--cd-width-auto);
+        height: var(--cd-width-auto);
+        filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.35));
+
+        &:hover {
+          filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.35));
+        }
+      }
+    }
+
+    &.single-column {
+      .left {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        opacity: 1;
+        transform: none;
+        pointer-events: auto;
+      }
+
+      .right {
+        width: 100%;
+        padding: 0;
+      }
+    }
+
+    &.mode-cover {
+      .left {
+        width: 100%;
+        padding: 0;
+        align-items: center;
+      }
+
+      .right {
+        width: 100%;
+        padding: 0;
+      }
+    }
+
+    .cover-layout-container {
+      width: 100%;
+      gap: 1rem;
+      margin-top: 0;
+      max-height: none;
+      align-items: center;
+
+      .cover-wrapper-square {
+        width: min(78vw, 340px, 40vh);
+        max-width: none;
+        border-radius: var(--mobile-card-radius);
+        transform: none;
+        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34), 0 0 0 0.5px rgba(255, 255, 255, 0.16);
+
+        &.playing,
+        &.playing:hover,
+        &:hover {
+          transform: none;
+        }
+      }
+    }
+
+    .song-info-area,
+    .mobile-song-info-area {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    .mobile-song-info-area {
+      display: flex;
+    }
+
+    .song-title-large {
+      width: min(100%, 420px);
+      max-width: 100%;
+      font-size: clamp(1.55rem, 7vw, 2.2rem) !important;
+      line-height: 1.12;
+      letter-spacing: -0.04em;
+
+      &.text-scroll-container {
+        white-space: normal;
+      }
+
+      .text-scroll-wrapper {
+        display: block;
+
+        &.animate-scroll {
+          animation: none;
+        }
+      }
+
+      .text-scroll-item {
+        padding-right: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .text-scroll-item + .text-scroll-item {
+        display: none;
+      }
+    }
+
+    .song-meta-large {
+      justify-content: center;
+      font-size: 0.95rem !important;
+      line-height: 1.35;
+      opacity: 0.78;
+
+      .artist.singer-link {
+        min-height: 32px;
+        display: inline-flex;
+        align-items: center;
+      }
+
+      .album {
+        max-width: 100%;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    }
+
+    .right {
+      width: 100%;
+      height: auto;
+      min-height: 128px;
+      max-height: 28vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border-radius: var(--mobile-card-radius);
+      background: rgba(255, 255, 255, 0.1);
+      border: 0.5px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+      -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+      mask: none;
+
+      .lyric-empty {
+        height: 128px;
+        min-height: 128px;
+        transform: none;
+      }
+
+      :deep(.lyric-player) {
+        height: min(28vh, 220px);
+        min-height: 128px;
+        transform: none;
+        --amll-lyric-player-font-size: clamp(18px, 5vw, 24px);
+        --amll-lp-font-size: clamp(18px, 5vw, 24px);
+      }
+    }
+  }
+
+  .float-action {
+    right: var(--mobile-page-gutter);
+    bottom: calc(var(--play-bottom-height) + var(--mobile-safe-bottom) + 12px);
+
+    .skin-btn {
+      width: var(--mobile-touch-target);
+      height: var(--mobile-touch-target);
+      min-width: var(--mobile-touch-target);
+      min-height: var(--mobile-touch-target);
+      border-radius: 50%;
+      touch-action: manipulation;
+
+      &[data-tooltip]::after {
+        display: none;
+      }
+    }
+
+    .settings-panel {
+      width: calc(100vw - var(--mobile-page-gutter) * 2);
+      max-height: calc(100dvh - var(--play-bottom-height) - var(--mobile-safe-bottom) - 120px);
+      right: 0;
+      bottom: calc(var(--mobile-touch-target) + 10px);
+      padding: 16px;
+      border-radius: var(--mobile-card-radius);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  .audio-visualizer-container {
+    bottom: var(--play-bottom-height);
+    height: 42px;
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cd-container,
+    .vinyl-record::after,
+    .label-shine {
+      animation: none !important;
+    }
+  }
 }
 </style>
 

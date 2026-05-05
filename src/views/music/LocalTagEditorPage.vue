@@ -92,7 +92,7 @@ onMounted(() => fetchTags())
 </template>
 
 <style scoped>
-.tag-editor-container { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; padding: 20px; }
+.tag-editor-container { width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; padding: 20px; box-sizing: border-box; }
 .editor-header { display: flex; align-items: center; gap: 12px; flex-shrink: 0; margin-bottom: 20px; }
 .editor-header h2 { font-size: 20px; font-weight: 600; color: var(--td-text-color-primary); margin: 0; }
 .editor-form { max-width: 600px; }
@@ -103,5 +103,73 @@ onMounted(() => fetchTags())
 .loading-state { display: flex; flex-direction: column; align-items: center; padding: 60px; }
 .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--td-bg-color-component); border-top-color: var(--td-brand-color); border-radius: 50%; will-change: transform; animation: spin 1s linear infinite; margin-bottom: 12px; }
 .loading-state p { color: var(--td-text-color-secondary); }
+
+@media (max-width: 768px) {
+  .tag-editor-container {
+    min-width: 0;
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .editor-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .editor-header :deep(.t-button) {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .editor-header h2 {
+    font-size: clamp(2rem, 9vw, 2.6rem);
+    line-height: 1.1;
+    letter-spacing: -0.04em;
+  }
+
+  .editor-form {
+    width: 100%;
+    max-width: none;
+    padding-bottom: 12px;
+  }
+
+  .form-item {
+    margin-bottom: 14px;
+  }
+
+  .form-item label {
+    font-size: 14px;
+  }
+
+  .form-item :deep(.t-input),
+  .form-item :deep(.t-input-number) {
+    width: 100%;
+    min-height: var(--mobile-touch-target);
+  }
+
+  .file-path {
+    padding: 12px;
+    border-radius: var(--mobile-card-radius-small);
+    line-height: 1.5;
+  }
+
+  .form-actions :deep(.t-button) {
+    width: 100%;
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+  }
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

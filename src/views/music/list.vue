@@ -909,32 +909,33 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: none;
+    background: rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: blur(var(--mobile-glass-blur));
+    border: 0.5px solid rgba(255, 255, 255, 0.18);
     color: #fff;
     cursor: pointer;
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: var(--mobile-page-top-gutter);
+    left: var(--mobile-page-gutter);
     z-index: 10;
+    touch-action: manipulation;
 
     svg {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
     }
 
     &:active {
-      transform: scale(0.9);
+      transform: scale(0.94);
     }
   }
 
   .list-container {
-    padding: 10px;
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
   }
 
   .fixed-header {
@@ -946,16 +947,17 @@ onBeforeUnmount(() => {
     text-align: center;
     gap: 0.75rem;
     height: auto;
-    padding: 1.25rem 1rem 1rem;
+    padding: calc(var(--mobile-touch-target) + 0.75rem) 1rem 1rem;
     position: relative;
+    border-radius: var(--mobile-card-radius);
 
     &.compact {
       height: auto;
-      padding: 0.75rem 1rem;
+      padding: calc(var(--mobile-touch-target) + 0.35rem) 1rem 0.75rem;
 
       .playlist-cover {
-        width: 48px;
-        height: 48px;
+        width: 56px;
+        height: 56px;
       }
     }
   }
@@ -963,11 +965,19 @@ onBeforeUnmount(() => {
   .playlist-cover {
     width: 120px;
     height: 120px;
+    border-radius: var(--mobile-card-radius-small);
   }
 
   .playlist-details {
+    width: 100%;
+
     .playlist-title {
-      font-size: 20px;
+      font-size: clamp(1.5rem, 7vw, 2rem);
+      line-height: 1.1;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
     }
   }
 
@@ -980,33 +990,53 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
     justify-content: center;
     gap: 0.5rem;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
 
-    .play-btn, .shuffle-btn {
-      min-width: auto;
-      flex: 1;
+    .play-btn,
+    .shuffle-btn {
+      min-width: 0;
+      flex: 1 1 calc(50% - 0.25rem);
+      min-height: var(--mobile-touch-target);
+      height: var(--mobile-touch-target);
+      border-radius: var(--mobile-control-radius);
       font-size: 0.875rem;
+      touch-action: manipulation;
     }
 
     .action-btn-more {
-      flex: 0 0 36px;
+      flex: 0 0 var(--mobile-touch-target);
+      width: var(--mobile-touch-target);
+      height: var(--mobile-touch-target);
+      border-radius: var(--mobile-control-radius);
+      touch-action: manipulation;
     }
   }
 
   .playlist-search {
     width: 100%;
+    max-width: 100%;
     margin-left: 0;
 
-    &.focused { width: 100%; }
+    &.focused {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    :deep(.t-input) {
+      min-height: var(--mobile-touch-target);
+    }
   }
 
   .scrollable-content {
-    border-radius: 6px;
+    border-radius: var(--mobile-card-radius-small);
   }
 
   .locate-current-btn {
     bottom: 16px;
     right: 16px;
+    width: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    touch-action: manipulation;
   }
 }
 </style>
