@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TitleBarControls from '@/components/TitleBarControls.vue'
-import UserCapsule from '@/components/Auth/UserCapsule.vue'
+import BackupRestore from '@/components/BackupRestore/BackupRestore.vue'
 import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
@@ -272,7 +272,7 @@ const handleKeyDown = () => {
 
               <TitleBarControls>
                 <template #before-settings>
-                  <UserCapsule />
+                  <BackupRestore />
                 </template>
               </TitleBarControls>
             </div>

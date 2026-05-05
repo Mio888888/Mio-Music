@@ -12,6 +12,7 @@
   "dependencies": {
     "@applemusic-like-lyrics/lyric": "^1.0.0",
     "@applemusic-like-lyrics/vue": "^0.4.1",
+    "@aws-sdk/client-s3": "^3.1042.0",
     "@logto/browser": "^3.0.13",
     "@logto/vue": "^3.0.13",
     "@lrc-player/core": "^1.1.5",
