@@ -519,10 +519,10 @@ const api = {
   s3: {
     testConnection: (config: Record<string, string>) =>
       ipcInvoke('s3:test-connection', { args: config }),
-    backup: (config: Record<string, string>, playlists: any, settings: any) =>
-      ipcInvoke('s3:backup', { args: { ...config, playlists, settings } }),
-    restore: (config: Record<string, string>) =>
-      ipcInvoke('s3:restore', { args: config })
+    backup: (config: Record<string, string>, playlists: any, settings: any, password: string, maxBackups: number) =>
+      ipcInvoke('s3:backup', { args: { ...config, playlists, settings, password, maxBackups } }),
+    restore: (config: Record<string, string>, password: string) =>
+      ipcInvoke('s3:restore', { args: { ...config, password } })
   }
 }
 

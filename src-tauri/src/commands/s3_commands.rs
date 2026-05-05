@@ -1,6 +1,12 @@
+use aes_gcm::{Aes256Gcm, Nonce};
+use aes_gcm::aead::{Aead, KeyInit};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use hmac::{Hmac, Mac};
+use pbkdf2::pbkdf2_hmac;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+
+use crate::db;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -11,7 +17,7 @@ fn sha256_hex(data: &[u8]) -> String {
 }
 
 fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC key error");
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(key).expect("HMAC key error");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }
@@ -98,7 +104,6 @@ fn get_str_or<'a>(args: &'a Value, key: &str, default: &str) -> String {
     args.get(key).and_then(|v| v.as_str()).unwrap_or(default).to_string()
 }
 
-/// Resolve region: "auto" or empty → "us-east-1"
 fn resolve_region(region: &str) -> String {
     let r = region.trim();
     if r.is_empty() || r == "auto" {
@@ -108,10 +113,6 @@ fn resolve_region(region: &str) -> String {
     }
 }
 
-/// Resolve endpoint + bucket with endpoint path priority.
-/// Examples:
-/// - endpoint=https://s3.hi168.com, bucket=vant => (https://s3.hi168.com, vant)
-/// - endpoint=https://s3.hi168.com/vant, bucket=xxx => (https://s3.hi168.com, vant)
 fn resolve_endpoint_and_bucket(endpoint: &str, bucket_input: &str) -> Result<(String, String), String> {
     let endpoint = endpoint.trim().trim_end_matches('/');
     let bucket_input = bucket_input.trim();
@@ -173,6 +174,255 @@ fn parse_list_objects(xml: &str) -> Vec<(String, String)> {
 
 const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
+// ====================
+// Encryption helpers
+// ====================
+
+const PBKDF2_ITERATIONS: u32 = 600_000;
+const SALT_LEN: usize = 16;
+const NONCE_LEN: usize = 12;
+
+fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
+    let mut key = [0u8; 32];
+    pbkdf2_hmac::<Sha256>(password.as_bytes(), salt, PBKDF2_ITERATIONS, &mut key);
+    key
+}
+
+fn encrypt_data(plaintext: &[u8], password: &str) -> Result<Vec<u8>, String> {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let salt: [u8; SALT_LEN] = rng.gen();
+    let nonce_bytes: [u8; NONCE_LEN] = rng.gen();
+
+    let key = derive_key(password, &salt);
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| format!("创建加密器失败: {}", e))?;
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher.encrypt(nonce, plaintext)
+        .map_err(|e| format!("加密失败: {}", e))?;
+
+    // Output: salt(16) + nonce(12) + ciphertext+tag
+    let mut result = Vec::with_capacity(SALT_LEN + NONCE_LEN + ciphertext.len());
+    result.extend_from_slice(&salt);
+    result.extend_from_slice(&nonce_bytes);
+    result.extend_from_slice(&ciphertext);
+    Ok(result)
+}
+
+fn decrypt_data(encrypted: &[u8], password: &str) -> Result<Vec<u8>, String> {
+    if encrypted.len() < SALT_LEN + NONCE_LEN + 16 {
+        return Err("加密数据格式错误".to_string());
+    }
+
+    let salt = &encrypted[..SALT_LEN];
+    let nonce_bytes = &encrypted[SALT_LEN..SALT_LEN + NONCE_LEN];
+    let ciphertext = &encrypted[SALT_LEN + NONCE_LEN..];
+
+    let key = derive_key(password, salt);
+    let cipher = Aes256Gcm::new_from_slice(&key)
+        .map_err(|e| format!("创建解密器失败: {}", e))?;
+    let nonce = Nonce::from_slice(nonce_bytes);
+
+    cipher.decrypt(nonce, ciphertext)
+        .map_err(|_| "解密失败：密码错误或数据损坏".to_string())
+}
+
+// ====================
+// Plugin helpers
+// ====================
+
+fn read_plugins_data() -> Result<Vec<Value>, String> {
+    let plugins_dir = db::get_app_data_dir().join("plugins");
+    if !plugins_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let entries = std::fs::read_dir(&plugins_dir)
+        .map_err(|e| format!("读取插件目录失败: {}", e))?;
+
+    let mut plugins = Vec::new();
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() { continue; }
+
+        let file_name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+
+        if file_name.ends_with(".config.json") { continue; }
+
+        let parts: Vec<&str> = file_name.splitn(2, '-').collect();
+        if parts.len() < 2 { continue; }
+        let plugin_id = parts[0];
+        let plugin_name = parts[1..].join("-");
+
+        let code = std::fs::read_to_string(&path)
+            .map_err(|e| format!("读取插件 {} 失败: {}", file_name, e))?;
+
+        let config = {
+            let config_path = plugins_dir.join(format!("{}.config.json", plugin_id));
+            if config_path.exists() {
+                let content = std::fs::read_to_string(&config_path).unwrap_or_default();
+                serde_json::from_str(&content).unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            }
+        };
+
+        plugins.push(serde_json::json!({
+            "id": plugin_id,
+            "name": plugin_name,
+            "code": code,
+            "config": config,
+        }));
+    }
+
+    Ok(plugins)
+}
+
+fn restore_plugins(plugins: &[Value]) -> Result<u32, String> {
+    let plugins_dir = db::get_app_data_dir().join("plugins");
+    std::fs::create_dir_all(&plugins_dir)
+        .map_err(|e| format!("创建插件目录失败: {}", e))?;
+
+    // Collect existing plugin IDs to skip
+    let existing_ids: Vec<String> = {
+        let entries = std::fs::read_dir(&plugins_dir)
+            .map_err(|e| format!("读取插件目录失败: {}", e))?;
+        entries.flatten().filter_map(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            if name.ends_with(".config.json") { return None; }
+            name.split('-').next().map(|s| s.to_string())
+        }).collect()
+    };
+
+    let mut restored = 0u32;
+
+    for plugin in plugins {
+        let id = plugin.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let name = plugin.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let code = plugin.get("code").and_then(|v| v.as_str()).unwrap_or("");
+        let config = plugin.get("config");
+
+        if existing_ids.iter().any(|e| e == id) {
+            continue;
+        }
+
+        let safe_name = name.replace(|c: char| !c.is_alphanumeric() && c != '-' && c != '_', "_");
+        let file_path = plugins_dir.join(format!("{}-{}", id, safe_name));
+        std::fs::write(&file_path, code)
+            .map_err(|e| format!("写入插件 {} 失败: {}", id, e))?;
+
+        if let Some(cfg) = config {
+            if !cfg.is_null() {
+                let config_path = plugins_dir.join(format!("{}.config.json", id));
+                let content = serde_json::to_string_pretty(cfg)
+                    .map_err(|e| format!("序列化配置失败: {}", e))?;
+                std::fs::write(&config_path, content)
+                    .map_err(|e| format!("写入配置失败: {}", e))?;
+            }
+        }
+
+        restored += 1;
+    }
+
+    Ok(restored)
+}
+
+// ====================
+// S3 delete helper
+// ====================
+
+async fn delete_s3_object(
+    base_endpoint: &str,
+    bucket: &str,
+    key: &str,
+    signer: &S3Signer,
+    client: &reqwest::Client,
+) -> Result<(), String> {
+    let url = format!("{}/{}/{}", base_endpoint, bucket, key);
+    let host = extract_host(&url)?;
+    let canonical_uri = format!("/{}/{}", bucket, key);
+
+    let (auth, amz_date) = signer.sign("DELETE", &host, &canonical_uri, "", EMPTY_HASH, None);
+
+    let resp = client
+        .delete(&url)
+        .header("Authorization", auth)
+        .header("x-amz-content-sha256", EMPTY_HASH)
+        .header("x-amz-date", amz_date)
+        .send()
+        .await
+        .map_err(|e| format!("删除失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        eprintln!("[S3] 删除旧备份 {} 失败: HTTP {} - {}", key, status, &text[..text.len().min(100)]);
+    }
+
+    Ok(())
+}
+
+async fn cleanup_old_backups(
+    base_endpoint: &str,
+    bucket: &str,
+    region: &str,
+    access_key: &str,
+    secret_key: &str,
+    max_backups: u32,
+    client: &reqwest::Client,
+) -> Result<(), String> {
+    let base_url = format!("{}/{}", base_endpoint, bucket);
+    let host = extract_host(&base_url)?;
+    let signer = S3Signer {
+        access_key: access_key.to_string(),
+        secret_key: secret_key.to_string(),
+        region: region.to_string(),
+    };
+
+    let query = "list-type=2&max-keys=1000&prefix=mio-backup-";
+    let list_url = format!("{}?{}", base_url, query);
+    let canonical_uri = format!("/{}", bucket);
+
+    let (auth, amz_date) = signer.sign("GET", &host, &canonical_uri, query, EMPTY_HASH, None);
+
+    let resp = client
+        .get(&list_url)
+        .header("Authorization", auth)
+        .header("x-amz-content-sha256", EMPTY_HASH)
+        .header("x-amz-date", amz_date)
+        .send()
+        .await
+        .map_err(|e| format!("列出备份失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Ok(()); // Non-critical: skip cleanup
+    }
+
+    let xml_body = resp.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
+    let mut objects = parse_list_objects(&xml_body);
+    if objects.len() <= max_backups as usize {
+        return Ok(());
+    }
+
+    objects.sort_by(|a, b| b.1.cmp(&a.1)); // newest first
+    let to_delete = &objects[max_backups as usize..];
+
+    for (key, _) in to_delete {
+        let _ = delete_s3_object(base_endpoint, bucket, key, &signer, client).await;
+    }
+
+    Ok(())
+}
+
+// ====================
+// Tauri Commands
+// ====================
+
 #[allow(non_snake_case)]
 #[tauri::command]
 pub async fn s3__test_connection(args: Value) -> Result<bool, String> {
@@ -214,30 +464,48 @@ pub async fn s3__test_connection(args: Value) -> Result<bool, String> {
 #[allow(non_snake_case)]
 #[tauri::command]
 pub async fn s3__backup(args: Value) -> Result<Value, String> {
+    eprintln!("[S3-DEBUG] backup args keys: {:?}", args.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    eprintln!("[S3-DEBUG] password field: {:?}", args.get("password"));
     let endpoint = get_str(&args, "endpoint")?;
     let region = resolve_region(&get_str_or(&args, "region", "auto"));
     let access_key = get_str(&args, "accessKeyId")?;
     let secret_key = get_str(&args, "secretAccessKey")?;
     let bucket_input = get_str_or(&args, "bucket", "");
+    let password = get_str(&args, "password")?;
+    let max_backups = args.get("maxBackups").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
     let playlists = args.get("playlists").cloned().unwrap_or(Value::Null);
     let settings = args.get("settings").cloned().unwrap_or(Value::Null);
 
     let (base_endpoint, bucket) = resolve_endpoint_and_bucket(endpoint, &bucket_input)?;
 
+    // Read plugins from filesystem
+    let plugins = read_plugins_data()?;
+
     let now = chrono::Utc::now();
     let timestamp = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-    let key_name = format!("mio-backup-{}.json", now.format("%Y-%m-%dT%H-%M-%S-%fZ"));
+    let key_name = format!("mio-backup-{}.enc", now.format("%Y-%m-%dT%H-%M-%S-%fZ"));
 
-    let backup_data = serde_json::json!({ "version": 1, "timestamp": timestamp, "playlists": playlists, "settings": settings });
-    let body = serde_json::to_string(&backup_data).map_err(|e| format!("序列化失败: {}", e))?;
+    let backup_data = serde_json::json!({
+        "version": 2,
+        "timestamp": timestamp,
+        "playlists": playlists,
+        "settings": settings,
+        "plugins": plugins,
+    });
+    let json_str = serde_json::to_string(&backup_data)
+        .map_err(|e| format!("序列化失败: {}", e))?;
+
+    // Encrypt
+    let encrypted = encrypt_data(json_str.as_bytes(), password)?;
+    let body = BASE64.encode(&encrypted);
 
     let url = format!("{}/{}/{}", base_endpoint, bucket, key_name);
     let host = extract_host(&url)?;
     let canonical_uri = format!("/{}/{}", bucket, key_name);
     let payload_hash = sha256_hex(body.as_bytes());
 
-    let signer = S3Signer { access_key: access_key.to_string(), secret_key: secret_key.to_string(), region };
-    let (auth, amz_date) = signer.sign("PUT", &host, &canonical_uri, "", &payload_hash, Some("application/json"));
+    let signer = S3Signer { access_key: access_key.to_string(), secret_key: secret_key.to_string(), region: region.clone() };
+    let (auth, amz_date) = signer.sign("PUT", &host, &canonical_uri, "", &payload_hash, Some("application/octet-stream"));
 
     let client = reqwest::Client::new();
     let resp = client
@@ -245,14 +513,17 @@ pub async fn s3__backup(args: Value) -> Result<Value, String> {
         .header("Authorization", auth)
         .header("x-amz-content-sha256", &payload_hash)
         .header("x-amz-date", amz_date)
-        .header("Content-Type", "application/json")
+        .header("Content-Type", "application/octet-stream")
         .body(body)
         .send()
         .await
         .map_err(|e| format!("上传失败: {}", e))?;
 
     if resp.status().is_success() {
-        Ok(serde_json::json!({ "success": true, "timestamp": timestamp }))
+        // Cleanup old backups
+        let _ = cleanup_old_backups(&base_endpoint, &bucket, &region, access_key, secret_key, max_backups, &client).await;
+
+        Ok(serde_json::json!({ "success": true, "timestamp": timestamp, "pluginsCount": plugins.len() }))
     } else {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
@@ -268,6 +539,7 @@ pub async fn s3__restore(args: Value) -> Result<Value, String> {
     let access_key = get_str(&args, "accessKeyId")?;
     let secret_key = get_str(&args, "secretAccessKey")?;
     let bucket_input = get_str_or(&args, "bucket", "");
+    let password = get_str(&args, "password")?;
 
     let (base_endpoint, bucket) = resolve_endpoint_and_bucket(endpoint, &bucket_input)?;
 
@@ -326,7 +598,33 @@ pub async fn s3__restore(args: Value) -> Result<Value, String> {
     }
 
     let body = resp.text().await.map_err(|e| format!("读取备份数据失败: {}", e))?;
-    let data: Value = serde_json::from_str(&body).map_err(|e| format!("解析备份数据失败: {}", e))?;
 
-    Ok(serde_json::json!({ "success": true, "data": data }))
+    // Try encrypted format first (base64)
+    let data: Value = if let Ok(encrypted) = BASE64.decode(&body) {
+        let decrypted = decrypt_data(&encrypted, password)?;
+        let json_str = String::from_utf8(decrypted)
+            .map_err(|e| format!("解密数据UTF8解码失败: {}", e))?;
+        serde_json::from_str(&json_str)
+            .map_err(|e| format!("解析备份数据失败: {}", e))?
+    } else {
+        // Fallback: try plain JSON (backward compat)
+        serde_json::from_str(&body)
+            .map_err(|e| format!("解析备份数据失败（可能密码错误）: {}", e))?
+    };
+
+    // Restore plugins if present
+    let mut plugins_restored = 0u32;
+    let plugins_arr: Vec<Value> = data.get("plugins")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if !plugins_arr.is_empty() {
+        plugins_restored = restore_plugins(&plugins_arr)?;
+    }
+
+    Ok(serde_json::json!({
+        "success": true,
+        "data": data,
+        "pluginsRestored": plugins_restored,
+    }))
 }

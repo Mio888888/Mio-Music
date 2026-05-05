@@ -14,6 +14,7 @@ export interface BackupData {
   timestamp: string
   playlists: any
   settings: any
+  plugins?: Array<{ id: string; name: string; code: string; config: any }>
 }
 
 type RestoreMode = 'overwrite' | 'merge'
@@ -35,6 +36,8 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
   const isRestoring = ref(false)
   const lastBackupTime = ref<string | null>(null)
   const errorMessage = ref<string | null>(null)
+  const backupPassword = ref('')
+  const maxBackups = ref(10)
 
   const statusText = computed(() => {
     if (isConnecting.value) return '连接中...'
@@ -53,6 +56,8 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
       }
       const time = localStorage.getItem('lastBackupTime')
       if (time) lastBackupTime.value = time
+      const mb = localStorage.getItem('maxBackups')
+      if (mb) maxBackups.value = parseInt(mb, 10) || 10
     } catch (e) {
       console.error('加载 S3 配置失败:', e)
     }
@@ -60,6 +65,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
   function saveConfig() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value))
+    localStorage.setItem('maxBackups', String(maxBackups.value))
   }
 
   function toApiConfig(): Record<string, string> {
@@ -94,6 +100,10 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
       errorMessage.value = '请先连接 S3'
       return false
     }
+    if (!backupPassword.value) {
+      errorMessage.value = '请设置备份密码'
+      return false
+    }
 
     isBackingUp.value = true
     errorMessage.value = null
@@ -104,7 +114,9 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
       const result = await (window as any).api.s3.backup(
         toApiConfig(),
         playlists,
-        settings
+        settings,
+        backupPassword.value,
+        maxBackups.value
       )
 
       lastBackupTime.value = result.timestamp
@@ -118,16 +130,20 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     }
   }
 
-  async function restore(mode: RestoreMode = 'overwrite'): Promise<boolean> {
+  async function restore(mode: RestoreMode = 'overwrite', password: string): Promise<boolean> {
     if (!isConnected.value) {
       errorMessage.value = '请先连接 S3'
+      return false
+    }
+    if (!password) {
+      errorMessage.value = '请输入恢复密码'
       return false
     }
 
     isRestoring.value = true
     errorMessage.value = null
     try {
-      const result = await (window as any).api.s3.restore(toApiConfig())
+      const result = await (window as any).api.s3.restore(toApiConfig(), password)
       const data: BackupData = result.data
 
       if (mode === 'overwrite') {
@@ -172,6 +188,8 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     lastBackupTime,
     errorMessage,
     statusText,
+    backupPassword,
+    maxBackups,
     testConnection,
     backup,
     restore,

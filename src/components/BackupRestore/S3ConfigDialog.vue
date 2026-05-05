@@ -2,6 +2,7 @@
   <Teleport to="body">
     <Transition name="glass-fade">
       <div v-if="visible" class="liquid-glass-overlay" @click.self="handleClose">
+        <div class="overlay-drag-bar" data-tauri-drag-region />
         <div class="liquid-glass-panel" @click.stop>
           <!-- Animated refraction border -->
           <div class="glass-border-glow" />
@@ -11,7 +12,7 @@
           <div class="glass-ambient" />
 
           <!-- Header -->
-          <div class="glass-header">
+          <div class="glass-header" data-tauri-drag-region>
             <div class="glass-title-group">
               <div class="glass-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -166,6 +167,37 @@
 
           <!-- Tab: Ops -->
           <div v-show="activeTab === 'ops'" class="glass-content">
+            <!-- Password & Settings -->
+            <div class="glass-field-group">
+              <div class="form-item">
+                <label>备份密码</label>
+                <div class="input-wrapper">
+                  <input
+                    v-model="store.backupPassword"
+                    :type="showBackupPwd ? 'text' : 'password'"
+                    placeholder="加密备份所需密码"
+                    autocomplete="new-password"
+                  />
+                  <button class="input-toggle" @click="showBackupPwd = !showBackupPwd">
+                    <svg v-if="showBackupPwd" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="form-item">
+                <label>最大保存份数</label>
+                <input
+                  :value="store.maxBackups"
+                  type="number"
+                  min="1"
+                  max="100"
+                  placeholder="10"
+                  @input="store.maxBackups = Math.max(1, Math.min(100, parseInt($event.target.value, 10) || 10))"
+                  @change="store.saveConfig()"
+                />
+              </div>
+            </div>
+
             <div class="ops-card">
               <div class="ops-card-header">
                 <div class="ops-icon backup">
@@ -175,7 +207,7 @@
                 </div>
                 <div class="ops-card-text">
                   <h3>备份到云端</h3>
-                  <p>将歌单和应用设置上传到 S3 存储</p>
+                  <p>加密备份歌单、设置和音源插件</p>
                   <span v-if="store.lastBackupTime" class="last-time">
                     上次备份：{{ formatTime(store.lastBackupTime) }}
                   </span>
@@ -183,7 +215,7 @@
               </div>
               <button
                 :class="['glass-btn', 'accent', { loading: store.isBackingUp }]"
-                :disabled="store.isBackingUp"
+                :disabled="store.isBackingUp || !store.backupPassword"
                 @click="handleBackup"
               >
                 <template v-if="store.isBackingUp">
@@ -191,7 +223,7 @@
                   备份中...
                 </template>
                 <template v-else>
-                  立即备份
+                  加密备份
                 </template>
               </button>
             </div>
@@ -205,13 +237,27 @@
                 </div>
                 <div class="ops-card-text">
                   <h3>从云端恢复</h3>
-                  <p>下载备份数据并应用到本地</p>
+                  <p>解密恢复歌单、设置和音源插件</p>
+                </div>
+              </div>
+              <div class="restore-field">
+                <div class="input-wrapper">
+                  <input
+                    v-model="restorePassword"
+                    :type="showRestorePwd ? 'text' : 'password'"
+                    placeholder="输入恢复密码"
+                    autocomplete="current-password"
+                  />
+                  <button class="input-toggle" @click="showRestorePwd = !showRestorePwd">
+                    <svg v-if="showRestorePwd" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
                 </div>
               </div>
               <div class="restore-actions">
                 <button
                   :class="['glass-btn', 'outline', { loading: store.isRestoring }]"
-                  :disabled="store.isRestoring"
+                  :disabled="store.isRestoring || !restorePassword"
                   @click="handleRestore('merge')"
                 >
                   <template v-if="store.isRestoring">
@@ -224,7 +270,7 @@
                 </button>
                 <button
                   :class="['glass-btn', 'danger', { loading: store.isRestoring }]"
-                  :disabled="store.isRestoring"
+                  :disabled="store.isRestoring || !restorePassword"
                   @click="handleRestore('overwrite')"
                 >
                   覆盖恢复
@@ -243,7 +289,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
-              <span><b>合并</b> 保留本地数据，仅补充云端新增项 &nbsp;|&nbsp; <b>覆盖</b> 用云端数据替换所有本地数据</span>
+              <span>备份采用 AES-256-GCM 加密，包含歌单、设置和音源插件。<b>合并</b> 保留本地数据 &nbsp;|&nbsp; <b>覆盖</b> 替换所有本地数据</span>
             </div>
           </div>
         </div>
@@ -261,6 +307,9 @@ const emit = defineEmits<{ (e: 'update:visible', val: boolean): void }>()
 
 const store = useS3BackupStore()
 const activeTab = ref<'recommend' | 'config' | 'ops'>('recommend')
+const restorePassword = ref('')
+const showBackupPwd = ref(false)
+const showRestorePwd = ref(false)
 
 const isConfigValid = computed(() =>
   store.config.endpoint &&
@@ -287,7 +336,7 @@ async function handleBackup() {
 }
 
 async function handleRestore(mode: 'overwrite' | 'merge') {
-  await store.restore(mode)
+  await store.restore(mode, restorePassword.value)
   window.location.reload()
 }
 
@@ -314,9 +363,19 @@ function formatTime(iso: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(12px) saturate(120%);
-  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+// --- Overlay Top Drag Bar ---
+.overlay-drag-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  z-index: 2;
 }
 
 // --- Glass Panel ---
@@ -325,23 +384,24 @@ function formatTime(iso: string): string {
   width: 500px;
   overflow: hidden;
   border-radius: 22px;
-  padding: 24px;
+  padding: 28px;
 
   background: linear-gradient(
     165deg,
-    rgba(255, 255, 255, 0.55) 0%,
-    rgba(255, 255, 255, 0.4) 35%,
-    rgba(255, 255, 255, 0.48) 100%
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 255, 255, 0.58) 35%,
+    rgba(255, 255, 255, 0.65) 100%
   );
-  backdrop-filter: blur(50px) saturate(180%);
-  -webkit-backdrop-filter: blur(50px) saturate(180%);
+  backdrop-filter: blur(80px) saturate(200%);
+  -webkit-backdrop-filter: blur(80px) saturate(200%);
 
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
   box-shadow:
-    0 32px 64px rgba(0, 0, 0, 0.18),
-    0 8px 20px rgba(0, 0, 0, 0.1),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.4),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+    0 32px 64px rgba(0, 0, 0, 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.06),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
 
 // --- Animated refraction border ---
@@ -353,14 +413,14 @@ function formatTime(iso: string): string {
   background: conic-gradient(
     from var(--border-angle, 0deg),
     transparent 0%,
-    rgba(120, 180, 255, 0.45) 7%,
-    rgba(180, 120, 255, 0.35) 14%,
-    rgba(255, 120, 180, 0.3) 22%,
+    rgba(120, 180, 255, 0.55) 7%,
+    rgba(180, 120, 255, 0.45) 14%,
+    rgba(255, 120, 180, 0.4) 22%,
     transparent 34%,
     transparent 66%,
-    rgba(120, 255, 200, 0.35) 74%,
-    rgba(180, 255, 120, 0.3) 82%,
-    rgba(120, 180, 255, 0.45) 94%,
+    rgba(120, 255, 200, 0.45) 74%,
+    rgba(180, 255, 120, 0.4) 82%,
+    rgba(120, 180, 255, 0.55) 94%,
     transparent 100%
   );
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -392,9 +452,9 @@ function formatTime(iso: string): string {
   background: linear-gradient(
     108deg,
     transparent 35%,
-    rgba(255, 255, 255, 0.05) 44%,
-    rgba(255, 255, 255, 0.1) 50%,
-    rgba(255, 255, 255, 0.05) 56%,
+    rgba(255, 255, 255, 0.08) 44%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 56%,
     transparent 65%
   );
   animation: light-sweep 9s ease-in-out infinite;
@@ -415,7 +475,7 @@ function formatTime(iso: string): string {
   right: -20%;
   width: 70%;
   height: 70%;
-  background: radial-gradient(ellipse, rgba(120, 160, 255, 0.08) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(120, 160, 255, 0.12) 0%, transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -819,6 +879,74 @@ function formatTime(iso: string): string {
 }
 
 // ==================
+// Glass Field Group (ops tab top)
+// ==================
+.glass-field-group {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin-bottom: 12px;
+
+  .form-item:last-child {
+    width: 120px;
+
+    input {
+      text-align: center;
+    }
+  }
+}
+
+.input-wrapper {
+  position: relative;
+
+  input {
+    padding-right: 36px !important;
+  }
+}
+
+.input-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover { opacity: 0.8; }
+
+  svg { color: var(--td-text-color-secondary); }
+}
+
+.restore-field {
+  .input-wrapper input {
+    width: 100%;
+    padding: 9px 12px 9px 36px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--td-text-color-primary);
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s;
+    box-sizing: border-box;
+
+    &::placeholder { color: var(--td-text-color-placeholder); }
+
+    &:focus {
+      border-color: var(--td-brand-color, #0052d9);
+      background: rgba(255, 255, 255, 0.65);
+      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+    }
+  }
+}
+
+// ==================
 // Ops Cards
 // ==================
 .ops-card {
@@ -998,16 +1126,17 @@ function formatTime(iso: string): string {
   .liquid-glass-panel {
     background: linear-gradient(
       165deg,
-      rgba(50, 50, 68, 0.82) 0%,
-      rgba(38, 38, 55, 0.75) 35%,
-      rgba(55, 55, 75, 0.78) 100%
+      rgba(50, 50, 68, 0.9) 0%,
+      rgba(38, 38, 55, 0.85) 35%,
+      rgba(55, 55, 75, 0.88) 100%
     );
-    border-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
     box-shadow:
-      0 32px 64px rgba(0, 0, 0, 0.5),
-      0 8px 20px rgba(0, 0, 0, 0.3),
-      inset 0 1.5px 0 rgba(255, 255, 255, 0.1),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.02);
+      0 32px 64px rgba(0, 0, 0, 0.55),
+      0 12px 28px rgba(0, 0, 0, 0.35),
+      0 2px 6px rgba(0, 0, 0, 0.2),
+      inset 0 2px 0 rgba(255, 255, 255, 0.15),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .glass-border-glow {
@@ -1050,6 +1179,17 @@ function formatTime(iso: string): string {
 
     p {
       opacity: 0.6;
+    }
+  }
+
+  .restore-field .input-wrapper input {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.08);
+
+    &:focus {
+      background: rgba(0, 0, 0, 0.15);
+      border-color: rgba(100, 160, 255, 0.5);
+      box-shadow: 0 0 0 3px rgba(100, 160, 255, 0.12);
     }
   }
 
