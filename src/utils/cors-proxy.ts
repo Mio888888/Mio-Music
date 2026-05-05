@@ -24,7 +24,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     : input instanceof URL ? input.href
     : String(input)
 
-  if (IMAGE_RE.test(url) && !url.startsWith('data:') && !url.startsWith('blob:')) {
+  if (IMAGE_RE.test(url) && !url.startsWith('data:') && !url.startsWith('blob:') && !url.startsWith('imgproxy://')) {
     try {
       const proxy = (window as any).api?.httpProxy
       if (proxy) {

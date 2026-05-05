@@ -14,9 +14,11 @@ use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::http::{StatusCode, header};
 #[cfg(target_os = "macos")]
 use tauri::TitleBarStyle;
 use commands::hotkey_commands;
+use std::borrow::Cow;
 use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -35,6 +37,100 @@ pub fn run() {
         .manage(commands::DesktopLyricState {
             is_open: Mutex::new(false),
             is_locked: Mutex::new(false),
+        })
+        .register_asynchronous_uri_scheme_protocol("imgproxy", |_ctx, request, responder| {
+            let uri = request.uri().to_string();
+            let path = request.uri().path().to_string();
+
+            let original_url = if path.starts_with('/') {
+                path[1..].to_string()
+            } else {
+                path
+            };
+
+            let original_url = urlencoding::decode(&original_url)
+                .unwrap_or_else(|_| std::borrow::Cow::Borrowed(&original_url))
+                .into_owned();
+
+            if !original_url.starts_with("http://") && !original_url.starts_with("https://") {
+                responder.respond(
+                    tauri::http::Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Cow::Owned(format!("invalid url: {uri}").into_bytes()))
+                        .unwrap(),
+                );
+                return;
+            }
+
+            tauri::async_runtime::spawn(async move {
+                let client = match reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(15))
+                    .redirect(reqwest::redirect::Policy::limited(10))
+                    .build()
+                {
+                    Ok(c) => c,
+                    Err(e) => {
+                        responder.respond(
+                            tauri::http::Response::builder()
+                                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                                .body(Cow::Owned(format!("client error: {e}").into_bytes()))
+                                .unwrap(),
+                        );
+                        return;
+                    }
+                };
+
+                let referer = original_url
+                    .split("://")
+                    .nth(1)
+                    .and_then(|h| h.split('/').next())
+                    .map(|h| format!("https://{h}"))
+                    .unwrap_or_default();
+
+                match client
+                    .get(&original_url)
+                    .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                    .header("Accept", "image/*,*/*;q=0.8")
+                    .header("Referer", &referer)
+                    .header("Origin", &referer)
+                    .send()
+                    .await
+                {
+                    Ok(resp) => {
+                        let status = resp.status();
+                        let content_type = resp
+                            .headers()
+                            .get(header::CONTENT_TYPE)
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("image/jpeg")
+                            .to_string();
+
+                        match resp.bytes().await {
+                            Ok(bytes) => responder.respond(
+                                tauri::http::Response::builder()
+                                    .status(status)
+                                    .header(header::CONTENT_TYPE, &content_type)
+                                    .header(header::CACHE_CONTROL, "public, max-age=86400")
+                                    .header("Access-Control-Allow-Origin", "*")
+                                    .body(Cow::Owned(bytes.to_vec()))
+                                    .unwrap(),
+                            ),
+                            Err(e) => responder.respond(
+                                tauri::http::Response::builder()
+                                    .status(StatusCode::BAD_GATEWAY)
+                                    .body(Cow::Owned(format!("read body error: {e}").into_bytes()))
+                                    .unwrap(),
+                            ),
+                        }
+                    }
+                    Err(e) => responder.respond(
+                        tauri::http::Response::builder()
+                            .status(StatusCode::BAD_GATEWAY)
+                            .body(Cow::Owned(format!("fetch error: {e}").into_bytes()))
+                            .unwrap(),
+                    ),
+                }
+            });
         })
         .setup(|app| {
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())

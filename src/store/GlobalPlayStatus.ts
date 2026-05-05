@@ -5,6 +5,7 @@ import PluginRunner from '@/utils/plugin/PluginRunner'
 import { playSetting } from './playSetting'
 import { reactive, watch, toRaw, markRaw } from 'vue'
 import { analyzeImageColors, type Color } from '@/utils/color/colorExtractor'
+import { proxyImageUrl } from '@/utils/imageProxy'
 import { type LyricLine } from '@/types/lyric'
 import {
   parseLrc as amllParseLrc,
@@ -465,7 +466,7 @@ export const useGlobalPlayStatusStore = defineStore(
             })
             const picUrl = res?.url || res
             if (picUrl && typeof picUrl === 'string' && picUrl.length > 0) {
-              player.cover = picUrl
+              player.cover = proxyImageUrl(picUrl)
               return
             }
           } catch {
@@ -479,13 +480,13 @@ export const useGlobalPlayStatusStore = defineStore(
             try {
               const picUrl = await PluginRunner.getPic(pluginId, info.source, getCleanSongInfo(info))
               if (picUrl && player.songInfo && !player.songInfo.img) {
-                newImg = picUrl
+                newImg = proxyImageUrl(picUrl)
               }
             } catch {
             }
           }
         }
-        player.cover = newImg || '/default-cover.png'
+        player.cover = proxyImageUrl(newImg) || '/default-cover.png'
       },
       { immediate: true }
     )

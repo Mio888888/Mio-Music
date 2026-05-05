@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { rewriteImageUrls, proxyImageUrl } from '@/utils/imageProxy'
 
 export interface MusicItem {
   songmid: string | number
@@ -118,7 +119,7 @@ export const musicSdk = {
       method,
       args: { ...args, source }
     })
-    return result
+    return rewriteImageUrls(result)
   },
 
   async search(keyword: string, page = 1, limit = 30): Promise<SearchResult> {
@@ -173,7 +174,7 @@ export const musicSdk = {
 
   async getPic(songInfo: MusicItem): Promise<string> {
     const res = await this.request('getPic', { songInfo, source: songInfo.source })
-    return res?.url || ''
+    return proxyImageUrl(res?.url || '')
   },
 
   async getLyric(songInfo: MusicItem): Promise<string> {

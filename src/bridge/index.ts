@@ -9,6 +9,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { withIpcPerformance } from '@/utils/performanceMonitor'
+import { rewriteImageUrls } from '@/utils/imageProxy'
 
 // ============================================================
 // IPC Core: wraps Tauri invoke / event into Electron-like API
@@ -136,8 +137,10 @@ const api = {
 
   // Music SDK
   music: {
-    requestSdk: (method: string, args: any) =>
-      ipcInvoke('service-music-sdk-request', { method, args }),
+    requestSdk: async (method: string, args: any) => {
+      const result = await ipcInvoke('service-music-sdk-request', { method, args })
+      return rewriteImageUrls(result)
+    },
     invoke: (channel: string, ...args: any[]) => ipcInvoke(channel, ...args)
   },
 

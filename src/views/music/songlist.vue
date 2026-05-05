@@ -8,6 +8,7 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { downloadSingleSong } from '@/utils/audio/download'
 import type { SongList } from '@/types/audio'
+import { proxyImageUrl } from '@/utils/imageProxy'
 import defaultCover from '/default-cover.png'
 
 const router = useRouter()
@@ -379,7 +380,7 @@ const handleNetworkPlaylistImport = async (input: string) => {
             source: platform,
             songInfo: song
           })
-          if (typeof url === 'string') song.img = url
+          if (typeof url === 'string') song.img = proxyImageUrl(url)
         } catch {}
       }))
     }
