@@ -7,6 +7,7 @@ import {
   nextTick,
   onActivated,
   onDeactivated,
+  onBeforeUnmount,
   toRaw
 } from 'vue'
 import { useLifecycle } from '@/composables/useEventListener'
@@ -739,15 +740,36 @@ const bg = ref('var(--player-bg-default)')
 
 // 封面图切换淡入效果
 const coverOpacity = ref(1)
+let coverFadeRaf: number | null = null
+let coverFadeNextRaf: number | null = null
+
+const cancelCoverFade = () => {
+  if (coverFadeRaf !== null) {
+    cancelAnimationFrame(coverFadeRaf)
+    coverFadeRaf = null
+  }
+  if (coverFadeNextRaf !== null) {
+    cancelAnimationFrame(coverFadeNextRaf)
+    coverFadeNextRaf = null
+  }
+}
+
 watch(
   () => player.value.cover,
   () => {
+    cancelCoverFade()
     coverOpacity.value = 0
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => { coverOpacity.value = 1 })
+    coverFadeRaf = requestAnimationFrame(() => {
+      coverFadeRaf = null
+      coverFadeNextRaf = requestAnimationFrame(() => {
+        coverFadeNextRaf = null
+        coverOpacity.value = 1
+      })
     })
   }
 )
+
+onBeforeUnmount(cancelCoverFade)
 
 watch(
   () => player.value.songInfo?.songmid,
@@ -1055,11 +1077,11 @@ watch(showFullPlay, (val) => {
 
 <style lang="scss" scoped>
 .fade-leave-active {
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 }
 
 .fade-enter-active {
-  transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+  transition: opacity var(--motion-duration-instant) var(--motion-ease-standard), transform var(--motion-duration-instant) var(--motion-ease-standard);
 }
 
 .fade-leave-to {
@@ -1079,7 +1101,7 @@ watch(showFullPlay, (val) => {
 
 .comment-fade-enter-active,
 .comment-fade-leave-active {
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 }
 .comment-fade-enter-from,
 .comment-fade-leave-to {
@@ -1149,7 +1171,7 @@ watch(showFullPlay, (val) => {
 /* 加载歌曲过渡动画 - 缩小透明效果 */
 .loadSong-enter-active,
 .loadSong-leave-active {
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 }
 
 .loadSong-enter-from,
@@ -1171,11 +1193,11 @@ watch(showFullPlay, (val) => {
   left: 0;
   right: 0;
   transition:
-    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background 0.3s;
+    transform var(--motion-duration-expressive) var(--motion-ease-spring),
+    background-color var(--motion-duration-standard) var(--motion-ease-standard);
   background: v-bind(bg);
   // border-top: 1px solid #e5e7eb;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(var(--glass-blur-panel));
   z-index: 1000;
   height: var(--play-bottom-height);
   display: flex;
@@ -1361,7 +1383,7 @@ watch(showFullPlay, (val) => {
       height: 100%;
       object-fit: cover;
       -webkit-user-drag: none;
-      transition: opacity 0.35s ease;
+      transition: opacity var(--motion-duration-standard) var(--motion-ease-standard);
     }
   }
 
@@ -1450,7 +1472,7 @@ watch(showFullPlay, (val) => {
       width: 42px;
       height: 42px;
       background-color: v-bind(playbg);
-      transition: background-color 0.2s ease;
+      transition: background-color var(--motion-duration-quick) var(--motion-ease-standard);
 
       border-radius: 50%;
 
@@ -1539,7 +1561,7 @@ watch(showFullPlay, (val) => {
   /* 位置微调 */
   background: v-bind(contrastTextColor);
   /* 毛玻璃背景 */
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(var(--glass-blur-panel));
   border-radius: 8px;
   padding: 15px 10px;
   width: 40px;
@@ -1604,7 +1626,7 @@ watch(showFullPlay, (val) => {
   border-radius: 50%;
   transform: translate(-50%, 50%);
   opacity: 1;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard);
 }
 
 // .volume-bar:hover .volume-handle {

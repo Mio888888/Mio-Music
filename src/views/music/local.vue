@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useVirtualList } from '@vueuse/core'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
@@ -21,7 +22,7 @@ const playStatus = useGlobalPlayStatusStore()
 
 const loading = ref(false)
 const scanning = ref(false)
-const tracks = ref<any[]>([])
+const tracks = shallowRef<any[]>([])
 const searchQuery = ref('')
 const coverCache = ref<Record<string, string>>({})
 
@@ -54,6 +55,14 @@ const hasSelection = computed(() => selectedIds.value.size > 0)
 const isAllSelected = computed(() =>
   displayTracks.value.length > 0 && displayTracks.value.every(t => selectedIds.value.has(t.songmid))
 )
+const { list: virtualTracks, containerProps, wrapperProps } = useVirtualList(displayTracks, {
+  itemHeight: 60,
+  overscan: 8
+})
+
+watch(searchQuery, () => {
+  containerProps.ref.value?.scrollTo({ top: 0 })
+})
 
 // 加载歌曲
 const fetchTracks = async () => {
@@ -397,35 +406,38 @@ onBeforeUnmount(() => {
         <span class="col-size">大小</span>
         <span class="col-actions-header">操作</span>
       </div>
-      <div class="list-body">
-        <div
-          v-for="track in displayTracks"
-          :key="track.songmid"
-          class="row"
-          :class="{ 'is-selected': selectedIds.has(track.songmid) }"
-          @click="multiSelect ? toggleSelect(track.songmid) : handlePlay(track)"
-          @contextmenu="handleContextMenu($event, track)"
-        >
-          <div class="col-check" @click.stop>
-            <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
-          </div>
-          <div class="col-cover">
-            <img
-              v-if="coverCache[track.songmid]"
-              :src="coverCache[track.songmid]"
-              class="track-cover"
-            />
-            <img v-else src="/default-cover.png" class="track-cover" />
-          </div>
-          <div class="col-name">
-            <span class="name-text" :class="{ playing: track.songmid === currentSongId }">{{ track.name }}</span>
-          </div>
-          <span class="col-singer">{{ track.singer || '未知' }}</span>
-          <span class="col-album">{{ track.albumName || '未知专辑' }}</span>
-          <span class="col-duration">{{ formatDuration(track.duration || track.interval) }}</span>
-          <span class="col-size">{{ formatSize(track.size) }}</span>
-          <div class="col-actions" @click.stop>
-            <t-button variant="text" size="small" @click="openTagEditor(track)">编辑</t-button>
+      <div v-bind="containerProps" class="list-body">
+        <div v-bind="wrapperProps">
+          <div
+            v-for="{ data: track } in virtualTracks"
+            :key="track.songmid"
+            class="row"
+            :class="{ 'is-selected': selectedIds.has(track.songmid) }"
+            @click="multiSelect ? toggleSelect(track.songmid) : handlePlay(track)"
+            @contextmenu="handleContextMenu($event, track)"
+          >
+            <div class="col-check" @click.stop>
+              <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
+            </div>
+            <div class="col-cover">
+              <img
+                v-if="coverCache[track.songmid]"
+                :src="coverCache[track.songmid]"
+                class="track-cover"
+                loading="lazy"
+              />
+              <img v-else src="/default-cover.png" class="track-cover" loading="lazy" />
+            </div>
+            <div class="col-name">
+              <span class="name-text" :class="{ playing: track.songmid === currentSongId }">{{ track.name }}</span>
+            </div>
+            <span class="col-singer">{{ track.singer || '未知' }}</span>
+            <span class="col-album">{{ track.albumName || '未知专辑' }}</span>
+            <span class="col-duration">{{ formatDuration(track.duration || track.interval) }}</span>
+            <span class="col-size">{{ formatSize(track.size) }}</span>
+            <div class="col-actions" @click.stop>
+              <t-button variant="text" size="small" @click="openTagEditor(track)">编辑</t-button>
+            </div>
           </div>
         </div>
       </div>
@@ -619,10 +631,12 @@ onBeforeUnmount(() => {
 .row {
   display: flex;
   align-items: center;
+  min-height: 60px;
   padding: 10px 12px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard);
+  box-sizing: border-box;
 }
 
 .row:hover {
@@ -793,9 +807,9 @@ onBeforeUnmount(() => {
   min-width: 156px;
   background: var(--td-bg-color-container);
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--td-border-level-1-color);
+  box-shadow: var(--glass-shadow-control), 0 0 0 1px var(--td-border-level-1-color);
   padding: 4px;
-  animation: menuIn 0.15s ease;
+  animation: menuIn var(--motion-duration-quick) var(--motion-ease-out);
 }
 
 .context-menu .menu-item {
@@ -807,7 +821,7 @@ onBeforeUnmount(() => {
   color: var(--td-text-color-primary);
   border-radius: 6px;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background-color var(--motion-duration-instant) var(--motion-ease-standard);
 }
 
 .context-menu .menu-item:hover {

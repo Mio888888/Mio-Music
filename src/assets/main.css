@@ -1,3 +1,22 @@
+:root {
+  /* Apple-like motion & glass tokens */
+  --motion-duration-instant: 120ms;
+  --motion-duration-quick: 180ms;
+  --motion-duration-standard: 280ms;
+  --motion-duration-expressive: 440ms;
+  --motion-duration-slow: 600ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --motion-ease-emphasized: cubic-bezier(0.22, 1, 0.36, 1);
+  --glass-blur-panel: 8px;
+  --glass-blur-control: 6px;
+  --glass-blur-overlay: 8px;
+  --glass-shadow-panel: 0 16px 32px rgba(0, 0, 0, 0.22), 0 6px 14px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  --glass-shadow-panel-dark: 0 24px 48px rgba(0, 0, 0, 0.48), 0 8px 20px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --glass-shadow-control: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
 :root[data-theme='light'],
 :root:not([data-theme]) {
   --hover-nav-color: #f3f4f6;

@@ -47,7 +47,7 @@ const formatDuration = (interval?: string) => interval || '--:--'
 .recent-header h2 { font-size: 20px; font-weight: 600; color: var(--td-text-color-primary); margin: 0; }
 .count { font-size: 14px; font-weight: 400; color: var(--td-text-color-secondary); }
 .song-list { flex: 1; overflow-y: auto; }
-.song-row { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; transition: background 0.15s; border-radius: 6px; }
+.song-row { display: flex; align-items: center; padding: 10px 12px; cursor: pointer; transition: background-color var(--motion-duration-instant) var(--motion-ease-standard); border-radius: 6px; }
 .song-row:hover { background: var(--td-bg-color-component-hover); }
 .song-index { width: 32px; font-size: 12px; color: var(--td-text-color-secondary); flex-shrink: 0; }
 .song-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }

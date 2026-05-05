@@ -66,6 +66,7 @@ let fwCanvas: HTMLCanvasElement | null = null
 let fwCtx: CanvasRenderingContext2D | null = null
 let rafId: number | null = null
 let loopId: number | null = null
+let fireworksAutoStopTimer: number | null = null
 let bursts: any[] = []
 let particles: any[] = []
 let lastTime = 0
@@ -165,13 +166,15 @@ const startFireworks = () => {
     if (!running || !fwCanvas) return
     scheduleBursts(fwCanvas.width, fwCanvas.height)
   }, 2200)
-  window.setTimeout(() => stopFireworks(), 14000)
+  if (fireworksAutoStopTimer) clearTimeout(fireworksAutoStopTimer)
+  fireworksAutoStopTimer = window.setTimeout(() => stopFireworks(), 14000)
 }
 
 const stopFireworks = () => {
   running = false
   if (rafId) { cancelAnimationFrame(rafId); rafId = null }
   if (loopId) { clearInterval(loopId); loopId = null }
+  if (fireworksAutoStopTimer) { clearTimeout(fireworksAutoStopTimer); fireworksAutoStopTimer = null }
   particles = []
   bursts = []
   if (fwCanvas && festivalOverlay.value) festivalOverlay.value.removeChild(fwCanvas)
@@ -398,24 +401,88 @@ watch(
 )
 
 // 初始化背景渲染器
+const isDocumentHidden = ref(document.hidden)
+const isFullPlayActive = computed(() => props.show && !isDocumentHidden.value)
+const shouldRunBackground = computed(() => isFullPlayActive.value && !!backgroundConfig.value?.enabled)
+
+let performanceWarningTimer: number | null = null
+const startPerformanceDegrader = () => {
+  if (!settingsStore.settings.backgroundRender?.fullPlay?.enabled) return
+  performanceDegrader.stop()
+  performanceDegrader.start({
+    onTick: (fps) => {
+      // 可选：实时 FPS 显示（调试用）
+      // console.log('[Performance] FPS:', fps.toFixed(1))
+    },
+    onDegrade: (degradedConfig) => {
+      console.warn('[FullPlay] 检测到性能问题，自动降低背景效果')
+      hasAutoDegraded.value = true
+      showPerformanceWarning.value = true
+
+      // 应用降级配置
+      settingsStore.updateSettings({
+        backgroundRender: {
+          ...settingsStore.settings.backgroundRender!,
+          fullPlay: {
+            ...settingsStore.settings.backgroundRender!.fullPlay,
+            ...degradedConfig
+          }
+        }
+      })
+
+      // 3秒后自动隐藏提示
+      if (performanceWarningTimer) clearTimeout(performanceWarningTimer)
+      performanceWarningTimer = window.setTimeout(() => {
+        showPerformanceWarning.value = false
+        performanceWarningTimer = null
+      }, 5000)
+    },
+    enabled: true
+  })
+}
+
+const pauseBackgroundRender = () => {
+  bgRef.value?.pause()
+  stopAudioResponse()
+  performanceDegrader.stop()
+}
+
+const disposeBackgroundRender = () => {
+  stopAudioResponse()
+  performanceDegrader.stop()
+  if (!bgRef.value) return
+  const canvas = bgRef.value.getElement()
+  canvas?.parentNode?.removeChild(canvas)
+  bgRef.value.dispose()
+  bgRef.value = undefined
+}
+
+const resumeBackgroundRender = async () => {
+  if (!shouldRunBackground.value) {
+    pauseBackgroundRender()
+    return
+  }
+
+  if (!bgRef.value) await initBackgroundRender()
+  else {
+    applyBackgroundConfig()
+    bgRef.value.resume()
+    if (audioResponseEnabled.value && Audio.value.isPlay) startAudioResponse()
+  }
+
+  if (bgRef.value) startPerformanceDegrader()
+}
+
 const initBackgroundRender = async () => {
+  if (!shouldRunBackground.value) return
   if (!backgroundContainer.value) {
     console.warn('[FullPlay] backgroundContainer 不存在，跳过背景初始化')
     return
   }
 
-  if (!backgroundConfig.value?.enabled) {
-    console.log('[FullPlay] 背景效果已禁用，跳过初始化')
-    return
-  }
-
   console.log('[FullPlay] 初始化背景渲染器，配置:', backgroundConfig.value)
 
-  if (bgRef.value) {
-    bgRef.value.dispose()
-    const canvas = bgRef.value.getElement()
-    canvas?.parentNode?.removeChild(canvas)
-  }
+  disposeBackgroundRender()
   bgRef.value = CoreBackgroundRender.new(PixiRenderer)
   const canvas = bgRef.value.getElement()
   canvas.style.position = 'absolute'
@@ -463,11 +530,11 @@ const applyBackgroundConfig = () => {
 
 // 启动音频响应效果
 const startAudioResponse = async () => {
-  if (!audioResponseEnabled.value || spectrumUnlisten) return
+  if (!audioResponseEnabled.value || spectrumUnlisten || !shouldRunBackground.value) return
 
   try {
     spectrumUnlisten = await listen('player:spectrum', (event: any) => {
-      if (!bgRef.value || !Audio.value.isPlay) return
+      if (!bgRef.value || !Audio.value.isPlay || !shouldRunBackground.value) return
 
       const { bands } = event.payload
       if (bands && Array.isArray(bands) && bands.length > 0) {
@@ -497,41 +564,6 @@ const stopAudioResponse = () => {
   bgRef.value?.setLowFreqVolume(0)
 }
 
-onMounted(async () => {
-  await initBackgroundRender()
-
-  // 启动性能监控（仅在启用背景效果时）
-  if (settingsStore.settings.backgroundRender?.fullPlay?.enabled) {
-    performanceDegrader.start({
-      onTick: (fps) => {
-        // 可选：实时 FPS 显示（调试用）
-        // console.log('[Performance] FPS:', fps.toFixed(1))
-      },
-      onDegrade: (degradedConfig) => {
-        console.warn('[FullPlay] 检测到性能问题，自动降低背景效果')
-        hasAutoDegraded.value = true
-        showPerformanceWarning.value = true
-
-        // 应用降级配置
-        settingsStore.updateSettings({
-          backgroundRender: {
-            ...settingsStore.settings.backgroundRender!,
-            fullPlay: {
-              ...settingsStore.settings.backgroundRender!.fullPlay,
-              ...degradedConfig
-            }
-          }
-        })
-
-        // 3秒后自动隐藏提示
-        setTimeout(() => {
-          showPerformanceWarning.value = false
-        }, 5000)
-      },
-      enabled: true
-    })
-  }
-})
 
 onBeforeUnmount(async () => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
@@ -548,15 +580,8 @@ onBeforeUnmount(async () => {
     // Rust 后端管理播放状态
   }
   // 停止音频响应
-  stopAudioResponse()
-  // 停止性能监控
-  performanceDegrader.stop()
-  if (bgRef.value) {
-    const canvas = bgRef.value.getElement()
-    canvas?.parentNode?.removeChild(canvas)
-    bgRef.value.dispose()
-    bgRef.value = undefined
-  }
+  if (performanceWarningTimer) { clearTimeout(performanceWarningTimer); performanceWarningTimer = null }
+  disposeBackgroundRender()
   lyricPlayerRef.value?.lyricPlayer?.dispose()
 })
 
@@ -567,12 +592,14 @@ watch(() => Audio.value.currentTime, (newTime) => { state.currentTime = Math.rou
 watch(
   () => Audio.value.isPlay,
   (isPlaying) => {
-    if (audioResponseEnabled.value) {
+    if (audioResponseEnabled.value && shouldRunBackground.value) {
       if (isPlaying) {
         startAudioResponse()
       } else {
         stopAudioResponse()
       }
+    } else {
+      stopAudioResponse()
     }
   }
 )
@@ -581,7 +608,7 @@ watch(
 watch(
   () => audioResponseEnabled.value,
   (enabled) => {
-    if (enabled) {
+    if (enabled && shouldRunBackground.value) {
       if (Audio.value.isPlay) {
         startAudioResponse()
       }
@@ -591,6 +618,18 @@ watch(
   }
 )
 
+// 监听全屏播放可见性，避免隐藏状态持续渲染
+watch(
+  () => shouldRunBackground.value,
+  (shouldRun) => {
+    if (shouldRun) {
+      resumeBackgroundRender()
+    } else {
+      pauseBackgroundRender()
+    }
+  },
+  { immediate: true }
+)
 // 监听歌词变化，更新 hasLyric 状态
 watch(
   () => player.value.lyrics.lines,
@@ -607,22 +646,21 @@ watch(
   (newConfig) => {
     if (!newConfig) return
 
-    // 如果启用状态改变
-    if (newConfig.enabled && !bgRef.value) {
-      // 从禁用到启用，重新初始化
+    if (!newConfig.enabled) {
+      disposeBackgroundRender()
+      return
+    }
+
+    if (!shouldRunBackground.value) {
+      pauseBackgroundRender()
+      return
+    }
+
+    if (!bgRef.value) {
       initBackgroundRender()
-    } else if (!newConfig.enabled && bgRef.value) {
-      // 从启用到禁用，清理
-      bgRef.value.dispose()
-      const canvas = bgRef.value.getElement()
-      canvas?.parentNode?.removeChild(canvas)
-      bgRef.value = undefined
-      stopAudioResponse()
-    } else if (newConfig.enabled && bgRef.value) {
-      // 已启用，更新参数
+    } else {
       applyBackgroundConfig()
 
-      // 音频响应开关变化
       if (newConfig.audioResponse && Audio.value.isPlay && !spectrumUnlisten) {
         startAudioResponse()
       } else if (!newConfig.audioResponse && spectrumUnlisten) {
@@ -671,11 +709,13 @@ const handleClickOutside = (event: MouseEvent) => {
 
 // 后台暂停动画
 const handleVisibilityChange = () => {
-  if (document.hidden) { bgRef.value?.pause() } else { bgRef.value?.resume() }
+  isDocumentHidden.value = document.hidden
+  if (shouldRunBackground.value) resumeBackgroundRender()
+  else pauseBackgroundRender()
 }
 
 const handleWindowFocus = () => {
-  if (!document.hidden) bgRef.value?.resume()
+  if (shouldRunBackground.value) resumeBackgroundRender()
 }
 
 const debouncedCheckOverflow = debounce(checkOverflow, 200)
@@ -687,6 +727,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   window.addEventListener('focus', handleWindowFocus)
   setTimeout(checkOverflow, 500)
+  resumeBackgroundRender()
 })
 
 onUnmounted(() => {
@@ -930,7 +971,7 @@ onUnmounted(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s;
+    transition: background-color var(--motion-duration-quick) var(--motion-ease-standard);
 
     &:hover {
       background: rgba(255, 255, 255, 0.3);
@@ -940,7 +981,7 @@ onUnmounted(() => {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 .fade-enter-from,
@@ -950,7 +991,7 @@ onUnmounted(() => {
 
 .fade-nav-enter-active,
 .fade-nav-leave-active {
-  transition: background-color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), border-color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), color 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), box-shadow 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), opacity 0.6s cubic-bezier(0.8, 0, 0.8, 0.43), transform 0.6s cubic-bezier(0.8, 0, 0.8, 0.43);
+  transition: background-color var(--motion-duration-slow) var(--motion-ease-emphasized), border-color var(--motion-duration-slow) var(--motion-ease-emphasized), color var(--motion-duration-slow) var(--motion-ease-emphasized), box-shadow var(--motion-duration-slow) var(--motion-ease-emphasized), opacity var(--motion-duration-slow) var(--motion-ease-emphasized), transform var(--motion-duration-slow) var(--motion-ease-emphasized);
 }
 .fade-nav-enter-from,
 .fade-nav-leave-to {
@@ -965,8 +1006,8 @@ onUnmounted(() => {
   padding: 10px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(var(--glass-blur-control));
+  -webkit-backdrop-filter: blur(var(--glass-blur-control));
   border: none;
   display: flex;
   align-items: center;
@@ -975,7 +1016,7 @@ onUnmounted(() => {
   z-index: 10;
   color: white;
   font-size: 18px;
-  transition: background-color 0.3s ease, transform 0.3s ease;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), transform var(--motion-duration-standard) var(--motion-ease-standard);
 
   &:hover {
     background: rgba(255, 255, 255, 0.3);
@@ -1012,7 +1053,7 @@ onUnmounted(() => {
   will-change: transform;
 
   &.animating {
-    transition: transform 0.3s cubic-bezier(0.8, 0, 0.8, 0.43);
+    transition: transform var(--motion-duration-standard) var(--motion-ease-emphasized);
   }
   &.use-black-text {
     --text-color: rgba(255, 255, 255, 0.9);
@@ -1041,7 +1082,7 @@ onUnmounted(() => {
     right: 0;
     padding: 30px 30px;
     padding-bottom: 10px;
-    transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity var(--motion-duration-expressive) var(--motion-ease-spring), transform var(--motion-duration-expressive) var(--motion-ease-spring);
   }
 
   .playbox {
@@ -1057,7 +1098,7 @@ onUnmounted(() => {
 
     .left {
       width: 40%;
-      transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity var(--motion-duration-expressive) var(--motion-ease-spring), transform var(--motion-duration-expressive) var(--motion-ease-spring);
       opacity: 1;
       transform: translateX(0);
       display: flex;
@@ -1076,7 +1117,7 @@ onUnmounted(() => {
         transform: rotate(-20deg);
         transform-origin: 1.8vh 1.8vh;
         z-index: 2;
-        transition: transform 0.3s;
+        transition: transform var(--motion-duration-standard) var(--motion-ease-standard);
         &.playing { transform: rotate(0deg); }
       }
 
@@ -1088,9 +1129,13 @@ onUnmounted(() => {
         align-items: center;
         justify-content: center;
         will-change: transform; animation: rotateRecord 33s linear infinite;
-        transition: filter 0.3s ease;
-        filter: drop-shadow(0 15px 35px rgba(0, 0, 0, 0.6));
-        &:hover { filter: drop-shadow(0 20px 45px rgba(0, 0, 0, 0.7)); }
+        transition: filter var(--motion-duration-standard) var(--motion-ease-standard);
+        filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45));
+        &:not(.playing) {
+          .vinyl-record::after,
+          .label-shine { animation-play-state: paused; }
+        }
+        &:hover { filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.52)); }
 
         .vinyl-record {
           aspect-ratio: 1/1;
@@ -1178,7 +1223,7 @@ onUnmounted(() => {
 
     .right {
       width: 60%;
-      transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity var(--motion-duration-expressive) var(--motion-ease-spring);
       mask: linear-gradient(rgba(255,255,255,0) 0px, rgba(255,255,255,0.6) 5%, rgb(255,255,255) 15%, rgb(255,255,255) 75%, rgba(255,255,255,0.6) 85%, rgba(255,255,255,0));
 
       .lyric-empty {
@@ -1275,13 +1320,13 @@ onUnmounted(() => {
         border-radius: 24px;
         overflow: hidden;
         box-shadow: 0 12px 16px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1);
-        transition: transform 0.44s cubic-bezier(0.44, 2, 0.64, 1);
+        transition: transform var(--motion-duration-expressive) var(--motion-ease-spring);
         margin: 0 auto;
         transform: scale(0.8);
 
         &.playing {
           transform: scale(1);
-          &:hover { transition: transform 0.2s; transform: scale(1.02); }
+          &:hover { transition: transform var(--motion-duration-quick) var(--motion-ease-standard); transform: scale(1.02); }
         }
         &:hover { transform: scale(0.82); }
 
@@ -1355,19 +1400,21 @@ onUnmounted(() => {
     left: 0;
     right: 0;
     height: 60px;
-    filter: blur(6px);
+    filter: blur(4px);
     display: flex;
     align-items: center;
     pointer-events: none;
-    transition: bottom 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    &.idle { bottom: 0 !important; }
+    transform: translateY(0);
+    transition: transform var(--motion-duration-expressive) var(--motion-ease-spring);
+    will-change: transform;
+    &.idle { transform: translateY(calc(var(--play-bottom-height) * -1 + 10px)); }
   }
 }
 
 .float-action {
   position: absolute;
   z-index: 5;
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transition: opacity var(--motion-duration-expressive) var(--motion-ease-standard), transform var(--motion-duration-expressive) var(--motion-ease-standard);
   &.idle {
     opacity: 0;
     transform: translateY(20px);
@@ -1379,7 +1426,7 @@ onUnmounted(() => {
 
   .skin-btn {
     position: relative;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(var(--glass-blur-control));
     background: rgba(255,255,255,0.15);
     border: 1px solid rgba(255,255,255,0.628);
     height: 50px;
@@ -1399,13 +1446,13 @@ onUnmounted(() => {
       white-space: nowrap;
       pointer-events: none;
       opacity: 0;
-      transition: opacity 0.2s;
+      transition: opacity var(--motion-duration-quick) var(--motion-ease-standard);
     }
     &:hover[data-tooltip]::after {
       opacity: 1;
     }
     cursor: pointer;
-    transition: background-color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: background-color var(--motion-duration-standard) var(--motion-ease-spring), border-color var(--motion-duration-standard) var(--motion-ease-spring), color var(--motion-duration-standard) var(--motion-ease-spring), box-shadow var(--motion-duration-standard) var(--motion-ease-spring), opacity var(--motion-duration-standard) var(--motion-ease-spring), transform var(--motion-duration-standard) var(--motion-ease-spring);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1421,7 +1468,7 @@ onUnmounted(() => {
     &:active {
       transform: translateY(1px) scale(0.92);
       box-shadow: 0 4px 10px 0 rgba(0,0,0,0.1), 0 0 10px v-bind(lightMainColor), inset 0 0 0 1px rgba(255,255,255,0.1);
-      transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
+      transition: background-color var(--motion-duration-instant) var(--motion-ease-standard), border-color var(--motion-duration-instant) var(--motion-ease-standard), color var(--motion-duration-instant) var(--motion-ease-standard), box-shadow var(--motion-duration-instant) var(--motion-ease-standard), opacity var(--motion-duration-instant) var(--motion-ease-standard), transform var(--motion-duration-instant) var(--motion-ease-standard);
     }
   }
 
@@ -1434,8 +1481,8 @@ onUnmounted(() => {
     right: 0;
     width: 340px;
     background: rgb(30 30 30 / 29%);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(var(--glass-blur-control));
+    -webkit-backdrop-filter: blur(var(--glass-blur-control));
     border-radius: 24px;
     padding: 20px;
     box-shadow: 0 6px 12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
@@ -1445,7 +1492,7 @@ onUnmounted(() => {
 }
 
 .fade-up-enter-active, .fade-up-leave-active {
-  transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity var(--motion-duration-standard) var(--motion-ease-spring), transform var(--motion-duration-standard) var(--motion-ease-spring);
 }
 .fade-up-enter-from, .fade-up-leave-to {
   opacity: 0;

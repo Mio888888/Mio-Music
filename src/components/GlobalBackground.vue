@@ -20,7 +20,7 @@ const bgUrl = computed(() => {
   return url
 })
 const bgOpacity = computed(() => bgSettings.value?.opacity ?? 0.5)
-const bgBlur = computed(() => bgSettings.value?.blur ?? 10)
+const bgBlur = computed(() => Math.min(bgSettings.value?.blur ?? 10, 8))
 const bgBrightness = computed(() => bgSettings.value?.brightness ?? 0.8)
 
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -79,7 +79,7 @@ watch([isEnabled, () => settings.value.isDarkMode], ([enabled, isDark]) => {
       .home-container .sidebar {
         background-image: none !important;
         background-color: rgba(${containerColor}, 0.2) !important;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(var(--glass-blur-panel));
       }
       .home-container .header {
         background-color: transparent !important;
@@ -121,7 +121,7 @@ watch([isEnabled, () => settings.value.isDarkMode], ([enabled, isDark]) => {
 }
 .global-background-media {
   position: absolute; top: -10%; left: -10%; width: 120%; height: 120%;
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity var(--motion-duration-standard) var(--motion-ease-standard), transform var(--motion-duration-standard) var(--motion-ease-standard);
 }
 .bg-video { width: 100%; height: 100%; object-fit: cover; }
 .bg-image { width: 100%; height: 100%; background-size: cover; background-position: center; background-repeat: no-repeat; }

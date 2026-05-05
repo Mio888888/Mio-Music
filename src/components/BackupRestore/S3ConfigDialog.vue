@@ -364,8 +364,8 @@ function formatTime(iso: string): string {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px) saturate(140%);
-  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
 }
 
 // --- Overlay Top Drag Bar ---
@@ -392,14 +392,12 @@ function formatTime(iso: string): string {
     rgba(255, 255, 255, 0.58) 35%,
     rgba(255, 255, 255, 0.65) 100%
   );
-  backdrop-filter: blur(8px) saturate(200%);
-  -webkit-backdrop-filter: blur(8px) saturate(200%);
+  backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
 
   border: 1.5px solid rgba(255, 255, 255, 0.45);
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.22),
-    0 6px 14px rgba(0, 0, 0, 0.12),
-    0 2px 6px rgba(0, 0, 0, 0.06),
+    var(--glass-shadow-panel),
     inset 0 2px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(255, 255, 255, 0.1);
 }
@@ -446,9 +444,10 @@ function formatTime(iso: string): string {
 .glass-light-sweep {
   position: absolute;
   top: 0;
-  left: -100%;
+  left: 0;
   width: 55%;
   height: 100%;
+  transform: translateX(-120%);
   background: linear-gradient(
     108deg,
     transparent 35%,
@@ -457,14 +456,14 @@ function formatTime(iso: string): string {
     rgba(255, 255, 255, 0.08) 56%,
     transparent 65%
   );
-  will-change: background-position; animation: light-sweep 9s ease-in-out infinite;
+  will-change: transform; animation: light-sweep 9s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
   border-radius: 22px;
 
   @keyframes light-sweep {
-    0%, 100% { left: -100%; }
-    50% { left: 160%; }
+    0%, 100% { transform: translateX(-120%); }
+    50% { transform: translateX(320%); }
   }
 }
 
@@ -544,7 +543,7 @@ function formatTime(iso: string): string {
   height: 6px;
   border-radius: 50%;
   background: var(--td-text-color-disabled);
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), border-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard), box-shadow var(--motion-duration-standard) var(--motion-ease-standard), opacity var(--motion-duration-standard) var(--motion-ease-standard), transform var(--motion-duration-standard) var(--motion-ease-standard);
 
   &.connected {
     background: var(--td-success-color, #2ba471);
@@ -569,7 +568,7 @@ function formatTime(iso: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 
   &:hover {
     background: rgba(255, 80, 80, 0.15);
@@ -603,7 +602,7 @@ function formatTime(iso: string): string {
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -651,7 +650,7 @@ function formatTime(iso: string): string {
   background: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.06);
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 
   &:hover {
     background: rgba(255, 255, 255, 0.45);
@@ -735,7 +734,7 @@ function formatTime(iso: string): string {
 // Content
 // ==================
 .glass-content {
-  animation: content-in 0.2s ease;
+  animation: content-in var(--motion-duration-quick) var(--motion-ease-out);
 }
 
 @keyframes content-in {
@@ -778,7 +777,7 @@ function formatTime(iso: string): string {
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
     box-sizing: border-box;
 
     &::placeholder {
@@ -806,7 +805,7 @@ function formatTime(iso: string): string {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -815,7 +814,7 @@ function formatTime(iso: string): string {
   &:hover:not(:disabled) {
     background: rgba(255, 255, 255, 0.55);
     transform: translateY(-1px);
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--glass-shadow-control);
   }
 
   &:active:not(:disabled) {
@@ -933,7 +932,7 @@ function formatTime(iso: string): string {
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
     box-sizing: border-box;
 
     &::placeholder { color: var(--td-text-color-placeholder); }
@@ -1082,6 +1081,7 @@ function formatTime(iso: string): string {
   border: 2px solid rgba(255, 255, 255, 0.15);
   border-top-color: currentColor;
   border-radius: 50%;
+  will-change: transform;
   animation: spin 0.6s linear infinite;
   display: inline-block;
 }
@@ -1094,14 +1094,14 @@ function formatTime(iso: string): string {
 // Transition
 // ==================
 .glass-fade-enter-active .liquid-glass-panel {
-  animation: glass-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: glass-in var(--motion-duration-standard) var(--motion-ease-out);
 }
 .glass-fade-leave-active .liquid-glass-panel {
-  animation: glass-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) reverse;
+  animation: glass-in var(--motion-duration-quick) var(--motion-ease-out) reverse;
 }
 .glass-fade-enter-active,
 .glass-fade-leave-active {
-  transition: opacity 0.2s;
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard);
 }
 .glass-fade-enter-from,
 .glass-fade-leave-to {
@@ -1132,9 +1132,7 @@ function formatTime(iso: string): string {
     );
     border-color: rgba(255, 255, 255, 0.12);
     box-shadow:
-      0 32px 64px rgba(0, 0, 0, 0.55),
-      0 12px 28px rgba(0, 0, 0, 0.35),
-      0 2px 6px rgba(0, 0, 0, 0.2),
+      var(--glass-shadow-panel-dark),
       inset 0 2px 0 rgba(255, 255, 255, 0.15),
       inset 0 -1px 0 rgba(255, 255, 255, 0.04);
   }
@@ -1236,6 +1234,19 @@ function formatTime(iso: string): string {
 
   .glass-spinner {
     border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-border-glow,
+  .glass-light-sweep,
+  .glass-spinner {
+    animation: none !important;
+  }
+
+  .glass-fade-enter-active .liquid-glass-panel,
+  .glass-fade-leave-active .liquid-glass-panel {
+    animation: none !important;
   }
 }
 </style>
