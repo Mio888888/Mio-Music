@@ -180,7 +180,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
         <div class="grid-scroll-container" @scroll="onPlaylistScroll">
           <TransitionGroup v-if="playlistResults.length > 0" name="grid-fade" tag="div" class="playlist-grid">
             <div v-for="playlist in playlistResults" :key="playlist.id" class="playlist-card" @click="routerToPlaylist(playlist)">
-              <div class="playlist-cover"><img :src="playlist.cover || '/default-cover.png'" :alt="playlist.title" /></div>
+              <div class="playlist-cover"><img :src="playlist.cover || '/default-cover.png'" :alt="playlist.title" loading="lazy" /></div>
               <div class="playlist-info">
                 <h4 class="playlist-title">{{ unescape(playlist.title) }}</h4>
                 <p class="playlist-desc">{{ playlist.description || '精选歌单' }}</p>

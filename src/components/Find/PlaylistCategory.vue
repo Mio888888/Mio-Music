@@ -50,7 +50,9 @@ const fetchCategoryPlaylists = async (reset = false) => {
     page.value = 1
     noMore.value = false
     loading.value = true
-    playlists.value = []
+    if (!categoryCache[(activeTagId.value || 'hot') + ':' + (userSource.value.source || 'kw')]) {
+      playlists.value = []
+    }
   }
 
   const cacheKey = (activeTagId.value || 'hot') + ':' + (userSource.value.source || 'kw')
@@ -451,6 +453,8 @@ onDeactivated(() => {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 320px;
 }
 
 .playlist-card:hover {

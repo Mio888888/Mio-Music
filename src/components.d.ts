@@ -40,7 +40,6 @@ declare module 'vue' {
     LyricFontSettings: typeof import('./components/Settings/LyricFontSettings.vue')['default']
     MusicCache: typeof import('./components/Settings/MusicCache.vue')['default']
     NBadge: typeof import('naive-ui')['NBadge']
-    NDropdown: typeof import('naive-ui')['NDropdown']
     NIcon: typeof import('naive-ui')['NIcon']
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, onActivated, watch, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { musicSdk, type MusicItem } from '@/services/musicSdk'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
@@ -12,8 +12,17 @@ import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 import SongVirtualList from '@/components/Music/SongVirtualList.vue'
 
 const route = useRoute()
+const router = useRouter()
 const playStatus = useGlobalPlayStatusStore()
 const localUserStore = LocalUserDetailStore()
+
+const handleBack = () => {
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/home')
+  }
+}
 
 const isLocalPlaylist = computed(() => route.query.type === 'local')
 const isLeaderboard = computed(() => route.query.isLeaderboard === 'true')
@@ -386,6 +395,13 @@ onBeforeUnmount(() => {
       style="display: none"
       @change="handleFileSelect"
     />
+
+    <!-- 手机端返回按钮 -->
+    <button class="mobile-back-btn" @click="handleBack">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+    </button>
 
     <!-- 固定头部 -->
     <div class="fixed-header" :class="{ compact: isHeaderCompact }">
@@ -882,29 +898,97 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
+/* 手机端返回按钮（默认隐藏） */
+.mobile-back-btn {
+  display: none;
+}
+
 @media (max-width: 768px) {
-  .list-container { padding: 15px; }
+  .mobile-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    &:active {
+      transform: scale(0.9);
+    }
+  }
+
+  .list-container {
+    padding: 10px;
+  }
+
+  .fixed-header {
+    margin-bottom: 10px;
+  }
 
   .playlist-header {
     flex-direction: column;
     text-align: center;
-    gap: 1rem;
+    gap: 0.75rem;
     height: auto;
-    padding: 1.5rem;
+    padding: 1.25rem 1rem 1rem;
+    position: relative;
+
+    &.compact {
+      height: auto;
+      padding: 0.75rem 1rem;
+
+      .playlist-cover {
+        width: 48px;
+        height: 48px;
+      }
+    }
   }
 
   .playlist-cover {
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
+  }
+
+  .playlist-details {
+    .playlist-title {
+      font-size: 20px;
+    }
+  }
+
+  .playlist-desc {
+    font-size: 0.875rem;
+    -webkit-line-clamp: 2;
   }
 
   .playlist-actions {
     flex-wrap: wrap;
     justify-content: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
 
     .play-btn, .shuffle-btn {
-      width: 100%;
       min-width: auto;
+      flex: 1;
+      font-size: 0.875rem;
+    }
+
+    .action-btn-more {
+      flex: 0 0 36px;
     }
   }
 
@@ -913,6 +997,15 @@ onBeforeUnmount(() => {
     margin-left: 0;
 
     &.focused { width: 100%; }
+  }
+
+  .scrollable-content {
+    border-radius: 6px;
+  }
+
+  .locate-current-btn {
+    bottom: 16px;
+    right: 16px;
   }
 }
 </style>

@@ -114,12 +114,17 @@ function comparePlaylistIdAsc(a: unknown, b: unknown): number {
 
 export const musicSdk = {
   async request(method: string, args: Record<string, any> = {}): Promise<any> {
-    const source = args.source || getSource()
-    const result = await invoke('service_music_sdk_request', {
-      method,
-      args: { ...args, source }
-    })
-    return rewriteImageUrls(result)
+    try {
+      const source = args.source || getSource()
+      const result = await invoke('service_music_sdk_request', {
+        method,
+        args: { ...args, source }
+      })
+      return rewriteImageUrls(result)
+    } catch (error) {
+      console.error(`[musicSdk] request('${method}') failed:`, error)
+      throw error
+    }
   },
 
   async search(keyword: string, page = 1, limit = 30): Promise<SearchResult> {

@@ -40,8 +40,13 @@ export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysi
   return new Promise((resolve) => {
     const w = getWorker()
     const requestId = ++requestIdSeed
+    const timeout = setTimeout(() => {
+      w.removeEventListener('message', handler as EventListener)
+      resolve(cacheAndReturn(FALLBACK))
+    }, 5000)
     const handler = (e: MessageEvent<{ requestId: number; dominantColor: Color; useBlackText: boolean }>) => {
       if (e.data?.requestId !== requestId) return
+      clearTimeout(timeout)
       w.removeEventListener('message', handler as EventListener)
       resolve(cacheAndReturn({ dominantColor: e.data.dominantColor, useBlackText: e.data.useBlackText }))
     }

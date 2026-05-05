@@ -897,6 +897,51 @@ watch(showFullPlay, (val) => {
       <div class="right-section">
         <div class="time-display">{{ currentTimeFormatted }} / {{ durationFormatted }}</div>
 
+        <!-- 移动端播放控制 -->
+        <div class="mobile-play-controls">
+          <button
+            class="control-btn"
+            :disabled="!songInfo.songmid"
+            @click.stop="onToggleLike"
+          >
+            <heart-icon
+              :fill-color="isLiked ? ['#FF7878', '#FF7878'] : ''"
+              :stroke-color="isLiked ? [] : [contrastTextColor, contrastTextColor]"
+              :stroke-width="isLiked ? 0 : 1.5"
+              size="18"
+            />
+          </button>
+          <button
+            class="control-btn"
+            @click.stop="playPrevious"
+          >
+            <span class="iconfont icon-shangyishou"></span>
+          </button>
+          <button
+            class="control-btn play-btn"
+            :disabled="isLoadingSong"
+            @click.stop="() => !isLoadingSong && togglePlayPause()"
+          >
+            <transition name="fade" mode="out-in">
+              <div v-if="isLoadingSong" key="loading" class="loading-spinner play-loading"></div>
+              <span v-else-if="Audio.isPlay" key="play" class="iconfont icon-zanting"></span>
+              <span v-else key="pause" class="iconfont icon-bofang"></span>
+            </transition>
+          </button>
+          <button
+            class="control-btn"
+            @click.stop="playNext"
+          >
+            <span class="iconfont icon-xiayishou"></span>
+          </button>
+          <button
+            class="control-btn"
+            @click.stop="togglePlaylist"
+          >
+            <liebiao style="width: 1.2em; height: 1.2em" />
+          </button>
+        </div>
+
         <div class="extra-controls">
           <!-- 播放模式按钮 -->
           <t-tooltip>
@@ -1580,28 +1625,127 @@ watch(showFullPlay, (val) => {
   transform: translateY(10px) scale(0.95);
 }
 
+/* 移动端播放控制（默认隐藏） */
+.mobile-play-controls {
+  display: none;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .right-section .time-display {
+  .player-container {
+    bottom: calc(var(--mobile-nav-height, 50px) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .player-content {
+    padding: 0 10px;
+    gap: 0;
+  }
+
+  /* 左侧：封面 + 歌曲信息，撑满剩余空间 */
+  .left-section {
+    flex: 1;
+    min-width: 0;
+    padding-top: 0;
+
+    .album-cover {
+      width: 42px;
+      height: 42px;
+      margin-right: 10px;
+      border-radius: 6px;
+    }
+
+    .song-info {
+      min-width: 0;
+
+      .song-name {
+        font-size: 13px;
+        margin-bottom: 2px;
+      }
+
+      .artist-name {
+        font-size: 11px;
+      }
+    }
+
+    .left-actions {
+      display: none;
+    }
+  }
+
+  /* 中间：隐藏，控制按钮移到右侧 */
+  .center-controls {
     display: none;
   }
 
-  .center-controls {
-    gap: 8px;
+  /* 右侧：只保留移动端控制 */
+  .right-section {
+    flex: 0 0 auto;
+    gap: 0;
+    white-space: nowrap;
+
+    .time-display {
+      display: none;
+    }
+
+    .extra-controls {
+      display: none;
+    }
   }
 
-  .right-section .extra-controls {
-    gap: 8px;
+  /* 移动端播放控制组 */
+  .mobile-play-controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+
+    .control-btn {
+      background: transparent;
+      border: none;
+      color: v-bind(contrastTextColor);
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .iconfont {
+        font-size: 20px;
+      }
+
+      &:hover {
+        color: v-bind(hoverColor);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+      }
+
+      &.play-btn {
+        width: 38px;
+        height: 38px;
+        background-color: v-bind(playbg);
+        border-radius: 50%;
+
+        span {
+          font-size: 22px;
+          font-weight: 800;
+          color: v-bind(hoverColor);
+        }
+
+        &:hover {
+          background-color: v-bind(playbghover);
+        }
+      }
+    }
   }
 }
 
 @media (max-width: 576px) {
   .left-section .song-info {
-    max-width: 120px;
-  }
-
-  .right-section .extra-controls .control-btn:nth-child(1) {
-    display: none;
+    max-width: 140px;
   }
 }
 </style>

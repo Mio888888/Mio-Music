@@ -101,4 +101,15 @@ function clearCache(pluginId?: string) {
   callWorker('clearCache', [pluginId]).catch(() => {})
 }
 
-export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache }
+function terminate() {
+  if (worker) {
+    worker.terminate()
+    worker = null
+    for (const pending of pendingCalls.values()) {
+      pending.reject(new Error('Worker terminated'))
+    }
+    pendingCalls.clear()
+  }
+}
+
+export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, terminate }

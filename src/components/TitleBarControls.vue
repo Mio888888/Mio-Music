@@ -291,6 +291,15 @@ const handleBack = () => {
   }
 }
 
+@media (max-width: 768px) {
+  .window-controls .separator,
+  .window-controls .minimize-btn,
+  .window-controls .maximize-btn,
+  .window-controls .close-btn {
+    display: none;
+  }
+}
+
 // Windows style
 .title-controls.windows {
   .control-btn {

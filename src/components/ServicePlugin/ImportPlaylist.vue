@@ -22,7 +22,7 @@
       <div v-else-if="playlists.length > 0" class="playlist-list">
         <div v-for="pl in playlists" :key="pl.id" class="playlist-item">
           <div class="playlist-cover">
-            <img v-if="pl.coverImg" :src="pl.coverImg" alt="cover" />
+            <img v-if="pl.coverImg" :src="pl.coverImg" alt="cover" loading="lazy" />
             <div v-else class="cover-placeholder">
               <t-icon name="queue-music" />
             </div>

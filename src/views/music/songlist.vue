@@ -513,6 +513,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
                 :alt="playlist.name"
                 :src="playlist.coverImgUrl"
                 class="cover-image"
+                loading="lazy"
               />
               <img v-else :alt="playlist.name" :src="defaultCover" class="cover-image" />
               <div class="cover-overlay">
@@ -876,6 +877,8 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 340px;
 }
 
 .playlist-card:hover {

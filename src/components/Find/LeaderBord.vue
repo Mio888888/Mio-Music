@@ -128,4 +128,19 @@ onMounted(() => fetchBoards())
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+@media (max-width: 768px) {
+  .leaderboard-container {
+    padding: 0 0.75rem 1rem;
+  }
+
+  .board-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .section-header .title {
+    font-size: 17px;
+  }
+}
 </style>

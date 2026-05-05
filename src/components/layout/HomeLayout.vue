@@ -56,6 +56,7 @@ const source_list_show = ref(false)
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
+const isDetailPage = computed(() => /\/(list|singer)\//.test(route.path))
 const showNewYear = computed(
   () => settingsStore.shouldUseSpringFestivalTheme() && !settings.value.springFestivalDisabled
 )
@@ -200,11 +201,11 @@ const handleKeyDown = () => {
     <t-layout style="flex: 1">
       <t-content>
         <div class="content">
-          <div class="header" data-tauri-drag-region>
-            <t-button shape="circle" theme="default" class="nav-btn" @click="goBack">
+          <div class="header" :class="{ 'detail-page': isDetailPage }" data-tauri-drag-region>
+            <t-button shape="circle" theme="default" class="nav-btn desktop-only" @click="goBack">
               <i class="iconfont icon-xiangzuo"></i>
             </t-button>
-            <t-button shape="circle" theme="default" class="nav-btn" @click="goForward">
+            <t-button shape="circle" theme="default" class="nav-btn desktop-only" @click="goForward">
               <i class="iconfont icon-xiangyou"></i>
             </t-button>
 
@@ -263,7 +264,7 @@ const handleKeyDown = () => {
                 shape="circle"
                 theme="default"
                 variant="text"
-                class="nav-btn"
+                class="nav-btn desktop-only"
                 style="width: 32px; height: 32px; margin: 0; flex-shrink: 0"
                 @click="router.push('/home/recognize')"
               >
@@ -284,6 +285,21 @@ const handleKeyDown = () => {
         </div>
       </t-content>
     </t-layout>
+
+    <!-- 移动端底部导航（Apple Music 风格） -->
+    <nav class="mobile-bottom-nav">
+      <button
+        v-for="(item, index) in menuList"
+        :key="index"
+        class="mobile-nav-item"
+        :class="{ active: menuActive === index }"
+        @click="handleClick(index)"
+      >
+        <div class="mobile-nav-dot"></div>
+        <i :class="`iconfont ${item.icon}`"></i>
+        <span class="mobile-nav-label">{{ item.name }}</span>
+      </button>
+    </nav>
   </t-layout>
 </template>
 
@@ -630,5 +646,133 @@ const handleKeyDown = () => {
 @keyframes bannerSparkle {
   0% { transform: translateX(-10%) rotate(0deg); }
   100% { transform: translateX(10%) rotate(180deg); }
+}
+
+/* ============ 移动端底部导航（Apple Music 风格） ============ */
+.mobile-bottom-nav {
+  display: none;
+}
+
+.desktop-only {
+  display: inline-flex;
+}
+
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .sidebar {
+    display: none !important;
+  }
+
+  .home-container {
+    height: calc(100vh - var(--play-bottom-height, 70px) - var(--mobile-nav-height, 50px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .home-container:has(.header.detail-page) {
+    height: calc(100vh - var(--play-bottom-height, 70px) - var(--mobile-nav-height, 50px) - env(safe-area-inset-bottom, 0px));
+  }
+
+  .header {
+    padding: 1rem;
+  }
+
+  .header.detail-page {
+    display: none;
+  }
+
+  .header.detail-page + .mainContent {
+    height: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .search-input:has(input:focus) {
+    width: 100%;
+  }
+
+  :deep(.title-controls) {
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    align-items: center;
+    justify-content: space-around;
+    height: var(--mobile-nav-height, 50px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--td-bg-color-container);
+    border-top: 0.5px solid var(--td-border-level-1-color);
+  }
+
+  .mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex: 1;
+    height: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    padding: 4px 0 2px;
+    position: relative;
+
+    .iconfont {
+      font-size: 22px;
+      color: var(--td-text-color-placeholder);
+      transition: color 0.2s ease;
+    }
+
+    .mobile-nav-label {
+      font-size: 10px;
+      line-height: 1;
+      color: var(--td-text-color-placeholder);
+      transition: color 0.2s ease;
+    }
+
+    .mobile-nav-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: transparent;
+      margin-bottom: 1px;
+      transition: background 0.2s ease;
+    }
+  }
+
+  .mobile-nav-item.active {
+    .iconfont {
+      color: var(--td-brand-color);
+    }
+
+    .mobile-nav-label {
+      color: var(--td-brand-color);
+      font-weight: 600;
+    }
+
+    .mobile-nav-dot {
+      background: var(--td-brand-color);
+    }
+  }
+
+  /* 暗色模式 */
+  :global([data-theme="dark"]) .mobile-bottom-nav {
+    background: var(--td-bg-color-container);
+    border-top-color: var(--td-border-level-1-color);
+  }
 }
 </style>

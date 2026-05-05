@@ -640,7 +640,7 @@ onUnmounted(() => {
             :style="{ animationDelay: `${idx * 0.1}s` }"
           >
             <div class="result-cover-wrapper">
-              <img :src="song.img" class="result-cover" :alt="song.name" />
+              <img :src="song.img" class="result-cover" :alt="song.name" loading="lazy" />
             </div>
             <div class="result-info">
               <h4 class="result-name">{{ song.name }}</h4>
@@ -686,7 +686,7 @@ onUnmounted(() => {
             @click="handlePlayHistory(item)"
           >
             <div class="history-cover-wrapper">
-              <img :src="item.img" class="history-cover" :alt="item.name" />
+              <img :src="item.img" class="history-cover" :alt="item.name" loading="lazy" />
             </div>
             <div class="history-info">
               <h5 class="history-name">{{ item.name }}</h5>
