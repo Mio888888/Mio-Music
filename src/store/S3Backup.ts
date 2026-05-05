@@ -1,12 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  HeadBucketCommand,
-  ListObjectsV2Command
-} from '@aws-sdk/client-s3'
 
 export interface S3Config {
   endpoint: string
@@ -26,7 +19,6 @@ export interface BackupData {
 type RestoreMode = 'overwrite' | 'merge'
 
 const STORAGE_KEY = 's3BackupConfig'
-const BACKUP_KEY_PREFIX = 'mio-backup-'
 
 export const useS3BackupStore = defineStore('s3Backup', () => {
   const config = ref<S3Config>({
@@ -70,30 +62,27 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value))
   }
 
-  function createClient(): S3Client {
-    return new S3Client({
+  function toApiConfig(): Record<string, string> {
+    return {
       endpoint: config.value.endpoint,
       region: config.value.region || 'auto',
-      credentials: {
-        accessKeyId: config.value.accessKeyId,
-        secretAccessKey: config.value.secretAccessKey
-      },
-      forcePathStyle: true
-    })
+      accessKeyId: config.value.accessKeyId,
+      secretAccessKey: config.value.secretAccessKey,
+      bucket: config.value.bucket
+    }
   }
 
   async function testConnection(): Promise<boolean> {
     isConnecting.value = true
     errorMessage.value = null
     try {
-      const client = createClient()
-      await client.send(new HeadBucketCommand({ Bucket: config.value.bucket }))
+      await (window as any).api.s3.testConnection(toApiConfig())
       isConnected.value = true
       saveConfig()
       return true
     } catch (e: any) {
       isConnected.value = false
-      errorMessage.value = e?.message || '连接失败'
+      errorMessage.value = e?.message || e?.toString() || '连接失败'
       return false
     } finally {
       isConnecting.value = false
@@ -109,57 +98,23 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     isBackingUp.value = true
     errorMessage.value = null
     try {
-      const playlists = localStorage.getItem('playlists') || '[]'
-      const settings = localStorage.getItem('appSettings') || '{}'
+      const playlists = JSON.parse(localStorage.getItem('playlists') || '[]')
+      const settings = JSON.parse(localStorage.getItem('appSettings') || '{}')
 
-      const data: BackupData = {
-        version: 1,
-        timestamp: new Date().toISOString(),
-        playlists: JSON.parse(playlists),
-        settings: JSON.parse(settings)
-      }
+      const result = await (window as any).api.s3.backup(
+        toApiConfig(),
+        playlists,
+        settings
+      )
 
-      const key = `${BACKUP_KEY_PREFIX}${new Date().toISOString().replace(/[:.]/g, '-')}.json`
-      const client = createClient()
-      await client.send(new PutObjectCommand({
-        Bucket: config.value.bucket,
-        Key: key,
-        Body: JSON.stringify(data),
-        ContentType: 'application/json'
-      }))
-
-      lastBackupTime.value = data.timestamp
-      localStorage.setItem('lastBackupTime', data.timestamp)
+      lastBackupTime.value = result.timestamp
+      localStorage.setItem('lastBackupTime', result.timestamp)
       return true
     } catch (e: any) {
-      errorMessage.value = e?.message || '备份失败'
+      errorMessage.value = e?.message || e?.toString() || '备份失败'
       return false
     } finally {
       isBackingUp.value = false
-    }
-  }
-
-  async function getLatestBackupKey(): Promise<string | null> {
-    try {
-      const client = createClient()
-      const result = await client.send(new ListObjectsV2Command({
-        Bucket: config.value.bucket,
-        Prefix: BACKUP_KEY_PREFIX,
-        MaxKeys: 1
-      }))
-
-      const contents = result.Contents
-      if (!contents || contents.length === 0) return null
-
-      contents.sort((a, b) => {
-        const ta = a.LastModified?.getTime() ?? 0
-        const tb = b.LastModified?.getTime() ?? 0
-        return tb - ta
-      })
-
-      return contents[0].Key ?? null
-    } catch {
-      return null
     }
   }
 
@@ -172,31 +127,13 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     isRestoring.value = true
     errorMessage.value = null
     try {
-      const key = await getLatestBackupKey()
-      if (!key) {
-        errorMessage.value = '未找到备份数据'
-        return false
-      }
-
-      const client = createClient()
-      const result = await client.send(new GetObjectCommand({
-        Bucket: config.value.bucket,
-        Key: key
-      }))
-
-      const body = await result.Body?.transformToString()
-      if (!body) {
-        errorMessage.value = '备份数据为空'
-        return false
-      }
-
-      const data: BackupData = JSON.parse(body)
+      const result = await (window as any).api.s3.restore(toApiConfig())
+      const data: BackupData = result.data
 
       if (mode === 'overwrite') {
         localStorage.setItem('playlists', JSON.stringify(data.playlists))
         localStorage.setItem('appSettings', JSON.stringify(data.settings))
       } else {
-        // merge playlists
         const existing = JSON.parse(localStorage.getItem('playlists') || '[]')
         const merged = [...existing]
         for (const pl of data.playlists) {
@@ -206,7 +143,6 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
         }
         localStorage.setItem('playlists', JSON.stringify(merged))
 
-        // merge settings (prefer local)
         const localSettings = JSON.parse(localStorage.getItem('appSettings') || '{}')
         const mergedSettings = { ...data.settings, ...localSettings }
         localStorage.setItem('appSettings', JSON.stringify(mergedSettings))
@@ -214,7 +150,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
       return true
     } catch (e: any) {
-      errorMessage.value = e?.message || '恢复失败'
+      errorMessage.value = e?.message || e?.toString() || '恢复失败'
       return false
     } finally {
       isRestoring.value = false

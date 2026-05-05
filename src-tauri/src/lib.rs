@@ -317,6 +317,10 @@ pub fn run() {
             player::commands::player__clear_secondary,
             player::commands::player__set_seamless_config,
             player::commands::player__set_cache_config,
+            // S3 Backup
+            commands::s3_commands::s3__test_connection,
+            commands::s3_commands::s3__backup,
+            commands::s3_commands::s3__restore,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

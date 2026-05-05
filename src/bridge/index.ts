@@ -513,6 +513,16 @@ const api = {
     seek: (seconds: number) => ipcInvoke('dlna__seek', { seconds }),
     setVolume: (volume: number) => ipcInvoke('dlna__set_volume', { volume }),
     getPosition: () => ipcInvoke('dlna__get_position')
+  },
+
+  // S3 Backup & Restore
+  s3: {
+    testConnection: (config: Record<string, string>) =>
+      ipcInvoke('s3:test-connection', { args: config }),
+    backup: (config: Record<string, string>, playlists: any, settings: any) =>
+      ipcInvoke('s3:backup', { args: { ...config, playlists, settings } }),
+    restore: (config: Record<string, string>) =>
+      ipcInvoke('s3:restore', { args: config })
   }
 }
 
