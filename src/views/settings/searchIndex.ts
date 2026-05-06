@@ -10,7 +10,6 @@ export const searchItems: SearchItem[] = [
   // 外观设置
   { id: 'appearance-titlebar', category: 'appearance', title: '标题栏风格', description: '选择标题栏控制按钮风格', keywords: ['标题栏', 'titlebar', '风格', 'windows', '红绿灯'] },
   { id: 'appearance-close-behavior', category: 'appearance', title: '关闭按钮行为', description: '设置点击窗口关闭按钮时的行为', keywords: ['关闭', '托盘', '退出', 'close', 'tray'] },
-  { id: 'appearance-theme', category: 'appearance', title: '应用主题色', description: '选择应用的主题颜色', keywords: ['主题', '颜色', 'theme', 'color', '暗色', 'dark'] },
   { id: 'appearance-lyric-font', category: 'appearance', title: '歌词字体设置', description: '配置歌词显示字体、大小和字重', keywords: ['歌词', '字体', 'font', '大小', '字重'] },
   { id: 'appearance-desktop-lyric', category: 'appearance', title: '桌面歌词样式', description: '配置桌面歌词窗口的显示样式', keywords: ['桌面歌词', '样式', '颜色', '字体', 'desktop', 'lyric'] },
 

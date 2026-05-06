@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useSettingsStore } from '@/store/Settings'
 import TitleBarControls from '@/components/TitleBarControls.vue'
-import ThemeSelector from '@/components/ThemeSelector.vue'
 import LyricFontSettings from '@/components/Settings/LyricFontSettings.vue'
 import DesktopLyricStyle from '@/components/Settings/DesktopLyricStyle.vue'
 import GlobalBackgroundSettings from '@/components/Settings/GlobalBackgroundSettings.vue'
@@ -71,36 +70,6 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
             @change="(val: any) => settingsStore.updateSettings({ closeToTray: Boolean(val) })"
           />
           <span class="setting-text">{{ settings.closeToTray ? '最小化到托盘' : '直接退出应用' }}</span>
-        </div>
-      </div>
-
-      <t-divider class="mobile-hidden" />
-
-      <div id="appearance-theme" class="setting-group-item">
-        <div class="setting-label">
-          <h4>应用主题色</h4>
-          <p>选择应用的主题颜色</p>
-        </div>
-        <ThemeSelector />
-      </div>
-
-      <t-divider />
-
-      <div v-if="settingsStore.shouldUseSpringFestivalTheme()" id="appearance-festival-theme" class="setting-group-item">
-        <div class="setting-label">
-          <h4>节日主题(限时体验)</h4>
-          <p>当前为春节主题，您可以选择关闭</p>
-        </div>
-        <div class="setting-control" style="display: flex; align-items: center; gap: 10px">
-          <t-button v-if="!settings.springFestivalDisabled" theme="danger" @click="settingsStore.updateSettings({ springFestivalDisabled: true })">
-            关闭春节主题
-          </t-button>
-          <template v-else>
-            <t-tag theme="default">春节主题已关闭</t-tag>
-            <t-button theme="success" variant="outline" @click="settingsStore.updateSettings({ springFestivalDisabled: false })">
-              开启春节主题
-            </t-button>
-          </template>
         </div>
       </div>
     </t-card>

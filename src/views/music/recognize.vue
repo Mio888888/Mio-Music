@@ -121,18 +121,19 @@ function drawVisualizer() {
   const ctx = canvas.getContext('2d')
   if (!ctx) return
 
-  const dpr = window.devicePixelRatio || 1
-  const size = 320
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const bounds = canvas.parentElement?.getBoundingClientRect()
+  const size = Math.max(1, Math.round(bounds?.width || 280))
   canvas.width = size * dpr
   canvas.height = size * dpr
   canvas.style.width = `${size}px`
   canvas.style.height = `${size}px`
-  ctx.scale(dpr, dpr)
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
   const cx = size / 2
   const cy = size / 2
-  const innerR = 68
-  const maxBarH = 60
+  const innerR = size * 0.215
+  const maxBarH = size * 0.19
 
   ctx.clearRect(0, 0, size, size)
 
@@ -590,6 +591,8 @@ onUnmounted(() => {
               'is-loading': status === 'initializing' || status === 'processing'
             }"
             :disabled="status === 'initializing' || status === 'processing'"
+            :aria-label="running ? '停止识别' : '开始听歌识曲'"
+            :aria-busy="status === 'initializing' || status === 'processing'"
             @click="running ? stopRecording(false) : start()"
           >
             <StopCircleIcon v-if="running" size="48px" />
@@ -650,10 +653,10 @@ onUnmounted(() => {
               </span>
             </div>
             <div class="result-actions">
-              <button class="result-btn primary" @click="handlePlayResult(song)">
+              <button class="result-btn primary" :aria-label="`播放 ${song.name}`" @click="handlePlayResult(song)">
                 <PlayCircleIcon size="22px" />
               </button>
-              <button class="result-btn" @click="handleSearchResult(song)">
+              <button class="result-btn" :aria-label="`搜索 ${song.name}`" @click="handleSearchResult(song)">
                 <SearchIcon size="18px" />
               </button>
             </div>
@@ -834,13 +837,11 @@ onUnmounted(() => {
 
 @keyframes wave-ripple {
   0% {
-    width: 120px;
-    height: 120px;
+    transform: scale(1);
     opacity: 0.4;
   }
   100% {
-    width: 280px;
-    height: 280px;
+    transform: scale(2.33);
     opacity: 0;
   }
 }
@@ -1164,6 +1165,8 @@ onUnmounted(() => {
 .history-section {
   padding-top: 8px;
   border-top: 1px solid var(--td-border-level-1-color);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .history-header {
@@ -1204,8 +1207,10 @@ onUnmounted(() => {
 
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .history-card {
@@ -1213,6 +1218,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 12px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--td-bg-color-container);
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 14px;
@@ -1318,7 +1326,8 @@ onUnmounted(() => {
 
   .recognize-container {
     min-width: 0;
-    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    max-width: 100vw;
+    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) calc(var(--mobile-page-top-gutter) + 4px);
     gap: 14px;
     box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
@@ -1331,14 +1340,31 @@ onUnmounted(() => {
   .viz-area {
     width: min(74vw, 280px);
     height: min(74vw, 280px);
+    max-width: 100%;
     margin-bottom: 18px;
   }
 
+  .viz-wave {
+    width: 43%;
+    height: 43%;
+  }
+
+  @keyframes wave-ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.4;
+    }
+    100% {
+      transform: scale(2.33);
+      opacity: 0;
+    }
+  }
+
   .center-btn {
-    width: min(32vw, 120px);
-    height: min(32vw, 120px);
-    min-width: calc(var(--mobile-touch-target) * 2);
-    min-height: calc(var(--mobile-touch-target) * 2);
+    width: clamp(88px, 32vw, 120px);
+    height: clamp(88px, 32vw, 120px);
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
     touch-action: manipulation;
   }
 
@@ -1365,10 +1391,21 @@ onUnmounted(() => {
     width: min(72vw, 260px);
   }
 
+  .results-section,
+  .result-list,
+  .history-section,
+  .history-grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .result-card {
     gap: 12px;
     padding: 12px;
     border-radius: var(--mobile-card-radius-small);
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     touch-action: manipulation;
   }
 
@@ -1380,6 +1417,21 @@ onUnmounted(() => {
 
   .result-actions {
     gap: 6px;
+  }
+
+  .result-info {
+    min-width: 0;
+  }
+
+  .result-tag {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .result-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 
   .result-btn,
@@ -1397,12 +1449,71 @@ onUnmounted(() => {
 
   .history-card {
     min-height: 72px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
     border-radius: var(--mobile-card-radius-small);
     touch-action: manipulation;
   }
 
   .history-play {
     opacity: 1;
+  }
+}
+
+@media (max-width: 360px) {
+  .recognize-container {
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    gap: 12px;
+  }
+
+  .recognition-stage {
+    padding-top: 4px;
+  }
+
+  .viz-area {
+    width: min(68vw, 232px);
+    height: min(68vw, 232px);
+    margin-bottom: 14px;
+  }
+
+  .status-title {
+    font-size: clamp(1.25rem, 6.2vw, 1.5rem);
+  }
+
+  .result-card {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px 12px;
+  }
+
+  .result-cover-wrapper {
+    width: 56px;
+    height: 56px;
+  }
+
+  .result-actions {
+    grid-column: 1 / -1;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .result-btn,
+  .result-btn.primary {
+    flex: 1 1 0;
+    border-radius: 999px;
+  }
+
+  .history-card {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .history-cover-wrapper {
+    width: 48px;
+    height: 48px;
   }
 }
 

@@ -36,9 +36,6 @@ export interface SettingsState {
   lyricFontWeight?: number
   closeToTray?: boolean
   hasConfiguredCloseBehavior?: boolean
-  theme?: string
-  isDarkMode?: boolean
-  springFestivalDisabled?: boolean
   routePreloadEnabled?: boolean
   globalBackground?: GlobalBackgroundSettings
   backgroundRender?: BackgroundRenderSettings
@@ -59,9 +56,6 @@ export const useSettingsStore = defineStore('settings', () => {
     lyricFontWeight: 700,
     closeToTray: true,
     hasConfiguredCloseBehavior: false,
-    theme: 'default',
-    isDarkMode: false,
-    springFestivalDisabled: false,
     routePreloadEnabled: true,
     globalBackground: { enable: false, type: 'none', url: '', opacity: 0.5, blur: 10, brightness: 0.8 },
     backgroundRender: DEFAULT_BACKGROUND_RENDER_SETTINGS
@@ -106,9 +100,6 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!settings.value.lyricFontWeight) settings.value.lyricFontWeight = 700
     if (typeof settings.value.closeToTray === 'undefined') settings.value.closeToTray = true
     if (typeof settings.value.hasConfiguredCloseBehavior === 'undefined') settings.value.hasConfiguredCloseBehavior = false
-    if (!settings.value.theme) settings.value.theme = 'default'
-    if (typeof settings.value.isDarkMode === 'undefined') settings.value.isDarkMode = false
-    if (typeof settings.value.springFestivalDisabled === 'undefined') settings.value.springFestivalDisabled = false
     if (typeof settings.value.routePreloadEnabled === 'undefined') settings.value.routePreloadEnabled = true
     if (!settings.value.globalBackground) {
       settings.value.globalBackground = { enable: false, type: 'none', url: '', opacity: 0.5, blur: 10, brightness: 0.8 }
@@ -138,37 +129,11 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
   }
 
-  const isSpringFestivalWindow = () => {
-    const now = new Date()
-    const today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate()
-    return today >= 20260217 && today <= 20260223
-  }
-
-  const shouldUseSpringFestivalTheme = () => {
-    const preview = localStorage.getItem('ceru_welcome_newyear_preview')
-    if (preview === '1') return true
-    return isSpringFestivalWindow()
-  }
-
-  const disableSpringFestivalTheme = () => {
-    settings.value.springFestivalDisabled = true
-    saveSettings()
-  }
-
-  const enableSpringFestivalTheme = () => {
-    settings.value.springFestivalDisabled = false
-    saveSettings()
-  }
-
   return {
     settings,
     updateSettings,
     toggleFloatBall,
-    saveSettings,
-    isSpringFestivalWindow,
-    shouldUseSpringFestivalTheme,
-    disableSpringFestivalTheme,
-    enableSpringFestivalTheme
+    saveSettings
   }
 }, {
   persist: false

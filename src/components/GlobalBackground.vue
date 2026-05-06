@@ -46,17 +46,24 @@ watch([bgType, bgUrl, isEnabled], ([type, _url, enabled]) => {
 const styleElement = document.createElement('style')
 styleElement.id = 'global-bg-transparency'
 
-watch([isEnabled, () => settings.value.isDarkMode], ([enabled, isDark]) => {
+const isDarkAppearance = () => {
+  const theme = document.documentElement.getAttribute('data-theme')
+  if (theme) return theme === 'dark'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+}
+
+watch(isEnabled, (enabled) => {
   const appEl = document.getElementById('app')
   if (enabled) {
     if (appEl) appEl.style.backgroundColor = 'transparent'
     document.body.style.backgroundColor = 'transparent'
     if (!document.head.contains(styleElement)) document.head.appendChild(styleElement)
+    const isDark = isDarkAppearance()
     const containerColor = isDark ? '36, 36, 36' : '255, 255, 255'
     const pageColor = isDark ? '24, 24, 24' : '243, 243, 243'
     const hoverColor = isDark ? '255, 255, 255' : '0, 0, 0'
     styleElement.innerHTML = `
-      :root, body[theme-mode="dark"], body[theme-mode="light"] {
+      :root {
         --td-bg-color-container: rgba(${containerColor}, 0.3) !important;
         --td-bg-color-page: transparent !important;
         --td-bg-color-secondarycontainer: rgba(${pageColor}, 0.2) !important;
