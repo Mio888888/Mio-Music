@@ -27,7 +27,7 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
 <template>
   <div class="settings-section">
     <t-card title="基础外观" class="setting-card" hover-shadow>
-      <div id="appearance-titlebar" class="setting-group-item">
+      <div id="appearance-titlebar" class="setting-group-item mobile-hidden">
         <div class="setting-label">
           <h4>标题栏风格</h4>
           <p>选择您喜欢的标题栏控制按钮风格</p>
@@ -58,9 +58,9 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
         </div>
       </div>
 
-      <t-divider />
+      <t-divider class="mobile-hidden" />
 
-      <div id="appearance-close-behavior" class="setting-group-item">
+      <div id="appearance-close-behavior" class="setting-group-item mobile-hidden">
         <div class="setting-label">
           <h4>关闭按钮行为</h4>
           <p>设置点击窗口关闭按钮时的行为</p>
@@ -74,7 +74,7 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
         </div>
       </div>
 
-      <t-divider />
+      <t-divider class="mobile-hidden" />
 
       <div id="appearance-theme" class="setting-group-item">
         <div class="setting-label">
@@ -179,6 +179,61 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
 }
 
 @media (max-width: 768px) {
-  .style-preview { grid-template-columns: 1fr; }
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .setting-group-item {
+    margin-bottom: 16px;
+  }
+
+  .setting-label {
+    margin-bottom: 12px;
+  }
+
+  .style-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+
+    .t-button {
+      min-width: 0;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+  }
+
+  .style-preview {
+    grid-template-columns: 1fr;
+    gap: 10px;
+
+    .preview-item {
+      padding: 12px;
+
+      h4 {
+        margin-bottom: 8px;
+        font-size: 13px;
+      }
+    }
+  }
+
+  .mock-titlebar {
+    padding: 10px 12px;
+
+    .mock-title {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+  }
+}
+
+@media (max-width: 380px) {
+  .style-buttons {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

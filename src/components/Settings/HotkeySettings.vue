@@ -272,4 +272,45 @@ onBeforeUnmount(() => { recorder?.unmount(); recorder = null })
 .preview { padding: 12px; border: 1px dashed var(--td-border-level-1-color); border-radius: 8px; font-weight: 700; text-align: center; }
 .preview.sub { font-weight: 600; }
 .tips { display: flex; justify-content: space-between; color: var(--td-text-color-secondary); font-size: 12px; }
+@media (max-width: 768px) {
+  .section {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .setting-item,
+  .hotkey-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .setting-item .item-info,
+  .hotkey-meta,
+  .hotkey-actions {
+    width: 100%;
+  }
+
+  .hotkey-toolbar {
+    justify-content: flex-start;
+  }
+
+  .hotkey-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .hotkey-actions .t-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tips {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+}
 </style>

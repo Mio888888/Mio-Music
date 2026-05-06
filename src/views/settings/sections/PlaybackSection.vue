@@ -161,4 +161,26 @@ const { settings } = storeToRefs(settingsStore)
     transform: translateY(0);
   }
 }
+@media (max-width: 768px) {
+  .setting-group {
+    padding: 14px;
+    margin-bottom: 10px;
+
+    h3 {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+  }
+
+  .setting-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+
+    .item-info {
+      width: 100%;
+    }
+  }
+}
 </style>

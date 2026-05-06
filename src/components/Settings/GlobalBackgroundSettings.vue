@@ -154,4 +154,29 @@ const selectFile = async () => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+@media (max-width: 768px) {
+  .global-bg-settings {
+    gap: 10px;
+  }
+
+  .setting-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .setting-info {
+    width: 100%;
+  }
+
+  .setting-item > div:last-child {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .file-path {
+    max-width: 100%;
+  }
+}
 </style>

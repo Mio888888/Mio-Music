@@ -152,4 +152,62 @@ const clearAPIKey = (): void => {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@media (max-width: 768px) {
+  .setting-group {
+    padding: 14px;
+    margin-bottom: 10px;
+
+    h3 {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
+    > p {
+      margin-bottom: 12px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  }
+
+  .api-key-section {
+    .api-key-input-group {
+      margin-bottom: 12px;
+
+      .input-container {
+        flex-direction: column;
+        gap: 10px;
+
+        .api-key-input,
+        .input-actions {
+          width: 100%;
+        }
+
+        .input-actions {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+          gap: 8px;
+        }
+      }
+    }
+
+    .api-key-status {
+      margin-bottom: 12px;
+    }
+
+    .api-key-tips {
+      padding: 12px;
+
+      h4,
+      ul li {
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      ul {
+        padding-left: 18px;
+      }
+    }
+  }
+}
 </style>

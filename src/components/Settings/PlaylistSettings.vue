@@ -545,4 +545,70 @@ watch(
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+@media (max-width: 768px) {
+  .playlist-settings {
+    margin-bottom: 0;
+  }
+
+  .playlist-stats-card,
+  .playlist-actions-card {
+    margin-bottom: 10px;
+  }
+
+  .stats-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--td-bg-color-page);
+
+    .t-icon {
+      font-size: 22px;
+    }
+  }
+
+  .action-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .feature-description {
+    padding: 12px;
+
+    h4 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    ul {
+      padding-left: 18px;
+    }
+
+    li {
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  }
+
+  .dialog-content {
+    padding: 8px 0;
+  }
+
+  .export-options,
+  .import-options {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .export-option-card:hover,
+  .import-option-card:hover {
+    transform: none;
+  }
+}
 </style>

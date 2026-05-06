@@ -390,10 +390,107 @@ const openLink = async (url: string) => {
   }
 }
 @media (max-width: 768px) {
-  .app-header-group .app-header { flex-direction: column; gap: 0.75rem; }
-  .app-header-group .app-info { flex-direction: column; align-items: center; }
-  .tech-stack { grid-template-columns: 1fr; }
-  .version-section .update-actions { flex-direction: column; gap: 0.75rem; align-items: stretch; }
+  .setting-group {
+    padding: 14px;
+    margin-bottom: 10px;
+
+    h3 {
+      font-size: 16px;
+      line-height: 1.35;
+    }
+  }
+
+  .app-header-group {
+    padding: 22px 14px;
+
+    .app-header {
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .app-logo {
+      width: 48px;
+      height: 48px;
+    }
+
+    .app-info {
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+
+      .app-name {
+        font-size: 24px;
+      }
+    }
+
+    .app-description {
+      font-size: 13px;
+    }
+  }
+
+  .version-section .update-actions {
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+
+    .update-option {
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--td-bg-color-page);
+    }
+  }
+
+  .update-card {
+    padding: 12px;
+  }
+
+  .update-actions-row {
+    padding-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .update-notes {
+    margin-left: 0;
+  }
+
+  .tech-stack {
+    grid-template-columns: 1fr;
+    gap: 8px;
+
+    .tech-item {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px;
+    }
+  }
+
+  .legal-notice .notice-item {
+    margin-bottom: 14px;
+
+    p {
+      font-size: 13px;
+      line-height: 1.55;
+    }
+  }
+
+  .about-us {
+    .about-intro {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .sponsor-card {
+      padding: 14px;
+
+      .sponsor-qr {
+        width: min(58vw, 180px);
+        height: min(58vw, 180px);
+      }
+    }
+  }
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }

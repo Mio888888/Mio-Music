@@ -915,12 +915,118 @@ function openImport(plugin: LoadedPlugin) {
 
 // Responsive
 @media (max-width: 768px) {
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+
+    h2 {
+      font-size: 20px;
+      border-left-width: 6px;
+      padding-left: 10px;
+    }
+  }
+
+  .header-actions {
+    width: 100%;
+    gap: 8px;
+
+    .t-button {
+      flex: 1;
+    }
+  }
+
+  .state-block {
+    padding: 36px 14px;
+    border-radius: 10px;
+  }
+
+  .plugin-list {
+    gap: 10px;
+  }
+
   .plugin-card {
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    padding: 14px;
+    border-width: 1px;
 
-    .plugin-info { margin-right: 0; }
-    .plugin-actions { flex-direction: row; justify-content: flex-end; min-width: auto; }
+    .plugin-info {
+      width: 100%;
+      min-width: 0;
+      margin-right: 0;
+
+      h3 {
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 16px;
+      }
+    }
+
+    .plugin-actions {
+      width: 100%;
+      min-width: auto;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+  }
+
+  .sources {
+    align-items: flex-start;
+  }
+
+  .config-test {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .log-dialog-header {
+    padding: 10px 12px;
+
+    .log-title {
+      min-width: 0;
+      font-size: 13px;
+    }
+
+    .mac-controls {
+      display: none;
+    }
+  }
+
+  .console-container {
+    min-height: 260px;
+    font-size: 12px;
+  }
+
+  .console-header .console-info {
+    gap: 8px;
+    overflow: hidden;
+
+    .console-path {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .console-content {
+    padding: 12px;
+    max-height: 55vh;
+  }
+
+  .log-entries .log-entry {
+    flex-direction: column;
+    gap: 2px;
+
+    .log-ts {
+      width: auto;
+      text-align: left;
+      margin-right: 0;
+    }
   }
 }
 </style>

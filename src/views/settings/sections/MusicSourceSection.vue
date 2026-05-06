@@ -324,10 +324,84 @@ const getSourceIcon = (key: string) => {
 }
 @media (max-width: 768px) {
   .music-config-container {
-    .source-cards { grid-template-columns: 1fr; }
-    .config-status { grid-template-columns: 1fr; }
+    .plugin-info {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .source-cards {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .source-card {
+      gap: 10px;
+      padding: 12px;
+      border-width: 1px;
+
+      .source-icon {
+        width: 36px;
+        height: 36px;
+      }
+
+      .source-info {
+        min-width: 0;
+      }
+
+      .source-type {
+        flex-wrap: wrap;
+      }
+    }
+
+    .quality-tags-container {
+      gap: 8px;
+      padding: 10px 0;
+    }
+
+    .quality-tag {
+      flex: 1 1 calc(50% - 4px);
+      min-width: 0;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .quality-description {
+      margin-top: 8px;
+      text-align: left;
+    }
+
+    .config-status {
+      grid-template-columns: 1fr;
+      gap: 8px;
+
+      .status-item {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+        padding: 12px;
+      }
+    }
   }
-  .plugin-prompt { flex-direction: column; text-align: center; gap: 1rem; }
+
+  .plugin-prompt {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+    padding: 18px 14px;
+
+    .prompt-icon {
+      width: 44px;
+      height: 44px;
+      font-size: 20px;
+    }
+
+    .prompt-content p {
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+  }
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 </style>

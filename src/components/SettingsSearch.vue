@@ -2,6 +2,10 @@
 import { ref, computed } from 'vue'
 import { searchItems, type SearchItem } from '@/views/settings/searchIndex'
 
+const props = defineProps<{
+  hiddenCategories?: string[]
+}>()
+
 const emit = defineEmits<{
   select: [item: SearchItem]
 }>()
@@ -35,9 +39,10 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.toLowerCase().trim()
   return searchItems.filter(
     (item) =>
-      item.title.toLowerCase().includes(query) ||
-      item.description.toLowerCase().includes(query) ||
-      item.keywords.some((k) => k.toLowerCase().includes(query))
+      !props.hiddenCategories?.includes(item.category) &&
+      (item.title.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.keywords.some((k) => k.toLowerCase().includes(query)))
   )
 })
 

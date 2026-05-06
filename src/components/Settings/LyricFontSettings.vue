@@ -157,4 +157,28 @@ onMounted(() => {
 
 .preview-label { font-size: 0.75rem; color: var(--td-text-color-secondary); margin-bottom: 0.5rem; }
 .preview-text { color: var(--td-text-color-primary); line-height: 1.4; word-break: break-all; }
+@media (max-width: 768px) {
+  .lyric-font-settings {
+    gap: 10px;
+  }
+
+  .setting-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .setting-info {
+    width: 100%;
+  }
+
+  .font-preview {
+    padding: 12px;
+  }
+
+  .preview-text {
+    font-size: clamp(20px, 8vw, 32px) !important;
+  }
+}
 </style>
