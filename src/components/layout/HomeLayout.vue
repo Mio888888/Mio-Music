@@ -754,16 +754,17 @@ const handleKeyDown = () => {
     margin: 0 auto;
     padding: 7px 8px;
     background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.24)),
-      color-mix(in srgb, var(--td-bg-color-container) 40%, transparent);
-    border: 1px solid rgba(255, 255, 255, 0.36);
+      linear-gradient(145deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12)),
+      color-mix(in srgb, var(--td-bg-color-container) 18%, transparent);
+    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: calc(var(--mobile-nav-height) / 2);
     box-shadow:
-      0 18px 44px rgba(15, 23, 42, 0.14),
-      0 6px 16px rgba(15, 23, 42, 0.06),
-      inset 0 1px 0 rgba(255, 255, 255, 0.58);
-    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
-    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+      0 16px 36px rgba(15, 23, 42, 0.1),
+      0 5px 14px rgba(15, 23, 42, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+    backdrop-filter: saturate(220%) blur(20px);
+    -webkit-backdrop-filter: saturate(220%) blur(20px);
   }
 
   .mobile-nav-item {
@@ -830,11 +831,11 @@ const handleKeyDown = () => {
   .mobile-nav-item.active {
     color: var(--td-brand-color);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18)),
-      color-mix(in srgb, var(--td-brand-color) 15%, transparent);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.1)),
+      color-mix(in srgb, var(--td-brand-color) 10%, transparent);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.52),
-      0 6px 18px color-mix(in srgb, var(--td-brand-color) 18%, transparent);
+      inset 0 1px 0 rgba(255, 255, 255, 0.42),
+      0 6px 16px color-mix(in srgb, var(--td-brand-color) 14%, transparent);
 
     .iconfont {
       transform: translateY(-1px);
@@ -858,22 +859,23 @@ const handleKeyDown = () => {
 
   :global([data-theme="dark"]) .mobile-bottom-nav {
     background:
-      linear-gradient(145deg, rgba(46, 48, 64, 0.46), rgba(20, 22, 32, 0.32)),
-      color-mix(in srgb, var(--td-bg-color-container) 36%, transparent);
-    border-color: rgba(255, 255, 255, 0.1);
+      linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(10, 12, 18, 0.16)),
+      color-mix(in srgb, var(--td-bg-color-container) 14%, transparent);
+    border-color: rgba(255, 255, 255, 0.12);
     box-shadow:
-      0 22px 52px rgba(0, 0, 0, 0.36),
-      0 8px 18px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      0 18px 42px rgba(0, 0, 0, 0.24),
+      0 6px 16px rgba(0, 0, 0, 0.14),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
   }
 
   :global([data-theme="dark"]) .mobile-nav-item.active {
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04)),
-      color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+      linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+      color-mix(in srgb, var(--td-brand-color) 14%, transparent);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.13),
-      0 8px 20px color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+      inset 0 1px 0 rgba(255, 255, 255, 0.11),
+      0 7px 18px color-mix(in srgb, var(--td-brand-color) 16%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {

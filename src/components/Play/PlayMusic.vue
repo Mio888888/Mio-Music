@@ -735,6 +735,25 @@ const playbg = computed(() => player.value.coverDetail.playBg || 'var(--player-b
 const playbghover = computed(
   () => player.value.coverDetail.playBgHover || 'var(--player-btn-bg-hover-idle)'
 )
+const mobilePlayerBg = computed(() => {
+  if (showFullPlay.value) return '#00000020'
+  if (!songInfo.value.songmid) return 'var(--player-bg-idle)'
+
+  const color = player.value.coverDetail.ColorObject
+  if (!color) return 'var(--player-bg-default)'
+
+  if (player.value.coverDetail.useBlackText) {
+    const r = Math.round(color.r + (255 - color.r) * 0.78)
+    const g = Math.round(color.g + (255 - color.g) * 0.78)
+    const b = Math.round(color.b + (255 - color.b) * 0.78)
+    return `rgba(${r}, ${g}, ${b}, 0.88)`
+  }
+
+  const r = Math.round(color.r * 0.35)
+  const g = Math.round(color.g * 0.35)
+  const b = Math.round(color.b * 0.35)
+  return `rgba(${r}, ${g}, ${b}, 0.88)`
+})
 
 const bg = ref('var(--player-bg-default)')
 
@@ -1661,13 +1680,29 @@ onBeforeUnmount(() => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .player-container {
+    background: v-bind(mobilePlayerBg) !important;
     bottom: var(--mobile-player-bottom);
     height: var(--mobile-player-height);
     border-top: 0.5px solid var(--mobile-glass-border);
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      right: 0;
+      left: 0;
+      height: var(--mobile-nav-total-height);
+      background: v-bind(mobilePlayerBg);
+      pointer-events: none;
+    }
   }
 
   .player-container.is-full-play {
     bottom: var(--mobile-safe-bottom);
+
+    &::after {
+      display: none;
+    }
   }
 
   .player-content {
