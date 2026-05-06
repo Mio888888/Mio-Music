@@ -42,6 +42,7 @@ html {
 body {
   background: transparent;
   overflow: hidden;
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 #app {
   height: 100%;
@@ -49,6 +50,7 @@ body {
   border-radius: 20px;
   overflow: hidden;
   background-color: rgba(255, 255, 255, 0.75);
+  transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard);
 }
 
 html:has(body #app .desktop-lyric),

@@ -13,6 +13,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { darkTheme } from 'naive-ui'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NGlobalStyle as NglobalStyle } from 'naive-ui'
 import { useSettingsStore } from '@/store/Settings'
+import { useDynamicSongTheme } from '@/composables/useDynamicSongTheme'
 import GlobalAudio from '@/components/Play/GlobalAudio.vue'
 import { storeToRefs } from 'pinia'
 import '@/assets/theme/blue.css'
@@ -33,6 +34,12 @@ const themes = [
 ]
 
 const themeVersion = ref(0)
+
+useDynamicSongTheme({
+  onThemeChange: () => {
+    themeVersion.value++
+  }
+})
 
 const themeOverrides = computed(() => {
   void themeVersion.value
