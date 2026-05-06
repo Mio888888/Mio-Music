@@ -397,7 +397,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- 手机端返回按钮 -->
-    <button class="mobile-back-btn" @click="handleBack">
+    <button class="mobile-back-btn" type="button" aria-label="返回上一页" @click="handleBack">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6" />
       </svg>
@@ -432,12 +432,15 @@ onBeforeUnmount(() => {
             </p>
             <p class="playlist-stats">{{ playlistInfo.total || songs.length }} 首歌曲</p>
           </div>
-          <div class="playlist-actions" :class="{ compact: isHeaderCompact }">
+        </div>
+
+        <div class="playlist-actions" :class="{ compact: isHeaderCompact }">
             <t-button
               theme="primary"
               size="medium"
               :disabled="songs.length === 0 || loading"
               class="play-btn"
+              aria-label="播放全部"
               @click="handlePlayAll"
             >
               <template #icon>
@@ -453,6 +456,7 @@ onBeforeUnmount(() => {
               size="medium"
               :disabled="songs.length === 0 || loading"
               class="shuffle-btn"
+              aria-label="随机播放"
               @click="handleShufflePlay"
             >
               <template #icon>
@@ -466,10 +470,10 @@ onBeforeUnmount(() => {
             <t-dropdown
               :max-column-width="160"
               :options="moreActions"
-              trigger="hover"
+              trigger="click"
               @click="(data: any) => handleMoreAction(data.value)"
             >
-              <t-button theme="default" class="action-btn-more">
+              <t-button theme="default" class="action-btn-more" aria-label="更多操作">
                 <template #icon>
                   <EllipsisIcon :stroke-width="1.5" />
                 </template>
@@ -479,7 +483,7 @@ onBeforeUnmount(() => {
             <div class="playlist-search" :class="{ focused: searchFocused || !!searchQuery }">
               <t-input
                 v-model="searchQuery"
-                :placeholder="searchFocused ? '搜索歌单内歌曲/歌手/专辑' : '搜索'"
+                aria-label="搜索歌单内歌曲"
                 clearable
                 @focus="searchFocused = true"
                 @blur="searchFocused = !!searchQuery"
@@ -489,7 +493,6 @@ onBeforeUnmount(() => {
                 </template>
               </t-input>
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -560,22 +563,34 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .list-container {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
   padding: 20px;
   overflow: hidden;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .fixed-header {
   flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-bottom: 20px;
 }
 
 .playlist-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(96px, 192px) minmax(0, 1fr) minmax(240px, 420px);
+  grid-template-areas: 'cover details actions';
   align-items: center;
   gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 1.5rem;
   height: 240px;
   background: var(--td-bg-color-container);
@@ -632,7 +647,10 @@ onBeforeUnmount(() => {
 }
 
 .playlist-cover {
-  height: 100%;
+  grid-area: cover;
+  width: 100%;
+  max-width: 192px;
+  height: auto;
   aspect-ratio: 1 / 1;
   border-radius: 0.5rem;
   overflow: hidden;
@@ -688,7 +706,7 @@ onBeforeUnmount(() => {
 }
 
 .playlist-details {
-  flex: 1;
+  grid-area: details;
   min-width: 0;
   font-family: lyricfont, Arial, Helvetica, sans-serif;
 
@@ -739,10 +757,16 @@ onBeforeUnmount(() => {
 }
 
 .playlist-actions {
+  grid-area: actions;
   display: flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.75rem;
-  margin-top: 1rem;
+  margin-top: 0;
+  margin-left: auto;
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &.compact {
@@ -784,13 +808,29 @@ onBeforeUnmount(() => {
 }
 
 .playlist-search {
-  margin-left: auto;
-  max-width: 90px;
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 260px;
+  margin-left: 0;
   overflow: hidden;
-  transition: max-width 0.2s ease;
+  transition: flex-basis 0.2s ease, max-width 0.2s ease, opacity 0.2s ease;
 
   &.focused {
-    max-width: 250px;
+    flex-basis: 240px;
+    max-width: 320px;
+  }
+
+  :deep(.t-input) {
+    height: 36px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--td-bg-color-container) 84%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  :deep(.t-input__inner) {
+    min-width: 0;
+    font-size: 0.875rem;
   }
 }
 
@@ -904,6 +944,26 @@ onBeforeUnmount(() => {
   display: none;
 }
 
+@media (max-width: 1120px) and (min-width: 769px) {
+  .playlist-header {
+    grid-template-columns: minmax(96px, 160px) minmax(0, 1fr);
+    grid-template-areas:
+      'cover details'
+      'cover actions';
+    height: auto;
+    min-height: 220px;
+  }
+
+  .playlist-actions {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .playlist-search {
+    max-width: 320px;
+  }
+}
+
 @media (max-width: 768px) {
   .mobile-back-btn {
     display: flex;
@@ -912,17 +972,18 @@ onBeforeUnmount(() => {
     width: var(--mobile-touch-target);
     height: var(--mobile-touch-target);
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.2);
     backdrop-filter: blur(var(--mobile-glass-blur));
     -webkit-backdrop-filter: blur(var(--mobile-glass-blur));
     border: 0.5px solid rgba(255, 255, 255, 0.18);
     color: #fff;
     cursor: pointer;
-    position: absolute;
-    top: var(--mobile-page-top-gutter);
+    position: fixed;
+    top: calc(var(--mobile-safe-top) + 8px);
     left: var(--mobile-page-gutter);
-    z-index: 10;
+    z-index: 20;
     touch-action: manipulation;
+    transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 
     svg {
       width: 22px;
@@ -935,67 +996,161 @@ onBeforeUnmount(() => {
   }
 
   .list-container {
-    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    padding: 0 var(--mobile-page-gutter) 0;
   }
 
   .fixed-header {
-    margin-bottom: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 12;
+    flex-shrink: 0;
+    width: calc(100% + var(--mobile-page-gutter) * 2);
+    max-width: none;
+    margin: 0 calc(var(--mobile-page-gutter) * -1) 10px;
   }
 
   .playlist-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.75rem;
+    display: grid;
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-areas:
+      'cover details'
+      'actions actions';
+    align-items: center;
+    gap: 12px;
+    min-height: 0;
     height: auto;
-    padding: calc(var(--mobile-touch-target) + 0.75rem) 1rem 1rem;
+    padding: 12px;
+    padding-top: calc(var(--mobile-touch-target) + 10px);
     position: relative;
-    border-radius: var(--mobile-card-radius);
+    border-radius: 0 0 var(--mobile-card-radius) var(--mobile-card-radius);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(14px);
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(14px);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+
+    &::before {
+      filter: blur(10px) saturate(1.2);
+      transform: scale(1.08);
+      -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.12) 72%, rgba(0, 0, 0, 0) 100%);
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.12) 72%, rgba(0, 0, 0, 0) 100%);
+    }
 
     &.compact {
-      height: auto;
-      padding: calc(var(--mobile-touch-target) + 0.35rem) 1rem 0.75rem;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      grid-template-areas: 'cover details actions';
+      gap: 8px;
+      padding: 8px;
+      padding-left: calc(var(--mobile-touch-target) + 18px);
+      border-radius: calc(var(--mobile-card-radius-small) + 2px);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      transform: translateY(0);
 
       .playlist-cover {
-        width: 56px;
-        height: 56px;
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+      }
+
+      .playlist-title {
+        font-size: 1rem;
+        line-height: 1.15;
+        -webkit-line-clamp: 1;
+        margin-bottom: 0.2rem;
+      }
+
+      .playlist-meta {
+        max-height: 18px;
+        opacity: 1;
+      }
+
+      .playlist-desc {
+        display: none;
+      }
+
+      .playlist-stats {
+        padding: 0;
+        font-size: 0.75rem;
+      }
+
+      .playlist-actions {
+        width: auto;
+        margin-top: 0;
+        flex-wrap: nowrap;
+        justify-content: flex-end;
+        gap: 4px;
+      }
+
+      .play-btn,
+      .shuffle-btn {
+        flex: 0 0 var(--mobile-touch-target);
+        min-width: var(--mobile-touch-target);
+        width: var(--mobile-touch-target);
+        padding: 0;
+        font-size: 0;
+      }
+
+      .playlist-search {
+        display: none;
       }
     }
   }
 
   .playlist-cover {
-    width: 120px;
-    height: 120px;
+    grid-area: cover;
+    width: 84px;
+    height: 84px;
     border-radius: var(--mobile-card-radius-small);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
   }
 
   .playlist-details {
+    grid-area: details;
     width: 100%;
+    min-width: 0;
+    text-align: left;
 
     .playlist-title {
-      font-size: clamp(1.5rem, 7vw, 2rem);
-      line-height: 1.1;
+      font-size: clamp(1.2rem, 5.5vw, 1.55rem);
+      line-height: 1.12;
       white-space: normal;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin: 0 0 0.35rem;
     }
   }
 
+  .playlist-meta {
+    max-height: 48px;
+  }
+
   .playlist-desc {
-    font-size: 0.875rem;
-    -webkit-line-clamp: 2;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    -webkit-line-clamp: 1;
+    margin: 0 0 0.25rem;
+  }
+
+  .playlist-stats {
+    font-size: 0.75rem;
+    padding: 0;
   }
 
   .playlist-actions {
+    grid-area: actions;
+    width: 100%;
+    max-width: none;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
+    gap: 8px;
+    margin-top: 0;
+    margin-left: 0;
 
     .play-btn,
     .shuffle-btn {
       min-width: 0;
-      flex: 1 1 calc(50% - 0.25rem);
+      flex: 1 1 calc(50% - 4px);
       min-height: var(--mobile-touch-target);
       height: var(--mobile-touch-target);
       border-radius: var(--mobile-control-radius);
@@ -1013,22 +1168,41 @@ onBeforeUnmount(() => {
   }
 
   .playlist-search {
-    width: 100%;
-    max-width: 100%;
+    flex: 1 1 calc(100% - var(--mobile-touch-target) - 8px);
+    width: auto;
+    max-width: none;
+    min-width: min(180px, 100%);
     margin-left: 0;
 
     &.focused {
-      width: 100%;
+      flex-basis: calc(100% - var(--mobile-touch-target) - 8px);
       max-width: 100%;
     }
 
     :deep(.t-input) {
+      height: var(--mobile-touch-target);
       min-height: var(--mobile-touch-target);
+      overflow: hidden;
+      border-radius: 999px !important;
+      --td-radius-default: 999px;
+      background: color-mix(in srgb, var(--td-bg-color-container) 88%, transparent);
+    }
+
+    :deep(.t-input__wrap) {
+      border-radius: 999px !important;
+    }
+
+    :deep(.t-input__inner) {
+      border-radius: 999px !important;
     }
   }
 
   .scrollable-content {
-    border-radius: var(--mobile-card-radius-small);
+    width: calc(100% + var(--mobile-page-gutter) * 2);
+    max-width: none;
+    margin-left: calc(var(--mobile-page-gutter) * -1);
+    margin-right: calc(var(--mobile-page-gutter) * -1);
+    border-radius: 0;
   }
 
   .locate-current-btn {
