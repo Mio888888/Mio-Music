@@ -5,11 +5,15 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check-version:
     runs-on: ubuntu-latest
     outputs:
       should_build: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -142,3 +146,29 @@ jobs:
           path: |
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage.*
+
+  publish-release:
+    needs: [check-version, build-windows, build-macos, build-linux]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const version = '${{ needs.check-version.outputs.version }}'
+            const tag = `v${version}`
+            const { owner, repo } = context.repo
+            const releases = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 })
+            const release = releases.find((item) => item.tag_name === tag)
+            if (!release) {
+              core.setFailed(`Release ${tag} was not created`)
+              return
+            }
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              draft: false,
+              prerelease: false,
+            })

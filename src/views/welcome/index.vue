@@ -8,7 +8,25 @@ const containerRef = ref<HTMLDivElement>()
 const countdown = ref(0)
 const showSkip = ref(false)
 
+interface SceneProfile {
+  isMobile: boolean
+  textScale: number
+  textParticleStep: number
+  bgParticleCount: number
+  bgSpread: number
+  bokehCount: number
+  bokehSpread: number
+  bokehMinScale: number
+  bokehMaxScale: number
+  startCameraZ: number
+  targetCameraZ: number
+  pixelRatioLimit: number
+  textParticleSize: number
+  bgParticleSize: number
+}
+
 let renderer: THREE.WebGLRenderer | null = null
+let particleTexture: THREE.CanvasTexture | null = null
 let animationId = 0
 let clock: THREE.Clock
 let convergeProgress = 0
@@ -17,10 +35,58 @@ let textParticles: THREE.Points
 let bgParticles: THREE.Points
 let bokehGroup: THREE.Group
 let camera: THREE.PerspectiveCamera
+let sceneProfile: SceneProfile
+let textGeometryScale = 1
 
 // 倒计时控制
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 const COUNTDOWN_SECONDS = 3
+
+function getSceneProfile(width: number, height: number): SceneProfile {
+  const shortSide = Math.min(width, height)
+  const isMobile = width <= 768
+  const narrowScale = Math.min(1, Math.max(0.72, shortSide / 430))
+
+  if (!isMobile) {
+    return {
+      isMobile,
+      textScale: 0.08,
+      textParticleStep: 2,
+      bgParticleCount: 800,
+      bgSpread: 80,
+      bokehCount: 15,
+      bokehSpread: 60,
+      bokehMinScale: 5,
+      bokehMaxScale: 20,
+      startCameraZ: 45,
+      targetCameraZ: 22,
+      pixelRatioLimit: 2,
+      textParticleSize: 0.2,
+      bgParticleSize: 0.4
+    }
+  }
+
+  return {
+    isMobile,
+    textScale: 0.055 * narrowScale,
+    textParticleStep: shortSide <= 360 ? 3 : 2,
+    bgParticleCount: shortSide <= 360 ? 360 : 480,
+    bgSpread: 58,
+    bokehCount: 9,
+    bokehSpread: 42,
+    bokehMinScale: 4,
+    bokehMaxScale: 12,
+    startCameraZ: 52,
+    targetCameraZ: 30,
+    pixelRatioLimit: 1.5,
+    textParticleSize: shortSide <= 360 ? 0.18 : 0.19,
+    bgParticleSize: 0.34
+  }
+}
+
+function getTextObjectScale(profile: SceneProfile): number {
+  return profile.isMobile ? profile.textScale / textGeometryScale : 1
+}
 
 function startCountdown() {
   showSkip.value = true
@@ -62,7 +128,7 @@ function createCircleTexture(): THREE.CanvasTexture {
 
 function getTextParticleData(
   text: string,
-  particleTexture: THREE.CanvasTexture
+  profile: SceneProfile
 ): { targetPos: number[]; startPos: number[]; pColors: number[] } {
   const tCanvas = document.createElement('canvas')
   const tWidth = 600
@@ -84,23 +150,22 @@ function getTextParticleData(
 
   const textColorCore = new THREE.Color('#1a1a1a')
   const textColorHighlight = new THREE.Color('#00d26a')
-
-  const step = 2
+  const step = profile.textParticleStep
 
   for (let y = 0; y < tHeight; y += step) {
     for (let x = 0; x < tWidth; x += step) {
       const index = (y * tWidth + x) * 4
       if (imgData[index + 3] > 128) {
-        const px = (x - tWidth / 2) * 0.08
-        const py = -(y - tHeight / 2) * 0.08
+        const px = (x - tWidth / 2) * profile.textScale
+        const py = -(y - tHeight / 2) * profile.textScale
         const pz = (Math.random() - 0.5) * 2
 
         targetPos.push(px, py, pz)
 
         startPos.push(
-          px + (Math.random() - 0.5) * 80,
-          py + (Math.random() - 0.5) * 80,
-          pz + (Math.random() - 0.5) * 80
+          px + (Math.random() - 0.5) * profile.bgSpread,
+          py + (Math.random() - 0.5) * profile.bgSpread,
+          pz + (Math.random() - 0.5) * profile.bgSpread
         )
 
         const c = Math.random() > 0.4 ? textColorHighlight : textColorCore
@@ -112,6 +177,7 @@ function getTextParticleData(
 }
 
 function createScene(width: number, height: number) {
+  sceneProfile = getSceneProfile(width, height)
   const scene = new THREE.Scene()
 
   renderer = new THREE.WebGLRenderer({
@@ -120,15 +186,15 @@ function createScene(width: number, height: number) {
     powerPreference: 'high-performance'
   })
   renderer.setSize(width, height)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, sceneProfile.pixelRatioLimit))
 
   camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000)
-  camera.position.z = 45
+  camera.position.z = sceneProfile.startCameraZ
 
-  const particleTexture = createCircleTexture()
+  particleTexture = createCircleTexture()
 
   // 背景粒子
-  const bgParticleCount = 800
+  const bgParticleCount = sceneProfile.bgParticleCount
   const bgGeometry = new THREE.BufferGeometry()
   const bgPositions = new Float32Array(bgParticleCount * 3)
   const bgColors = new Float32Array(bgParticleCount * 3)
@@ -138,9 +204,9 @@ function createScene(width: number, height: number) {
   const colorGray = new THREE.Color('#e0e8e4')
 
   for (let i = 0; i < bgParticleCount; i++) {
-    bgPositions[i * 3] = (Math.random() - 0.5) * 80
-    bgPositions[i * 3 + 1] = (Math.random() - 0.5) * 80
-    bgPositions[i * 3 + 2] = (Math.random() - 0.5) * 80
+    bgPositions[i * 3] = (Math.random() - 0.5) * sceneProfile.bgSpread
+    bgPositions[i * 3 + 1] = (Math.random() - 0.5) * sceneProfile.bgSpread
+    bgPositions[i * 3 + 2] = (Math.random() - 0.5) * sceneProfile.bgSpread
 
     const randColor = Math.random()
     let c = colorGray
@@ -156,11 +222,11 @@ function createScene(width: number, height: number) {
   bgGeometry.setAttribute('color', new THREE.BufferAttribute(bgColors, 3))
 
   const bgMaterial = new THREE.PointsMaterial({
-    size: 0.4,
+    size: sceneProfile.bgParticleSize,
     vertexColors: true,
     map: particleTexture,
     transparent: true,
-    opacity: 0.5,
+    opacity: sceneProfile.isMobile ? 0.42 : 0.5,
     blending: THREE.NormalBlending,
     depthWrite: false
   })
@@ -169,7 +235,7 @@ function createScene(width: number, height: number) {
 
   // 前景散景
   bokehGroup = new THREE.Group()
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < sceneProfile.bokehCount; i++) {
     const mat = new THREE.SpriteMaterial({
       map: particleTexture,
       transparent: true,
@@ -179,11 +245,13 @@ function createScene(width: number, height: number) {
     })
     const sprite = new THREE.Sprite(mat)
     sprite.position.set(
-      (Math.random() - 0.5) * 60,
-      (Math.random() - 0.5) * 60,
+      (Math.random() - 0.5) * sceneProfile.bokehSpread,
+      (Math.random() - 0.5) * sceneProfile.bokehSpread,
       15 + Math.random() * 20
     )
-    const scale = Math.random() * 15 + 5
+    const scale =
+      Math.random() * (sceneProfile.bokehMaxScale - sceneProfile.bokehMinScale) +
+      sceneProfile.bokehMinScale
     sprite.scale.set(scale, scale, 1)
     sprite.userData = { vy: Math.random() * 0.03 + 0.01, rx: Math.random() * 0.02 }
     bokehGroup.add(sprite)
@@ -191,7 +259,8 @@ function createScene(width: number, height: number) {
   scene.add(bokehGroup)
 
   // 粒子文字
-  textData = getTextParticleData('Mio', particleTexture)
+  textData = getTextParticleData('Mio', sceneProfile)
+  textGeometryScale = sceneProfile.textScale
   const textGeometry = new THREE.BufferGeometry()
   textGeometry.setAttribute(
     'position',
@@ -203,7 +272,7 @@ function createScene(width: number, height: number) {
   )
 
   const textMaterial = new THREE.PointsMaterial({
-    size: 0.2,
+    size: sceneProfile.textParticleSize,
     vertexColors: true,
     map: particleTexture,
     transparent: true,
@@ -213,7 +282,8 @@ function createScene(width: number, height: number) {
   })
 
   textParticles = new THREE.Points(textGeometry, textMaterial)
-  textParticles.position.y = 1
+  textParticles.scale.setScalar(getTextObjectScale(sceneProfile))
+  textParticles.position.y = sceneProfile.isMobile ? 1.6 : 1
   scene.add(textParticles)
 
   clock = new THREE.Clock()
@@ -265,11 +335,13 @@ function createScene(width: number, height: number) {
     }
     textParticles.geometry.attributes.position.needsUpdate = true
 
-    textParticles.position.y = 1 + Math.sin(elapsedTime * 1.2) * 0.15
+    const textYOffset = sceneProfile.isMobile ? 1.6 : 1
+    textParticles.scale.setScalar(getTextObjectScale(sceneProfile))
+    textParticles.position.y = textYOffset + Math.sin(elapsedTime * 1.2) * 0.15
 
     camera.position.z = THREE.MathUtils.lerp(
       camera.position.z,
-      22 + Math.sin(elapsedTime * 0.3) * 1.0,
+      sceneProfile.targetCameraZ + Math.sin(elapsedTime * 0.3) * 1.0,
       0.02
     )
     camera.lookAt(0, 0, 0)
@@ -290,9 +362,19 @@ function handleResize() {
   if (!renderer || !camera || !containerRef.value) return
   const width = containerRef.value.clientWidth
   const height = containerRef.value.clientHeight
+  sceneProfile = getSceneProfile(width, height)
   camera.aspect = width / height
+  camera.position.z = Math.max(camera.position.z, sceneProfile.targetCameraZ)
   camera.updateProjectionMatrix()
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, sceneProfile.pixelRatioLimit))
   renderer.setSize(width, height)
+  if (textParticles) {
+    textParticles.scale.setScalar(getTextObjectScale(sceneProfile))
+    ;(textParticles.material as THREE.PointsMaterial).size = sceneProfile.textParticleSize
+  }
+  if (bgParticles) {
+    ;(bgParticles.material as THREE.PointsMaterial).size = sceneProfile.bgParticleSize
+  }
 }
 
 function cleanup() {
@@ -302,8 +384,13 @@ function cleanup() {
     animationId = 0
   }
   if (renderer) {
+    renderer.domElement.remove()
     renderer.dispose()
     renderer = null
+  }
+  if (particleTexture) {
+    particleTexture.dispose()
+    particleTexture = null
   }
   // Dispose geometries and materials
   if (bgParticles) {
@@ -350,9 +437,9 @@ onUnmounted(() => {
         <div class="bar"></div>
       </div>
       <transition name="fade">
-        <div v-if="showSkip" class="skip-section" @click="skipToHome">
+        <button v-if="showSkip" class="skip-section" type="button" @click="skipToHome">
           <span class="skip-text">跳过 <span class="countdown-num">{{ countdown }}s</span></span>
-        </div>
+        </button>
       </transition>
     </div>
   </div>
@@ -361,11 +448,14 @@ onUnmounted(() => {
 <style scoped>
 .splash-container {
   width: 100vw;
+  max-width: 100vw;
   height: 100dvh;
   min-height: 100dvh;
   position: relative;
   overflow: hidden;
   background: radial-gradient(circle at center, #ffffff 0%, #eef3f0 100%);
+  box-sizing: border-box;
+  overscroll-behavior: none;
 }
 
 .webgl-canvas {
@@ -375,6 +465,14 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   z-index: 1;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.webgl-canvas :deep(canvas) {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .ui-layer {
@@ -430,6 +528,7 @@ onUnmounted(() => {
   margin-top: 1.5rem;
   min-height: 44px;
   padding: 0 1.2rem;
+  border: 0;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(8px);
@@ -441,6 +540,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   touch-action: manipulation;
+  appearance: none;
+  font: inherit;
 }
 
 .skip-section:hover {
@@ -469,20 +570,53 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
+  .splash-container {
+    width: 100dvw;
+    max-width: 100dvw;
+  }
+
   .ui-layer {
-    padding-bottom: calc(var(--mobile-safe-bottom) + 48px);
+    padding: 0 var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 48px);
   }
 
   .equalizer {
     height: 26px;
+    gap: 5px;
+  }
+
+  .bar {
+    width: 4px;
   }
 
   .skip-section {
     min-height: var(--mobile-touch-target);
+    padding: 0 18px;
     background: var(--mobile-glass-bg, rgba(255, 255, 255, 0.72));
     border: 0.5px solid var(--mobile-glass-border, rgba(0, 0, 0, 0.08));
     backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
     -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .skip-section:active {
+    background: color-mix(in srgb, var(--td-brand-color, #00d26a) 14%, var(--mobile-glass-bg, rgba(255, 255, 255, 0.72)));
+  }
+
+  .skip-text {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .ui-layer {
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(var(--mobile-safe-bottom) + 36px);
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  .skip-section {
+    margin-top: 1.1rem;
+    padding: 0 16px;
   }
 }
 
