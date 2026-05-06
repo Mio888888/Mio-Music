@@ -242,10 +242,12 @@ onUnmounted(() => {
 <style scoped>
 .audio-output-settings {
   padding: 0;
+  color: var(--td-text-color-primary);
 }
 
 .output-card {
   border-radius: 8px;
+  color: var(--td-text-color-primary);
 }
 
 .output-card.embedded {
@@ -266,6 +268,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
+  color: var(--td-text-color-primary);
 }
 
 .embedded-title {
@@ -388,6 +391,11 @@ onUnmounted(() => {
 .device-name {
   font-weight: 500;
   flex: 1;
+  color: var(--td-text-color-primary);
+}
+
+.device-item.active .device-name {
+  color: var(--td-text-color-primary);
 }
 
 .device-status {
@@ -424,6 +432,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--td-text-color-primary);
 }
 
 .info-icon {
@@ -437,7 +446,9 @@ onUnmounted(() => {
   gap: 12px;
   background: var(--td-bg-color-secondarycontainer);
   padding: 16px;
+  border: 1px solid var(--td-component-border);
   border-radius: 8px;
+  color: var(--td-text-color-primary);
 }
 
 .channel-config {

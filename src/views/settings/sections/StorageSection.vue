@@ -270,7 +270,7 @@ const getTagOptionsStatus = () => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out;
   animation-fill-mode: both;
 
@@ -299,8 +299,8 @@ const getTagOptionsStatus = () => {
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1rem;
-  border: 1px solid var(--td-border-level-1-color);
-  background: var(--td-bg-color-page);
+  border: 1px solid var(--settings-feature-border, var(--td-border-level-1-color));
+  background: var(--settings-feature-bg, var(--td-bg-color-container));
   border-radius: 0.5rem;
   margin-top: 0.75rem;
 
@@ -324,16 +324,44 @@ const getTagOptionsStatus = () => {
   }
 }
 
+.setting-item :deep(.t-radio-group--filled) {
+  overflow: hidden;
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+  border-radius: 6px;
+}
+
+.setting-item :deep(.t-radio-group--filled .t-radio-button) {
+  color: var(--td-text-color-secondary);
+}
+
+.setting-item :deep(.t-radio-group--filled .t-radio-button:hover),
+.setting-item :deep(.t-radio-group--filled .t-radio-button.t-is-checked),
+.setting-item :deep(.t-radio-group--filled .t-radio-button.t-is-checked .t-radio-button__label),
+.setting-item :deep(.t-radio-group--filled .t-radio-button--checked),
+.setting-item :deep(.t-radio-group--filled .t-radio-button--checked .t-radio-button__label) {
+  color: var(--settings-nav-label-active, var(--td-text-color-primary));
+}
+
+.setting-item :deep(.t-radio-group--filled .t-radio-group__bg-block) {
+  background: var(--settings-nav-active-bg, var(--td-bg-color-component-active));
+  border: 1px solid var(--settings-nav-active-border, var(--td-brand-color));
+  box-shadow: var(--settings-nav-active-shadow, none);
+}
+
 // 文件名模板样式
 .template-tip {
   display: flex;
   align-items: center;
   gap: 2em;
+  color: var(--td-text-color-secondary);
 }
 
 .template-tip-item {
   display: flex;
+  align-items: center;
   gap: 0.5em;
+  color: var(--td-text-color-secondary);
 }
 
 .preview-container {
@@ -341,6 +369,12 @@ const getTagOptionsStatus = () => {
   align-items: center;
   gap: 0.5em;
   margin: 0.5em 0 0 0;
+  color: var(--td-text-color-secondary);
+}
+
+.preview-container > div:last-child {
+  color: var(--td-text-color-primary);
+  font-weight: 500;
 }
 
 // 标签写入设置样式
@@ -352,7 +386,7 @@ const getTagOptionsStatus = () => {
 
   .tag-option {
     padding: 1rem;
-    background: var(--td-bg-color-page);
+    background: var(--settings-feature-bg, var(--td-bg-color-container));
     border-radius: 0.5rem;
     border: 1px solid var(--td-border-level-1-color);
 
@@ -446,7 +480,7 @@ const getTagOptionsStatus = () => {
     min-height: 28px;
     padding: 4px 8px;
     border-radius: 999px;
-    background: var(--td-bg-color-page);
+    background: var(--settings-feature-bg, var(--td-bg-color-container));
   }
 
   .preview-container {
@@ -455,7 +489,7 @@ const getTagOptionsStatus = () => {
     gap: 4px;
     padding: 10px 12px;
     border-radius: 8px;
-    background: var(--td-bg-color-page);
+    background: var(--settings-feature-bg, var(--td-bg-color-container));
     word-break: break-all;
   }
 

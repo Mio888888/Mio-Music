@@ -327,6 +327,7 @@ const handleSearchSelect = async (item: SearchItem) => {
     &.active {
       background: var(--settings-nav-active-bg);
       border-left-color: var(--settings-nav-active-border);
+      box-shadow: var(--settings-nav-active-shadow, none);
 
       .nav-icon {
         color: var(--settings-nav-icon-active);
@@ -388,6 +389,72 @@ const handleSearchSelect = async (item: SearchItem) => {
     background: var(--settings-main-bg);
     scroll-behavior: smooth;
   }
+}
+
+.content-panel :deep(.t-input),
+.content-panel :deep(.t-input-number .t-input),
+.content-panel :deep(.t-select .t-input),
+.content-panel :deep(.t-textarea__inner) {
+  background-color: var(--td-bg-color-specialcomponent, var(--td-bg-color-component));
+  border-color: var(--td-border-level-2-color, var(--td-component-border));
+  color: var(--td-text-color-primary);
+}
+
+.content-panel :deep(.t-input:hover),
+.content-panel :deep(.t-input-number .t-input:hover),
+.content-panel :deep(.t-select .t-input:hover),
+.content-panel :deep(.t-textarea__inner:hover) {
+  background-color: var(--td-bg-color-component-hover);
+  border-color: var(--td-brand-color);
+}
+
+.content-panel :deep(.t-input:focus),
+.content-panel :deep(.t-input--focused),
+.content-panel :deep(.t-input-number .t-input:focus),
+.content-panel :deep(.t-input-number .t-input--focused),
+.content-panel :deep(.t-select .t-input:focus),
+.content-panel :deep(.t-select .t-input--focused),
+.content-panel :deep(.t-textarea__inner:focus) {
+  background-color: var(--td-bg-color-specialcomponent, var(--td-bg-color-component));
+  border-color: var(--td-brand-color);
+  box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+}
+
+.content-panel :deep(.t-input__inner),
+.content-panel :deep(.t-textarea__inner) {
+  color: var(--td-text-color-primary);
+}
+
+.content-panel :deep(.t-input__inner::placeholder),
+.content-panel :deep(.t-textarea__inner::placeholder) {
+  color: var(--td-text-color-placeholder);
+}
+
+.content-panel :deep(.t-input__prefix),
+.content-panel :deep(.t-input__suffix),
+.content-panel :deep(.t-input__prefix .t-icon),
+.content-panel :deep(.t-input__suffix .t-icon),
+.content-panel :deep(.t-fake-arrow),
+.content-panel :deep(.t-input-number__decrease .t-icon),
+.content-panel :deep(.t-input-number__increase .t-icon) {
+  color: var(--td-text-color-secondary);
+}
+
+.content-panel :deep(.t-input-number__decrease),
+.content-panel :deep(.t-input-number__increase) {
+  border-color: var(--td-border-level-2-color, var(--td-component-border));
+}
+
+.content-panel :deep(.t-input-number__decrease:hover:not(.t-is-disabled)),
+.content-panel :deep(.t-input-number__increase:hover:not(.t-is-disabled)) {
+  background-color: var(--td-bg-color-component-hover);
+  border-color: var(--td-brand-color);
+  color: var(--td-brand-color);
+}
+
+.content-panel :deep(.t-input-number__decrease:hover:not(.t-is-disabled) .t-icon),
+.content-panel :deep(.t-input-number__increase:hover:not(.t-is-disabled) .t-icon) {
+  color: var(--td-brand-color);
 }
 
 @media (max-width: 768px) {
@@ -472,21 +539,31 @@ const handleSearchSelect = async (item: SearchItem) => {
     background: var(--mobile-glass-bg);
     scroll-snap-align: start;
     touch-action: manipulation;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition:
+      background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar .nav-item:hover {
+    background: var(--settings-nav-hover-bg);
   }
 
   .sidebar .nav-item.active {
-    background: var(--td-brand-color);
-    border-color: var(--td-brand-color);
-    box-shadow: 0 2px 8px rgba(var(--td-brand-color-rgb), 0.3);
+    background: var(--settings-nav-active-bg);
+    border-color: var(--settings-nav-active-border);
+    box-shadow: var(--settings-nav-active-shadow, 0 2px 8px rgba(15, 23, 42, 0.12));
   }
 
   .sidebar .nav-item.active .nav-icon {
-    color: #fff;
+    color: var(--settings-nav-icon-active);
   }
 
   .sidebar .nav-item.active .nav-label {
-    color: #fff;
+    color: var(--settings-nav-label-active);
     font-weight: 600;
   }
 

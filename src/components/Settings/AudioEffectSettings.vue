@@ -27,6 +27,8 @@
             <div class="presets">
               <t-radio-group
                 v-model="bassPreset"
+                class="effect-radio-group"
+                :class="{ 'is-effect-disabled': !bassBoost.enabled }"
                 variant="default-filled"
                 :disabled="!bassBoost.enabled"
                 @change="(val) => applyBassPreset(val as string)"
@@ -50,6 +52,8 @@
               <label>环境模拟</label>
               <t-radio-group
                 v-model="surround.mode"
+                class="effect-radio-group"
+                :class="{ 'is-effect-disabled': !surround.enabled }"
                 variant="default-filled"
                 :disabled="!surround.enabled"
               >
@@ -151,6 +155,7 @@ onMounted(() => { applyEffects() })
 <style scoped>
 .audio-effects-settings {
   padding: 20px 0;
+  color: var(--td-text-color-primary);
 }
 .effects-grid {
   display: grid;
@@ -167,7 +172,7 @@ onMounted(() => { applyEffects() })
 }
 .effect-card:hover {
   border-color: var(--td-brand-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--theme-shadow-light);
 }
 .card-header {
   display: flex;
@@ -180,6 +185,7 @@ onMounted(() => { applyEffects() })
 .title {
   font-weight: 600;
   font-size: 16px;
+  color: var(--td-text-color-primary);
 }
 .card-content {
   display: flex;
@@ -200,9 +206,70 @@ onMounted(() => { applyEffects() })
   justify-content: center;
   margin-top: 8px;
 }
+.presets :deep(.t-radio-group),
+.control-group :deep(.t-radio-group) {
+  background: var(--td-bg-color-secondarycontainer);
+  border: 1px solid var(--td-component-border);
+}
+.presets :deep(.effect-radio-group),
+.control-group :deep(.effect-radio-group) {
+  overflow: hidden;
+  border-radius: 6px;
+}
+.presets :deep(.t-radio-group--filled .t-radio-button),
+.control-group :deep(.t-radio-group--filled .t-radio-button) {
+  color: var(--td-text-color-secondary);
+}
+.presets :deep(.t-radio-group--filled .t-radio-button:hover),
+.control-group :deep(.t-radio-group--filled .t-radio-button:hover),
+.presets :deep(.t-radio-group--filled .t-radio-button.t-is-checked),
+.control-group :deep(.t-radio-group--filled .t-radio-button.t-is-checked),
+.presets :deep(.t-radio-group--filled .t-radio-button.t-is-checked .t-radio-button__label),
+.control-group :deep(.t-radio-group--filled .t-radio-button.t-is-checked .t-radio-button__label),
+.presets :deep(.t-radio-group--filled .t-radio-button--checked),
+.control-group :deep(.t-radio-group--filled .t-radio-button--checked),
+.presets :deep(.t-radio-group--filled .t-radio-button--checked .t-radio-button__label),
+.control-group :deep(.t-radio-group--filled .t-radio-button--checked .t-radio-button__label) {
+  color: var(--settings-nav-label-active, var(--td-text-color-primary));
+}
+.presets :deep(.t-radio-group--filled .t-radio-group__bg-block),
+.control-group :deep(.t-radio-group--filled .t-radio-group__bg-block) {
+  background: var(--settings-nav-active-bg, var(--td-bg-color-component-active));
+  border: 1px solid var(--settings-nav-active-border, var(--td-brand-color));
+  box-shadow: var(--settings-nav-active-shadow, none);
+}
+.presets :deep(.effect-radio-group.is-effect-disabled),
+.control-group :deep(.effect-radio-group.is-effect-disabled) {
+  background: var(--td-bg-color-secondarycontainer);
+  border-color: var(--td-component-border);
+}
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button),
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button__label),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button__label) {
+  color: var(--td-text-color-secondary) !important;
+  opacity: 0.72;
+}
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-group__bg-block),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-group__bg-block) {
+  background: var(--td-bg-color-component) !important;
+  border: 1px solid var(--td-component-border) !important;
+  box-shadow: none !important;
+}
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button.t-is-checked),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button.t-is-checked),
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button--checked),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button--checked),
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button.t-is-checked .t-radio-button__label),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button.t-is-checked .t-radio-button__label),
+.presets :deep(.effect-radio-group.is-effect-disabled .t-radio-button--checked .t-radio-button__label),
+.control-group :deep(.effect-radio-group.is-effect-disabled .t-radio-button--checked .t-radio-button__label) {
+  color: var(--td-text-color-primary) !important;
+  opacity: 0.76;
+}
 .info-text {
   font-size: 12px;
-  color: var(--td-text-color-disabled);
+  color: var(--td-text-color-secondary);
   text-align: center;
 }
 .balance-labels {

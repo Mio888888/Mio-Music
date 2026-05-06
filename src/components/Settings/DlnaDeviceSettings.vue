@@ -83,6 +83,7 @@ const stopDlna = () => {
 <style scoped>
 .dlna-device-settings {
   padding: 0;
+  color: var(--td-text-color-primary);
 }
 
 .section-header {
@@ -95,6 +96,7 @@ const stopDlna = () => {
 .section-title {
   font-weight: 600;
   font-size: 14px;
+  color: var(--td-text-color-primary);
 }
 
 .device-list {
@@ -153,6 +155,11 @@ const stopDlna = () => {
 .device-name {
   font-weight: 500;
   flex: 1;
+  color: var(--td-text-color-primary);
+}
+
+.device-item.active .device-name {
+  color: var(--td-text-color-primary);
 }
 
 .device-address {
@@ -171,7 +178,7 @@ const stopDlna = () => {
 
 .empty-msg {
   text-align: center;
-  color: var(--td-text-color-disabled);
+  color: var(--td-text-color-secondary);
   padding: 20px;
 }
 </style>

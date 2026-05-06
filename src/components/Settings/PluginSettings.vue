@@ -573,6 +573,7 @@ function openImport(plugin: LoadedPlugin) {
 <style scoped lang="scss">
 .plugin-section {
   height: 100%;
+  color: var(--td-text-color-primary);
 }
 
 .section-header {
@@ -590,6 +591,7 @@ function openImport(plugin: LoadedPlugin) {
     border-radius: 8px;
     line-height: 1.5em;
     margin: 0;
+    color: var(--td-text-color-primary);
   }
 }
 
@@ -606,9 +608,15 @@ function openImport(plugin: LoadedPlugin) {
   justify-content: center;
   padding: 60px 0;
   gap: 12px;
-  background: var(--td-bg-color-container);
+  background: var(--settings-feature-bg, var(--td-bg-color-container));
+  border: 1px solid var(--settings-feature-border, transparent);
   border-radius: 12px;
   color: var(--td-text-color-secondary);
+}
+
+.state-block p {
+  margin: 0;
+  color: var(--td-text-color-primary);
 }
 
 .error-msg {
@@ -636,8 +644,8 @@ function openImport(plugin: LoadedPlugin) {
   align-items: flex-start;
   padding: 20px;
   border-radius: 12px;
-  background: var(--td-bg-color-container);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--plugins-card-bg, var(--td-bg-color-container));
+  box-shadow: var(--plugins-card-shadow, var(--theme-card-shadow));
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   border: 2px solid transparent;
 
@@ -650,6 +658,7 @@ function openImport(plugin: LoadedPlugin) {
 .plugin-info {
   flex: 1;
   margin-right: 20px;
+  color: var(--td-text-color-primary);
 
   h3 {
     margin: 0 0 8px 0;
@@ -659,6 +668,7 @@ function openImport(plugin: LoadedPlugin) {
     align-items: center;
     gap: 10px;
     line-height: 1.4;
+    color: var(--td-text-color-primary);
   }
 }
 
@@ -676,16 +686,16 @@ function openImport(plugin: LoadedPlugin) {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-  color: white;
+  color: var(--td-text-color-anti);
 
   &.tag-current {
     background: linear-gradient(135deg, var(--td-brand-color-5), var(--td-brand-color-6));
-    box-shadow: 0 2px 4px rgba(0, 167, 77, 0.2);
+    box-shadow: var(--theme-shadow-light);
   }
 
   &.tag-service {
-    background: linear-gradient(135deg, #5b8def, #3a6ed8);
-    box-shadow: 0 2px 4px rgba(58, 110, 216, 0.2);
+    background: linear-gradient(135deg, var(--td-brand-color-4), var(--td-brand-color-5));
+    box-shadow: var(--theme-shadow-light);
   }
 }
 
@@ -698,7 +708,7 @@ function openImport(plugin: LoadedPlugin) {
 .description {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   line-height: 1.5;
 }
 
@@ -711,13 +721,13 @@ function openImport(plugin: LoadedPlugin) {
 
 .source-label {
   font-size: 13px;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   font-weight: 500;
 }
 
 .source-tag {
   background: linear-gradient(135deg, var(--td-brand-color-4), var(--td-brand-color-5));
-  color: white;
+  color: var(--td-text-color-anti);
   padding: 3px 10px;
   border-radius: 10px;
   font-size: 12px;
@@ -734,7 +744,7 @@ function openImport(plugin: LoadedPlugin) {
 // Dialog tips
 .dialog-tip {
   font-size: 13px;
-  color: var(--td-text-color-placeholder);
+  color: var(--td-text-color-secondary);
   margin-bottom: 16px;
   line-height: 1.5;
 }
@@ -753,6 +763,7 @@ function openImport(plugin: LoadedPlugin) {
   flex-direction: column;
   gap: 16px;
   padding: 8px 0;
+  color: var(--td-text-color-primary);
 }
 
 .config-field {
@@ -764,6 +775,7 @@ function openImport(plugin: LoadedPlugin) {
 .config-label {
   font-size: 14px;
   font-weight: 500;
+  color: var(--td-text-color-primary);
 
   .required {
     color: var(--td-error-color);
@@ -801,6 +813,7 @@ function openImport(plugin: LoadedPlugin) {
     font-weight: 600;
     font-size: 14px;
     flex: 1;
+    color: var(--td-text-color-primary);
   }
 
   .log-actions {
@@ -819,16 +832,16 @@ function openImport(plugin: LoadedPlugin) {
       border-radius: 50%;
       cursor: pointer;
 
-      &.close { background: #ff5f57; &:hover { background: #ff3b30; } }
-      &.minimize { background: #ffbd2e; &:hover { background: #ff9500; } }
-      &.maximize { background: #28c840; &:hover { background: #30d158; } }
+      &.close { background: var(--plugins-mac-close); &:hover { background: var(--plugins-mac-close); filter: brightness(0.92); } }
+      &.minimize { background: var(--plugins-mac-minimize); &:hover { background: var(--plugins-mac-minimize); filter: brightness(0.92); } }
+      &.maximize { background: var(--plugins-mac-maximize); &:hover { background: var(--plugins-mac-maximize); filter: brightness(1.08); } }
     }
   }
 }
 
 .console-container {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--plugins-console-bg);
+  color: var(--plugins-console-text);
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.4;
@@ -839,8 +852,8 @@ function openImport(plugin: LoadedPlugin) {
 }
 
 .console-header {
-  background: #2d2d2d;
-  border-bottom: 1px solid #3e3e3e;
+  background: var(--plugins-console-header-bg);
+  border-bottom: 1px solid var(--plugins-console-border);
   padding: 8px 16px;
 
   .console-info {
@@ -849,9 +862,9 @@ function openImport(plugin: LoadedPlugin) {
     gap: 12px;
     font-size: 12px;
 
-    .console-prompt { color: #4ec9b0; font-weight: bold; }
-    .console-path { color: #9cdcfe; }
-    .console-time { color: #6a9955; margin-left: auto; }
+    .console-prompt { color: var(--plugins-console-prompt); font-weight: bold; }
+    .console-path { color: var(--plugins-console-path); }
+    .console-time { color: var(--plugins-console-time); margin-left: auto; }
   }
 }
 
@@ -862,8 +875,8 @@ function openImport(plugin: LoadedPlugin) {
   max-height: 50vh;
 
   &::-webkit-scrollbar { width: 8px; }
-  &::-webkit-scrollbar-track { background: #1e1e1e; }
-  &::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; &:hover { background: #555; } }
+  &::-webkit-scrollbar-track { background: var(--plugins-console-scrollbar-track); }
+  &::-webkit-scrollbar-thumb { background: var(--plugins-console-scrollbar-thumb); border-radius: 4px; &:hover { background: var(--plugins-console-scrollbar-thumb-hover); } }
 }
 
 .console-loading,
@@ -874,10 +887,10 @@ function openImport(plugin: LoadedPlugin) {
   justify-content: center;
   gap: 8px;
   padding: 40px 0;
-  color: #808080;
+  color: var(--plugins-console-time);
 }
 
-.console-error { color: #f44747; }
+.console-error { color: var(--plugins-log-error); }
 
 .log-entries {
   .log-entry {
@@ -886,10 +899,10 @@ function openImport(plugin: LoadedPlugin) {
     padding: 2px 0;
     border-radius: 3px;
 
-    &:hover { background: rgba(255, 255, 255, 0.05); }
+    &:hover { background: var(--plugins-console-header-bg); }
 
     .log-ts {
-      color: #6a9955;
+      color: var(--plugins-console-time);
       font-size: 11px;
       width: 80px;
       text-align: center;
@@ -905,11 +918,11 @@ function openImport(plugin: LoadedPlugin) {
       user-select: text;
     }
 
-    &.log-error .log-content { color: #f44747; }
-    &.log-warn .log-content { color: #cca700; }
-    &.log-info .log-content { color: #4fc1ff; }
-    &.log-debug .log-content { color: #608b4e; }
-    &.log-default .log-content { color: #d4d4d4; }
+    &.log-error .log-content { color: var(--plugins-log-error); }
+    &.log-warn .log-content { color: var(--plugins-log-warn); }
+    &.log-info .log-content { color: var(--plugins-log-info); }
+    &.log-debug .log-content { color: var(--plugins-log-debug); }
+    &.log-default .log-content { color: var(--plugins-console-text); }
   }
 }
 

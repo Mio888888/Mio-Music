@@ -277,6 +277,11 @@ const handleFileImport = async (event: Event) => {
   input.value = ''
 }
 
+const readThemeValue = (name: string, fallback: string): string => {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
 // 可视化 — 使用 Rust 频谱事件
 const resizeCanvas = () => {
   if (!canvasRef.value) return
@@ -303,8 +308,11 @@ const setupVisualizer = async () => {
     const width = canvasRef.value.width
     const height = canvasRef.value.height
 
-    ctx.fillStyle = 'rgba(30, 30, 30, 0.2)'
+    ctx.fillStyle = readThemeValue('--settings-eq-visualizer-trail', 'rgba(0, 0, 0, 0.18)')
     ctx.fillRect(0, 0, width, height)
+
+    const barStartColor = readThemeValue('--settings-eq-visualizer-bar-start', readThemeValue('--td-brand-color-5', '#00a74d'))
+    const barEndColor = readThemeValue('--settings-eq-visualizer-bar-end', readThemeValue('--td-brand-color-7', '#03de6d'))
 
     const barCount = Math.min(spectrumData.length, 128)
     const barWidth = (width / barCount) * 2.5
@@ -315,8 +323,8 @@ const setupVisualizer = async () => {
       const barHeight = Math.pow(normalized, 0.6) * (height / 2)
 
       const gradient = ctx.createLinearGradient(0, height, 0, 0)
-      gradient.addColorStop(0, '#00f260')
-      gradient.addColorStop(1, '#0575e6')
+      gradient.addColorStop(0, barStartColor)
+      gradient.addColorStop(1, barEndColor)
       ctx.fillStyle = gradient
       ctx.fillRect(x, height - barHeight, barWidth, barHeight)
       x += barWidth + 1
@@ -341,6 +349,7 @@ onUnmounted(() => {
 <style scoped>
 .equalizer-settings {
   padding: 20px;
+  color: var(--td-text-color-primary);
 }
 .eq-content {
   display: flex;
@@ -349,7 +358,7 @@ onUnmounted(() => {
 }
 .visualizer-container {
   width: 100%;
-  background: #111;
+  background: var(--settings-eq-visualizer-bg, var(--td-bg-color-page));
   border-radius: 8px;
   overflow: hidden;
 }
@@ -405,6 +414,6 @@ onUnmounted(() => {
 .gain-label {
   margin-top: 4px;
   font-size: 10px;
-  color: var(--td-text-color-disabled);
+  color: var(--td-text-color-secondary);
 }
 </style>

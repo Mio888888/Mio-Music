@@ -235,7 +235,7 @@ const getSourceIcon = (key: string) => {
   background: var(--settings-group-bg, var(--td-bg-color-container));
   border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out; animation-fill-mode: both;
   @for $i from 1 through 5 { &:nth-child(#{$i}) { animation-delay: #{$i * 0.1}s; } }
   h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); }
@@ -246,7 +246,7 @@ const getSourceIcon = (key: string) => {
     background: linear-gradient(135deg, var(--td-brand-color-1) 0%, var(--td-brand-color-2) 100%);
     border-radius: 0.75rem; border: 1px solid var(--td-brand-color-3);
     .plugin-name { font-weight: 600; font-size: 1rem; color: var(--td-brand-color-6); }
-    .plugin-status { background: var(--td-brand-color-5); color: white; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 500; }
+    .plugin-status { background: var(--td-brand-color-5); color: var(--td-text-color-anti); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 500; }
   }
   .source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
   .source-card {
@@ -254,7 +254,7 @@ const getSourceIcon = (key: string) => {
     background: var(--settings-source-card-bg, var(--td-bg-color-container));
     border: 2px solid var(--settings-source-card-border, var(--td-border-level-1-color));
     border-radius: 0.75rem; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-    &:hover { border-color: var(--settings-source-card-hover-border, var(--td-brand-color-3)); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    &:hover { border-color: var(--settings-source-card-hover-border, var(--td-brand-color-3)); box-shadow: var(--theme-shadow-light); }
     &.active { border-color: var(--settings-source-card-active-border, var(--td-brand-color)); background: var(--settings-source-card-active-bg, var(--td-brand-color-1)); box-shadow: 0 0 0 3px var(--td-brand-color-2); }
     .source-icon {
       width: 2.5rem; height: 2.5rem; background: var(--settings-source-icon-bg, var(--td-brand-color-1)); border-radius: 50%;
@@ -288,7 +288,7 @@ const getSourceIcon = (key: string) => {
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     user-select: none;
     .quality-tag-name { font-size: 0.8125rem; font-weight: 500; color: var(--td-text-color-primary); }
-    &:hover { border-color: var(--td-brand-color-3); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+    &:hover { border-color: var(--td-brand-color-3); box-shadow: var(--theme-shadow-light); }
     &.active {
       border-color: var(--td-brand-color); background: var(--td-brand-color-1);
       box-shadow: 0 0 0 2px var(--td-brand-color-2);
@@ -314,7 +314,7 @@ const getSourceIcon = (key: string) => {
   .prompt-icon {
     width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--td-brand-color-5) 0%, var(--td-brand-color-6) 100%);
     border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; color: white; font-size: 1.5rem;
+    flex-shrink: 0; color: var(--td-text-color-anti); font-size: 1.5rem;
   }
   .prompt-content {
     flex: 1;

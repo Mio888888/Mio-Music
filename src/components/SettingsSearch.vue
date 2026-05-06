@@ -155,6 +155,39 @@ const getCategoryLabel = (category: string) => {
   width: 320px;
 }
 
+.settings-search :deep(.t-input) {
+  background-color: var(--td-bg-color-specialcomponent, var(--td-bg-color-component));
+  border-color: var(--td-border-level-2-color, var(--td-component-border));
+  color: var(--td-text-color-primary);
+}
+
+.settings-search :deep(.t-input:hover) {
+  background-color: var(--td-bg-color-component-hover);
+  border-color: var(--td-brand-color);
+}
+
+.settings-search :deep(.t-input:focus),
+.settings-search :deep(.t-input--focused) {
+  background-color: var(--td-bg-color-specialcomponent, var(--td-bg-color-component));
+  border-color: var(--td-brand-color);
+  box-shadow: 0 0 0 2px var(--td-brand-color-focus);
+}
+
+.settings-search :deep(.t-input__inner) {
+  color: var(--td-text-color-primary);
+}
+
+.settings-search :deep(.t-input__inner::placeholder) {
+  color: var(--td-text-color-placeholder);
+}
+
+.settings-search :deep(.t-input__prefix),
+.settings-search :deep(.t-input__suffix),
+.settings-search :deep(.t-input__prefix .t-icon),
+.settings-search :deep(.t-input__suffix .t-icon) {
+  color: var(--td-text-color-secondary);
+}
+
 .search-results {
   position: absolute;
   top: 100%;

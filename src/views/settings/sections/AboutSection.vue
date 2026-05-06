@@ -274,7 +274,7 @@ const openLink = async (url: string) => {
   background: var(--settings-group-bg, var(--td-bg-color-container));
   border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out; animation-fill-mode: both;
   h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--td-text-color-primary); }
   > p { margin: 0 0 1.5rem; color: var(--td-text-color-secondary); font-size: 0.875rem; }
@@ -304,7 +304,10 @@ const openLink = async (url: string) => {
 .version-section {
   .update-actions {
     display: flex; justify-content: space-between; align-items: center;
-    .update-option { display: flex; align-items: center; gap: 0.5rem; }
+    .update-option {
+      display: flex; align-items: center; gap: 0.5rem;
+      color: var(--td-text-color-primary);
+    }
   }
 }
 .update-card {
@@ -328,7 +331,7 @@ const openLink = async (url: string) => {
   display: inline-flex; align-items: center; justify-content: center;
   width: 1.25rem; height: 1.25rem; border-radius: 50%; font-size: 0.75rem;
   font-weight: 700; flex-shrink: 0;
-  background: var(--td-success-color); color: #fff;
+  background: var(--td-success-color); color: var(--td-text-color-anti);
 
   &.new { background: var(--td-brand-color); }
   &.downloading { background: var(--td-brand-color); will-change: opacity, transform; animation: pulse 1.5s infinite; }
@@ -438,7 +441,9 @@ const openLink = async (url: string) => {
       justify-content: space-between;
       padding: 10px 12px;
       border-radius: 8px;
-      background: var(--td-bg-color-page);
+      background: var(--settings-feature-bg, var(--td-bg-color-container));
+      border: 1px solid var(--settings-feature-border, var(--td-border-level-1-color));
+      color: var(--td-text-color-primary);
     }
   }
 

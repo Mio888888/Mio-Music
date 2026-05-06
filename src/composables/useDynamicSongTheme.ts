@@ -37,6 +37,20 @@ interface DynamicThemePalette {
   mobileGlassBg: string
   mobileGlassBgStrong: string
   mobileGlassBorder: string
+  settingsNavHoverBg: string
+  settingsNavActiveBg: string
+  settingsNavActiveBorder: string
+  settingsNavIconColor: string
+  settingsNavIconActive: string
+  settingsNavLabelColor: string
+  settingsNavLabelActive: string
+  settingsNavDescColor: string
+  settingsNavActiveShadow: string
+  settingsGroupShadow: string
+  settingsEqVisualizerBg: string
+  settingsEqVisualizerTrail: string
+  settingsEqVisualizerBarStart: string
+  settingsEqVisualizerBarEnd: string
 }
 
 const DYNAMIC_THEME_PROPERTIES = [
@@ -71,6 +85,7 @@ const DYNAMIC_THEME_PROPERTIES = [
   '--td-bg-color-component',
   '--td-bg-color-component-hover',
   '--td-bg-color-component-active',
+  '--td-bg-color-specialcomponent',
   '--td-component-stroke',
   '--td-component-border',
   '--td-border-level-1-color',
@@ -113,9 +128,30 @@ const DYNAMIC_THEME_PROPERTIES = [
   '--settings-sidebar-bg',
   '--settings-sidebar-border',
   '--settings-nav-hover-bg',
+  '--settings-nav-active-bg',
+  '--settings-nav-active-border',
+  '--settings-nav-icon-color',
+  '--settings-nav-icon-active',
+  '--settings-nav-label-color',
+  '--settings-nav-label-active',
+  '--settings-nav-desc-color',
+  '--settings-nav-active-shadow',
   '--settings-content-bg',
   '--settings-group-bg',
   '--settings-group-border',
+  '--settings-group-shadow',
+  '--settings-text-primary',
+  '--settings-text-secondary',
+  '--settings-source-card-hover-border',
+  '--settings-source-card-active-border',
+  '--settings-source-card-active-bg',
+  '--settings-source-icon-bg',
+  '--settings-plugin-prompt-bg',
+  '--settings-plugin-prompt-border',
+  '--settings-eq-visualizer-bg',
+  '--settings-eq-visualizer-trail',
+  '--settings-eq-visualizer-bar-start',
+  '--settings-eq-visualizer-bar-end',
   '--settings-preview-bg',
   '--settings-preview-border',
   '--settings-feature-bg',
@@ -192,6 +228,18 @@ const createPalette = (baseColor: Color, useBlackText: boolean): DynamicThemePal
     : mixColor(baseColor, white, 0.12)
   const textBase = useBlackText ? black : white
   const borderBase = useBlackText ? black : white
+  const settingsNavActiveTextBase = useBlackText ? black : white
+  const settingsNavActiveBg = useBlackText
+    ? mixColor(baseColor, white, 0.7)
+    : mixColor(baseColor, black, 0.34)
+  const settingsNavHoverBg = useBlackText
+    ? mixColor(baseColor, white, 0.8)
+    : mixColor(baseColor, white, 0.04)
+  const settingsNavActiveBorder = mixColor(
+    brand,
+    useBlackText ? black : white,
+    useBlackText ? 0.08 : 0.16
+  )
 
   return {
     brand1: rgba(mixColor(brand, white, 0.86), useBlackText ? 1 : 0.2),
@@ -222,7 +270,23 @@ const createPalette = (baseColor: Color, useBlackText: boolean): DynamicThemePal
     playerIdleBg: rgba(useBlackText ? mixColor(baseColor, white, 0.86) : mixColor(baseColor, black, 0.45), 0.92),
     mobileGlassBg: rgba(useBlackText ? mixColor(baseColor, white, 0.78) : mixColor(baseColor, black, 0.36), 0.78),
     mobileGlassBgStrong: rgba(useBlackText ? mixColor(baseColor, white, 0.88) : mixColor(baseColor, black, 0.46), 0.9),
-    mobileGlassBorder: rgba(borderBase, useBlackText ? 0.1 : 0.18)
+    mobileGlassBorder: rgba(borderBase, useBlackText ? 0.1 : 0.18),
+    settingsNavHoverBg: rgba(settingsNavHoverBg, useBlackText ? 0.86 : 0.7),
+    settingsNavActiveBg: rgba(settingsNavActiveBg, useBlackText ? 0.92 : 0.82),
+    settingsNavActiveBorder: rgba(settingsNavActiveBorder, useBlackText ? 0.72 : 0.9),
+    settingsNavIconColor: rgba(textBase, useBlackText ? 0.5 : 0.58),
+    settingsNavIconActive: rgba(settingsNavActiveTextBase, useBlackText ? 0.86 : 0.94),
+    settingsNavLabelColor: rgba(textBase, useBlackText ? 0.72 : 0.82),
+    settingsNavLabelActive: rgba(settingsNavActiveTextBase, useBlackText ? 0.92 : 0.96),
+    settingsNavDescColor: rgba(textBase, useBlackText ? 0.48 : 0.58),
+    settingsNavActiveShadow: useBlackText
+      ? '0 4px 14px rgba(15, 23, 42, 0.1)'
+      : '0 6px 18px rgba(0, 0, 0, 0.24)',
+    settingsGroupShadow: useBlackText ? 'rgba(15, 23, 42, 0.08)' : 'rgba(0, 0, 0, 0.28)',
+    settingsEqVisualizerBg: rgb(useBlackText ? mixColor(baseColor, white, 0.9) : mixColor(baseColor, black, 0.72)),
+    settingsEqVisualizerTrail: rgba(useBlackText ? mixColor(baseColor, white, 0.72) : mixColor(baseColor, black, 0.42), 0.28),
+    settingsEqVisualizerBarStart: rgb(brand),
+    settingsEqVisualizerBarEnd: rgb(mixColor(brand, useBlackText ? black : white, useBlackText ? 0.22 : 0.28))
   }
 }
 
@@ -263,6 +327,7 @@ const applyDynamicTheme = (palette: DynamicThemePalette): void => {
   setThemeProperty(root, '--td-bg-color-component', palette.componentBg)
   setThemeProperty(root, '--td-bg-color-component-hover', palette.componentHoverBg)
   setThemeProperty(root, '--td-bg-color-component-active', palette.componentActiveBg)
+  setThemeProperty(root, '--td-bg-color-specialcomponent', palette.componentBg)
   setThemeProperty(root, '--td-component-stroke', palette.borderLight)
   setThemeProperty(root, '--td-component-border', palette.borderMedium)
   setThemeProperty(root, '--td-border-level-1-color', palette.borderLight)
@@ -307,10 +372,31 @@ const applyDynamicTheme = (palette: DynamicThemePalette): void => {
   setThemeProperty(root, '--settings-header-bg', palette.elevatedBg)
   setThemeProperty(root, '--settings-sidebar-bg', palette.elevatedBg)
   setThemeProperty(root, '--settings-sidebar-border', palette.borderMedium)
-  setThemeProperty(root, '--settings-nav-hover-bg', palette.componentHoverBg)
+  setThemeProperty(root, '--settings-nav-hover-bg', palette.settingsNavHoverBg)
+  setThemeProperty(root, '--settings-nav-active-bg', palette.settingsNavActiveBg)
+  setThemeProperty(root, '--settings-nav-active-border', palette.settingsNavActiveBorder)
+  setThemeProperty(root, '--settings-nav-icon-color', palette.settingsNavIconColor)
+  setThemeProperty(root, '--settings-nav-icon-active', palette.settingsNavIconActive)
+  setThemeProperty(root, '--settings-nav-label-color', palette.settingsNavLabelColor)
+  setThemeProperty(root, '--settings-nav-label-active', palette.settingsNavLabelActive)
+  setThemeProperty(root, '--settings-nav-desc-color', palette.settingsNavDescColor)
+  setThemeProperty(root, '--settings-nav-active-shadow', palette.settingsNavActiveShadow)
   setThemeProperty(root, '--settings-content-bg', palette.pageBg)
   setThemeProperty(root, '--settings-group-bg', palette.elevatedBg)
   setThemeProperty(root, '--settings-group-border', palette.borderMedium)
+  setThemeProperty(root, '--settings-group-shadow', palette.settingsGroupShadow)
+  setThemeProperty(root, '--settings-text-primary', palette.textPrimary)
+  setThemeProperty(root, '--settings-text-secondary', palette.textSecondary)
+  setThemeProperty(root, '--settings-source-card-hover-border', palette.brand3)
+  setThemeProperty(root, '--settings-source-card-active-border', palette.brand5)
+  setThemeProperty(root, '--settings-source-card-active-bg', palette.brandLight)
+  setThemeProperty(root, '--settings-source-icon-bg', palette.componentBg)
+  setThemeProperty(root, '--settings-plugin-prompt-bg', `linear-gradient(135deg, ${palette.surfaceBg} 0%, ${palette.elevatedBg} 100%)`)
+  setThemeProperty(root, '--settings-plugin-prompt-border', palette.borderMedium)
+  setThemeProperty(root, '--settings-eq-visualizer-bg', palette.settingsEqVisualizerBg)
+  setThemeProperty(root, '--settings-eq-visualizer-trail', palette.settingsEqVisualizerTrail)
+  setThemeProperty(root, '--settings-eq-visualizer-bar-start', palette.settingsEqVisualizerBarStart)
+  setThemeProperty(root, '--settings-eq-visualizer-bar-end', palette.settingsEqVisualizerBarEnd)
   setThemeProperty(root, '--settings-preview-bg', palette.surfaceBg)
   setThemeProperty(root, '--settings-preview-border', palette.borderMedium)
   setThemeProperty(root, '--settings-feature-bg', palette.surfaceBg)

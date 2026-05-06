@@ -525,7 +525,7 @@ watch(
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--theme-shadow-medium);
   }
 }
 

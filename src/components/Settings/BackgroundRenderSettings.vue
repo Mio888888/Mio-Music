@@ -253,10 +253,10 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    background: var(--td-warning-color-1);
+    border: 1px solid var(--td-warning-color-3);
     border-radius: 0.5rem;
-    color: #ff9800;
+    color: var(--td-warning-color-6);
     font-size: 0.875rem;
 
     .t-icon {
@@ -276,18 +276,18 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
   }
 
   .tag-low {
-    background: rgba(76, 175, 80, 0.15);
-    color: #4caf50;
+    background: var(--td-success-color-1);
+    color: var(--td-success-color-6);
   }
 
   .tag-medium {
-    background: rgba(255, 193, 7, 0.15);
-    color: #ffc107;
+    background: var(--td-warning-color-1);
+    color: var(--td-warning-color-6);
   }
 
   .tag-high {
-    background: rgba(244, 67, 54, 0.15);
-    color: #f44336;
+    background: var(--td-error-color-1);
+    color: var(--td-error-color-6);
   }
 }
 </style>

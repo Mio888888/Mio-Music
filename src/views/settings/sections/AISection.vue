@@ -98,7 +98,7 @@ const clearAPIKey = (): void => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out;
   animation-fill-mode: both;
 
