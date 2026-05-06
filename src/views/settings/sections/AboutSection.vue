@@ -147,12 +147,16 @@ const openLink = async (url: string) => {
             <div>应用启动时检查更新</div>
           </div>
           <t-button
+            class="update-check-button"
             theme="primary"
-            :loading="isChecking"
-            :disabled="updateStatus === 'downloading'"
+            :disabled="isChecking || updateStatus === 'downloading'"
+            :aria-busy="isChecking"
             @click="handleCheckUpdate"
           >
-            {{ isChecking ? '检查中...' : '检查更新' }}
+            <span class="update-check-content">
+              <span v-if="isChecking" class="update-check-spinner" aria-hidden="true" />
+              {{ isChecking ? '检查中...' : '检查更新' }}
+            </span>
           </t-button>
         </div>
 
@@ -308,6 +312,25 @@ const openLink = async (url: string) => {
       display: flex; align-items: center; gap: 0.5rem;
       color: var(--td-text-color-primary);
     }
+  }
+}
+.update-check-button {
+  .update-check-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .update-check-spinner {
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
+    border-radius: 50%;
+    will-change: transform;
+    animation: update-check-spin 1s linear infinite;
   }
 }
 .update-card {
@@ -499,4 +522,5 @@ const openLink = async (url: string) => {
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+@keyframes update-check-spin { to { transform: rotate(360deg); } }
 </style>

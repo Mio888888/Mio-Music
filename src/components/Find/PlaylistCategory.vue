@@ -323,7 +323,10 @@ onDeactivated(() => {
       <h3 class="section-title">{{ activeCategoryName }}歌单</h3>
 
       <div v-if="loading && playlists.length === 0" class="loading-container">
-        <t-loading size="large" text="正在加载歌单..." />
+        <div class="playlist-loading" role="status" aria-live="polite">
+          <span class="playlist-loading-spinner" aria-hidden="true" />
+          <span>正在加载歌单...</span>
+        </div>
       </div>
 
       <div v-else-if="error" class="error-container">
@@ -366,7 +369,10 @@ onDeactivated(() => {
       </div>
 
       <div v-if="loadingMore && playlists.length > 0" class="load-status">
-        <t-loading size="small" text="加载更多..." />
+        <div class="playlist-loading small" role="status" aria-live="polite">
+          <span class="playlist-loading-spinner" aria-hidden="true" />
+          <span>加载更多...</span>
+        </div>
       </div>
       <div v-else-if="noMore && playlists.length > 0" class="load-status">
         <span class="no-more">没有更多内容</span>
@@ -488,6 +494,37 @@ onDeactivated(() => {
   justify-content: center;
   align-items: center;
   padding: 4rem 0;
+}
+
+.playlist-loading {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+}
+
+.playlist-loading.small {
+  flex-direction: row;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.playlist-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--td-bg-color-component);
+  border-top-color: var(--td-brand-color);
+  border-radius: 50%;
+  will-change: transform;
+  animation: playlist-loading-spin 1s linear infinite;
+}
+
+.playlist-loading.small .playlist-loading-spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
 }
 
 .error-container {
@@ -1148,6 +1185,12 @@ onDeactivated(() => {
   .playlist-cover img,
   .tag-chip {
     transition: none;
+  }
+}
+
+@keyframes playlist-loading-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
