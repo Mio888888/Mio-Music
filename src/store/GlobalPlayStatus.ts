@@ -360,6 +360,7 @@ interface PlayerState {
   }
   lyrics: { lines: LyricLine[]; trans?: string; source?: string }
   isLoading: boolean
+  isFullPlayOpen: boolean
   comments: CommentsState
   _lyricsTrigger: number
 }
@@ -404,6 +405,7 @@ export const useGlobalPlayStatusStore = defineStore(
       },
       lyrics: { lines: [] },
       isLoading: false,
+      isFullPlayOpen: false,
       _lyricsTrigger: 0,
       comments: {
         hotList: [],
@@ -648,7 +650,11 @@ export const useGlobalPlayStatusStore = defineStore(
       setTimeout(() => { fetchComments(1, 'hot'); fetchComments(1, 'latest') }, 500)
     }
 
-    return { player, updatePlayerInfo, fetchComments }
+    function setFullPlayOpen(open: boolean) {
+      player.isFullPlayOpen = open
+    }
+
+    return { player, updatePlayerInfo, fetchComments, setFullPlayOpen }
   },
   { persist: false }
 )

@@ -4,6 +4,7 @@ import BackupRestore from '@/components/BackupRestore/BackupRestore.vue'
 import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useSettingsStore } from '@/store/Settings'
 import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
@@ -55,8 +56,11 @@ const route = useRoute()
 const source_list_show = ref(false)
 
 const settingsStore = useSettingsStore()
+const globalPlayStatus = useGlobalPlayStatusStore()
 const { settings } = storeToRefs(settingsStore)
+const { player } = storeToRefs(globalPlayStatus)
 const isDetailPage = computed(() => /\/(list|singer)\//.test(route.path))
+const isFullPlayOpen = computed(() => player.value.isFullPlayOpen)
 const showNewYear = computed(
   () => settingsStore.shouldUseSpringFestivalTheme() && !settings.value.springFestivalDisabled
 )
@@ -286,17 +290,19 @@ const handleKeyDown = () => {
       </t-content>
     </t-layout>
 
-    <!-- 移动端底部导航（Apple Music 风格） -->
-    <nav class="mobile-bottom-nav">
+    <!-- 移动端底部导航（悬浮胶囊 Glass Island） -->
+    <nav v-if="!isFullPlayOpen" class="mobile-bottom-nav" aria-label="主要导航">
       <button
         v-for="(item, index) in menuList"
         :key="index"
         class="mobile-nav-item"
         :class="{ active: menuActive === index }"
+        :aria-label="item.name"
+        :aria-current="menuActive === index ? 'page' : undefined"
         @click="handleClick(index)"
       >
-        <div class="mobile-nav-dot"></div>
-        <i :class="`iconfont ${item.icon}`"></i>
+        <span class="mobile-nav-indicator" aria-hidden="true"></span>
+        <i :class="`iconfont ${item.icon}`" aria-hidden="true"></i>
         <span class="mobile-nav-label">{{ item.name }}</span>
       </button>
     </nav>
@@ -737,88 +743,145 @@ const handleKeyDown = () => {
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    right: max(14px, var(--mobile-page-gutter));
+    bottom: calc(var(--mobile-safe-bottom) + var(--mobile-nav-bottom-gap));
+    left: max(14px, var(--mobile-page-gutter));
     z-index: var(--mobile-bottom-layer-z);
-    align-items: flex-start;
-    justify-content: space-around;
-    height: var(--mobile-nav-total-height);
-    padding: 6px max(10px, var(--mobile-page-gutter)) var(--mobile-safe-bottom);
-    background: var(--mobile-glass-bg);
-    border-top: 0.5px solid var(--mobile-glass-border);
-    box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
+    align-items: center;
+    justify-content: space-between;
+    height: var(--mobile-nav-height);
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 7px 8px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.24)),
+      color-mix(in srgb, var(--td-bg-color-container) 40%, transparent);
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    border-radius: calc(var(--mobile-nav-height) / 2);
+    box-shadow:
+      0 18px 44px rgba(15, 23, 42, 0.14),
+      0 6px 16px rgba(15, 23, 42, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.58);
     backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
     -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
   }
 
   .mobile-nav-item {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
-    flex: 1;
     min-width: var(--mobile-touch-target);
     min-height: var(--mobile-touch-target);
-    height: var(--mobile-nav-height);
-    background: none;
+    height: 100%;
+    padding: 5px 0 4px;
+    color: var(--td-text-color-secondary);
+    background: transparent;
     border: none;
     border-radius: var(--mobile-control-radius);
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    padding: 5px 0 4px;
     position: relative;
-    transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--motion-duration-quick) var(--motion-ease-standard),
+      box-shadow var(--motion-duration-quick) var(--motion-ease-standard),
+      color var(--motion-duration-quick) var(--motion-ease-standard),
+      transform var(--motion-duration-quick) var(--motion-ease-standard);
 
     &:active {
-      transform: scale(0.96);
-      background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+      transform: scale(0.95);
+      background: color-mix(in srgb, var(--td-brand-color) 13%, transparent);
     }
 
     .iconfont {
-      font-size: 22px;
-      color: var(--td-text-color-placeholder);
-      transition: color 0.2s ease;
+      font-size: 21px;
+      line-height: 1;
+      color: currentColor;
+      transition: transform var(--motion-duration-quick) var(--motion-ease-standard);
     }
 
     .mobile-nav-label {
       font-size: 10px;
       line-height: 1;
-      color: var(--td-text-color-placeholder);
-      transition: color 0.2s ease;
+      color: currentColor;
+      font-weight: 500;
+      letter-spacing: 0.01em;
     }
 
-    .mobile-nav-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
+    .mobile-nav-indicator {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      width: 18px;
+      height: 3px;
+      border-radius: 999px;
       background: transparent;
-      margin-bottom: 1px;
-      transition: background-color 0.2s ease, transform 0.2s ease;
+      transform: translateX(-50%) scaleX(0.4);
+      transform-origin: center;
+      transition:
+        background-color var(--motion-duration-quick) var(--motion-ease-standard),
+        box-shadow var(--motion-duration-quick) var(--motion-ease-standard),
+        transform var(--motion-duration-quick) var(--motion-ease-standard);
     }
   }
 
   .mobile-nav-item.active {
+    color: var(--td-brand-color);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.18)),
+      color-mix(in srgb, var(--td-brand-color) 15%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.52),
+      0 6px 18px color-mix(in srgb, var(--td-brand-color) 18%, transparent);
+
     .iconfont {
-      color: var(--td-brand-color);
+      transform: translateY(-1px);
     }
 
     .mobile-nav-label {
-      color: var(--td-brand-color);
-      font-weight: 600;
+      font-weight: 700;
     }
 
-    .mobile-nav-dot {
+    .mobile-nav-indicator {
       background: var(--td-brand-color);
-      transform: scale(1.15);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--td-brand-color) 60%, transparent);
+      transform: translateX(-50%) scaleX(1);
     }
   }
 
-  /* 暗色模式 */
+  .mobile-nav-item:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--td-brand-color) 70%, white);
+    outline-offset: 2px;
+  }
+
   :global([data-theme="dark"]) .mobile-bottom-nav {
-    background: var(--mobile-glass-bg);
-    border-top-color: var(--mobile-glass-border);
+    background:
+      linear-gradient(145deg, rgba(46, 48, 64, 0.46), rgba(20, 22, 32, 0.32)),
+      color-mix(in srgb, var(--td-bg-color-container) 36%, transparent);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 22px 52px rgba(0, 0, 0, 0.36),
+      0 8px 18px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+
+  :global([data-theme="dark"]) .mobile-nav-item.active {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04)),
+      color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.13),
+      0 8px 20px color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-nav-item,
+    .mobile-nav-item .iconfont,
+    .mobile-nav-indicator {
+      transition: none;
+    }
   }
 }
 </style>

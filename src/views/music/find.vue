@@ -116,12 +116,12 @@ const activeTab = ref<'songlist' | 'leaderboard'>('songlist')
 
 @media (max-width: 768px) {
   .find-container {
-    padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
+    padding: var(--mobile-page-top-gutter) 0 0;
     overflow: hidden;
   }
 
   .page-header {
-    margin: 0 0 1rem;
+    margin: 0 var(--mobile-page-gutter) 1rem;
   }
 
   .page-header h2 {
@@ -137,7 +137,7 @@ const activeTab = ref<'songlist' | 'leaderboard'>('songlist')
   }
 
   .segment-tabs {
-    margin: 0 0 1rem;
+    margin: 0 var(--mobile-page-gutter) 1rem;
     min-height: var(--mobile-touch-target);
     padding: 4px;
     border-radius: var(--mobile-control-radius);
@@ -154,7 +154,9 @@ const activeTab = ref<'songlist' | 'leaderboard'>('songlist')
 
   .tab-content,
   .leaderboard-pane {
+    min-width: 0;
     min-height: 0;
+    max-width: 100%;
     -webkit-overflow-scrolling: touch;
   }
 }

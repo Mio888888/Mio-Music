@@ -3,8 +3,11 @@
   --play-bottom-height: max(min(10vh, 80px), 70px);
   --mobile-safe-top: env(safe-area-inset-top, 0px);
   --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --mobile-nav-height: 58px;
-  --mobile-nav-total-height: calc(var(--mobile-nav-height) + var(--mobile-safe-bottom));
+  --mobile-nav-height: 64px;
+  --mobile-nav-bottom-gap: 10px;
+  --mobile-nav-total-height: calc(
+    var(--mobile-nav-height) + var(--mobile-safe-bottom) + var(--mobile-nav-bottom-gap)
+  );
   --mobile-player-height: var(--play-bottom-height);
   --mobile-player-bottom: var(--mobile-nav-total-height);
   --mobile-content-bottom-inset: calc(

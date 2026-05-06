@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onActivated, onDeactivated } from 'vue'
+import { ref, onMounted, watch, onActivated, onDeactivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { storeToRefs } from 'pinia'
@@ -109,6 +109,22 @@ const onSelectTag = async (tagId: string, name: string) => {
   await fetchCategoryPlaylists(true)
 }
 
+const onSelectGroup = (groupName: string) => {
+  activeGroupName.value = groupName
+}
+
+const openMoreCategories = () => {
+  showMore.value = true
+}
+
+const closeMoreCategories = () => {
+  showMore.value = false
+}
+
+const handleMoreKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') closeMoreCategories()
+}
+
 const onScroll = (e: Event) => {
   const el = e.target as HTMLElement
   if (el.scrollHeight - el.scrollTop - el.clientHeight < 100 && !noMore.value && !loadingMore.value) {
@@ -135,6 +151,11 @@ const goToPlaylist = (item: any) => {
   })
 }
 
+const onDocClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.category-bar') && showMore.value) showMore.value = false
+}
+
 onMounted(() => {
   watch(
     userSource,
@@ -151,11 +172,13 @@ onMounted(() => {
     { deep: true, immediate: true }
   )
 
-  const onDocClick = (e: MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('.category-bar') && showMore.value) showMore.value = false
-  }
   document.addEventListener('click', onDocClick)
+  document.addEventListener('keydown', handleMoreKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick)
+  document.removeEventListener('keydown', handleMoreKeydown)
 })
 
 onActivated(() => {
@@ -190,10 +213,17 @@ onDeactivated(() => {
 
         <div
           class="more-category-wrapper"
-          @mouseenter="showMore = true"
-          @mouseleave="showMore = false"
+          @mouseenter="openMoreCategories"
+          @mouseleave="closeMoreCategories"
         >
-          <t-button class="tag-chip more" shape="round" variant="outline">
+          <t-button
+            class="tag-chip more"
+            shape="round"
+            variant="outline"
+            :aria-expanded="showMore"
+            aria-haspopup="dialog"
+            @click.stop="openMoreCategories"
+          >
             更多分类
             <template #suffix>
               <t-icon name="chevron-down" size="14px" :class="{ rotate: showMore }" />
@@ -201,7 +231,7 @@ onDeactivated(() => {
           </t-button>
 
           <transition name="dropdown">
-            <div v-if="showMore" class="more-panel">
+            <div v-if="showMore" class="more-panel desktop-more-panel">
               <div class="panel-inner">
                 <div class="panel-content">
                   <t-tabs v-model:value="activeGroupName" size="medium">
@@ -229,6 +259,64 @@ onDeactivated(() => {
           </transition>
         </div>
       </div>
+
+      <teleport to="body">
+        <transition name="sheet-fade">
+          <div
+            v-if="showMore"
+            class="mobile-category-sheet-mask"
+            role="presentation"
+            @click.self="closeMoreCategories"
+          >
+            <section
+              class="mobile-category-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="categorySheetTitle"
+              @click.stop
+            >
+              <div class="sheet-handle" />
+              <header class="sheet-header">
+                <div>
+                  <p class="sheet-eyebrow">选择歌单分类</p>
+                  <h3 id="categorySheetTitle">发现更多音乐口味</h3>
+                </div>
+                <button class="sheet-close" aria-label="关闭分类面板" @click="closeMoreCategories">
+                  <t-icon name="close" size="18px" />
+                </button>
+              </header>
+
+              <div class="sheet-body">
+                <div class="sheet-groups" role="tablist" aria-label="歌单分类分组">
+                  <button
+                    v-for="group in tags"
+                    :key="group.name"
+                    class="sheet-group-tab"
+                    :class="{ active: activeGroupName === group.name }"
+                    role="tab"
+                    :aria-selected="activeGroupName === group.name"
+                    @click="onSelectGroup(group.name)"
+                  >
+                    {{ group.name }}
+                  </button>
+                </div>
+
+                <div v-if="tags[activeGroupIndex]" class="sheet-tags">
+                  <button
+                    v-for="t in tags[activeGroupIndex].list"
+                    :key="t.id"
+                    class="sheet-tag-chip"
+                    :class="{ active: activeTagId === t.id }"
+                    @click="onSelectTag(t.id, t.name)"
+                  >
+                    {{ t.name }}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </transition>
+      </teleport>
     </div>
 
     <div class="section">
@@ -243,6 +331,14 @@ onDeactivated(() => {
         <t-button theme="primary" style="margin-top: 1rem" @click="fetchCategoryPlaylists(true)">
           重新加载
         </t-button>
+      </div>
+
+      <div v-else-if="playlists.length === 0" class="empty-container">
+        <div class="empty-orb">
+          <t-icon name="music" size="28px" />
+        </div>
+        <h4>暂无歌单</h4>
+        <p>换个分类看看，也许会发现新的音乐灵感</p>
       </div>
 
       <div v-else class="playlist-grid">
@@ -417,12 +513,67 @@ onDeactivated(() => {
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
 
-@media (max-width: 480px) {
-  .playlist-grid {
-    gap: 0.75rem;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
+.sheet-fade-enter-active,
+.sheet-fade-leave-active {
+  transition: opacity 0.22s ease;
 }
+
+.sheet-fade-enter-active .mobile-category-sheet,
+.sheet-fade-leave-active .mobile-category-sheet {
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+}
+
+.sheet-fade-enter-from,
+.sheet-fade-leave-to {
+  opacity: 0;
+}
+
+.sheet-fade-enter-from .mobile-category-sheet,
+.sheet-fade-leave-to .mobile-category-sheet {
+  opacity: 0;
+  transform: translateY(24px) scale(0.98);
+}
+
+.mobile-category-sheet-mask {
+  display: none;
+}
+
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 260px;
+  padding: 2rem;
+  text-align: center;
+  color: var(--td-text-color-secondary);
+}
+
+.empty-orb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  color: var(--td-brand-color);
+  background: var(--td-brand-color-light);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.1);
+}
+
+.empty-container h4 {
+  margin: 0.5rem 0 0;
+  color: var(--td-text-color-primary);
+  font-size: 1rem;
+}
+
+.empty-container p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+
 
 @media (min-width: 481px) and (max-width: 768px) {
   .playlist-grid {
@@ -570,5 +721,433 @@ onDeactivated(() => {
   padding: 0.125rem 0.5rem;
   border-radius: 0.375rem;
   transition: color 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .playlist-category {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 var(--mobile-page-gutter) 1.5rem;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-bar,
+  .section,
+  .playlist-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .playlist-card {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .category-bar {
+    position: relative;
+    margin: 0 0 1rem;
+    padding: 0.75rem 0 0.5rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  .category-bar::after {
+    content: '';
+    position: absolute;
+    top: 0.75rem;
+    right: 0;
+    bottom: 0.5rem;
+    width: 28px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--td-bg-color-page, var(--td-bg-color-container)) 78%);
+  }
+
+  .hot-tags {
+    width: calc(100vw - var(--mobile-page-gutter) * 2);
+    max-width: calc(100vw - var(--mobile-page-gutter) * 2);
+    min-width: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-content: start;
+    gap: 0.5rem;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    padding: 0.125rem 1.75rem 0.375rem 0;
+    scroll-padding-inline: 0;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+  }
+
+  .hot-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .more-category-wrapper {
+    min-width: 0;
+    display: block;
+  }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: top;
+    scroll-snap-align: start;
+    flex: 0 0 auto;
+    min-height: var(--mobile-touch-target);
+    padding: 0 0.875rem;
+    border: 1px solid var(--td-border-level-1-color);
+    border-radius: 999px;
+    color: var(--td-text-color-secondary);
+    background: var(--td-bg-color-container);
+    box-shadow: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    touch-action: manipulation;
+  }
+
+  .tag-chip:hover {
+    color: var(--td-text-color-secondary);
+    background: var(--td-bg-color-container);
+    transform: none;
+  }
+
+  .tag-chip:active,
+  .tag-chip.more:active {
+    transform: scale(0.97);
+    background: var(--td-bg-color-secondarycontainer);
+  }
+
+  .tag-chip.active {
+    color: var(--td-brand-color);
+    background: var(--td-brand-color-light);
+    border-color: var(--td-brand-color);
+    font-weight: 600;
+  }
+
+  .tag-chip.more {
+    position: static;
+    z-index: auto;
+    gap: 0.25rem;
+    color: var(--td-text-color-primary);
+    background: var(--td-bg-color-secondarycontainer);
+    border-color: var(--td-border-level-2-color);
+  }
+
+  .desktop-more-panel {
+    display: none;
+  }
+
+  .mobile-category-sheet-mask {
+    position: fixed;
+    inset: 0;
+    z-index: var(--mobile-overlay-layer-z);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 0 var(--mobile-safe-bottom);
+    background: rgba(0, 0, 0, 0.42);
+  }
+
+  .mobile-category-sheet {
+    width: 100%;
+    max-width: 430px;
+    max-height: min(78dvh, 640px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 20px 20px 0 0;
+    background: var(--td-bg-color-container);
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+  }
+
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    flex: 0 0 auto;
+    margin: 10px auto 0;
+    border-radius: 999px;
+    background: var(--td-border-level-2-color);
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem var(--mobile-page-gutter) 0.75rem;
+    border-bottom: 1px solid var(--td-border-level-1-color);
+  }
+
+  .sheet-eyebrow {
+    display: none;
+  }
+
+  .sheet-header h3 {
+    margin: 0;
+    color: var(--td-text-color-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .sheet-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border: 0;
+    border-radius: 12px;
+    color: var(--td-text-color-secondary);
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .sheet-close:active {
+    background: var(--td-bg-color-secondarycontainer);
+    transform: scale(0.97);
+  }
+
+  .sheet-body {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 0.875rem var(--mobile-page-gutter) 1rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sheet-groups {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.125rem;
+    scrollbar-width: none;
+  }
+
+  .sheet-groups::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sheet-group-tab,
+  .sheet-tag-chip {
+    border: 1px solid var(--td-border-level-1-color);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .sheet-group-tab {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0 0.875rem;
+    border-radius: 999px;
+    color: var(--td-text-color-secondary);
+    background: var(--td-bg-color-container);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .sheet-group-tab.active {
+    color: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+    background: var(--td-brand-color-light);
+    font-weight: 600;
+  }
+
+  .sheet-tags {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .sheet-tag-chip {
+    min-height: var(--mobile-touch-target);
+    padding: 0 0.375rem;
+    border-radius: 12px;
+    color: var(--td-text-color-primary);
+    background: var(--td-bg-color-secondarycontainer);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .sheet-tag-chip.active {
+    color: var(--td-brand-color);
+    border-color: var(--td-brand-color);
+    background: var(--td-brand-color-light);
+    font-weight: 600;
+  }
+
+  .section {
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    margin: 0 0 0.75rem;
+    font-size: 1.0625rem;
+    line-height: 1.4;
+  }
+
+  .loading-container,
+  .error-container,
+  .empty-container {
+    min-height: 220px;
+    margin-top: 0.5rem;
+    padding: 1.5rem 1rem;
+    border: 1px solid var(--td-border-level-1-color);
+    border-radius: 16px;
+    background: var(--td-bg-color-container);
+    box-shadow: none;
+  }
+
+  .empty-orb {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    box-shadow: none;
+  }
+
+  .error-container :deep(.t-alert) {
+    text-align: left;
+    border-radius: 12px;
+  }
+
+  .error-container :deep(.t-button) {
+    min-height: var(--mobile-touch-target);
+    border-radius: 999px;
+  }
+
+  .playlist-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .playlist-card {
+    min-height: 104px;
+    display: flex;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.625rem;
+    border: 1px solid var(--td-border-level-1-color);
+    border-radius: 16px;
+    background: var(--td-bg-color-container);
+    box-shadow: none;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 116px;
+    touch-action: manipulation;
+  }
+
+  .playlist-card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .playlist-card:active {
+    transform: scale(0.99);
+    background: var(--td-bg-color-secondarycontainer);
+  }
+
+  .playlist-cover {
+    width: 84px;
+    height: 84px;
+    flex: 0 0 84px;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: auto;
+  }
+
+  .playlist-cover::after {
+    display: none;
+  }
+
+  .playlist-cover img,
+  .playlist-card:hover .playlist-cover img {
+    transform: none;
+  }
+
+  .playlist-info {
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.125rem 0;
+    background: transparent;
+  }
+
+  .playlist-title {
+    min-height: 0;
+    margin: 0 0 0.375rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
+  }
+
+  .playlist-desc {
+    min-height: 0;
+    margin: 0 0 0.5rem;
+    color: var(--td-text-color-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    -webkit-line-clamp: 1;
+  }
+
+  .playlist-meta {
+    justify-content: flex-start;
+    gap: 0.5rem;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .play-count,
+  .song-count {
+    color: var(--td-text-color-placeholder);
+    font-size: 0.75rem;
+  }
+
+  .song-count {
+    background: var(--td-bg-color-secondarycontainer);
+  }
+
+  .load-status {
+    padding: 1rem 0 0;
+  }
+
+  .no-more {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 0.875rem;
+    border-radius: 999px;
+    background: var(--td-bg-color-secondarycontainer);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-fade-enter-active,
+  .sheet-fade-leave-active,
+  .sheet-fade-enter-active .mobile-category-sheet,
+  .sheet-fade-leave-active .mobile-category-sheet,
+  .playlist-card,
+  .playlist-cover img,
+  .tag-chip {
+    transition: none;
+  }
 }
 </style>

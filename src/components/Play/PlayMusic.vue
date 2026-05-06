@@ -783,6 +783,7 @@ watch(
 )
 
 watch(showFullPlay, (val) => {
+  globalPlayStatus.setFullPlayOpen(val)
   if (val) {
     console.log('背景hei')
     bg.value = '#00000020'
@@ -790,13 +791,17 @@ watch(showFullPlay, (val) => {
     bg.value = 'var(--player-bg-default)'
   }
 })
+
+onBeforeUnmount(() => {
+  globalPlayStatus.setFullPlayOpen(false)
+})
 </script>
 
 <template>
   <div
     class="player-container"
     :style="!showFullPlay && 'box-shadow: none'"
-    :class="{ 'full-play-idle': isFullPlayIdle && showFullPlay }"
+    :class="{ 'full-play-idle': isFullPlayIdle && showFullPlay, 'is-full-play': showFullPlay }"
     @click.stop="toggleFullPlay"
   >
     <!-- 进度条 -->
@@ -1659,6 +1664,10 @@ watch(showFullPlay, (val) => {
     bottom: var(--mobile-player-bottom);
     height: var(--mobile-player-height);
     border-top: 0.5px solid var(--mobile-glass-border);
+  }
+
+  .player-container.is-full-play {
+    bottom: var(--mobile-safe-bottom);
   }
 
   .player-content {
