@@ -92,22 +92,23 @@ export const usePluginStore = defineStore('plugin', () => {
             const selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
             userStore.userInfo.pluginId = plugin.plugin_id
             userStore.userInfo.pluginName = plugin.plugin_info.name
-            userStore.userInfo.supportedSources = supportedSourcesForStore
+            userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
             userStore.userInfo.selectSources = selectSources
             userStore.userInfo.selectQuality = selectQuality
           } else {
             // Sync: update supportedSources with latest plugin data, preserve user selections
             const prevSources = userStore.userInfo.supportedSources || {}
-            userStore.userInfo.supportedSources = supportedSourcesForStore
+            userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
             userStore.userInfo.pluginName = plugin.plugin_info.name
 
             // Validate current selections still exist in new data
             const currentSource = userStore.userInfo.selectSources as string
-            if (currentSource && !supportedSourcesForStore[currentSource]) {
-              userStore.userInfo.selectSources = Object.keys(supportedSourcesForStore)[0]
+            const availableSources = userStore.userInfo.supportedSources || {}
+            if (currentSource && !availableSources[currentSource]) {
+              userStore.userInfo.selectSources = Object.keys(availableSources)[0]
             }
             const currentQuality = userStore.userInfo.selectQuality as string
-            const sourceQualities = supportedSourcesForStore[userStore.userInfo.selectSources as string]?.qualitys || []
+            const sourceQualities = availableSources[userStore.userInfo.selectSources as string]?.qualitys || []
             if (currentQuality && !sourceQualities.includes(currentQuality)) {
               userStore.userInfo.selectQuality = sourceQualities.length > 0 ? sourceQualities[sourceQualities.length - 1] : ''
             }

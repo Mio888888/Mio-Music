@@ -93,6 +93,24 @@ function getSource(): string {
   return store.userSource.source || 'kw'
 }
 
+function getSubsonicConfig(): Record<string, any> | undefined {
+  const store = LocalUserDetailStore()
+  const config = store.userInfo.subsonicConfig
+  if (!config) return undefined
+  return {
+    baseUrl: config.baseUrl || '',
+    username: config.username || '',
+    password: config.password || '',
+    apiVersion: config.apiVersion || '1.16.1',
+    clientName: config.clientName || 'Mio',
+  }
+}
+
+function withSourceConfig(source: string, args: Record<string, any>): Record<string, any> {
+  if (source !== 'subsonic') return { ...args, source }
+  return { ...args, source, subsonicConfig: args.subsonicConfig || getSubsonicConfig() }
+}
+
 function parsePlaylistPlayCount(raw: unknown): number {
   if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0
   if (typeof raw !== 'string') return 0
@@ -118,7 +136,7 @@ export const musicSdk = {
       const source = args.source || getSource()
       const result = await invoke('service_music_sdk_request', {
         method,
-        args: { ...args, source }
+        args: withSourceConfig(source, args)
       })
       return rewriteImageUrls(result)
     } catch (error) {

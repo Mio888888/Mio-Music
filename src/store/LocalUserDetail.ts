@@ -2,7 +2,37 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch, toRaw } from 'vue'
 import { ControlAudioStore } from './ControlAudio'
 import type { SongList } from '../types/audio'
-import type { UserInfo } from '../types/userInfo'
+import type { MusicSource, UserInfo } from '../types/userInfo'
+
+const SUBSONIC_SOURCE: MusicSource = {
+  name: 'Subsonic',
+  type: '内置音源',
+  qualitys: ['128k', '320k', 'flac'],
+}
+
+function hasValidSubsonicConfig(userInfo: UserInfo): boolean {
+  const config = userInfo.subsonicConfig
+  return !!(
+    config?.enabled &&
+    config.baseUrl?.trim() &&
+    config.username?.trim() &&
+    config.password
+  )
+}
+
+function mergeBuiltInSources(userInfo: UserInfo, sources: Record<string, MusicSource> = {}): Record<string, MusicSource> {
+  const merged = { ...sources }
+  if (hasValidSubsonicConfig(userInfo)) {
+    merged.subsonic = SUBSONIC_SOURCE
+  } else {
+    delete merged.subsonic
+  }
+  return merged
+}
+
+function ensureBuiltInSources(userInfo: UserInfo): void {
+  userInfo.supportedSources = mergeBuiltInSources(userInfo, userInfo.supportedSources || {})
+}
 
 function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | null = null
@@ -51,11 +81,13 @@ export const LocalUserDetailStore = defineStore('Local', () => {
     if (UserInfoLocal) {
       userInfo.value = JSON.parse(UserInfoLocal) as UserInfo
       if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
+      ensureBuiltInSources(userInfo.value)
     } else {
       userInfo.value = {
         lastPlaySongId: null, topBarStyle: false, mainColor: '#00DAC0',
         volume: 80, currentTime: 0, selectSources: 'wy', sourceQualityMap: {}, hasGuide: false
       }
+      ensureBuiltInSources(userInfo.value)
       localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
     }
     if (ListLocal) {
@@ -311,6 +343,9 @@ export const LocalUserDetailStore = defineStore('Local', () => {
     loadPlaylists, createPlaylist, deletePlaylist, batchDeletePlaylists,
     updatePlaylist, updatePlaylistCover, addSongsToPlaylist, removeSongFromPlaylist,
     removeSongsFromPlaylist, getSongsForPlaylist, searchSongsInPlaylist,
-    moveSongInPlaylist, getFavoritesId, setFavoritesId
+    moveSongInPlaylist, getFavoritesId, setFavoritesId,
+    mergeBuiltInSources,
+    ensureBuiltInSources,
+    hasValidSubsonicConfig
   }
 }, { persist: false })

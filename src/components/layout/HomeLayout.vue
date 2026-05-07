@@ -31,8 +31,8 @@ const sourceicon: Record<string, string> = {
   tx: 'tx',
   kw: 'kw',
   bd: 'kw',
-  xm: 'xm',
-  git: 'git'
+  git: 'git',
+  subsonic: 'git'
 }
 const source = ref('kugouyinle')
 
@@ -71,7 +71,6 @@ watch(
 const hasPluginData = computed(() => {
   const LocalUserDetail = LocalUserDetailStore()
   return !!(
-    LocalUserDetail.userInfo.pluginId &&
     LocalUserDetail.userInfo.supportedSources &&
     Object.keys(LocalUserDetail.userInfo.supportedSources).length > 0
   )
@@ -85,7 +84,8 @@ const sourceNames: Record<string, string> = {
   kw: '酷我音乐',
   bd: '波点音乐',
   xm: '虾米音乐',
-  git: 'GitCode'
+  git: 'GitCode',
+  subsonic: 'Subsonic'
 }
 
 const sourceList = computed(() => {

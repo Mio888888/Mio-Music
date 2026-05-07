@@ -6,6 +6,7 @@ pub mod mg;
 pub mod bd;
 pub mod xm;
 pub mod git;
+pub mod subsonic;
 
 use crate::music_sdk::client::{PlaylistDetailResult, PlaylistResult, SearchResult};
 use serde_json::json;
@@ -20,6 +21,7 @@ pub async fn dispatch(source: &str, method: &str, args: serde_json::Value) -> Re
         "mg" => mg::handle(method, args).await,
         "xm" => xm::handle(method, args).await,
         "git" => git::handle(method, args).await,
+        "subsonic" => subsonic::handle(method, args).await,
         _ => stub_response(method, source),
     }
 }

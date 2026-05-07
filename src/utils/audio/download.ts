@@ -4,6 +4,7 @@ import { useSettingsStore } from '@/store/Settings'
 import { toRaw, h } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { musicSdk } from '@/services/musicSdk'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import {
   getQualityDisplayName,
@@ -265,20 +266,25 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
       MessagePlugin.warning(`所选音质不可用，已自动调整为: ${getQualityDisplayName(quality)}`)
     }
 
-    const pluginId = localUserDetail.userSource.pluginId
-    if (!pluginId) {
-      MessagePlugin.error('未选择音源插件，请先在设置中选择插件')
-      return
-    }
-
     const tip = MessagePlugin.success('正在获取下载地址：' + songInfo.name)
 
-    const rawUrl = await PluginRunner.getMusicUrl(
-      pluginId,
-      songInfo.source || 'kw',
-      toRaw(songInfo) as any,
-      quality
-    )
+    let rawUrl = ''
+    if (songInfo.source === 'subsonic') {
+      rawUrl = await musicSdk.getMusicUrl(toRaw(songInfo) as any, quality)
+    } else {
+      const pluginId = localUserDetail.userSource.pluginId
+      if (!pluginId) {
+        MessagePlugin.error('未选择音源插件，请先在设置中选择插件')
+        ;(await tip).close()
+        return
+      }
+      rawUrl = await PluginRunner.getMusicUrl(
+        pluginId,
+        songInfo.source || 'kw',
+        toRaw(songInfo) as any,
+        quality
+      )
+    }
 
     ;(await tip).close()
 
@@ -308,7 +314,7 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
       },
       rawUrl,
       filePath,
-      pluginId?.toString(),
+      null,
       quality,
       1
     )
@@ -326,7 +332,9 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
           const songInfoForTags = { ...toRaw(songInfo) }
 
           if (tagOptions.lyrics || tagOptions.downloadLyrics) {
-            songInfoForTags.lrc = await resolveDownloadLyricText(pluginId, toRaw(songInfo) as MusicItem)
+            songInfoForTags.lrc = songInfo.source === 'subsonic'
+              ? await musicSdk.getLyric(toRaw(songInfo) as any)
+              : await resolveDownloadLyricText(localUserDetail.userSource.pluginId, toRaw(songInfo) as MusicItem)
           }
 
           await invoke('local_music__write_tags', {

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { musicSdk } from '@/services/musicSdk'
 import { TreeRoundDotIcon } from 'tdesign-icons-vue-next'
 import fonts from '@/assets/icon_font/icons'
 
@@ -18,12 +20,68 @@ const sortQualities = (qualities: string[]): string[] =>
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
 
+const subsonicTesting = ref(false)
+
+const subsonicConfig = computed({
+  get: () => {
+    if (!userInfo.value.subsonicConfig) {
+      userInfo.value.subsonicConfig = {
+        baseUrl: '',
+        username: '',
+        password: '',
+        apiVersion: '1.16.1',
+        clientName: 'Mio',
+        enabled: false,
+      }
+    }
+    return userInfo.value.subsonicConfig
+  },
+  set: (value) => {
+    userInfo.value.subsonicConfig = value
+  }
+})
+
+const syncSubsonicSource = () => {
+  userStore.ensureBuiltInSources(userInfo.value)
+  if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
+  if (userStore.hasValidSubsonicConfig(userInfo.value)) {
+    if (!userInfo.value.sourceQualityMap.subsonic) userInfo.value.sourceQualityMap.subsonic = 'flac'
+  } else if (userInfo.value.selectSources === 'subsonic') {
+    const nextSource = Object.keys(userInfo.value.supportedSources || {})[0]
+    userInfo.value.selectSources = nextSource
+    userInfo.value.selectQuality = nextSource
+      ? userInfo.value.supportedSources?.[nextSource]?.qualitys?.slice(-1)[0] || ''
+      : ''
+  }
+}
+
+const testSubsonicConnection = async () => {
+  syncSubsonicSource()
+  subsonicTesting.value = true
+  try {
+    const result = await musicSdk.request('ping', { source: 'subsonic' })
+    if (result?.success) {
+      subsonicConfig.value.enabled = true
+      syncSubsonicSource()
+      MessagePlugin.success(result.message || 'Subsonic 连接成功')
+    } else {
+      MessagePlugin.warning(result?.message || 'Subsonic 连接失败')
+    }
+  } catch (error: any) {
+    MessagePlugin.error(error?.message || String(error) || 'Subsonic 连接失败')
+  } finally {
+    subsonicTesting.value = false
+  }
+}
+
+watch(() => userInfo.value.subsonicConfig, syncSubsonicSource, { deep: true })
+
 const hasPluginData = computed(() => {
-  return !!(userInfo.value.pluginId && userInfo.value.supportedSources && Object.keys(userInfo.value.supportedSources).length > 0)
+  return !!(userInfo.value.supportedSources && Object.keys(userInfo.value.supportedSources).length > 0)
 })
 
 const currentPluginName = computed(() => {
-  if (!hasPluginData.value) return ''
+  if (!userInfo.value.pluginId) return userInfo.value.supportedSources?.subsonic ? '内置音源' : ''
   return userInfo.value.pluginName || userInfo.value.pluginId || '未知插件'
 })
 
@@ -129,10 +187,33 @@ const getSourceIcon = (key: string) => {
 
 <template>
   <div class="settings-section">
+    <div class="setting-group subsonic-config">
+      <h3>Subsonic 内置音源</h3>
+      <div class="subsonic-form">
+        <div class="subsonic-switch-row">
+          <span>启用</span>
+          <t-switch v-model="subsonicConfig.enabled" @change="syncSubsonicSource" />
+        </div>
+        <t-input v-model="subsonicConfig.baseUrl" label="服务器" placeholder="https://navidrome.example.com" clearable />
+        <t-input v-model="subsonicConfig.username" label="用户名" placeholder="Subsonic 用户名" clearable />
+        <t-input v-model="subsonicConfig.password" label="密码" type="password" placeholder="Subsonic 密码" clearable />
+        <div class="subsonic-inline">
+          <t-input v-model="subsonicConfig.apiVersion" label="API 版本" placeholder="1.16.1" />
+          <t-input v-model="subsonicConfig.clientName" label="客户端名" placeholder="Mio" />
+        </div>
+        <div class="subsonic-actions">
+          <t-button theme="primary" :loading="subsonicTesting" @click="testSubsonicConnection">
+            测试连接
+          </t-button>
+          <span class="subsonic-hint">连接成功后会在音乐源列表中显示 Subsonic。</span>
+        </div>
+      </div>
+    </div>
+
     <div v-if="hasPluginData" class="music-config-container">
       <div class="setting-group">
         <div class="plugin-info">
-          <span class="plugin-name">当前插件: {{ currentPluginName }}</span>
+          <span class="plugin-name">当前配置: {{ currentPluginName }}</span>
           <span class="plugin-status">已启用</span>
         </div>
       </div>
@@ -238,6 +319,32 @@ const getSourceIcon = (key: string) => {
   box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out; animation-fill-mode: both;
   @for $i from 1 through 5 { &:nth-child(#{$i}) { animation-delay: #{$i * 0.1}s; } }
+  .subsonic-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .subsonic-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--settings-text-primary, var(--td-text-color-primary));
+  }
+  .subsonic-inline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .subsonic-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .subsonic-hint {
+    color: var(--settings-text-secondary, var(--td-text-color-secondary));
+    font-size: 0.8125rem;
+  }
   h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); }
 }
 .music-config-container {
@@ -329,6 +436,19 @@ const getSourceIcon = (key: string) => {
       flex-direction: column;
       gap: 8px;
       padding: 12px;
+    }
+
+    .subsonic-config {
+      .subsonic-inline {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .subsonic-actions {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+      }
     }
 
     .source-cards {

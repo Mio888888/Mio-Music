@@ -7,6 +7,7 @@ import { playSetting } from '@/store/playSetting'
 import { PlayMode, type SongList } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality, compareQuality, normalizeTypes } from '@/utils/quality'
+import { musicSdk } from '@/services/musicSdk'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -80,6 +81,14 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
       if (available.length) {
         quality = [...available].sort(compareQuality)[0]
       }
+    }
+
+    if (song.source === 'subsonic') {
+      const rawUrl = await musicSdk.getMusicUrl(toRaw(song) as any, quality)
+      if (!rawUrl || typeof rawUrl !== 'string') {
+        throw new Error('无法获取播放链接')
+      }
+      return rawUrl
     }
 
     const pluginId = localUserStore.userSource.pluginId
