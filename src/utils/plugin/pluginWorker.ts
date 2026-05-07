@@ -439,7 +439,18 @@ function createCerumusicApi() {
       return doFetch()
     },
     NoticeCenter(type: string, data: any) {
-      console.log(`[CeruMusic] NoticeCenter [${type}]:`, data?.title || data)
+      if (type === 'update' && data) {
+        self.postMessage({
+          type: 'plugin-update-notice',
+          notice: {
+            pluginName: data.pluginInfo?.name || '',
+            updateUrl: data.url || '',
+            newVersion: data.version || '',
+            content: data.content || '',
+            pluginType: data.pluginInfo?.type || 'cr',
+          }
+        })
+      }
     }
   }
 }
@@ -516,12 +527,33 @@ function executePluginCode(code: string): PluginExports {
   const mockExports: any = { exports: {} }
   const mockModule: any = { exports: mockExports }
 
-  const lxState: { requestHandler: Function | null } = { requestHandler: null }
+  const lxState: { requestHandler: Function | null; updateAlertSent: boolean } = { requestHandler: null, updateAlertSent: false }
   const mockLx = {
     on: (event: string, handler: Function) => {
       if (event === 'request') lxState.requestHandler = handler
     },
-    send: () => {},
+    send: (event: string, data?: any) => {
+      if (event === 'updateAlert' && !lxState.updateAlertSent) {
+        lxState.updateAlertSent = true
+        const log = data?.log ? String(data.log).substring(0, 1024) : ''
+        let updateUrl = data?.updateUrl ? String(data.updateUrl) : ''
+        if (updateUrl && (updateUrl.startsWith('http://') || updateUrl.startsWith('https://'))) {
+          updateUrl = updateUrl.substring(0, 1024)
+        } else {
+          updateUrl = ''
+        }
+        self.postMessage({
+          type: 'plugin-update-notice',
+          notice: {
+            pluginName: '',
+            updateUrl,
+            newVersion: '',
+            content: log,
+            pluginType: 'lx',
+          }
+        })
+      }
+    },
     version: '1.0.0',
     env: 'browser'
   }
@@ -634,6 +666,21 @@ async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
   console.log(`[PluginWorker] 加载插件 ${pluginId}, 代码长度: ${code.length}, Cr格式: ${isCrPlugin(code)}`)
   const exports = executePluginCode(code)
   console.log(`[PluginWorker] 插件导出: musicUrl=${typeof exports.musicUrl}, keys=[${Object.keys(exports).join(', ')}]`)
+
+  const plugin: LoadedPlugin = { exports, code }
+  pluginCache.set(pluginId, plugin)
+  return plugin
+}
+
+/**
+ * 重新加载插件（绕过缓存），用于更新检查场景。
+ * 删除缓存后重新获取代码并执行，使插件顶层的 checkUpdate() 等逻辑重新运行。
+ */
+async function reloadPlugin(pluginId: string): Promise<LoadedPlugin> {
+  pluginCache.delete(pluginId)
+
+  const code = await getPluginCode(pluginId)
+  const exports = executePluginCode(code)
 
   const plugin: LoadedPlugin = { exports, code }
   pluginCache.set(pluginId, plugin)
@@ -868,6 +915,14 @@ self.onmessage = async (e: MessageEvent) => {
           break
         case 'clearCache':
           clearCache(msg.args[0])
+          result = undefined
+          break
+        case 'loadPlugin':
+          await loadPlugin(msg.args[0])
+          result = undefined
+          break
+        case 'reloadPlugin':
+          await reloadPlugin(msg.args[0])
           result = undefined
           break
         default:

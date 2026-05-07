@@ -10,11 +10,30 @@ let worker: Worker | null = null
 const pendingCalls = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 let callSeq = 0
 
+type UpdateNoticeHandler = (notice: PluginUpdateNotice) => void
+const updateNoticeListeners = new Set<UpdateNoticeHandler>()
+
+export interface PluginUpdateNotice {
+  pluginName: string
+  updateUrl: string
+  newVersion: string
+  content: string
+  pluginType: string
+}
+
 function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./pluginWorker.ts', import.meta.url), { type: 'module' })
     worker.onmessage = (e) => {
       const msg = e.data
+
+      // Worker 发送插件更新通知
+      if (msg.type === 'plugin-update-notice' && msg.notice) {
+        for (const listener of updateNoticeListeners) {
+          try { listener(msg.notice as PluginUpdateNotice) } catch (e) { console.warn('[PluginRunner] 更新通知监听器异常:', e) }
+        }
+        return
+      }
 
       // Worker 请求 IPC 桥接
       if (msg.type === 'ipc') {
@@ -44,6 +63,12 @@ function getWorker(): Worker {
     }
   }
   return worker
+}
+
+function onUpdateNotice(handler: UpdateNoticeHandler): () => void {
+  updateNoticeListeners.add(handler)
+  getWorker() // ensure worker is alive so messages flow
+  return () => { updateNoticeListeners.delete(handler) }
 }
 
 async function handleIpc(ipcId: number, method: string, args: any) {
@@ -101,6 +126,14 @@ function clearCache(pluginId?: string) {
   callWorker('clearCache', [pluginId]).catch(() => {})
 }
 
+async function loadPlugin(pluginId: string): Promise<void> {
+  return callWorker('loadPlugin', [pluginId])
+}
+
+async function reloadPlugin(pluginId: string): Promise<void> {
+  return callWorker('reloadPlugin', [pluginId])
+}
+
 function terminate() {
   if (worker) {
     worker.terminate()
@@ -112,4 +145,4 @@ function terminate() {
   }
 }
 
-export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, terminate }
+export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, terminate, onUpdateNotice, loadPlugin, reloadPlugin }
