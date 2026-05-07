@@ -404,13 +404,13 @@ defineExpose({ scrollToCurrentSong })
   width: 380px;
   height: calc(100vh - var(--play-bottom-height) - 80px);
   transition: background-color 0.3s ease, color 0.3s ease;
-  background: rgba(255, 255, 255, 0.6);
+  background: color-mix(in srgb, var(--td-bg-color-container) 60%, transparent);
   backdrop-filter: blur(8px);
-  box-shadow: -3px 0 12px rgba(0, 0, 0, 0.15);
+  box-shadow: -3px 0 12px color-mix(in srgb, var(--td-text-color-primary) 15%, transparent);
   z-index: 9001;
   display: flex;
   flex-direction: column;
-  color: #333;
+  color: var(--td-text-color-primary);
 }
 
 .cover {
@@ -424,32 +424,32 @@ defineExpose({ scrollToCurrentSong })
 }
 
 .playlist-container.full-screen-mode {
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  background: color-mix(in srgb, var(--td-bg-color-container) 20%, transparent);
+  color: var(--td-text-color-primary);
 }
 .playlist-container.full-screen-mode .song-artist,
 .playlist-container.full-screen-mode .song-duration,
 .playlist-container.full-screen-mode .playlist-close,
-.playlist-container.full-screen-mode .song-remove { color: #ccc; }
+.playlist-container.full-screen-mode .song-remove { color: var(--td-text-color-secondary); }
 
 .playlist-container .playlist-content {
   scrollbar-arrow-color: transparent;
   scrollbar-width: thin;
-  scrollbar-color: rgba(91, 91, 91, 0.3) transparent;
+  scrollbar-color: color-mix(in srgb, var(--td-text-color-placeholder) 30%, transparent) transparent;
 }
 .playlist-container.full-screen-mode .playlist-content {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scrollbar-color: color-mix(in srgb, var(--td-text-color-primary) 30%, transparent) transparent;
 }
 .playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar { width: 8px; }
 .playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-track { background: transparent; }
-.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 4px; }
-.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
-.playlist-container.full-screen-mode .playlist-song:hover { background-color: rgba(255, 255, 255, 0.1); }
-.playlist-container.full-screen-mode .playlist-song.active { border-left: #2373ce5d 4px solid; background-color: rgba(255, 255, 255, 0.2); }
-.playlist-container .playlist-song.active { border-left: #2373ce93 4px solid; background-color: rgba(114, 231, 255, 0.183); }
-.playlist-container.full-screen-mode .playlist-header { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-.playlist-container.full-screen-mode .playlist-empty { color: #ccc; }
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--td-text-color-primary) 30%, transparent); border-radius: 4px; }
+.playlist-container.full-screen-mode .playlist-content::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--td-text-color-primary) 50%, transparent); }
+.playlist-container.full-screen-mode .playlist-song:hover { background-color: color-mix(in srgb, var(--td-text-color-primary) 10%, transparent); }
+.playlist-container.full-screen-mode .playlist-song.active { border-left: color-mix(in srgb, var(--td-brand-color) 36%, transparent) 4px solid; background-color: color-mix(in srgb, var(--td-brand-color) 12%, transparent); }
+.playlist-container .playlist-song.active { border-left: color-mix(in srgb, var(--td-brand-color) 58%, transparent) 4px solid; background-color: color-mix(in srgb, var(--td-brand-color) 12%, transparent); }
+.playlist-container.full-screen-mode .playlist-header { border-bottom: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent); }
+.playlist-container.full-screen-mode .playlist-empty { color: var(--td-text-color-secondary); }
 
 .playlist-header {
   display: flex;
@@ -457,13 +457,13 @@ defineExpose({ scrollToCurrentSong })
   align-items: center;
   padding: 16px;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
 }
 .playlist-title { font-size: 16px; font-weight: 600; }
 .playlist-close {
   background: transparent;
   border: none;
-  color: #666;
+  color: var(--td-text-color-secondary);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -477,13 +477,13 @@ defineExpose({ scrollToCurrentSong })
   align-items: center;
   justify-content: center;
   height: 100px;
-  color: #333;
+  color: var(--td-text-color-secondary);
   font-size: 14px;
   text-align: center;
 }
 .playlist-songs { display: flex; flex-direction: column; position: relative; }
 .playlist-songs.drag-sorting .playlist-song:not(.dragging) { transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-.playlist-songs.drag-sorting .playlist-song.dragging { transition: none; z-index: 1000; opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+.playlist-songs.drag-sorting .playlist-song.dragging { transition: none; z-index: 1000; opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px color-mix(in srgb, var(--td-text-color-primary) 15%, transparent); }
 
 .playlist-song {
   display: flex;
@@ -499,9 +499,9 @@ defineExpose({ scrollToCurrentSong })
   user-select: none;
   transform: translateY(0);
 }
-.playlist-song:hover { background-color: rgba(123, 123, 123, 0.384); }
-.playlist-song.active { background-color: rgba(255, 255, 255, 0.15); }
-.playlist-song.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); z-index: 1000; background-color: rgba(255, 255, 255, 0.2) !important; }
+.playlist-song:hover { background-color: color-mix(in srgb, var(--td-text-color-primary) 8%, transparent); }
+.playlist-song.active { background-color: color-mix(in srgb, var(--td-brand-color) 8%, transparent); }
+.playlist-song.dragging { opacity: 0.8; transform: scale(1.02); box-shadow: 0 4px 12px color-mix(in srgb, var(--td-text-color-primary) 15%, transparent); z-index: 1000; background-color: color-mix(in srgb, var(--td-text-color-primary) 12%, transparent) !important; }
 
 .drag-handle {
   display: flex;
@@ -511,7 +511,7 @@ defineExpose({ scrollToCurrentSong })
   height: 20px;
   margin-right: 8px;
   cursor: grab;
-  color: #999;
+  color: var(--td-text-color-placeholder);
 }
 .song-index {
   display: flex;
@@ -519,12 +519,12 @@ defineExpose({ scrollToCurrentSong })
   justify-content: center;
   width: 20px;
   margin-right: 15px;
-  color: #999;
+  color: var(--td-text-color-placeholder);
   font-size: 13px;
   font-family: 'DIN Alternate', 'Roboto', sans-serif;
   font-weight: 500;
 }
-.playlist-container.full-screen-mode .song-index { color: #ccc; }
+.playlist-container.full-screen-mode .song-index { color: var(--td-text-color-secondary); }
 .drag-handle:active { cursor: grabbing; }
 .drag-dots { font-size: 16px; line-height: 1; letter-spacing: -2px; transform: rotate(90deg); }
 
@@ -534,11 +534,11 @@ defineExpose({ scrollToCurrentSong })
 
 .playlist-song .song-info { flex: 1; min-width: 0; }
 .playlist-song .song-name { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.playlist-container.full-screen-mode .playlist-song .song-name { color: #fff; }
-.playlist-song .song-artist { font-size: 12px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.playlist-container.full-screen-mode .playlist-song .song-name { color: var(--td-text-color-primary); }
+.playlist-song .song-artist { font-size: 12px; color: var(--td-text-color-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .playlist-song .song-duration {
   font-size: 12px;
-  color: #888;
+  color: var(--td-text-color-placeholder);
   position: absolute;
   top: 50%;
   left: 50%;
@@ -550,7 +550,7 @@ defineExpose({ scrollToCurrentSong })
 .playlist-song .song-remove {
   background: transparent;
   border: none;
-  color: #5c5c5c;
+  color: var(--td-text-color-placeholder);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -565,7 +565,7 @@ defineExpose({ scrollToCurrentSong })
   pointer-events: none;
 }
 .playlist-song:hover .song-remove { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
-.playlist-song:hover .song-remove:hover { color: #e5484d; border-radius: 4px; }
+.playlist-song:hover .song-remove:hover { color: var(--td-error-color, #e5484d); border-radius: 4px; }
 .song-actions { position: relative; width: 60px; height: 100%; flex-shrink: 0; }
 
 .hover-tip {
@@ -573,17 +573,17 @@ defineExpose({ scrollToCurrentSong })
   top: 50%;
   right: 70px;
   transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
+  background: color-mix(in srgb, var(--td-text-color-primary) 60%, transparent);
+  color: var(--td-bg-color-container);
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
   z-index: 1001;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--td-text-color-primary) 20%, transparent);
 }
-.playlist-container.full-screen-mode .hover-tip { background: rgba(255, 255, 255, 0.6); color: #000000; }
+.playlist-container.full-screen-mode .hover-tip { background: color-mix(in srgb, var(--td-bg-color-container) 60%, transparent); color: var(--td-text-color-primary); }
 .hover-tip-enter-active, .hover-tip-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .hover-tip-enter-from, .hover-tip-leave-to { opacity: 0; transform: translateY(-50%) scale(0.9); }
 
@@ -597,10 +597,10 @@ defineExpose({ scrollToCurrentSong })
   display: flex;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
   flex-shrink: 0;
 }
-.playlist-container.full-screen-mode .playlist-footer { border-top: 1px solid rgba(255, 255, 255, 0.1); }
+.playlist-container.full-screen-mode .playlist-footer { border-top: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent); }
 
 .playlist-action-btn {
   flex: 1;
@@ -617,11 +617,11 @@ defineExpose({ scrollToCurrentSong })
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   backdrop-filter: blur(10px);
 }
-.locate-btn { background: rgba(35, 115, 206, 0.1); color: #2373ce; border: 1px solid rgba(35, 115, 206, 0.2); }
-.locate-btn:hover:not(:disabled) { background: rgba(35, 115, 206, 0.15); border-color: rgba(35, 115, 206, 0.3); transform: translateY(-1px); }
-.locate-btn:disabled { opacity: 0.5; cursor: not-allowed; color: #999; background: rgba(0, 0, 0, 0.05); border-color: rgba(0, 0, 0, 0.1); }
-.clear-btn { background: rgba(229, 72, 77, 0.1); color: #e5484d; border: 1px solid rgba(229, 72, 77, 0.2); }
-.clear-btn:hover { background: rgba(229, 72, 77, 0.15); border-color: rgba(229, 72, 77, 0.3); transform: translateY(-1px); }
+.locate-btn { background: color-mix(in srgb, var(--td-brand-color) 10%, transparent); color: var(--td-brand-color); border: 1px solid color-mix(in srgb, var(--td-brand-color) 20%, transparent); }
+.locate-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--td-brand-color) 15%, transparent); border-color: color-mix(in srgb, var(--td-brand-color) 30%, transparent); transform: translateY(-1px); }
+.locate-btn:disabled { opacity: 0.5; cursor: not-allowed; color: var(--td-text-color-placeholder); background: color-mix(in srgb, var(--td-text-color-primary) 5%, transparent); border-color: color-mix(in srgb, var(--td-text-color-primary) 10%, transparent); }
+.clear-btn { background: color-mix(in srgb, var(--td-error-color, #e5484d) 10%, transparent); color: var(--td-error-color, #e5484d); border: 1px solid color-mix(in srgb, var(--td-error-color, #e5484d) 20%, transparent); }
+.clear-btn:hover { background: color-mix(in srgb, var(--td-error-color, #e5484d) 15%, transparent); border-color: color-mix(in srgb, var(--td-error-color, #e5484d) 30%, transparent); transform: translateY(-1px); }
 
 @media (max-width: 768px) {
   .cover {
@@ -725,8 +725,8 @@ defineExpose({ scrollToCurrentSong })
     min-width: 36px;
     min-height: 36px;
     border-radius: var(--mobile-control-radius);
-    background: rgba(229, 72, 77, 0.1);
-    color: #e5484d;
+    background: color-mix(in srgb, var(--td-error-color, #e5484d) 10%, transparent);
+    color: var(--td-error-color, #e5484d);
     transform: none;
     opacity: 1;
     pointer-events: auto;

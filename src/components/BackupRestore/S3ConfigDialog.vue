@@ -388,18 +388,18 @@ function formatTime(iso: string): string {
 
   background: linear-gradient(
     165deg,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(255, 255, 255, 0.58) 35%,
-    rgba(255, 255, 255, 0.65) 100%
+    color-mix(in srgb, var(--td-bg-color-container) 72%, transparent) 0%,
+    color-mix(in srgb, var(--td-bg-color-container) 58%, transparent) 35%,
+    color-mix(in srgb, var(--td-bg-color-container) 65%, transparent) 100%
   );
   backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
 
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border: 1.5px solid color-mix(in srgb, var(--td-text-color-primary) 18%, transparent);
   box-shadow:
     var(--glass-shadow-panel),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 2px 0 color-mix(in srgb, var(--td-text-color-primary) 12%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
 }
 
 // --- Animated refraction border ---
@@ -509,8 +509,8 @@ function formatTime(iso: string): string {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.18), rgba(140, 80, 255, 0.12));
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 3px 10px rgba(100, 140, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
 
   svg {
     color: var(--td-brand-color, #0052d9);
@@ -561,8 +561,8 @@ function formatTime(iso: string): string {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
   color: var(--td-text-color-secondary);
   cursor: pointer;
   display: flex;
@@ -587,8 +587,8 @@ function formatTime(iso: string): string {
   gap: 3px;
   padding: 3px;
   border-radius: 11px;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--td-text-color-primary) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 5%, transparent);
   margin-bottom: 18px;
 }
 
@@ -611,14 +611,14 @@ function formatTime(iso: string): string {
   svg { flex-shrink: 0; }
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
     color: var(--td-text-color-primary);
   }
 
   &.active {
-    background: rgba(255, 255, 255, 0.14);
+    background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
     color: var(--td-text-color-primary);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--td-text-color-primary) 6%, transparent), inset 0 1px 0 color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
   }
 
   &:disabled {
@@ -647,15 +647,15 @@ function formatTime(iso: string): string {
 .recommend-card {
   padding: 14px;
   border-radius: 13px;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: color-mix(in srgb, var(--td-bg-color-component) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   cursor: pointer;
   transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.45);
+    background: color-mix(in srgb, var(--td-bg-color-component) 45%, transparent);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   }
 
   &:active {
@@ -712,7 +712,7 @@ function formatTime(iso: string): string {
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.04);
+  background: color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
   color: var(--td-text-color-primary);
   opacity: 0.7;
 
@@ -772,8 +772,8 @@ function formatTime(iso: string): string {
     width: 100%;
     padding: 9px 12px;
     border-radius: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+    background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
@@ -786,8 +786,8 @@ function formatTime(iso: string): string {
 
     &:focus {
       border-color: var(--td-brand-color, #0052d9);
-      background: rgba(255, 255, 255, 0.65);
-      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+      background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
     }
   }
 }
@@ -799,8 +799,8 @@ function formatTime(iso: string): string {
   width: 100%;
   padding: 10px 18px;
   border-radius: 11px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   color: var(--td-text-color-primary);
   font-size: 13px;
   font-weight: 500;
@@ -812,7 +812,7 @@ function formatTime(iso: string): string {
   gap: 6px;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.55);
+    background: color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
     transform: translateY(-1px);
     box-shadow: var(--glass-shadow-control);
   }
@@ -835,7 +835,7 @@ function formatTime(iso: string): string {
     &:hover:not(:disabled) {
       background: var(--td-brand-color-hover, #4787f0);
       border-color: var(--td-brand-color-hover, #4787f0);
-      box-shadow: 0 4px 16px rgba(0, 82, 204, 0.3);
+      box-shadow: 0 4px 16px color-mix(in srgb, var(--td-brand-color) 30%, transparent);
     }
 
     &:active:not(:disabled) {
@@ -867,12 +867,12 @@ function formatTime(iso: string): string {
 
   &.outline {
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
     color: var(--td-text-color-primary);
 
     &:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.22);
+      background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+      border-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
     }
   }
 }
@@ -927,8 +927,8 @@ function formatTime(iso: string): string {
     width: 100%;
     padding: 9px 12px 9px 36px;
     border-radius: 10px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+    background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
@@ -939,8 +939,8 @@ function formatTime(iso: string): string {
 
     &:focus {
       border-color: var(--td-brand-color, #0052d9);
-      background: rgba(255, 255, 255, 0.65);
-      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+      background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
     }
   }
 }
@@ -954,8 +954,8 @@ function formatTime(iso: string): string {
   gap: 12px;
   padding: 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: color-mix(in srgb, var(--td-bg-color-component) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 5%, transparent);
 
   & + & {
     margin-top: 10px;
@@ -1078,7 +1078,7 @@ function formatTime(iso: string): string {
 .glass-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
   border-top-color: currentColor;
   border-radius: 50%;
   will-change: transform;
@@ -1116,124 +1116,6 @@ function formatTime(iso: string): string {
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-  }
-}
-
-// ==================
-// Dark Mode
-// ==================
-:global([data-theme="dark"]) & {
-  .liquid-glass-panel {
-    background: linear-gradient(
-      165deg,
-      rgba(50, 50, 68, 0.9) 0%,
-      rgba(38, 38, 55, 0.85) 35%,
-      rgba(55, 55, 75, 0.88) 100%
-    );
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow:
-      var(--glass-shadow-panel-dark),
-      inset 0 2px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  .glass-border-glow {
-    opacity: 0.5;
-  }
-
-  .glass-ambient {
-    background: radial-gradient(ellipse, rgba(120, 160, 255, 0.06) 0%, transparent 70%);
-  }
-
-  .glass-tabs {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.06);
-  }
-
-  .glass-tab.active {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .form-item {
-    label {
-      opacity: 0.85;
-    }
-
-    input {
-      background: rgba(0, 0, 0, 0.2);
-      border-color: rgba(255, 255, 255, 0.08);
-
-      &:focus {
-        background: rgba(0, 0, 0, 0.15);
-        border-color: rgba(100, 160, 255, 0.5);
-        box-shadow: 0 0 0 3px rgba(100, 160, 255, 0.12);
-      }
-    }
-  }
-
-  .ops-card {
-    background: rgba(0, 0, 0, 0.15);
-    border-color: rgba(255, 255, 255, 0.06);
-
-    p {
-      opacity: 0.6;
-    }
-  }
-
-  .restore-field .input-wrapper input {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.08);
-
-    &:focus {
-      background: rgba(0, 0, 0, 0.15);
-      border-color: rgba(100, 160, 255, 0.5);
-      box-shadow: 0 0 0 3px rgba(100, 160, 255, 0.12);
-    }
-  }
-
-  .glass-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    &.primary {
-      background: var(--td-brand-color, #4787f0);
-      border-color: var(--td-brand-color, #4787f0);
-
-      &:hover:not(:disabled) {
-        background: var(--td-brand-color-hover, #6ba3f5);
-        border-color: var(--td-brand-color-hover, #6ba3f5);
-      }
-    }
-
-    &.accent {
-      background: linear-gradient(135deg, rgba(60, 200, 140, 0.2), rgba(60, 160, 255, 0.16));
-      border-color: rgba(60, 200, 140, 0.2);
-    }
-  }
-
-  .glass-hint {
-    opacity: 0.8;
-  }
-
-  .recommend-card {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.06);
-
-    &:hover {
-      background: rgba(255, 255, 255, 0.08);
-    }
-  }
-
-  .feature-tag {
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  .glass-spinner {
-    border-color: rgba(255, 255, 255, 0.1);
   }
 }
 

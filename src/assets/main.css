@@ -252,12 +252,12 @@
   --song-list-item-current: #f0f7ff;
   --song-list-item-playing: #e6f7ff;
   --song-list-track-number: #999999;
-  --song-list-title-color: #333333;
+  --song-list-title-color: var(--theme-text-primary);
   --song-list-title-hover: var(--td-brand-color);
-  --song-list-artist-color: #999999;
-  --song-list-album-color: #999999;
+  --song-list-artist-color: var(--theme-text-muted);
+  --song-list-album-color: var(--theme-text-muted);
   --song-list-album-hover: var(--td-brand-color);
-  --song-list-duration-color: #999999;
+  --song-list-duration-color: var(--theme-text-muted);
   --song-list-btn-color: #cccccc;
   --song-list-btn-hover: var(--td-brand-color);
   --song-list-btn-bg-hover: var(--td-brand-color-light);

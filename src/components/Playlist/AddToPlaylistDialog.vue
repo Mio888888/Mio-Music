@@ -245,18 +245,18 @@ const handleClose = () => {
 
   background: linear-gradient(
     165deg,
-    rgba(255, 255, 255, 0.72) 0%,
-    rgba(255, 255, 255, 0.58) 35%,
-    rgba(255, 255, 255, 0.65) 100%
+    color-mix(in srgb, var(--td-bg-color-container) 72%, transparent) 0%,
+    color-mix(in srgb, var(--td-bg-color-container) 58%, transparent) 35%,
+    color-mix(in srgb, var(--td-bg-color-container) 65%, transparent) 100%
   );
   backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
   -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
 
-  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border: 1.5px solid color-mix(in srgb, var(--td-text-color-primary) 18%, transparent);
   box-shadow:
     var(--glass-shadow-panel),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 2px 0 color-mix(in srgb, var(--td-text-color-primary) 12%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
 }
 
 // --- Animated refraction border ---
@@ -365,8 +365,8 @@ const handleClose = () => {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.18), rgba(140, 80, 255, 0.12));
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 3px 10px rgba(100, 140, 255, 0.12);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
 
   svg {
     color: var(--td-brand-color, #0052d9);
@@ -404,8 +404,8 @@ const handleClose = () => {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
   color: var(--td-text-color-secondary);
   cursor: pointer;
   display: flex;
@@ -442,8 +442,8 @@ const handleClose = () => {
     width: 100%;
     padding: 10px 36px 10px 38px;
     border-radius: 11px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+    background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
     color: var(--td-text-color-primary);
     font-size: 13px;
     outline: none;
@@ -454,8 +454,8 @@ const handleClose = () => {
 
     &:focus {
       border-color: var(--td-brand-color, #0052d9);
-      background: rgba(255, 255, 255, 0.65);
-      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+      background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
     }
   }
 
@@ -519,10 +519,10 @@ const handleClose = () => {
   border-radius: 13px;
   cursor: pointer;
   transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard), box-shadow var(--motion-duration-quick) var(--motion-ease-standard), opacity var(--motion-duration-quick) var(--motion-ease-standard), transform var(--motion-duration-quick) var(--motion-ease-standard);
-  background: rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
 
   &:hover {
-    background: rgba(255, 255, 255, 0.35);
+    background: color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
     transform: translateX(3px);
   }
 
@@ -537,8 +537,8 @@ const handleClose = () => {
   border-radius: 10px;
   overflow: hidden;
   flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.04);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
 
   img {
     width: 100%;
@@ -575,7 +575,7 @@ const handleClose = () => {
 .meta-source {
   padding: 0 6px;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.04);
+  background: color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
   font-size: 10.5px;
 }
 
@@ -595,7 +595,7 @@ const handleClose = () => {
 // ==================
 .create-entry {
   padding-top: 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   margin-top: 14px;
   flex-shrink: 0;
 }
@@ -616,8 +616,8 @@ const handleClose = () => {
   flex: 1;
   padding: 9px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
   color: var(--td-text-color-primary);
   font-size: 13px;
   outline: none;
@@ -627,8 +627,8 @@ const handleClose = () => {
 
   &:focus {
     border-color: var(--td-brand-color, #0052d9);
-    background: rgba(255, 255, 255, 0.65);
-    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+    background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
   }
 }
 
@@ -639,8 +639,8 @@ const handleClose = () => {
   width: 100%;
   padding: 10px 18px;
   border-radius: 11px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   color: var(--td-text-color-primary);
   font-size: 13px;
   font-weight: 500;
@@ -652,7 +652,7 @@ const handleClose = () => {
   gap: 6px;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.55);
+    background: color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
     transform: translateY(-1px);
     box-shadow: var(--glass-shadow-control);
   }
@@ -675,18 +675,18 @@ const handleClose = () => {
     &:hover:not(:disabled) {
       background: var(--td-brand-color-hover, #4787f0);
       border-color: var(--td-brand-color-hover, #4787f0);
-      box-shadow: 0 4px 16px rgba(0, 82, 204, 0.3);
+      box-shadow: 0 4px 16px color-mix(in srgb, var(--td-brand-color) 30%, transparent);
     }
   }
 
   &.outline {
     background: transparent;
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
     color: var(--td-text-color-primary);
 
     &:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.22);
+      background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+      border-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
     }
   }
 }
@@ -697,7 +697,7 @@ const handleClose = () => {
 .glass-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
   border-top-color: currentColor;
   border-radius: 50%;
   will-change: transform; animation: spin 0.6s linear infinite;
@@ -735,74 +735,6 @@ const handleClose = () => {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
-}
-
-// ==================
-// Dark Mode
-// ==================
-:global([data-theme="dark"]) & {
-  .liquid-glass-panel {
-    background: linear-gradient(
-      165deg,
-      rgba(50, 50, 68, 0.9) 0%,
-      rgba(38, 38, 55, 0.85) 35%,
-      rgba(55, 55, 75, 0.88) 100%
-    );
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow:
-      var(--glass-shadow-panel-dark),
-      inset 0 2px 0 rgba(255, 255, 255, 0.15),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  .glass-border-glow { opacity: 0.5; }
-  .glass-ambient { background: radial-gradient(ellipse, rgba(120, 160, 255, 0.06) 0%, transparent 70%); }
-
-  .glass-search input {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.08);
-
-    &:focus {
-      background: rgba(0, 0, 0, 0.15);
-      border-color: rgba(100, 160, 255, 0.5);
-      box-shadow: 0 0 0 3px rgba(100, 160, 255, 0.12);
-    }
-  }
-
-  .playlist-item {
-    background: rgba(255, 255, 255, 0.04);
-
-    &:hover { background: rgba(255, 255, 255, 0.08); }
-  }
-
-  .meta-source { background: rgba(255, 255, 255, 0.06); }
-
-  .create-entry { border-top-color: rgba(255, 255, 255, 0.06); }
-
-  .create-input {
-    background: rgba(0, 0, 0, 0.2);
-    border-color: rgba(255, 255, 255, 0.08);
-
-    &:focus {
-      background: rgba(0, 0, 0, 0.15);
-      border-color: rgba(100, 160, 255, 0.5);
-      box-shadow: 0 0 0 3px rgba(100, 160, 255, 0.12);
-    }
-  }
-
-  .glass-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.1);
-
-    &:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
-
-    &.primary {
-      background: var(--td-brand-color, #4787f0);
-      border-color: var(--td-brand-color, #4787f0);
-    }
-  }
-
-  .glass-spinner { border-color: rgba(255, 255, 255, 0.1); }
 }
 
 @media (max-width: 768px) {
