@@ -29,8 +29,6 @@ declare module 'vue' {
     EqualizerSettings: typeof import('./components/Settings/EqualizerSettings.vue')['default']
     FullPlay: typeof import('./components/Play/FullPlay.vue')['default']
     GlobalAudio: typeof import('./components/Play/GlobalAudio.vue')['default']
-    GlobalBackground: typeof import('./components/GlobalBackground.vue')['default']
-    GlobalBackgroundSettings: typeof import('./components/Settings/GlobalBackgroundSettings.vue')['default']
     GlobalContextMenu: typeof import('./components/ContextMenu/GlobalContextMenu.vue')['default']
     HomeLayout: typeof import('./components/layout/HomeLayout.vue')['default']
     HotkeySettings: typeof import('./components/Settings/HotkeySettings.vue')['default']

@@ -6,7 +6,6 @@ import { useSettingsStore } from '@/store/Settings'
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import LyricFontSettings from '@/components/Settings/LyricFontSettings.vue'
 import DesktopLyricStyle from '@/components/Settings/DesktopLyricStyle.vue'
-import GlobalBackgroundSettings from '@/components/Settings/GlobalBackgroundSettings.vue'
 
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
@@ -72,11 +71,6 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
           <span class="setting-text">{{ settings.closeToTray ? '最小化到托盘' : '直接退出应用' }}</span>
         </div>
       </div>
-    </t-card>
-
-    <div class="setting-spacer"></div>
-    <t-card title="全局背景" class="setting-card" hover-shadow>
-      <GlobalBackgroundSettings />
     </t-card>
 
     <div class="setting-spacer"></div>

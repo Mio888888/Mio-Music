@@ -41,32 +41,37 @@ pub fn local_music__get_covers(state: State<'_, AppDb>, track_ids: Vec<String>) 
     Ok(serde_json::json!({ "success": true, "data": covers }))
 }
 
+fn normalize_cover_url(url: &str) -> String {
+    if let Some(encoded) = url.strip_prefix("imgproxy://localhost/") {
+        match urlencoding::decode(encoded) {
+            Ok(decoded) => decoded.into_owned(),
+            Err(_) => url.to_string(),
+        }
+    } else {
+        url.to_string()
+    }
+}
+
 #[tauri::command]
 pub async fn local_music__write_tags(
-    _state: State<'_, AppDb>,
+    state: State<'_, AppDb>,
     file_path: String,
     song_info: serde_json::Value,
     tag_write_options: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     let path = std::path::Path::new(&file_path);
 
-    // Convert to FLAC first
-    let actual_path = match scanner::convert_to_flac(path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[write_tags] FLAC转换失败，保留原文件: {}", e);
-            path.to_path_buf()
-        }
-    };
+    let actual_path = path.to_path_buf();
 
     let has_options = tag_write_options.as_object().map(|o| !o.is_empty()).unwrap_or(false);
     if has_options {
         // Fetch cover if needed
         let cover_data = if tag_write_options.get("cover").and_then(|v| v.as_bool()).unwrap_or(false) {
-            let img_url = song_info.get("img").and_then(|v| v.as_str()).unwrap_or("");
+            let raw_img_url = song_info.get("img").and_then(|v| v.as_str()).unwrap_or("");
+            let img_url = normalize_cover_url(raw_img_url);
             if !img_url.is_empty() {
                 let resp = crate::music_sdk::client::get_client()
-                    .get(img_url)
+                    .get(&img_url)
                     .send().await;
                 match resp {
                     Ok(r) => r.bytes().await.ok().map(|b| b.to_vec()),
@@ -86,7 +91,6 @@ pub async fn local_music__write_tags(
         } else {
             None
         };
-
         scanner::write_download_tags(
             &actual_path,
             &song_info,
@@ -122,6 +126,11 @@ pub async fn local_music__write_tags(
             updated_at: 0,
         };
         scanner::write_tags(&actual_path, &track)?;
+    }
+
+    if let Some(track) = scanner::read_file_tags(&actual_path) {
+        let conn = state.music.lock().map_err(|e| e.to_string())?;
+        music_db::upsert_track(&conn, &track).map_err(|e| e.to_string())?;
     }
 
     Ok(serde_json::json!({ "success": true, "data": { "filePath": actual_path.to_string_lossy().to_string() } }))

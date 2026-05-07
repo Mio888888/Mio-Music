@@ -32,7 +32,7 @@ const playlistInfo = ref({
   id: '',
   title: (route.query.title as string) || '歌单',
   author: (route.query.author as string) || '',
-  cover: (route.query.cover as string) || '/default-cover.png',
+  cover: ((route.query.cover as string) && (route.query.cover as string) !== 'default-cover') ? (route.query.cover as string) : '/default-cover.png',
   total: 0,
   source: (route.query.source as string) || '',
   desc: (route.query.description as string) || ''
@@ -119,6 +119,12 @@ const fetchSongs = async (reset = false) => {
   try {
     if (isLocalPlaylist.value) {
       playlistInfo.value.id = playlistId.value
+      const pl = localUserStore.playlists.find(p => p.id === playlistId.value)
+      if (pl) {
+        const cover = pl.coverImgUrl && pl.coverImgUrl !== 'default-cover' ? pl.coverImgUrl : ''
+        if (cover) playlistInfo.value.cover = cover
+        if (pl.description) playlistInfo.value.desc = pl.description
+      }
       const rows = await localUserStore.getSongsForPlaylist(playlistId.value)
       const parsed = (rows || []).map(r => {
         try { return JSON.parse(r.data) } catch {
@@ -362,7 +368,8 @@ watch(hasCurrentPlaying, (v) => {
 })
 
 onMounted(() => {
-  const coverUrl = (route.query.cover as string) || ''
+  const rawCover = (route.query.cover as string) || ''
+  const coverUrl = rawCover && rawCover !== 'default-cover' ? rawCover : ''
   if (coverUrl) {
     playlistInfo.value.cover = coverUrl
     bgImageFromRoute.value = true

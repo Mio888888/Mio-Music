@@ -157,7 +157,7 @@ const viewPlaylist = (playlist: PlaylistRow) => {
     params: { id: playlist.id },
     query: {
       title: playlist.name,
-      cover: playlist.coverImgUrl || '',
+      cover: playlist.coverImgUrl && playlist.coverImgUrl !== 'default-cover' ? playlist.coverImgUrl : '',
       source: playlist.source,
       type: 'local',
       description: playlist.description || ''

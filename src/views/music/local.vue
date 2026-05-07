@@ -129,7 +129,10 @@ const scanLibrary = async () => {
     const scanRes = await (window as any).api?.localMusic?.scan?.(scanDirs.value)
     if (scanRes?.success) {
       const data = scanRes.data
-      MessagePlugin.success(`扫描完成: ${data.scanned} 个文件, ${data.added} 首新增`)
+      const parts = [`扫描完成: ${data.scanned} 个文件, ${data.added} 首新增`]
+      if (data.updated) parts.push(`${data.updated} 首更新`)
+      if (data.errors) parts.push(`${data.errors} 首失败`)
+      MessagePlugin.success(parts.join('，'))
       await fetchTracks()
     }
   } catch (e) { console.error('扫描失败:', e); MessagePlugin.error('扫描失败') }

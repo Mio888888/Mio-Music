@@ -28,6 +28,82 @@ interface MusicItem {
   typeUrl: Record<string, any>
 }
 
+function extractLyricText(result: any): string {
+  if (!result) return ''
+  if (typeof result === 'string') return result
+  if (typeof result?.data === 'string') return result.data
+  const obj = typeof result === 'object' ? result : typeof result?.data === 'object' ? result.data : null
+  if (!obj) return ''
+  return obj.lxlyric || obj.crlyric || obj.lyric || obj.lrc || obj.tlyric || obj.rlyric || ''
+}
+
+function getCleanSongInfo(songInfo: any) {
+  return JSON.parse(JSON.stringify(toRaw(songInfo)))
+}
+
+function getLikelyServicePluginId(songInfo: any): string | undefined {
+  const keys = ['_servicePluginId', 'servicePluginId']
+  for (const key of keys) {
+    const val = songInfo?.[key]
+    if (typeof val === 'string' && val) return val
+  }
+  return undefined
+}
+
+async function fetchTtmlLyricText(source: string, songId: string | number): Promise<string> {
+  const ttmlSource = source === 'wy' ? 'ncm' : source === 'tx' ? 'qq' : ''
+  if (!ttmlSource) return ''
+
+  const url = `https://amll-ttml-db.stevexmh.net/${ttmlSource}/${songId}`
+  const proxyResponse = await (window as any).api?.httpProxy?.(url, { method: 'GET', timeout: 10000 })
+  const statusCode = Number(proxyResponse?.statusCode || 0)
+  if (statusCode >= 400) return ''
+  const body = proxyResponse?.body
+  return typeof body === 'string' && body.length >= 100 ? body : ''
+}
+
+async function fetchSdkLyricText(source: string, songInfo: MusicItem): Promise<string> {
+  try {
+    const result = await (window as any).api?.music?.requestSdk?.('getLyric', {
+      source,
+      songInfo: getCleanSongInfo(songInfo),
+      grepLyricInfo: true,
+      useStrictMode: false
+    })
+    return extractLyricText(result)
+  } catch {
+    return ''
+  }
+}
+
+async function fetchServicePluginLyricText(pluginId: string | undefined, songInfo: MusicItem): Promise<string> {
+  if (!pluginId) return ''
+  try {
+    const result = await PluginRunner.getLyric(pluginId, songInfo.source || 'kw', getCleanSongInfo(songInfo))
+    return extractLyricText(result)
+  } catch {
+    return ''
+  }
+}
+
+async function resolveDownloadLyricText(pluginId: string | undefined, songInfo: MusicItem): Promise<string> {
+  const source = songInfo.source || 'kw'
+  const songId = songInfo.songmid
+
+  if (source === 'wy' || source === 'tx') {
+    const ttml = await fetchTtmlLyricText(source, songId)
+    if (ttml) return ttml
+    return fetchSdkLyricText(source, songInfo)
+  }
+
+  const servicePluginId = getLikelyServicePluginId(songInfo) || pluginId
+  const serviceLyric = await fetchServicePluginLyricText(servicePluginId, songInfo)
+  if (serviceLyric) return serviceLyric
+
+  return fetchSdkLyricText(source, songInfo)
+}
+
+
 export function createQualityDialog(
   songInfoOrTypes: MusicItem | Array<{ type: string; size?: string }>,
   userQuality: string,
@@ -217,7 +293,9 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
 
     const dirs = await invoke<{ cacheDir: string; downloadDir: string }>('get_directories')
     const downloadDir = dirs?.downloadDir || ''
-    const filePath = downloadDir ? `${downloadDir}/${safeName}.flac` : `${safeName}.flac`
+    const urlExtension = rawUrl.match(/\.(mp3|flac|m4a|aac|ogg|opus|wav)(?:[?#/]|$)/i)?.[1]?.toLowerCase()
+    const extension = urlExtension || (['flac', 'flac24bit', 'hires', 'master', 'atmos', 'atmos_plus'].includes(quality) ? 'flac' : 'mp3')
+    const filePath = downloadDir ? `${downloadDir}/${safeName}.${extension}` : `${safeName}.${extension}`
 
     await (window as any).api?.download?.addTask(
       {
@@ -248,12 +326,7 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
           const songInfoForTags = { ...toRaw(songInfo) }
 
           if (tagOptions.lyrics || tagOptions.downloadLyrics) {
-            try {
-              const lrcResult = await PluginRunner.getLyric(
-                pluginId, songInfo.source || 'kw', toRaw(songInfo) as any
-              )
-              songInfoForTags.lrc = typeof lrcResult === 'string' ? lrcResult : (lrcResult as any)?.lyric || ''
-            } catch {}
+            songInfoForTags.lrc = await resolveDownloadLyricText(pluginId, toRaw(songInfo) as MusicItem)
           }
 
           await invoke('local_music__write_tags', {

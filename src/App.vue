@@ -1,6 +1,5 @@
 <template>
   <Provider v-if="!$route.path.includes('desktop-lyric')">
-    <GlobalBackground />
     <div class="app-route-stage">
       <router-view v-slot="{ Component }">
         <Transition name="fade-page">
@@ -17,7 +16,6 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Provider from '@/components/layout/Provider.vue'
-import GlobalBackground from '@/components/GlobalBackground.vue'
 import GlobalContextMenu from '@/components/ContextMenu/GlobalContextMenu.vue'
 import { useAuthStore } from '@/store/Auth'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
