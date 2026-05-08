@@ -1387,7 +1387,7 @@ onUnmounted(() => {
     transform: translateY(0);
     transition: transform var(--motion-duration-expressive) var(--motion-ease-spring);
     will-change: transform;
-    &.idle { transform: translateY(calc(var(--play-bottom-height) * -1 + 10px)); }
+    &.idle { transform: translateY(var(--play-bottom-height)); }
   }
 }
 
