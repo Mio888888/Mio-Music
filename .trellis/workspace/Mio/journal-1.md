@@ -170,3 +170,40 @@ Summarized existing Vue frontend conventions into Trellis frontend spec files, i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: feat: 中英文 i18n 多语言全量迁移
+
+**Date**: 2026-05-08
+**Task**: feat: 中英文 i18n 多语言全量迁移
+**Branch**: `main`
+
+### Summary
+
+引入 vue-i18n + Vite 插件，创建 12 个翻译模块覆盖全应用，Settings store 新增 language 字段支持跟随系统/中文/English，Provider 同步 TDesign/Naive UI locale，全量替换 90+ 个文件中硬编码中文为 t() 调用，修复 HotkeySettings 主题适配样式问题
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `dfea3f8` | (see git log) |
+| `cd5681a` | (see git log) |
+| `d5c49b5` | (see git log) |
+| `1a34bc3` | (see git log) |
+| `3922a4d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
