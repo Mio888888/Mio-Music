@@ -69,7 +69,7 @@ onActivated(() => {
 
     <div v-else-if="shouldShowSetupGuide" class="source-state setup-guide" aria-labelledby="source-setup-title">
       <div class="setup-orb" aria-hidden="true">
-        <t-icon name="music" />
+        <img class="setup-logo" src="/icon.png" alt="" />
       </div>
       <div class="setup-copy">
         <h3 id="source-setup-title">配置音乐源以开始发现音乐</h3>
@@ -233,8 +233,14 @@ onActivated(() => {
   justify-content: center;
   border-radius: 22px;
   background: linear-gradient(135deg, var(--td-brand-color-1), var(--td-brand-color-3));
-  color: var(--td-brand-color);
-  font-size: 34px;
+}
+
+.setup-logo {
+  width: 100%;
+  height: 100%;
+  border-radius: 22px;
+  object-fit: cover;
+  display: block;
 }
 
 .setup-copy h3 {
@@ -357,7 +363,10 @@ onActivated(() => {
     width: 60px;
     height: 60px;
     border-radius: 18px;
-    font-size: 28px;
+  }
+
+  .setup-logo {
+    border-radius: 18px;
   }
 
   .setup-copy h3 {
