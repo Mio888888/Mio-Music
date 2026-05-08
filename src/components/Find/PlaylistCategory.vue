@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onActivated, onDeactivated, onUnmounted } from 'vue'
+import { ref, computed, onMounted, watch, onActivated, onDeactivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { storeToRefs } from 'pinia'
@@ -21,6 +21,8 @@ const showMore = ref(false)
 const activeGroupIndex = ref(0)
 const activeGroupName = ref('')
 
+const isSubsonic = computed(() => userSource.value.source === 'subsonic')
+
 const page = ref(1)
 const limit = ref(30)
 const total = ref(0)
@@ -35,10 +37,15 @@ const scrollRef = ref<HTMLDivElement>()
 const fetchTags = async () => {
   try {
     const res = await musicSdk.getPlaylistTags()
-    tags.value = res?.tags || []
-    hotTag.value = res?.hotTag || []
-    activeGroupIndex.value = 0
-    activeGroupName.value = tags.value[0]?.name || ''
+    if (isSubsonic.value) {
+      tags.value = []
+      hotTag.value = res?.tags || []
+    } else {
+      tags.value = res?.tags || []
+      hotTag.value = res?.hotTag || []
+      activeGroupIndex.value = 0
+      activeGroupName.value = tags.value[0]?.name || ''
+    }
   } catch (e) {
     console.error('获取歌单标签失败:', e)
   }
@@ -68,7 +75,9 @@ const fetchCategoryPlaylists = async (reset = false) => {
 
   loadingMore.value = true
   try {
-    const res = await musicSdk.getCategoryPlaylists('hot', activeTagId.value, page.value, limit.value)
+    const sortId = isSubsonic.value ? (activeTagId.value || 'recent') : 'hot'
+    const tagId = isSubsonic.value ? '' : activeTagId.value
+    const res = await musicSdk.getCategoryPlaylists(sortId, tagId, page.value, limit.value)
     const list = Array.isArray(res?.list) ? res.list : []
     total.value = res?.total || 0
 
@@ -212,6 +221,7 @@ onDeactivated(() => {
         </button>
 
         <div
+          v-if="!isSubsonic"
           class="more-category-wrapper"
           @mouseenter="openMoreCategories"
           @mouseleave="closeMoreCategories"
