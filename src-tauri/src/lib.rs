@@ -264,6 +264,19 @@ pub fn run() {
                             _ => {}
                         }
                     })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::Click {
+                            button: tauri::tray::MouseButton::Left,
+                            button_state: tauri::tray::MouseButtonState::Up,
+                            ..
+                        } = event {
+                            let app_handle = tray.app_handle();
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    })
                     .build(app)?;
                 std::mem::forget(tray);
             }
@@ -424,6 +437,15 @@ pub fn run() {
             commands::s3_commands::s3__backup,
             commands::s3_commands::s3__restore,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        });
 }

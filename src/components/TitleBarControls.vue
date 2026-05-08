@@ -49,14 +49,12 @@ const handleMaximize = async () => {
 }
 
 const handleClose = async () => {
-  const hasConfigured = localStorage.getItem('hasConfiguredCloseBehavior')
-  if (!hasConfigured) {
+  if (!settingsStore.settings.hasConfiguredCloseBehavior) {
     showCloseDialog.value = true
     return
   }
 
-  const closeToTray = localStorage.getItem('closeToTray') === 'true'
-  if (closeToTray) {
+  if (settingsStore.settings.closeToTray) {
     handleMiniMode()
   } else {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
@@ -69,8 +67,10 @@ const rememberChoice = ref(true)
 
 const handleCloseChoice = async (toTray: boolean) => {
   if (rememberChoice.value) {
-    localStorage.setItem('closeToTray', String(toTray))
-    localStorage.setItem('hasConfiguredCloseBehavior', 'true')
+    settingsStore.updateSettings({
+      closeToTray: toTray,
+      hasConfiguredCloseBehavior: true
+    })
   }
   showCloseDialog.value = false
   if (toTray) {
