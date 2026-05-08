@@ -240,3 +240,36 @@ Summarized existing Vue frontend conventions into Trellis frontend spec files, i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: 修复插件安装参数 & 合并弹窗
+
+**Date**: 2026-05-08
+**Task**: 修复插件安装参数 & 合并弹窗
+**Branch**: `main`
+
+### Summary
+
+修复 plugin__select_and_add 缺少 args 包裹导致安装失败的 bug；合并添加插件的两步弹窗为单步，减少闪烁。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c2fd2c7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
