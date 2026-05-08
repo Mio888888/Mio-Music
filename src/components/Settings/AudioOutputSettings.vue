@@ -3,7 +3,7 @@
     <component
       :is="embedded ? 'div' : 't-card'"
       :bordered="!embedded"
-      :title="embedded ? undefined : '音频输出设备'"
+      :title="embedded ? undefined : t('settings.audioOutput.title')"
       class="output-card"
       :class="{ embedded: embedded }"
     >
@@ -22,7 +22,7 @@
 
       <div v-if="!store.rustSupported && !store.supported" class="unsupported-msg">
         <InfoCircleIcon class="unsupported-icon" />
-        <span>当前环境不支持音频设备枚举（MediaDevices API 不可用），将使用系统默认输出设备。</span>
+        <span>{{ t('settings.audioOutput.unsupportedMsg') }}</span>
       </div>
 
       <template v-else>
@@ -39,7 +39,7 @@
                 <div class="device-main">
                   <span class="device-name">{{ device.name }}</span>
                   <span v-if="device.is_default" class="device-status">
-                    <CheckCircleIcon class="status-icon" /> 当前使用
+                    <CheckCircleIcon class="status-icon" /> {{ t('settings.audioOutput.currentUsing') }}
                   </span>
                 </div>
                 <div class="device-details">
@@ -47,7 +47,7 @@
                     {{ formatSampleRate(device.sample_rate) }}
                   </span>
                   <span v-if="device.channels > 0" class="device-detail-tag">
-                    {{ device.channels }}声道
+                    {{ t('settings.audioOutput.channel', { count: device.channels }) }}
                   </span>
                 </div>
               </div>
@@ -64,7 +64,7 @@
                 <span class="volume-value">{{ Math.round(device.volume * 100) }}%</span>
               </div>
               <div v-if="store.currentRustDeviceId === device.id" class="device-actions">
-                <t-tooltip content="播放测试音">
+                <t-tooltip :content="t('settings.audioOutput.playTestSound')">
                   <t-button
                     variant="text"
                     shape="circle"
@@ -95,12 +95,12 @@
                   <div class="device-info">
                     <span class="device-name">{{ device.name }}</span>
                     <span v-if="device.id === store.currentDeviceId" class="device-status">
-                      <CheckCircleIcon class="status-icon" /> 当前使用
+                      <CheckCircleIcon class="status-icon" /> {{ t('settings.audioOutput.currentUsing') }}
                     </span>
                   </div>
                 </t-radio>
                 <div v-if="device.id === store.currentDeviceId" class="device-meta">
-                  <t-tooltip content="播放测试音">
+                  <t-tooltip :content="t('settings.audioOutput.playTestSound')">
                     <t-button
                       variant="text"
                       shape="circle"
@@ -117,7 +117,7 @@
 
           <div v-if="store.error" class="error-msg">{{ store.error }}</div>
           <div v-if="store.sortedDevices.length === 0 && !store.isLoading" class="empty-msg">
-            未检测到音频输出设备
+            {{ t('settings.audioOutput.noAudioDevice') }}
           </div>
         </div>
 
@@ -125,17 +125,17 @@
 
         <div class="ab-switch-section">
           <div class="section-title">
-            <span>A/B 对比模式</span>
-            <t-tooltip content="快速切换两组不同的输出设备进行音质对比">
+            <span>{{ t('settings.audioOutput.abCompareMode') }}</span>
+            <t-tooltip :content="t('settings.audioOutput.abCompareTip')">
               <InfoCircleIcon class="info-icon" />
             </t-tooltip>
           </div>
           <div class="ab-controls">
             <div class="channel-config">
-              <label>设备 A (主设备): </label>
+              <label>{{ t('settings.audioOutput.deviceAPrimary') }}</label>
               <t-select
                 v-model="store.primaryDeviceId"
-                placeholder="选择设备 A"
+                :placeholder="t('settings.audioOutput.selectDeviceA')"
                 class="device-select"
               >
                 <t-option
@@ -147,10 +147,10 @@
               </t-select>
             </div>
             <div class="channel-config">
-              <label>设备 B (对比设备): </label>
+              <label>{{ t('settings.audioOutput.deviceBSecondary') }}</label>
               <t-select
                 v-model="store.secondaryDeviceId"
-                placeholder="选择设备 B"
+                :placeholder="t('settings.audioOutput.selectDeviceB')"
                 class="device-select"
               >
                 <t-option
@@ -164,7 +164,7 @@
 
             <div class="ab-action">
               <t-button block theme="primary" variant="outline" @click="store.toggleAB">
-                切换 A/B (当前: {{ store.activeABChannel }})
+                {{ t('settings.audioOutput.switchAB', { channel: store.activeABChannel }) }}
                 <template #suffix>Alt+O</template>
               </t-button>
             </div>
@@ -184,6 +184,8 @@ import {
   PlayCircleIcon
 } from 'tdesign-icons-vue-next'
 import { useAudioOutputStore } from '@/store/audioOutput'
+
+const { t } = useI18n()
 
 defineProps<{
   embedded?: boolean

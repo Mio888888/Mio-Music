@@ -1,7 +1,7 @@
 <template>
   <div class="dlna-device-settings">
     <div class="section-header">
-      <span class="section-title">DLNA 投屏设备</span>
+      <span class="section-title">{{ t('settings.dlna.title') }}</span>
       <t-button
         variant="text"
         shape="circle"
@@ -31,7 +31,7 @@
             </div>
           </t-radio>
           <div v-if="dlnaStore.currentDevice?.usn === device.usn" class="device-meta">
-            <t-tooltip content="停止投屏">
+            <t-tooltip :content="t('settings.dlna.stopCast')">
               <t-button variant="text" shape="circle" size="large" @click.stop="stopDlna">
                 <template #icon><PoweroffIcon /></template>
               </t-button>
@@ -40,7 +40,7 @@
         </div>
       </t-radio-group>
       <div v-if="dlnaStore.devices.length === 0 && !dlnaStore.isSearching" class="empty-msg">
-        未检测到 DLNA 投屏设备
+        {{ t('settings.dlna.noDevice') }}
       </div>
     </div>
   </div>
@@ -53,13 +53,15 @@ import { ControlAudioStore } from '@/store/ControlAudio'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { MessagePlugin } from 'tdesign-vue-next'
 
+const { t } = useI18n()
+
 const dlnaStore = useDlnaStore()
 const controlAudio = ControlAudioStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
 
 const handleDlnaDeviceChange = (val: any) => {
   if (val) {
-    MessagePlugin.success(`已连接投屏设备: ${val.name}`)
+    MessagePlugin.success(t('settings.dlna.connected', { name: val.name }))
 
     if (controlAudio.Audio?.url) {
       const url = controlAudio.Audio.url
@@ -76,7 +78,7 @@ const handleDlnaDeviceChange = (val: any) => {
 const stopDlna = () => {
   dlnaStore.stop()
   dlnaStore.currentDevice = null
-  MessagePlugin.success('已断开投屏设备')
+  MessagePlugin.success(t('settings.dlna.disconnected'))
 }
 </script>
 
