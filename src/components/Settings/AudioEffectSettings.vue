@@ -1,20 +1,20 @@
 <template>
   <div class="audio-effects-settings">
-    <t-card title="高级音效处理 (Audio Effects)" :bordered="false">
+    <t-card :title="t('settings.audioEffect.title')" :bordered="false">
       <template #actions>
-        <t-button theme="default" variant="text" @click="resetAll">重置全部</t-button>
+        <t-button theme="default" variant="text" @click="resetAll">{{ t('settings.audioEffect.resetAll') }}</t-button>
       </template>
 
       <div class="effects-grid">
         <!-- 1. Bass Boost -->
         <div class="effect-card">
           <div class="card-header">
-            <div class="title">低音增强 (Bass Boost)</div>
+            <div class="title">{{ t('settings.audioEffect.bassBoost') }}</div>
             <t-switch v-model="bassBoost.enabled" />
           </div>
           <div class="card-content">
             <div class="control-group">
-              <label>低频增益</label>
+              <label>{{ t('settings.audioEffect.bassGain') }}</label>
               <t-slider
                 v-model="bassBoost.gain"
                 :min="-12"
@@ -33,9 +33,9 @@
                 :disabled="!bassBoost.enabled"
                 @change="(val: string | number | boolean) => applyBassPreset(val as string)"
               >
-                <t-radio-button value="light">轻度</t-radio-button>
-                <t-radio-button value="medium">中度</t-radio-button>
-                <t-radio-button value="heavy">重度</t-radio-button>
+                <t-radio-button value="light">{{ t('settings.audioEffect.bassLight') }}</t-radio-button>
+                <t-radio-button value="medium">{{ t('settings.audioEffect.bassMedium') }}</t-radio-button>
+                <t-radio-button value="heavy">{{ t('settings.audioEffect.bassHeavy') }}</t-radio-button>
               </t-radio-group>
             </div>
           </div>
@@ -44,12 +44,12 @@
         <!-- 2. Surround Sound -->
         <div class="effect-card">
           <div class="card-header">
-            <div class="title">环绕音效 (Surround)</div>
+            <div class="title">{{ t('settings.audioEffect.surround') }}</div>
             <t-switch v-model="surround.enabled" />
           </div>
           <div class="card-content">
             <div class="control-group">
-              <label>环境模拟</label>
+              <label>{{ t('settings.audioEffect.surroundSimulation') }}</label>
               <t-radio-group
                 v-model="surround.mode"
                 class="effect-radio-group"
@@ -57,20 +57,20 @@
                 variant="default-filled"
                 :disabled="!surround.enabled"
               >
-                <t-radio-button value="off">关闭</t-radio-button>
-                <t-radio-button value="small">小房间</t-radio-button>
-                <t-radio-button value="medium">中厅堂</t-radio-button>
-                <t-radio-button value="large">大教堂</t-radio-button>
+                <t-radio-button value="off">{{ t('settings.audioEffect.surroundOff') }}</t-radio-button>
+                <t-radio-button value="small">{{ t('settings.audioEffect.surroundSmall') }}</t-radio-button>
+                <t-radio-button value="medium">{{ t('settings.audioEffect.surroundMedium') }}</t-radio-button>
+                <t-radio-button value="large">{{ t('settings.audioEffect.surroundLarge') }}</t-radio-button>
               </t-radio-group>
             </div>
-            <div class="info-text">模拟 5.1/7.1 虚拟声场与环境混响</div>
+            <div class="info-text">{{ t('settings.audioEffect.surroundInfo') }}</div>
           </div>
         </div>
 
         <!-- 3. Channel Balance -->
         <div class="effect-card">
           <div class="card-header">
-            <div class="title">声道平衡 (Balance)</div>
+            <div class="title">{{ t('settings.audioEffect.balance') }}</div>
             <t-switch v-model="balance.enabled" />
           </div>
           <div class="card-content">
@@ -103,7 +103,7 @@
                 variant="outline"
                 :disabled="!balance.enabled"
                 @click="balance.value = 0"
-                >居中校准</t-button
+                >{{ t('settings.audioEffect.centerCalibration') }}</t-button
               >
             </div>
           </div>
@@ -116,9 +116,11 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useAudioEffectsStore } from '@/store/AudioEffects'
 import { invoke } from '@tauri-apps/api/core'
 
+const { t } = useI18n()
 const store = useAudioEffectsStore()
 const { bassBoost, surround, balance } = storeToRefs(store)
 
@@ -143,10 +145,10 @@ const applyBassPreset = (val: string) => {
 const resetAll = () => { store.resetEffects() }
 
 const formatBalance = (val: number) => {
-  if (val === 0) return 'Center'
+  if (val === 0) return t('settings.audioEffect.balanceCenter')
   return val < 0
-    ? `Left ${Math.abs(val * 100).toFixed(0)}%`
-    : `Right ${Math.abs(val * 100).toFixed(0)}%`
+    ? t('settings.audioEffect.balanceLeft', { percent: Math.abs(val * 100).toFixed(0) })
+    : t('settings.audioEffect.balanceRight', { percent: Math.abs(val * 100).toFixed(0) })
 }
 
 onMounted(() => { applyEffects() })
