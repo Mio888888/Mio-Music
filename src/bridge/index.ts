@@ -200,7 +200,7 @@ const api = {
         return { success: false, error: e?.message || String(e) }
       }
     },
-    selectAndAdd: (pluginType: string) => ipcInvoke('plugin__select_and_add', { pluginType }),
+    selectAndAdd: (pluginType: string) => ipcInvoke('plugin__select_and_add', { args: { pluginType } }),
     getCode: (pluginId: string) => ipcInvoke('plugin__get_code', { args: { pluginId } }),
     onDeepLinkAdd: (
       callback: (payload: { url: string; type: 'lx' | 'cr'; targetPluginId?: string }) => void

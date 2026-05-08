@@ -3,7 +3,7 @@
     <div class="section-header">
       <h2>{{ t('settings.plugin.title') }}</h2>
       <div class="header-actions">
-        <t-button theme="primary" @click="showTypeDialog = true">
+        <t-button theme="primary" @click="showAddDialog = true">
           <template #icon><t-icon name="add" /></template> {{ t('settings.plugin.addPlugin') }}
         </t-button>
         <t-button theme="default" @click="doRefresh">
@@ -103,45 +103,39 @@
       </div>
     </div>
 
-    <!-- Step 1: Select Plugin Type -->
+    <!-- Add Plugin (merged: type + method in one dialog) -->
     <t-dialog
-      v-model:visible="showTypeDialog"
-      :header="t('settings.plugin.selectPluginType')"
-      :confirm-btn="{ content: t('settings.plugin.nextStep') }"
-      :cancel-btn="{ content: t('common.cancel') }"
-      @confirm="goToImportMethod"
-    >
-      <p class="dialog-tip">{{ t('settings.plugin.pluginTypeTip') }}</p>
-      <t-radio-group v-model="addPluginType" variant="primary-filled">
-        <t-radio-button value="cr">{{ t('settings.plugin.cranPlugin') }}</t-radio-button>
-        <t-radio-button value="lx">{{ t('settings.plugin.lxPlugin') }}</t-radio-button>
-      </t-radio-group>
-    </t-dialog>
-
-    <!-- Step 2: Select Import Method -->
-    <t-dialog
-      v-model:visible="showImportDialog"
-      :header="t('settings.plugin.selectImportMethod')"
+      v-model:visible="showAddDialog"
+      :header="t('settings.plugin.addPlugin')"
       :confirm-btn="{ content: t('common.confirm') }"
-      :cancel-btn="{ content: t('common.back') }"
+      :cancel-btn="{ content: t('common.cancel') }"
       @confirm="doImport"
-      @cancel="backToTypeSelection"
     >
-      <div class="import-method-container">
-        <t-radio-group v-model="importMethod" variant="primary-filled">
-          <t-radio-button value="local">{{ t('settings.plugin.localImport') }}</t-radio-button>
-          <t-radio-button value="online">{{ t('settings.plugin.onlineImport') }}</t-radio-button>
-        </t-radio-group>
-        <div v-if="importMethod === 'online'" class="online-section">
-          <t-input
-            v-model="onlineUrl"
-            :placeholder="t('settings.plugin.onlineUrlPlaceholder')"
-            size="large"
-          />
-          <p class="dialog-tip">{{ t('settings.plugin.onlineUrlTip') }}</p>
+      <div class="add-plugin-form">
+        <div class="form-section">
+          <p class="dialog-tip">{{ t('settings.plugin.pluginTypeTip') }}</p>
+          <t-radio-group v-model="addPluginType" variant="primary-filled">
+            <t-radio-button value="cr">{{ t('settings.plugin.cranPlugin') }}</t-radio-button>
+            <t-radio-button value="lx">{{ t('settings.plugin.lxPlugin') }}</t-radio-button>
+          </t-radio-group>
         </div>
-        <div v-else class="dialog-tip">
-          {{ t('settings.plugin.localImportTip') }}
+        <div class="form-section">
+          <p class="dialog-tip">{{ t('settings.plugin.selectImportMethod') }}</p>
+          <t-radio-group v-model="importMethod" variant="primary-filled">
+            <t-radio-button value="local">{{ t('settings.plugin.localImport') }}</t-radio-button>
+            <t-radio-button value="online">{{ t('settings.plugin.onlineImport') }}</t-radio-button>
+          </t-radio-group>
+          <div v-if="importMethod === 'online'" class="online-section">
+            <t-input
+              v-model="onlineUrl"
+              :placeholder="t('settings.plugin.onlineUrlPlaceholder')"
+              size="large"
+            />
+            <p class="dialog-tip">{{ t('settings.plugin.onlineUrlTip') }}</p>
+          </div>
+          <div v-else class="dialog-tip">
+            {{ t('settings.plugin.localImportTip') }}
+          </div>
         </div>
       </div>
     </t-dialog>
@@ -295,8 +289,7 @@ const userStore = LocalUserDetailStore()
 const error = ref<string | null>(null)
 
 // Add plugin flow
-const showTypeDialog = ref(false)
-const showImportDialog = ref(false)
+const showAddDialog = ref(false)
 const addPluginType = ref<'cr' | 'lx'>('cr')
 const importMethod = ref<'local' | 'online'>('local')
 const onlineUrl = ref('')
@@ -339,20 +332,9 @@ async function doRefresh() {
 
 // ==================== Add Plugin ====================
 
-function goToImportMethod() {
-  showTypeDialog.value = false
-  showImportDialog.value = true
-}
-
-function backToTypeSelection() {
-  showImportDialog.value = false
-  showTypeDialog.value = true
-  onlineUrl.value = ''
-}
-
 async function doImport() {
   try {
-    showImportDialog.value = false
+    showAddDialog.value = false
     if (importMethod.value === 'local') {
       const result = await store.selectAndAdd(addPluginType.value)
       if (!result) return // canceled
@@ -360,12 +342,12 @@ async function doImport() {
     } else {
       if (!onlineUrl.value.trim()) {
         MessagePlugin.warning(t('settings.plugin.enterUrl'))
-        showImportDialog.value = true
+        showAddDialog.value = true
         return
       }
       try { new URL(onlineUrl.value) } catch {
         MessagePlugin.warning(t('settings.plugin.invalidUrl'))
-        showImportDialog.value = true
+        showAddDialog.value = true
         return
       }
       const result = await store.downloadAndAdd(onlineUrl.value.trim(), addPluginType.value)
@@ -750,8 +732,16 @@ function openImport(plugin: LoadedPlugin) {
   line-height: 1.5;
 }
 
-.import-method-container {
-  padding: 8px 0;
+.add-plugin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 
 .online-section {
