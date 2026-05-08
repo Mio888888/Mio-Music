@@ -273,3 +273,36 @@ Summarized existing Vue frontend conventions into Trellis frontend spec files, i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: 下载页 UI 全面重新设计
+
+**Date**: 2026-05-08
+**Task**: 下载页 UI 全面重新设计
+**Branch**: `main`
+
+### Summary
+
+全面重新设计下载管理页：移除 TDesign 组件依赖，自绘 pill tab 栏/渐变进度条/垂直卡片布局，桌面端 Grid 双列布局，移动端优化触控目标和 safe-area
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `29373b1` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
