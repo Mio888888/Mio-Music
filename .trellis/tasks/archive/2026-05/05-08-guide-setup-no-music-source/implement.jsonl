@@ -1,7 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Vue/TDesign/responsive component patterns"}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Pinia/page state/loading/error patterns"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Async handling/theme/mobile quality rules"}
-{"file": ".trellis/tasks/05-08-guide-setup-no-music-source/research/discover-source-state.md", "reason": "Find page source state research"}
-{"file": ".trellis/tasks/05-08-guide-setup-no-music-source/research/setup-guide-ui-patterns.md", "reason": "Setup guide UI pattern research"}

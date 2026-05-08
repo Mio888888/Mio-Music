@@ -1,6 +1,0 @@
-{"file": ".trellis/tasks/05-08-i18n-multi-language-support-chinese-and-english/prd.md", "reason": "PRD with full requirements, implementation plan, and technical approach for i18n"}
-{"file": ".trellis/tasks/05-08-i18n-multi-language-support-chinese-and-english/research/vue3-i18n-approach.md", "reason": "vue-i18n 11.x setup patterns, Vite plugin config, TypeScript integration, system locale detection"}
-{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component conventions to follow when modifying Vue components for i18n"}
-{"file": ".trellis/spec/frontend/state-management.md", "reason": "Store patterns for adding language field to Settings store"}
-{"file": ".trellis/spec/frontend/type-safety.md", "reason": "TypeScript patterns for i18n type-safe translation keys"}
-{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality bar for the i18n implementation"}

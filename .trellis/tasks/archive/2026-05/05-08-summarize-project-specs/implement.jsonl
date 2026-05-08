@@ -1,6 +1,0 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
-{"file": ".trellis/spec/frontend/index.md", "reason": "Frontend spec index defines target guideline files and documentation language"}
-{"file": ".trellis/tasks/05-08-summarize-project-specs/research/directory-structure.md", "reason": "Research for directory-structure spec"}
-{"file": ".trellis/tasks/05-08-summarize-project-specs/research/component-guidelines.md", "reason": "Research for component-guidelines spec"}
-{"file": ".trellis/tasks/05-08-summarize-project-specs/research/hooks-state-types.md", "reason": "Research for hook, state, and type-safety specs"}
-{"file": ".trellis/tasks/05-08-summarize-project-specs/research/quality-guidelines.md", "reason": "Research for quality-guidelines spec"}
