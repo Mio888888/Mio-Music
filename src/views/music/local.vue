@@ -16,6 +16,7 @@ import {
 } from 'tdesign-icons-vue-next'
 import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
 const playStatus = useGlobalPlayStatusStore()
@@ -112,16 +113,16 @@ const saveDirs = async () => {
   try {
     await (window as any).api?.localMusic?.setDirs?.(scanDirs.value)
     showDirModal.value = false
-    MessagePlugin.success('目录已保存')
+    MessagePlugin.success(t('music.local.dirSaved'))
   } catch {
-    MessagePlugin.error('保存目录失败')
+    MessagePlugin.error(t('music.local.dirSaveFailed'))
   }
 }
 
 // 扫描
 const scanLibrary = async () => {
   if (scanDirs.value.length === 0) {
-    MessagePlugin.warning('请先选择扫描目录')
+    MessagePlugin.warning(t('music.local.selectScanDir'))
     return
   }
   scanning.value = true
@@ -129,13 +130,13 @@ const scanLibrary = async () => {
     const scanRes = await (window as any).api?.localMusic?.scan?.(scanDirs.value)
     if (scanRes?.success) {
       const data = scanRes.data
-      const parts = [`扫描完成: ${data.scanned} 个文件, ${data.added} 首新增`]
-      if (data.updated) parts.push(`${data.updated} 首更新`)
-      if (data.errors) parts.push(`${data.errors} 首失败`)
+      const parts = [t('music.local.scanComplete', { scanned: data.scanned, added: data.added })]
+      if (data.updated) parts.push(t('music.local.scanUpdated', { updated: data.updated }))
+      if (data.errors) parts.push(t('music.local.scanErrors', { errors: data.errors }))
       MessagePlugin.success(parts.join('，'))
       await fetchTracks()
     }
-  } catch (e) { console.error('扫描失败:', e); MessagePlugin.error('扫描失败') }
+  } catch (e) { console.error('扫描失败:', e); MessagePlugin.error(t('music.local.scanFailed')) }
   finally { scanning.value = false }
 }
 
@@ -145,12 +146,12 @@ const clearScan = async () => {
     const res = await (window as any).api?.localMusic?.clearIndex?.()
     if (res?.success) {
       tracks.value = []
-      MessagePlugin.success('已清空扫描索引')
+      MessagePlugin.success(t('music.local.indexCleared'))
     } else {
-      MessagePlugin.error('清空失败')
+      MessagePlugin.error(t('music.local.clearFailed'))
     }
   } catch {
-    MessagePlugin.error('清空失败')
+    MessagePlugin.error(t('music.local.clearFailed'))
   }
 }
 
@@ -179,7 +180,7 @@ const playAll = () => {
   localUserStore.replaceSongList(songList as any)
   playSong(songList[0] as any)
   playStatus.updatePlayerInfo(songList[0] as any)
-  MessagePlugin.success(`正在播放 ${songList.length} 首本地歌曲`)
+  MessagePlugin.success(t('music.local.playingLocal', { count: songList.length }))
 }
 
 // 添加全部到播放列表
@@ -194,7 +195,7 @@ const addAllToPlaylist = () => {
     }
     localUserStore.addSong(song)
   })
-  MessagePlugin.success('已将全部加入播放列表')
+  MessagePlugin.success(t('music.local.addedAllToPlaylist'))
 }
 
 // 选择
@@ -268,7 +269,7 @@ const handleMenuAction = (action: string) => {
       hasCover: !!track.hasCover
     }
     localUserStore.addSong(song)
-    MessagePlugin.success('已添加到播放列表')
+    MessagePlugin.success(t('music.local.addedToPlaylist'))
   } else if (action === 'addToList') {
     songsToAdd.value = [{
       songmid: track.songmid, name: track.name, singer: track.singer,
@@ -302,12 +303,12 @@ const formatSize = (bytes: number) => {
 }
 
 // 更多操作下拉
-const moreActions = [
-  { content: '播放全部', value: 'playAll' },
-  { content: '添加全部到播放列表', value: 'addAll' },
-  { content: multiSelect.value ? '取消批量选择' : '批量选择', value: 'toggleMulti' },
-  { content: '清空所有', value: 'clear' }
-]
+const moreActions = computed(() => [
+  { content: t('common.playAll'), value: 'playAll' },
+  { content: t('music.local.addAllToPlaylist'), value: 'addAll' },
+  { content: multiSelect.value ? t('common.cancelBatch') : t('common.batchSelect'), value: 'toggleMulti' },
+  { content: t('common.clearAll'), value: 'clear' }
+])
 
 const handleMoreAction = (value: string) => {
   if (value === 'playAll') playAll()
@@ -336,13 +337,13 @@ onBeforeUnmount(() => {
     <div class="local-header">
       <div class="left-container">
         <h2 class="title">
-          本地音乐库<span style="font-size: 12px; color: var(--td-text-color-placeholder)">共 {{ tracks.length }} 首</span>
+          {{ t('music.local.title') }}<span style="font-size: 12px; color: var(--td-text-color-placeholder)">{{ t('music.local.totalSongs', { count: tracks.length }) }}</span>
         </h2>
       </div>
       <div class="right-container">
         <t-button shape="round" theme="primary" variant="text" @click="showDirModal = true">
           <span style="display: flex; align-items: center">
-            <span style="font-weight: bold">选择目录</span>
+            <span style="font-weight: bold">{{ t('music.local.selectDir') }}</span>
             <ChevronRightIcon :stroke-width="2.5" style="margin-left: 2px" />
           </span>
         </t-button>
@@ -353,7 +354,7 @@ onBeforeUnmount(() => {
     <div class="controls">
       <t-button theme="primary" class="local-btn play-all" @click="playAll" :disabled="tracks.length === 0">
         <template #icon><i class="iconfont icon-bofang"></i></template>
-        播放全部
+        {{ t('common.playAll') }}
       </t-button>
       <t-button theme="default" class="local-btn scan" :loading="scanning" @click="scanLibrary">
         <template #icon><RefreshIcon :stroke-width="1.5" /></template>
@@ -372,7 +373,7 @@ onBeforeUnmount(() => {
         <t-input
           v-model="searchQuery"
           clearable
-          placeholder="搜索本地歌曲/歌手/专辑"
+          :placeholder="t('music.local.searchPlaceholder')"
           style="width: 260px"
         >
           <template #prefix-icon><SearchIcon size="16px" /></template>
@@ -382,17 +383,17 @@ onBeforeUnmount(() => {
 
     <!-- 批量操作栏 -->
     <div v-if="hasSelection" class="batch-toolbar">
-      <span class="batch-info">已选择 {{ selectedIds.size }} 首</span>
-      <t-button size="small" @click="batchPlay">播放选中</t-button>
-      <t-button size="small" @click="batchAddToPlaylist">添加到歌单</t-button>
-      <t-button size="small" variant="text" @click="clearSelection">取消选择</t-button>
+      <span class="batch-info">{{ t('music.local.selectedCount', { count: selectedIds.size }) }}</span>
+      <t-button size="small" @click="batchPlay">{{ t('music.local.playSelected') }}</t-button>
+      <t-button size="small" @click="batchAddToPlaylist">{{ t('common.addToPlaylist') }}</t-button>
+      <t-button size="small" variant="text" @click="clearSelection">{{ t('music.local.cancelSelect') }}</t-button>
     </div>
 
     <!-- 歌曲列表 -->
     <div v-if="loading" class="loading-container">
       <div class="loading-content">
         <div class="loading-spinner"></div>
-        <p>加载中...</p>
+        <p>{{ t('common.loading') }}</p>
       </div>
     </div>
 
@@ -402,12 +403,12 @@ onBeforeUnmount(() => {
           <t-checkbox :checked="isAllSelected" @change="toggleSelectAll" />
         </span>
         <span class="col-cover"></span>
-        <span class="col-name">歌曲</span>
-        <span class="col-singer">歌手</span>
-        <span class="col-album">专辑</span>
-        <span class="col-duration">时长</span>
-        <span class="col-size">大小</span>
-        <span class="col-actions-header">操作</span>
+        <span class="col-name">{{ t('music.local.colSong') }}</span>
+        <span class="col-singer">{{ t('music.local.colArtist') }}</span>
+        <span class="col-album">{{ t('music.local.colAlbum') }}</span>
+        <span class="col-duration">{{ t('music.local.colDuration') }}</span>
+        <span class="col-size">{{ t('music.local.colSize') }}</span>
+        <span class="col-actions-header">{{ t('music.local.colActions') }}</span>
       </div>
       <div v-bind="containerProps" class="list-body">
         <div v-bind="wrapperProps">
@@ -434,12 +435,12 @@ onBeforeUnmount(() => {
             <div class="col-name">
               <span class="name-text" :class="{ playing: track.songmid === currentSongId }">{{ track.name }}</span>
             </div>
-            <span class="col-singer">{{ track.singer || '未知' }}</span>
-            <span class="col-album">{{ track.albumName || '未知专辑' }}</span>
+            <span class="col-singer">{{ track.singer || t('common.unknown') }}</span>
+            <span class="col-album">{{ track.albumName || t('common.unknownAlbum') }}</span>
             <span class="col-duration">{{ formatDuration(track.duration || track.interval) }}</span>
             <span class="col-size">{{ formatSize(track.size) }}</span>
             <div class="col-actions" @click.stop>
-              <t-button variant="text" size="small" @click="openTagEditor(track)">编辑</t-button>
+              <t-button variant="text" size="small" @click="openTagEditor(track)">{{ t('music.local.edit') }}</t-button>
             </div>
           </div>
         </div>
@@ -447,26 +448,26 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else class="empty">
-      {{ searchQuery ? '没有匹配的音乐' : '暂无数据，点击选择目录后扫描' }}
+      {{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.noMusicDir') }}
     </div>
 
     <!-- 目录管理弹窗 -->
     <t-dialog
       v-model:visible="showDirModal"
-      header="选择本地文件夹"
+      :header="t('music.local.selectDirDialog')"
       placement="center"
       width="500px"
       :footer="false"
     >
       <div class="dir-modal-content">
-        <div class="dir-hint">你可以添加常用目录，文件将即时索引。</div>
+        <div class="dir-hint">{{ t('music.local.selectDirTip') }}</div>
         <div v-for="d in scanDirs" :key="d" class="dir-row">
           <span class="dir-path">{{ d }}</span>
-          <t-button size="small" variant="text" theme="danger" @click="removeDir(d)">删除</t-button>
+          <t-button size="small" variant="text" theme="danger" @click="removeDir(d)">{{ t('common.delete') }}</t-button>
         </div>
         <div class="dir-actions">
-          <t-button block variant="outline" @click="selectDirs">添加文件夹</t-button>
-          <t-button block theme="primary" @click="saveDirs">确认</t-button>
+          <t-button block variant="outline" @click="selectDirs">{{ t('common.addFolder') }}</t-button>
+          <t-button block theme="primary" @click="saveDirs">{{ t('common.confirm') }}</t-button>
         </div>
       </div>
     </t-dialog>
@@ -480,17 +481,17 @@ onBeforeUnmount(() => {
         @click.stop
       >
         <div class="menu-item" @click="handleMenuAction('play')">
-          <PlayCircleIcon size="14px" /> 播放
+          <PlayCircleIcon size="14px" /> {{ t('music.local.contextPlay') }}
         </div>
         <div class="menu-item" @click="handleMenuAction('addToEnd')">
-          <i class="iconfont icon-zengjia" style="font-size:14px"></i> 加入播放列表
+          <i class="iconfont icon-zengjia" style="font-size:14px"></i> {{ t('music.local.contextJoinPlaylist') }}
         </div>
         <div class="menu-item" @click="handleMenuAction('addToList')">
-          <FolderIcon size="14px" /> 添加到本地歌单
+          <FolderIcon size="14px" /> {{ t('music.local.contextAddToLocal') }}
         </div>
         <div class="menu-separator"></div>
         <div class="menu-item" @click="handleMenuAction('editTags')">
-          <i class="iconfont icon-bianji" style="font-size:14px"></i> 编辑标签
+          <i class="iconfont icon-bianji" style="font-size:14px"></i> {{ t('music.local.contextEditTag') }}
         </div>
       </div>
     </Teleport>

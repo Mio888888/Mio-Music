@@ -1,3 +1,5 @@
+import i18n from '@/locales'
+
 export interface SearchItem {
   id: string
   category: string
@@ -6,44 +8,48 @@ export interface SearchItem {
   keywords: string[]
 }
 
-export const searchItems: SearchItem[] = [
-  // 外观设置
-  { id: 'appearance-titlebar', category: 'appearance', title: '标题栏风格', description: '选择标题栏控制按钮风格', keywords: ['标题栏', 'titlebar', '风格', 'windows', '红绿灯'] },
-  { id: 'appearance-close-behavior', category: 'appearance', title: '关闭按钮行为', description: '设置点击窗口关闭按钮时的行为', keywords: ['关闭', '托盘', '退出', 'close', 'tray'] },
-  { id: 'appearance-lyric-font', category: 'appearance', title: '歌词字体设置', description: '配置歌词显示字体、大小和字重', keywords: ['歌词', '字体', 'font', '大小', '字重'] },
-  { id: 'appearance-desktop-lyric', category: 'appearance', title: '桌面歌词样式', description: '配置桌面歌词窗口的显示样式', keywords: ['桌面歌词', '样式', '颜色', '字体', 'desktop', 'lyric'] },
+const t = i18n.global.t
 
-  // AI 功能
-  { id: 'ai-api-config', category: 'ai', title: 'DeepSeek API 配置', description: '配置 DeepSeek API Key 以使用 AI 功能', keywords: ['deepseek', 'api', 'key', 'ai', '人工智能'] },
-  { id: 'ai-floatball', category: 'ai', title: 'AI 浮球设置', description: '控制 AI 悬浮球的显示与隐藏', keywords: ['浮球', '悬浮球', 'ai', 'float', 'ball'] },
+export function getSearchIndex(): SearchItem[] {
+  return [
+    // 外观设置
+    { id: 'appearance-titlebar', category: 'appearance', title: t('common.searchIndex.appearanceTitlebar.title'), description: t('common.searchIndex.appearanceTitlebar.description'), keywords: t('common.searchIndex.appearanceTitlebar.keywords') as unknown as string[] },
+    { id: 'appearance-close-behavior', category: 'appearance', title: t('common.searchIndex.appearanceCloseBehavior.title'), description: t('common.searchIndex.appearanceCloseBehavior.description'), keywords: t('common.searchIndex.appearanceCloseBehavior.keywords') as unknown as string[] },
+    { id: 'appearance-lyric-font', category: 'appearance', title: t('common.searchIndex.appearanceLyricFont.title'), description: t('common.searchIndex.appearanceLyricFont.description'), keywords: t('common.searchIndex.appearanceLyricFont.keywords') as unknown as string[] },
+    { id: 'appearance-desktop-lyric', category: 'appearance', title: t('common.searchIndex.appearanceDesktopLyric.title'), description: t('common.searchIndex.appearanceDesktopLyric.description'), keywords: t('common.searchIndex.appearanceDesktopLyric.keywords') as unknown as string[] },
 
-  // 播放设置
-  { id: 'playback-playlist', category: 'playlist', title: '播放列表管理', description: '导入、导出和清空播放列表', keywords: ['播放列表', '导入', '导出', '清空', 'playlist'] },
-  { id: 'playback-audio-output', category: 'playlist', title: '音频输出', description: '选择音频输出设备和 DLNA 投屏', keywords: ['音频', '输出', '设备', 'dlna', '投屏', 'audio', 'output'] },
-  { id: 'playback-equalizer', category: 'playlist', title: '音频均衡器', description: '调节均衡器预设和频段增益', keywords: ['均衡器', 'eq', 'equalizer', '音效', '频段'] },
-  { id: 'playback-audio-effect', category: 'playlist', title: '高级音效处理', description: '低音增强、环绕音效、声道平衡', keywords: ['音效', '低音', '环绕', '声道', 'bass', 'surround', 'balance'] },
-  { id: 'playback-performance', category: 'playlist', title: '全屏播放-性能优化', description: '跳动歌词、背景动画、音频可视化', keywords: ['性能', '跳动歌词', '背景动画', '可视化', 'visualizer'] },
+    // AI 功能
+    { id: 'ai-api-config', category: 'ai', title: t('common.searchIndex.aiApiConfig.title'), description: t('common.searchIndex.aiApiConfig.description'), keywords: t('common.searchIndex.aiApiConfig.keywords') as unknown as string[] },
+    { id: 'ai-floatball', category: 'ai', title: t('common.searchIndex.aiFloatball.title'), description: t('common.searchIndex.aiFloatball.description'), keywords: t('common.searchIndex.aiFloatball.keywords') as unknown as string[] },
 
-  // 音乐源
-  { id: 'music-source', category: 'music', title: '音乐源选择', description: '选择音乐来源', keywords: ['音乐源', 'source', '音源'] },
-  { id: 'music-quality', category: 'music', title: '音质选择', description: '选择播放和下载的音质', keywords: ['音质', 'quality', '无损', 'flac', 'hires'] },
+    // 播放设置
+    { id: 'playback-playlist', category: 'playlist', title: t('common.searchIndex.playbackPlaylist.title'), description: t('common.searchIndex.playbackPlaylist.description'), keywords: t('common.searchIndex.playbackPlaylist.keywords') as unknown as string[] },
+    { id: 'playback-audio-output', category: 'playlist', title: t('common.searchIndex.playbackAudioOutput.title'), description: t('common.searchIndex.playbackAudioOutput.description'), keywords: t('common.searchIndex.playbackAudioOutput.keywords') as unknown as string[] },
+    { id: 'playback-equalizer', category: 'playlist', title: t('common.searchIndex.playbackEqualizer.title'), description: t('common.searchIndex.playbackEqualizer.description'), keywords: t('common.searchIndex.playbackEqualizer.keywords') as unknown as string[] },
+    { id: 'playback-audio-effect', category: 'playlist', title: t('common.searchIndex.playbackAudioEffect.title'), description: t('common.searchIndex.playbackAudioEffect.description'), keywords: t('common.searchIndex.playbackAudioEffect.keywords') as unknown as string[] },
+    { id: 'playback-performance', category: 'playlist', title: t('common.searchIndex.playbackPerformance.title'), description: t('common.searchIndex.playbackPerformance.description'), keywords: t('common.searchIndex.playbackPerformance.keywords') as unknown as string[] },
 
-  // 存储管理
-  { id: 'storage-directory', category: 'storage', title: '存储目录', description: '配置缓存和下载目录', keywords: ['目录', '存储', '缓存', '下载', 'directory', 'cache'] },
-  { id: 'storage-cache', category: 'storage', title: '缓存管理', description: '查看和清除本地歌曲缓存', keywords: ['缓存', '清除', 'cache', 'clean'] },
-  { id: 'storage-cache-strategy', category: 'storage', title: '缓存策略', description: '自动缓存音乐设置', keywords: ['缓存', '策略', '自动'] },
-  { id: 'storage-filename', category: 'storage', title: '文件名格式设置', description: '设置下载歌曲的文件名格式', keywords: ['文件名', '格式', '模板', 'filename', 'template'] },
-  { id: 'storage-tags', category: 'storage', title: '标签写入设置', description: '设置下载歌曲时要写入的标签信息', keywords: ['标签', 'tag', 'id3', '封面', '歌词'] },
+    // 音乐源
+    { id: 'music-source', category: 'music', title: t('common.searchIndex.musicSource.title'), description: t('common.searchIndex.musicSource.description'), keywords: t('common.searchIndex.musicSource.keywords') as unknown as string[] },
+    { id: 'music-quality', category: 'music', title: t('common.searchIndex.musicQuality.title'), description: t('common.searchIndex.musicQuality.description'), keywords: t('common.searchIndex.musicQuality.keywords') as unknown as string[] },
 
-  // 快捷键
-  { id: 'hotkey-settings', category: 'hotkeys', title: '快捷键设置', description: '配置系统级全局快捷键', keywords: ['快捷键', 'hotkey', 'shortcut', '全局'] },
+    // 存储管理
+    { id: 'storage-directory', category: 'storage', title: t('common.searchIndex.storageDirectory.title'), description: t('common.searchIndex.storageDirectory.description'), keywords: t('common.searchIndex.storageDirectory.keywords') as unknown as string[] },
+    { id: 'storage-cache', category: 'storage', title: t('common.searchIndex.storageCache.title'), description: t('common.searchIndex.storageCache.description'), keywords: t('common.searchIndex.storageCache.keywords') as unknown as string[] },
+    { id: 'storage-cache-strategy', category: 'storage', title: t('common.searchIndex.storageCacheStrategy.title'), description: t('common.searchIndex.storageCacheStrategy.description'), keywords: t('common.searchIndex.storageCacheStrategy.keywords') as unknown as string[] },
+    { id: 'storage-filename', category: 'storage', title: t('common.searchIndex.storageFilename.title'), description: t('common.searchIndex.storageFilename.description'), keywords: t('common.searchIndex.storageFilename.keywords') as unknown as string[] },
+    { id: 'storage-tags', category: 'storage', title: t('common.searchIndex.storageTags.title'), description: t('common.searchIndex.storageTags.description'), keywords: t('common.searchIndex.storageTags.keywords') as unknown as string[] },
 
-  // 插件
-  { id: 'plugin-settings', category: 'plugins', title: '插件管理', description: '安装、配置和管理插件', keywords: ['插件', 'plugin', '扩展', '音源插件'] },
+    // 快捷键
+    { id: 'hotkey-settings', category: 'hotkeys', title: t('common.searchIndex.hotkeySettings.title'), description: t('common.searchIndex.hotkeySettings.description'), keywords: t('common.searchIndex.hotkeySettings.keywords') as unknown as string[] },
 
-  // 关于
-  { id: 'about-version', category: 'about', title: '版本信息', description: '查看应用版本和检查更新', keywords: ['版本', '更新', 'version', 'update'] },
-  { id: 'about-tech', category: 'about', title: '技术栈', description: '查看应用使用的技术栈', keywords: ['技术', 'tech', '框架', 'framework'] },
-  { id: 'about-team', category: 'about', title: '开发团队', description: '了解开发团队成员', keywords: ['团队', '开发者', 'team', 'developer'] },
-  { id: 'about-legal', category: 'about', title: '法律声明', description: '法律声明和使用条款', keywords: ['法律', '声明', '版权', 'legal', 'copyright'] },
-]
+    // 插件
+    { id: 'plugin-settings', category: 'plugins', title: t('common.searchIndex.pluginSettings.title'), description: t('common.searchIndex.pluginSettings.description'), keywords: t('common.searchIndex.pluginSettings.keywords') as unknown as string[] },
+
+    // 关于
+    { id: 'about-version', category: 'about', title: t('common.searchIndex.aboutVersion.title'), description: t('common.searchIndex.aboutVersion.description'), keywords: t('common.searchIndex.aboutVersion.keywords') as unknown as string[] },
+    { id: 'about-tech', category: 'about', title: t('common.searchIndex.aboutTech.title'), description: t('common.searchIndex.aboutTech.description'), keywords: t('common.searchIndex.aboutTech.keywords') as unknown as string[] },
+    { id: 'about-team', category: 'about', title: t('common.searchIndex.aboutTeam.title'), description: t('common.searchIndex.aboutTeam.description'), keywords: t('common.searchIndex.aboutTeam.keywords') as unknown as string[] },
+    { id: 'about-legal', category: 'about', title: t('common.searchIndex.aboutLegal.title'), description: t('common.searchIndex.aboutLegal.description'), keywords: t('common.searchIndex.aboutLegal.keywords') as unknown as string[] }
+  ]
+}

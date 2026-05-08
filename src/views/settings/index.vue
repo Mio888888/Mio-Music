@@ -24,67 +24,69 @@ import AboutSection from './sections/AboutSection.vue'
 import SettingsSearch from '@/components/SettingsSearch.vue'
 import type { SearchItem } from './searchIndex'
 
+const { t } = useI18n()
+
 const activeCategory = ref<string>('appearance')
 const isMobile = ref(false)
 const route = useRoute()
 const contentPanelRef = ref<HTMLElement>()
 const scrollPositions = ref<Record<string, number>>({})
 
-const settingsCategories = [
+const settingsCategories = computed(() => [
   {
     key: 'appearance',
-    label: '外观设置',
+    label: t('settings.musicSource.navAppearance'),
     icon: PaletteIcon,
-    description: '主题、标题栏风格等外观配置'
+    description: t('settings.musicSource.navAppearanceDesc')
   },
   {
     key: 'ai',
-    label: 'AI 功能',
+    label: t('settings.musicSource.navAi'),
     icon: ApiIcon,
-    description: 'DeepSeek API 配置和 AI 相关功能'
+    description: t('settings.musicSource.navAiDesc')
   },
   {
     key: 'playlist',
-    label: '播放设置',
+    label: t('settings.musicSource.navPlaylist'),
     icon: PlayCircleIcon,
-    description: '播放列表，歌词管理和相关设置'
+    description: t('settings.musicSource.navPlaylistDesc')
   },
   {
     key: 'hotkeys',
-    label: '快捷键',
+    label: t('settings.musicSource.navHotkeys'),
     icon: KeyboardIcon,
-    description: '全局快捷键配置'
+    description: t('settings.musicSource.navHotkeysDesc')
   },
   {
     key: 'plugins',
-    label: '插件管理',
+    label: t('settings.musicSource.navPlugins'),
     icon: TreeRoundDotIcon,
-    description: '插件安装、配置和管理'
+    description: t('settings.musicSource.navPluginsDesc')
   },
   {
     key: 'music',
-    label: '音乐源',
+    label: t('settings.musicSource.navMusic'),
     icon: MusicIcon,
-    description: '音乐源选择和音质配置'
+    description: t('settings.musicSource.navMusicDesc')
   },
   {
     key: 'storage',
-    label: '存储管理',
+    label: t('settings.musicSource.navStorage'),
     icon: SaveIcon,
-    description: '缓存管理和存储设置'
+    description: t('settings.musicSource.navStorageDesc')
   },
   {
     key: 'about',
-    label: '关于',
+    label: t('settings.musicSource.navAbout'),
     icon: InfoCircleIcon,
-    description: '版本信息和功能说明'
+    description: t('settings.musicSource.navAboutDesc')
   }
-]
+])
 
 const visibleSettingsCategories = computed(() =>
   isMobile.value
-    ? settingsCategories.filter((category) => category.key !== 'hotkeys')
-    : settingsCategories
+    ? settingsCategories.value.filter((category) => category.key !== 'hotkeys')
+    : settingsCategories.value
 )
 
 const sectionComponents: Record<string, any> = {
@@ -224,7 +226,7 @@ const handleSearchSelect = async (item: SearchItem) => {
 <template>
   <div class="main-container">
     <div class="header" data-tauri-drag-region>
-      <TitleBarControls title="设置" :show-back="true" :show-account="false">
+      <TitleBarControls :title="t('settings.title')" :show-back="true" :show-account="false">
         <template #extra>
           <div style="flex-shrink: 0">
             <SettingsSearch :hidden-categories="isMobile ? ['hotkeys'] : []" @select="handleSearchSelect" />

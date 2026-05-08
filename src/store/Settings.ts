@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
+import { computed } from 'vue'
 import { ref } from 'vue'
 import type { BackgroundRenderSettings } from '@/types/background'
 import { DEFAULT_BACKGROUND_RENDER_SETTINGS } from '@/types/background'
+import { resolveAppLocale } from '@/locales/runtime'
 
 export interface TagWriteOptions {
   basicInfo: boolean
@@ -11,8 +13,11 @@ export interface TagWriteOptions {
   lyricFormat: 'lrc' | 'word-by-word'
 }
 
+export type AppLocale = 'zh-CN' | 'en-US' | 'system'
+
 export interface SettingsState {
   showFloatBall: boolean
+  language?: AppLocale
   autoCacheMusic?: boolean
   cacheSizeLimit?: number
   directories?: { cacheDir: string; downloadDir: string }
@@ -34,6 +39,7 @@ export interface SettingsState {
 export const useSettingsStore = defineStore('settings', () => {
   const defaultSettings: SettingsState = {
     showFloatBall: true,
+    language: 'system',
     autoCacheMusic: true,
     cacheSizeLimit: 1073741824,
     filenameTemplate: '%t - %s',
@@ -90,6 +96,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (typeof settings.value.closeToTray === 'undefined') settings.value.closeToTray = true
     if (typeof settings.value.hasConfiguredCloseBehavior === 'undefined') settings.value.hasConfiguredCloseBehavior = false
     if (typeof settings.value.routePreloadEnabled === 'undefined') settings.value.routePreloadEnabled = true
+    if (!settings.value.language) settings.value.language = 'system'
     if (!settings.value.tagWriteOptions) {
       settings.value.tagWriteOptions = { basicInfo: true, cover: true, lyrics: true, downloadLyrics: false, lyricFormat: 'word-by-word' }
     }
@@ -115,11 +122,23 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
   }
 
+  const resolveLocale = async (): Promise<string> => resolveAppLocale(settings.value.language)
+
+  const currentLocale = computed(() => settings.value.language && settings.value.language !== 'system' ? settings.value.language : 'zh-CN')
+
+  const updateLanguage = (lang: AppLocale) => {
+    settings.value.language = lang
+    saveSettings()
+  }
+
   return {
     settings,
     updateSettings,
     toggleFloatBall,
-    saveSettings
+    saveSettings,
+    resolveLocale,
+    currentLocale,
+    updateLanguage
   }
 }, {
   persist: false

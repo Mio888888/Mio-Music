@@ -7,6 +7,8 @@ import { musicSdk } from '@/services/musicSdk'
 import { TreeRoundDotIcon } from 'tdesign-icons-vue-next'
 import fonts from '@/assets/icon_font/icons'
 
+const { t } = useI18n()
+
 const emit = defineEmits(['switch-category'])
 
 const QUALITY_ORDER: Record<string, number> = {
@@ -65,12 +67,12 @@ const testSubsonicConnection = async () => {
     if (result?.success) {
       subsonicConfig.value.enabled = true
       syncSubsonicSource()
-      MessagePlugin.success(result.message || 'Subsonic 连接成功')
+      MessagePlugin.success(result.message || t('settings.musicSource.subsonicConnectSuccess'))
     } else {
-      MessagePlugin.warning(result?.message || 'Subsonic 连接失败')
+      MessagePlugin.warning(result?.message || t('settings.musicSource.subsonicConnectFailed'))
     }
   } catch (error: any) {
-    MessagePlugin.error(error?.message || String(error) || 'Subsonic 连接失败')
+    MessagePlugin.error(error?.message || String(error) || t('settings.musicSource.subsonicConnectFailed'))
   } finally {
     subsonicTesting.value = false
   }
@@ -83,8 +85,8 @@ const hasPluginData = computed(() => {
 })
 
 const currentPluginName = computed(() => {
-  if (!userInfo.value.pluginId) return userInfo.value.supportedSources?.subsonic ? '内置音源' : ''
-  return userInfo.value.pluginName || userInfo.value.pluginId || '未知插件'
+  if (!userInfo.value.pluginId) return userInfo.value.supportedSources?.subsonic ? t('settings.musicSource.builtInSource') : ''
+  return userInfo.value.pluginName || userInfo.value.pluginId || t('settings.musicSource.unknownPlugin')
 })
 
 const currentSourceQualities = computed(() => {
@@ -157,25 +159,32 @@ const selectSource = (sourceKey: string) => {
 
 const getQualityDisplayName = (quality: string) => {
   const qualityMap: Record<string, string> = {
-    '128k': '128kbps', '320k': '320kbps',
-    flac: 'FLAC 无损', flac24bit: '24bit FLAC', hires: 'Hi-Res 高解析度',
-    atmos: '杜比全景声', master: '母带音质'
+    '128k': t('settings.musicSource.quality128k'),
+    '320k': t('settings.musicSource.quality320k'),
+    flac: t('settings.musicSource.qualityFlac'),
+    flac24bit: t('settings.musicSource.qualityFlac24bit'),
+    hires: t('settings.musicSource.qualityHires'),
+    atmos: t('settings.musicSource.qualityAtmos'),
+    master: t('settings.musicSource.qualityMaster')
   }
   return qualityMap[quality] || quality
 }
 
 const getQualityDescription = (quality: string) => {
   const descriptions: Record<string, string> = {
-    '128k': '128kbps 基础音质', '320k': '320kbps 高品质音质',
-    flac: 'FLAC 无损，完美还原原始录音', flac24bit: '24bit FLAC 高解析度无损',
-    hires: 'Hi-Res 高解析度，96kHz/24bit', atmos: '杜比全景声，沉浸式空间音频',
-    master: '母带音质，192kHz/24bit'
+    '128k': t('settings.musicSource.quality128kDesc'),
+    '320k': t('settings.musicSource.quality320kDesc'),
+    flac: t('settings.musicSource.qualityFlacDesc'),
+    flac24bit: t('settings.musicSource.qualityFlac24bitDesc'),
+    hires: t('settings.musicSource.qualityHiresDesc'),
+    atmos: t('settings.musicSource.qualityAtmosDesc'),
+    master: t('settings.musicSource.qualityMasterDesc')
   }
-  return descriptions[quality] || '自定义音质设置'
+  return descriptions[quality] || t('settings.musicSource.qualityCustomDesc')
 }
 
 const getCurrentSourceName = () => {
-  if (!hasPluginData.value || !userInfo.value.selectSources) return '未选择'
+  if (!hasPluginData.value || !userInfo.value.selectSources) return t('settings.musicSource.noSelection')
   const source = userInfo.value.supportedSources?.[userInfo.value.selectSources]
   return source?.name || userInfo.value.selectSources
 }
@@ -190,24 +199,24 @@ const getSourceIcon = (key: string) => {
 <template>
   <div class="settings-section">
     <div class="setting-group subsonic-config">
-      <h3>Subsonic 内置音源</h3>
+      <h3>{{ t('settings.musicSource.subsonicTitle') }}</h3>
       <div class="subsonic-form">
         <div class="subsonic-switch-row">
-          <span>启用</span>
+          <span>{{ t('settings.musicSource.subsonicEnable') }}</span>
           <t-switch v-model="subsonicConfig.enabled" @change="syncSubsonicSource" />
         </div>
-        <t-input v-model="subsonicConfig.baseUrl" label="服务器" placeholder="https://navidrome.example.com" clearable />
-        <t-input v-model="subsonicConfig.username" label="用户名" placeholder="Subsonic 用户名" clearable />
-        <t-input v-model="subsonicConfig.password" label="密码" type="password" placeholder="Subsonic 密码" clearable />
+        <t-input v-model="subsonicConfig.baseUrl" :label="t('settings.musicSource.subsonicServer')" placeholder="https://navidrome.example.com" clearable />
+        <t-input v-model="subsonicConfig.username" :label="t('settings.musicSource.subsonicUsername')" :placeholder="t('settings.musicSource.subsonicUsername')" clearable />
+        <t-input v-model="subsonicConfig.password" :label="t('settings.musicSource.subsonicPassword')" type="password" :placeholder="t('settings.musicSource.subsonicPassword')" clearable />
         <div class="subsonic-inline">
-          <t-input v-model="subsonicConfig.apiVersion" label="API 版本" placeholder="1.16.1" />
-          <t-input v-model="subsonicConfig.clientName" label="客户端名" placeholder="Mio" />
+          <t-input v-model="subsonicConfig.apiVersion" :label="t('settings.musicSource.subsonicApiVersion')" placeholder="1.16.1" />
+          <t-input v-model="subsonicConfig.clientName" :label="t('settings.musicSource.subsonicClientName')" placeholder="Mio" />
         </div>
         <div class="subsonic-actions">
           <t-button theme="primary" :loading="subsonicTesting" @click="testSubsonicConnection">
-            测试连接
+            {{ t('settings.musicSource.subsonicTestConnection') }}
           </t-button>
-          <span class="subsonic-hint">连接成功后会在音乐源列表中显示 Subsonic。</span>
+          <span class="subsonic-hint">{{ t('settings.musicSource.subsonicHint') }}</span>
         </div>
       </div>
     </div>
@@ -215,13 +224,13 @@ const getSourceIcon = (key: string) => {
     <div v-if="hasPluginData" class="music-config-container">
       <div class="setting-group">
         <div class="plugin-info">
-          <span class="plugin-name">当前配置: {{ currentPluginName }}</span>
-          <span class="plugin-status">已启用</span>
+          <span class="plugin-name">{{ t('settings.musicSource.currentConfig', { name: currentPluginName }) }}</span>
+          <span class="plugin-status">{{ t('settings.musicSource.enabled') }}</span>
         </div>
       </div>
 
       <div id="music-source" class="setting-group">
-        <h3>音乐源选择</h3>
+        <h3>{{ t('settings.musicSource.musicSourceSelect') }}</h3>
         <div class="source-cards">
           <div
             v-for="(source, key) in userInfo.supportedSources"
@@ -237,7 +246,7 @@ const getSourceIcon = (key: string) => {
             <div class="source-info">
               <div class="source-name">{{ source.name }}</div>
               <div class="source-type">
-                <span>{{ source.type || '音乐源' }}</span>
+                <span>{{ source.type || t('settings.musicSource.sourceType') }}</span>
                 <t-tag
                   v-if="getSourceQuality(String(key))"
                   size="small"
@@ -257,7 +266,7 @@ const getSourceIcon = (key: string) => {
       </div>
 
       <div v-if="currentSourceQualities.length > 0" id="music-quality" class="setting-group">
-        <h3>音质选择 <span class="quality-source-hint">— {{ getCurrentSourceName() }}</span></h3>
+        <h3>{{ t('settings.musicSource.qualitySelect') }} <span class="quality-source-hint">— {{ getCurrentSourceName() }}</span></h3>
         <div class="quality-tags-container">
           <div
             v-for="quality in currentSourceQualities"
@@ -275,21 +284,21 @@ const getSourceIcon = (key: string) => {
       </div>
 
       <div v-if="globalQualityOptions.length > 0" class="setting-group">
-        <h3>全局音质（支持交集）</h3>
+        <h3>{{ t('settings.musicSource.globalQuality') }}</h3>
         <t-select v-model="globalQualitySelected" @change="(v: any) => applyGlobalQuality(String(v))">
           <t-option v-for="q in globalQualityOptions" :key="q" :value="q" :label="getQualityDisplayName(q)" />
         </t-select>
       </div>
 
       <div class="setting-group">
-        <h3>配置状态</h3>
+        <h3>{{ t('settings.musicSource.configStatus') }}</h3>
         <div class="config-status">
           <div class="status-item">
-            <span class="status-label">音乐源:</span>
+            <span class="status-label">{{ t('settings.musicSource.musicSourceLabel') }}:</span>
             <span class="status-value">{{ getCurrentSourceName() }}</span>
           </div>
           <div class="status-item">
-            <span class="status-label">音质:</span>
+            <span class="status-label">{{ t('settings.musicSource.qualityLabel') }}:</span>
             <span class="status-value">{{ getQualityDisplayName(userInfo.selectQuality || '') }}</span>
           </div>
         </div>
@@ -301,11 +310,11 @@ const getSourceIcon = (key: string) => {
         <TreeRoundDotIcon />
       </div>
       <div class="prompt-content">
-        <h4>未检测到插件配置</h4>
-        <p>请先安装并选择一个音乐插件，然后返回此处配置音乐源和音质选项。</p>
+        <h4>{{ t('settings.musicSource.noPluginTitle') }}</h4>
+        <p>{{ t('settings.musicSource.noPluginDesc') }}</p>
         <t-button theme="primary" @click="goPlugin">
           <i class="iconfont icon-shezhi" />
-          前往插件管理
+          {{ t('settings.musicSource.goToPlugin') }}
         </t-button>
       </div>
     </div>

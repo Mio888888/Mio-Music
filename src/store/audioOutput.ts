@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { MessagePlugin } from 'tdesign-vue-next'
+import i18n from '@/locales'
 
 export interface AudioOutputDevice {
   deviceId: string
@@ -128,23 +129,23 @@ export const useAudioOutputStore = defineStore(
               `Previously selected device ${currentDeviceId.value} not found, reverting to default.`
             )
             currentDeviceId.value = 'default'
-            MessagePlugin.warning('上次使用的音频设备未找到，已切换回默认设备')
+            MessagePlugin.warning(i18n.global.t('settings.audioOutput.prevDeviceNotFound'))
           }
         } catch (err: any) {
           console.error('Failed to enumerate audio devices:', err)
           if (err.name === 'NotAllowedError') {
-            error.value = '访问音频设备权限被拒绝，请检查系统设置'
+            error.value = i18n.global.t('settings.audioOutput.permissionDenied')
           } else if (err.name === 'NotFoundError') {
-            error.value = '未找到音频输出设备'
+            error.value = i18n.global.t('settings.audioOutput.deviceNotFound')
           } else {
-            error.value = err.message || '无法获取音频设备列表'
+            error.value = err.message || i18n.global.t('settings.audioOutput.cannotGetDevices')
           }
-          MessagePlugin.error(error.value || '获取音频设备列表失败')
+          MessagePlugin.error(error.value || i18n.global.t('settings.audioOutput.getDevicesFailed'))
         }
       }
 
       if (!rustSupported.value && devices.value.length === 0 && !error.value) {
-        error.value = '未找到音频输出设备'
+        error.value = i18n.global.t('settings.audioOutput.deviceNotFound')
       }
 
       isLoading.value = false
@@ -161,7 +162,7 @@ export const useAudioOutputStore = defineStore(
         })
       }
       devices.value = [...devices.value, ...fakeDevices]
-      MessagePlugin.info(`已生成 ${count} 个虚拟设备用于性能测试`)
+      MessagePlugin.info(i18n.global.t('settings.audioOutput.virtualDevicesGenerated', { count }))
     }
 
     const setDevice = async (deviceId: string) => {
@@ -176,11 +177,11 @@ export const useAudioOutputStore = defineStore(
           secondaryDeviceId.value = deviceId
         }
 
-        MessagePlugin.success(`已切换音频输出至: ${currentDeviceLabel.value}`)
+        MessagePlugin.success(i18n.global.t('settings.audioOutput.switchedTo', { name: currentDeviceLabel.value }))
       } catch (err: any) {
         console.error('Failed to set audio device:', err)
         error.value = err.message
-        MessagePlugin.error('切换音频设备失败')
+        MessagePlugin.error(i18n.global.t('settings.audioOutput.switchFailed'))
       }
     }
 
@@ -205,11 +206,11 @@ export const useAudioOutputStore = defineStore(
           is_default: d.id === deviceId
         }))
 
-        MessagePlugin.success(`已切换音频输出至: ${device?.name || deviceId}`)
+        MessagePlugin.success(i18n.global.t('settings.audioOutput.switchedTo', { name: device?.name || deviceId }))
       } catch (err: any) {
         console.error('Failed to set Rust audio device:', err)
-        error.value = err.message || '切换音频设备失败'
-        MessagePlugin.error('切换音频设备失败')
+        error.value = err.message || i18n.global.t('settings.audioOutput.switchFailed')
+        MessagePlugin.error(i18n.global.t('settings.audioOutput.switchFailed'))
       }
     }
 
@@ -240,7 +241,7 @@ export const useAudioOutputStore = defineStore(
           activeABChannel.value = 'B'
           setDevice(secondaryDeviceId.value)
         } else {
-          MessagePlugin.info('请先设置对比设备 (设备 B)')
+          MessagePlugin.info(i18n.global.t('settings.audioOutput.setCompareDevice'))
         }
       } else {
         activeABChannel.value = 'A'
@@ -307,7 +308,7 @@ export const useAudioOutputStore = defineStore(
         }, 600)
       } catch (err: any) {
         console.error('Test sound failed', err)
-        MessagePlugin.error('测试音播放失败')
+        MessagePlugin.error(i18n.global.t('settings.audioOutput.testPlayFailed'))
       }
     }
 

@@ -29,6 +29,8 @@ import PlaySettings from './PlaySettings.vue'
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import CommentsOverlay from './CommentsOverlay.vue'
 
+const { t } = useI18n()
+
 const playSetting = usePlaySettingStore()
 const settingsStore = useSettingsStore()
 const dlnaStore = useDlnaStore()
@@ -234,7 +236,7 @@ const actualCoverImage = computed(() => {
 
 const jumpTime = (e: any) => {
   if (dlnaStore.currentDevice) {
-    MessagePlugin.warning('投屏模式下不支持拖拽进度')
+    MessagePlugin.warning(t('play.screenCastingNoSeekFull'))
     return
   }
   const startTime = e?.line?.getLine?.()?.startTime ?? 0
@@ -566,7 +568,7 @@ const titleContentRef = ref<HTMLElement | null>(null)
 const songName = computed(() => {
   const info = player.value.songInfo
   if (info && 'name' in info && typeof info.name === 'string') return info.name
-  return '未知歌曲'
+  return t('common.unknownSong')
 })
 
 const checkOverflow = async () => {
@@ -639,7 +641,7 @@ onUnmounted(() => {
     <Transition name="fade">
       <div v-if="showPerformanceWarning" class="performance-warning-toast">
         <t-icon name="info-circle" size="1.2rem" />
-        <span>检测到性能问题，已自动降低背景效果以提升流畅度</span>
+        <span>{{ t('play.performanceWarning') }}</span>
         <button class="close-btn" @click="showPerformanceWarning = false">
           <t-icon name="close" size="1rem" />
         </button>
@@ -785,7 +787,7 @@ onUnmounted(() => {
       </div>
       <div class="right">
         <div v-if="player.lyrics.lines.length <= 0 && !player.isLoading" class="lyric-empty">
-          <span>暂无歌词</span>
+          <span>{{ t('play.noLyrics') }}</span>
         </div>
         <LyricPlayer
           v-if="player.lyrics.lines.length > 0"
@@ -823,7 +825,7 @@ onUnmounted(() => {
     </div>
     <!-- 播放设置浮动按钮 -->
     <div ref="floatActionRef" class="float-action" :class="{ idle: isIdle }">
-      <button class="skin-btn" data-tooltip="播放器主题" @click="showSettings = !showSettings">
+      <button class="skin-btn" :data-tooltip="t('play.playerTheme')" @click="showSettings = !showSettings">
         <pen-ball-icon
           :fill-color="'transparent'"
           :stroke-color="'currentColor'"

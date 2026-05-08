@@ -7,6 +7,8 @@ import { DeleteIcon } from 'tdesign-icons-vue-next'
 import { useVirtualList } from '@vueuse/core'
 import type { SongList } from '@/types/audio'
 
+const { t } = useI18n()
+
 interface Props {
   show: boolean
   currentSongId: string | number | null | undefined
@@ -280,23 +282,23 @@ onUnmounted(() => {
 })
 
 const handleClearPlaylist = () => {
-  if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
+  if (list.value.length === 0) { MessagePlugin.warning(t('play.playlistAlreadyEmpty')); return }
   localUserStore.clearList()
-  MessagePlugin.success('播放列表已清空')
+  MessagePlugin.success(t('play.playlistCleared'))
 }
 
 const handleClearConfirm = () => {
-  if (list.value.length === 0) { MessagePlugin.warning('播放列表已为空'); return }
+  if (list.value.length === 0) { MessagePlugin.warning(t('play.playlistAlreadyEmpty')); return }
   emit('close')
   nextTick(() => {
     const dialog = DialogPlugin.confirm({
-      header: '清空播放列表',
-      body: '确定要清空播放列表吗？此操作不可撤销。',
-      confirmBtn: { content: '确认清空', theme: 'danger' },
-      cancelBtn: '取消',
+      header: t('play.clearPlaylistConfirmTitle'),
+      body: t('play.clearPlaylistConfirmBody'),
+      confirmBtn: { content: t('play.confirmClear'), theme: 'danger' },
+      cancelBtn: t('common.cancel'),
       onConfirm: () => {
         localUserStore.clearList()
-        MessagePlugin.success('播放列表已清空')
+        MessagePlugin.success(t('play.playlistCleared'))
         dialog.destroy()
       }
     })
@@ -304,9 +306,9 @@ const handleClearConfirm = () => {
 }
 
 const handleLocateCurrentSong = () => {
-  if (!props.currentSongId) { MessagePlugin.info('当前没有正在播放的歌曲'); return }
+  if (!props.currentSongId) { MessagePlugin.info(t('play.noSongPlaying')); return }
   const currentSongExists = list.value.some((song) => song.songmid === props.currentSongId)
-  if (!currentSongExists) { MessagePlugin.warning('当前播放的歌曲不在播放列表中'); return }
+  if (!currentSongExists) { MessagePlugin.warning(t('play.currentSongNotInPlaylist')); return }
   scrollToCurrentSong()
 }
 
@@ -325,7 +327,7 @@ defineExpose({ scrollToCurrentSong })
       @click.stop
     >
       <div class="playlist-header">
-        <div class="playlist-title">播放列表 ({{ list.length }})</div>
+        <div class="playlist-title">{{ t('play.playlistTitle') }} ({{ list.length }})</div>
         <button class="playlist-close" @click.stop="handleClose">
           <span class="iconfont icon-guanbi"></span>
         </button>
@@ -333,8 +335,8 @@ defineExpose({ scrollToCurrentSong })
 
       <div class="playlist-content" v-bind="containerProps">
         <div v-if="list.length === 0" class="playlist-empty">
-          <p>播放列表为空</p>
-          <p>请添加歌曲到播放列表，也可在设置中导入歌曲列表</p>
+          <p>{{ t('play.playlistEmpty') }}</p>
+          <p>{{ t('play.playlistEmptyTip') }}</p>
         </div>
         <div v-else :class="playlistSongsClass" :style="wrapperProps.style">
           <div
@@ -374,7 +376,7 @@ defineExpose({ scrollToCurrentSong })
 
             <transition name="hover-tip">
               <div v-if="hoverTipVisible && hoverTipIndex === item.index" class="hover-tip" @click.stop>
-                长按可拖动排序
+                {{ t('play.longPressToSort') }}
               </div>
             </transition>
           </div>
@@ -384,11 +386,11 @@ defineExpose({ scrollToCurrentSong })
       <div v-if="list.length > 0" class="playlist-footer">
         <button class="playlist-action-btn locate-btn" :disabled="!currentSongId" @click="handleLocateCurrentSong">
           <span class="iconfont icon-dingwei" style="font-size: 14px"></span>
-          <span>定位当前播放</span>
+          <span>{{ t('play.locateCurrentPlay') }}</span>
         </button>
         <button class="playlist-action-btn clear-btn" @click="handleClearConfirm">
           <DeleteIcon size="16" />
-          <span>清空播放列表</span>
+          <span>{{ t('play.clearPlaylist') }}</span>
         </button>
       </div>
     </div>

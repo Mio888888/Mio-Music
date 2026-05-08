@@ -1,10 +1,10 @@
 <template>
   <div class="equalizer-settings">
-    <t-card title="全局均衡器 (Professional EQ)" :bordered="false">
+    <t-card :title="t('settings.equalizer.title')" :bordered="false">
       <template #actions>
         <t-space>
-          <t-switch v-model="enabled" :label="['开启', '关闭']" />
-          <t-button theme="default" variant="text" @click="resetToCurrentPreset">重置</t-button>
+          <t-switch v-model="enabled" :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]" />
+          <t-button theme="default" variant="text" @click="resetToCurrentPreset">{{ t('settings.equalizer.reset') }}</t-button>
         </t-space>
       </template>
 
@@ -19,9 +19,9 @@
           <div class="preset-controls">
             <t-select
               v-model="currentPresetName"
-              placeholder="选择预设"
+              :placeholder="t('settings.equalizer.selectPreset')"
               class="preset-select"
-              @change="(val) => handlePresetChange(val as string)"
+              @change="(val: unknown) => handlePresetChange(val as string)"
             >
               <t-option
                 v-for="preset in presets"
@@ -39,7 +39,7 @@
               @click="saveCurrentToPreset"
             >
               <template #icon><SaveIcon /></template>
-              保存
+              {{ t('settings.equalizer.savePreset') }}
             </t-button>
 
             <t-button
@@ -50,16 +50,16 @@
               @click="confirmDeletePreset"
             >
               <template #icon><DeleteIcon /></template>
-              删除
+              {{ t('settings.equalizer.deletePreset') }}
             </t-button>
           </div>
 
           <div class="action-buttons">
             <t-button theme="primary" variant="outline" @click="savePresetDialogVisible = true"
-              >保存预设</t-button
+              >{{ t('settings.equalizer.saveAsPreset') }}</t-button
             >
-            <t-button theme="default" variant="outline" @click="exportConfig">导出配置</t-button>
-            <t-button theme="default" variant="outline" @click="triggerImport">导入配置</t-button>
+            <t-button theme="default" variant="outline" @click="exportConfig">{{ t('settings.equalizer.exportConfig') }}</t-button>
+            <t-button theme="default" variant="outline" @click="triggerImport">{{ t('settings.equalizer.importConfig') }}</t-button>
             <input
               ref="fileInputRef"
               type="file"
@@ -82,7 +82,7 @@
                 layout="vertical"
                 :show-tooltip="true"
                 :disabled="!enabled"
-                @change="(val) => onGainChange(index, val as number)"
+                @change="(val: number | number[]) => onGainChange(index, val as number)"
               />
             </div>
             <span class="freq-label">{{ formatFreq(freq) }}</span>
@@ -94,10 +94,10 @@
 
     <t-dialog
       v-model:visible="savePresetDialogVisible"
-      header="保存为新预设"
+      :header="t('settings.equalizer.saveNewPresetTitle')"
       @confirm="saveNewPreset"
     >
-      <t-input v-model="newPresetName" placeholder="输入预设名称" />
+      <t-input v-model="newPresetName" :placeholder="t('settings.equalizer.presetNamePlaceholder')" />
     </t-dialog>
   </div>
 </template>
@@ -110,11 +110,14 @@ import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { DeleteIcon, SaveIcon } from 'tdesign-icons-vue-next'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { useI18n } from 'vue-i18n'
 
-const BUILTIN_PRESETS = [
-  'Flat(原声)', 'Pop(流行)', 'Rock(摇滚)', 'Jazz(爵士)',
-  'Classical(古典)', 'Bass Boost(低音增强)', 'Vocal Boost(人声增强)', 'Treble Boost(高音增强)'
-]
+const { t } = useI18n()
+
+const BUILTIN_PRESETS = computed(() => [
+  t('settings.equalizer.presetFlat'), t('settings.equalizer.presetPop'), t('settings.equalizer.presetRock'), t('settings.equalizer.presetJazz'),
+  t('settings.equalizer.presetClassical'), t('settings.equalizer.presetBassBoost'), t('settings.equalizer.presetVocalBoost'), t('settings.equalizer.presetTrebleBoost')
+])
 
 const eqStore = useEqualizerStore()
 const { enabled, currentPreset, gains, presets } = storeToRefs(eqStore)
@@ -144,13 +147,13 @@ const canDeleteCurrentPreset = computed(() => {
 
 const confirmDeletePreset = () => {
   if (!canDeleteCurrentPreset.value) {
-    MessagePlugin.warning('内置预设不能删除')
+    MessagePlugin.warning(t('settings.equalizer.builtinNoDelete'))
     return
   }
   const dialog = DialogPlugin.confirm({
-    header: '删除预设',
-    body: `确定要删除预设 "${currentPreset.value}" 吗？`,
-    confirmBtn: { theme: 'danger', content: '删除' },
+    header: t('settings.equalizer.deletePresetTitle'),
+    body: t('settings.equalizer.deletePresetBody', { name: currentPreset.value }),
+    confirmBtn: { theme: 'danger', content: t('settings.equalizer.deletePreset') },
     onConfirm: () => { deleteCurrentPreset(); dialog.destroy() }
   })
 }
@@ -161,22 +164,22 @@ const deleteCurrentPreset = () => {
   for (let i = presets.value.length - 1; i >= 0; i--) {
     if (presets.value[i].name === presetName) { index = i; break }
   }
-  if (index === -1) { MessagePlugin.error('预设不存在'); return }
-  if (presets.value[index].originalGains === undefined) { MessagePlugin.warning('内置预设不能删除'); return }
+  if (index === -1) { MessagePlugin.error(t('settings.equalizer.presetNotExist')); return }
+  if (presets.value[index].originalGains === undefined) { MessagePlugin.warning(t('settings.equalizer.builtinNoDelete')); return }
   presets.value.splice(index, 1)
   currentPreset.value = 'Flat'
   handlePresetChange('Flat')
-  MessagePlugin.success(`预设 "${presetName}" 已删除`)
+  MessagePlugin.success(t('settings.equalizer.presetDeleted', { name: presetName }))
   eqStore.addLog(`Deleted preset: ${presetName}`)
 }
 
 const saveCurrentToPreset = () => {
   const presetName = currentPreset.value
-  if (BUILTIN_PRESETS.includes(presetName)) { MessagePlugin.warning('内置预设不能修改，请创建新预设'); return }
+  if (BUILTIN_PRESETS.value.includes(presetName)) { MessagePlugin.warning(t('settings.equalizer.builtinNoModify')); return }
   const preset = presets.value.find((p) => p.name === presetName)
-  if (!preset) { MessagePlugin.error('预设不存在'); return }
+  if (!preset) { MessagePlugin.error(t('settings.equalizer.presetNotExist')); return }
   preset.gains = [...gains.value]
-  MessagePlugin.success(`已保存当前值到预设 "${presetName}"`)
+  MessagePlugin.success(t('settings.equalizer.savedToPreset', { name: presetName }))
   eqStore.addLog(`Updated preset "${presetName}" with current gains: ${gains.value.map((g) => g.toFixed(1)).join(', ')}`)
 }
 
@@ -204,22 +207,22 @@ const onGainChange = (index: number, val: number) => {
 
 const resetToCurrentPreset = () => {
   const presetName = currentPreset.value
-  if (BUILTIN_PRESETS.includes(presetName)) {
+  if (BUILTIN_PRESETS.value.includes(presetName)) {
     const preset = presets.value.find((p) => p.name === presetName)
     if (preset) {
       gains.value = [...preset.gains]
-      MessagePlugin.success(`已重置到 "${presetName}" 预设的原始值`)
+      MessagePlugin.success(t('settings.equalizer.resetToPreset', { name: presetName }))
       eqStore.addLog(`Reset to preset original values: ${presetName}`)
     }
   } else {
     const preset = presets.value.find((p) => p.name === presetName)
     if (preset && preset.originalGains) {
       gains.value = [...preset.originalGains]
-      MessagePlugin.success(`已重置到 "${presetName}" 的初始值`)
+      MessagePlugin.success(t('settings.equalizer.resetToInitial', { name: presetName }))
       eqStore.addLog(`Reset custom preset "${presetName}" to original values`)
     } else {
       handlePresetChange('Flat')
-      MessagePlugin.success('已重置到 Flat')
+      MessagePlugin.success(t('settings.equalizer.resetToFlat'))
       eqStore.addLog(`Reset custom preset "${presetName}" to Flat`)
     }
   }
@@ -227,14 +230,14 @@ const resetToCurrentPreset = () => {
 
 const saveNewPreset = () => {
   if (!newPresetName.value) return
-  if (BUILTIN_PRESETS.includes(newPresetName.value)) { MessagePlugin.warning(`"${newPresetName.value}" 是内置预设名称，请使用其他名称`); return }
-  if (presets.value.some((p) => p.name === newPresetName.value)) { MessagePlugin.warning(`预设 "${newPresetName.value}" 已存在`); return }
+  if (BUILTIN_PRESETS.value.includes(newPresetName.value)) { MessagePlugin.warning(t('settings.equalizer.builtinNameConflict', { name: newPresetName.value })); return }
+  if (presets.value.some((p) => p.name === newPresetName.value)) { MessagePlugin.warning(t('settings.equalizer.presetExists', { name: newPresetName.value })); return }
   const currentGains = [...gains.value]
   presets.value.push({ name: newPresetName.value, gains: currentGains, originalGains: currentGains })
   currentPreset.value = newPresetName.value
   savePresetDialogVisible.value = false
   newPresetName.value = ''
-  MessagePlugin.success('预设保存成功')
+  MessagePlugin.success(t('settings.equalizer.presetSaveSuccess'))
   eqStore.addLog(`Saved new preset with gains: ${currentGains.map((g) => g.toFixed(1)).join(', ')}`)
 }
 
@@ -269,10 +272,10 @@ const handleFileImport = async (event: Event) => {
     if (data.enabled !== undefined) enabled.value = data.enabled
     if (data.gains) gains.value = data.gains
     if (data.currentPreset) currentPreset.value = data.currentPreset
-    MessagePlugin.success('配置导入成功')
+    MessagePlugin.success(t('settings.equalizer.importSuccess'))
     eqStore.addLog('Imported configuration')
   } catch (e) {
-    MessagePlugin.error('导入失败，文件格式错误')
+    MessagePlugin.error(t('settings.equalizer.importFailed'))
   }
   input.value = ''
 }

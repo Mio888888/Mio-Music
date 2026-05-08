@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useSettingsStore } from '@/store/Settings'
 
+const { t } = useI18n()
 const settingsStore = useSettingsStore()
 </script>
 
@@ -8,8 +9,8 @@ const settingsStore = useSettingsStore()
   <div class="ai-floatball-settings">
     <div class="setting-item">
       <div class="setting-info">
-        <div class="setting-title">显示 AI 悬浮球</div>
-        <div class="setting-desc">在主界面显示 AI 助手悬浮球，方便快速调用 AI 功能</div>
+        <div class="setting-title">{{ t('settings.ai.showFloatBall') }}</div>
+        <div class="setting-desc">{{ t('settings.ai.showFloatBallDesc') }}</div>
       </div>
       <t-switch
         :value="settingsStore.settings.showFloatBall"

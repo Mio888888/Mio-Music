@@ -1,6 +1,10 @@
+<script setup lang="ts">
+const { t } = useI18n()
+</script>
+
 <template>
   <div class="page profile-page">
-    <h2>个人资料</h2>
+    <h2>{{ t('auth.profile') }}</h2>
   </div>
 </template>
 

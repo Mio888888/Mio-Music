@@ -4,6 +4,8 @@ import { ref, shallowRef, computed, onMounted, onBeforeUnmount, markRaw, type Co
 import { listen, emit, type UnlistenFn } from '@tauri-apps/api/event'
 import type { LyricLine } from '@/types/lyric'
 
+const { t } = useI18n()
+
 const LyricPlayerComp = shallowRef<Component | null>(null)
 const lyricPlayerError = ref(false)
 
@@ -271,7 +273,7 @@ onBeforeUnmount(() => {
 
     <!-- Error state -->
     <div v-else-if="lyricPlayerError" class="lyric-placeholder">
-      <span>歌词组件加载失败</span>
+      <span>{{ t('play.desktopLyric.loadFailed') }}</span>
     </div>
 
     <!-- Placeholder when no lyrics -->
@@ -286,12 +288,12 @@ onBeforeUnmount(() => {
           {{ songInfo.name }} - {{ songInfo.singer }}
         </div>
         <div class="control-buttons">
-          <button class="ctrl-btn" title="上一首" @click="onPrev">
+          <button class="ctrl-btn" :title="t('play.desktopLyric.prev')" @click="onPrev">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
             </svg>
           </button>
-          <button class="ctrl-btn" :title="isPlaying ? '暂停' : '播放'" @click="onToggle">
+          <button class="ctrl-btn" :title="isPlaying ? t('play.desktopLyric.pause') : t('play.desktopLyric.play')" @click="onToggle">
             <svg v-if="isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 4h4v16H6zM14 4h4v16h-4z"/>
             </svg>
@@ -299,12 +301,12 @@ onBeforeUnmount(() => {
               <path d="M8 5v14l11-7z"/>
             </svg>
           </button>
-          <button class="ctrl-btn" title="下一首" @click="onNext">
+          <button class="ctrl-btn" :title="t('play.desktopLyric.next')" @click="onNext">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
             </svg>
           </button>
-          <button class="ctrl-btn" :title="isLocked ? '解锁' : '锁定'" @click="onToggleLock">
+          <button class="ctrl-btn" :title="isLocked ? t('play.desktopLyric.unlock') : t('play.desktopLyric.lock')" @click="onToggleLock">
             <svg v-if="isLocked" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -314,7 +316,7 @@ onBeforeUnmount(() => {
               <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
             </svg>
           </button>
-          <button class="ctrl-btn" title="关闭" @click="onClose">
+          <button class="ctrl-btn" :title="t('play.desktopLyric.close')" @click="onClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>

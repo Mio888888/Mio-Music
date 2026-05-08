@@ -7,6 +7,8 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/store/Settings'
 
+const { t } = useI18n()
+
 const userStore = LocalUserDetailStore()
 const settingsStore = useSettingsStore()
 const { userInfo } = storeToRefs(userStore)
@@ -133,8 +135,7 @@ const handleMouseUp = () => {
 
 const checkAPIKey = async (): Promise<boolean> => {
   if (!userInfo.value.deepseekAPIkey) {
-    const errorMessage =
-      '请先配置 DeepSeek API Key 才能使用 AI 功能。\n\n请前往 设置 → DeepSeek API Key 配置 进行设置。'
+    const errorMessage = t('ai.configRequired')
     messages.value.push({
       type: 'error',
       content: errorMessage,
@@ -145,6 +146,8 @@ const checkAPIKey = async (): Promise<boolean> => {
   clearErrorMessages()
   return true
 }
+
+const createWelcomeMessage = () => t('ai.greeting')
 
 const clearErrorMessages = () => {
   messages.value = messages.value.filter((msg) => msg.type !== 'error')
@@ -164,8 +167,7 @@ const handleBallClick = async () => {
   }
 
   if (messages.value.length === 0) {
-    const welcomeContent =
-      '您好！我是AI助手，有什么可以帮助您的吗？ 您可以向我咨询音乐相关问题，我会尽力回答您的问题。'
+    const welcomeContent = createWelcomeMessage()
     messages.value.push({
       type: 'ai',
       content: welcomeContent,
@@ -204,7 +206,7 @@ const sendMessage = async () => {
   const aiMessageIndex = messages.value.length
   messages.value.push({
     type: 'loading',
-    content: '正在思考中...',
+    content: t('ai.thinking'),
     html: ''
   })
   scrollToBottom()
@@ -238,8 +240,8 @@ const sendMessage = async () => {
         if (!aiContent) {
           messages.value[aiMessageIndex] = {
             type: 'error',
-            content: `发送失败: ${data.error}`,
-            html: DOMPurify.sanitize(await marked(`发送失败: ${data.error}`))
+            content: t('ai.sendFailed', { message: data.error }),
+            html: DOMPurify.sanitize(await marked(t('ai.sendFailed', { message: data.error })))
           }
         }
         isLoading.value = false
@@ -255,12 +257,11 @@ const sendMessage = async () => {
   } catch (error: any) {
     console.error('AI流式API调用失败:', error)
     if (!aiContent) {
+      const errorMessage = t('ai.sendFailed', { message: (error as Error).message || t('ai.unknownError') })
       messages.value[aiMessageIndex] = {
         type: 'error',
-        content: `发送失败: ${(error as Error).message || '未知错误'}`,
-        html: DOMPurify.sanitize(
-          await marked(`发送失败: ${(error as Error).message || '未知错误'}`)
-        )
+        content: errorMessage,
+        html: DOMPurify.sanitize(await marked(errorMessage))
       }
     }
     isLoading.value = false
@@ -284,8 +285,7 @@ watch(
     if (!oldKey && newKey) {
       clearErrorMessages()
       if (showAskWindow.value && messages.value.length === 0) {
-        const welcomeContent =
-          '您好！我是AI助手，有什么可以帮助您的吗？ 您可以向我咨询音乐相关问题，我会尽力回答您的问题。'
+        const welcomeContent = createWelcomeMessage()
         messages.value.push({
           type: 'ai',
           content: welcomeContent,
@@ -430,7 +430,7 @@ onBeforeUnmount(() => {
         }"
       >
         <div class="ask-header">
-          <h3>AI助手</h3>
+          <h3>{{ t('ai.title') }}</h3>
           <button class="close-btn" @click="closeAskWindow">×</button>
         </div>
         <div class="ask-content">
@@ -452,12 +452,12 @@ onBeforeUnmount(() => {
         <div class="input-area">
           <input
             v-model="inputText"
-            placeholder="请输入您的问题..."
+            :placeholder="t('ai.inputPlaceholder')"
             class="message-input"
             @keyup.enter="sendMessage"
           />
           <button class="send-btn" :disabled="!inputText.trim() || isLoading" @click="sendMessage">
-            {{ isLoading ? '发送中...' : '发送' }}
+            {{ isLoading ? t('ai.sending') : t('ai.send') }}
           </button>
         </div>
       </div>

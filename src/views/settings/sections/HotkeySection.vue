@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import HotkeySettings from '@/components/Settings/HotkeySettings.vue'
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="settings-section">
     <div id="hotkey-settings" class="setting-group">
-      <h3>快捷键设置</h3>
-      <p>配置系统级全局快捷键，来快速达到你的理想效果</p>
+      <h3>{{ t('settings.hotkey.title') }}</h3>
+      <p>{{ t('settings.hotkey.description') }}</p>
       <HotkeySettings />
     </div>
   </div>

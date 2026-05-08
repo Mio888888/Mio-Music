@@ -5,6 +5,7 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { storeToRefs } from 'pinia'
 
+const { t } = useI18n()
 const localUserStore = LocalUserDetailStore()
 const playStatus = useGlobalPlayStatusStore()
 const { list } = storeToRefs(localUserStore)
@@ -22,7 +23,7 @@ const formatDuration = (interval?: string) => interval || '--:--'
 <template>
   <div class="recent-container">
     <div class="recent-header">
-      <h2>最近播放 <span class="count">({{ list.length }} 首)</span></h2>
+      <h2>{{ t('music.recent.title') }} <span class="count">({{ list.length }} {{ t('common.unitSongs') }})</span></h2>
     </div>
 
     <div v-if="recentList.length > 0" class="song-list">
@@ -36,7 +37,7 @@ const formatDuration = (interval?: string) => interval || '--:--'
       </div>
     </div>
     <div v-else class="empty-state">
-      <p>还没有播放记录</p>
+      <p>{{ t('music.recent.empty') }}</p>
     </div>
   </div>
 </template>

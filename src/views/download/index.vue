@@ -4,6 +4,7 @@ import { useDownloadStore, DownloadStatus } from '@/store/download'
 import { formatMusicInfo } from '@/utils/format'
 import { storeToRefs } from 'pinia'
 
+const { t } = useI18n()
 const store = useDownloadStore()
 const { tasks } = storeToRefs(store)
 const maxConcurrent = ref(3)
@@ -84,20 +85,20 @@ const formatSize = (size: number) => {
 
 const formatRemaining = (seconds: number | null) => {
   if (!seconds || !isFinite(seconds)) return ''
-  if (seconds < 60) return `${Math.round(seconds)}秒`
+  if (seconds < 60) return t('common.unitSecond', { seconds: Math.round(seconds) })
   const m = Math.floor(seconds / 60)
   const s = Math.round(seconds % 60)
-  return `${m}分${s}秒`
+  return t('common.unitMinuteSecond', { m, s })
 }
 
 const getStatusText = (status: DownloadStatus) => {
   const map: Record<string, string> = {
-    [DownloadStatus.Queued]: '等待中',
-    [DownloadStatus.Downloading]: '下载中',
-    [DownloadStatus.Paused]: '已暂停',
-    [DownloadStatus.Completed]: '完成',
-    [DownloadStatus.Error]: '错误',
-    [DownloadStatus.Cancelled]: '已取消'
+    [DownloadStatus.Queued]: t('common.waiting'),
+    [DownloadStatus.Downloading]: t('common.downloading'),
+    [DownloadStatus.Paused]: t('common.paused'),
+    [DownloadStatus.Completed]: t('common.completed'),
+    [DownloadStatus.Error]: t('common.error'),
+    [DownloadStatus.Cancelled]: t('common.cancelled')
   }
   return map[status] || status
 }
@@ -116,11 +117,11 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 <template>
   <div class="download-manager">
     <div class="header">
-      <h2>下载管理</h2>
+      <h2>{{ t('download.title') }}</h2>
       <div class="settings">
         <t-input
           v-model="searchKeyword"
-          placeholder="搜索任务"
+          :placeholder="t('download.searchTask')"
           clearable
           size="small"
           style="width: 180px"
@@ -129,8 +130,8 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
         </t-input>
         <div class="divider"></div>
         <div v-if="activeTab === 'downloading'" class="batch-actions">
-          <t-button theme="primary" variant="text" size="small" @click="store.resumeAllTasks()">全部开始</t-button>
-          <t-button theme="warning" variant="text" size="small" @click="store.pauseAllTasks()">全部暂停</t-button>
+          <t-button theme="primary" variant="text" size="small" @click="store.resumeAllTasks()">{{ t('download.startAll') }}</t-button>
+          <t-button theme="warning" variant="text" size="small" @click="store.pauseAllTasks()">{{ t('download.pauseAll') }}</t-button>
           <div class="divider"></div>
         </div>
         <t-button
@@ -138,10 +139,10 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
           theme="default" variant="outline" size="small"
           @click="activeTab === 'downloading' ? store.clearTasks('queue') : activeTab === 'completed' ? store.clearTasks('completed') : store.clearTasks('failed')"
         >
-          {{ activeTab === 'downloading' ? '清空队列' : '清空记录' }}
+          {{ activeTab === 'downloading' ? t('download.clearQueue') : t('download.clearRecords') }}
         </t-button>
         <div class="divider"></div>
-        <span>同时下载数：</span>
+        <span>{{ t('download.concurrentDownloads') }}</span>
         <t-input-number
           v-model="maxConcurrent" :min="1" :max="5" style="width: 100px"
           @change="(val: any) => store.setMaxConcurrent(Number(val))"
@@ -150,19 +151,19 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
     </div>
 
     <t-tabs v-model="activeTab" class="tabs">
-      <t-tab-panel value="downloading" :label="downloadingTasks.length ? `进行中(${downloadingTasks.length})` : '进行中'" />
-      <t-tab-panel value="completed" :label="completedTasks.length ? `已完成(${completedTasks.length})` : '已完成'" />
-      <t-tab-panel value="failed" :label="failedTasks.length ? `失败(${failedTasks.length})` : '失败'" />
+      <t-tab-panel value="downloading" :label="downloadingTasks.length ? `${t('download.tabActive')}(${downloadingTasks.length})` : t('download.tabActive')" />
+      <t-tab-panel value="completed" :label="completedTasks.length ? `${t('download.tabCompleted')}(${completedTasks.length})` : t('download.tabCompleted')" />
+      <t-tab-panel value="failed" :label="failedTasks.length ? `${t('download.tabFailed')}(${failedTasks.length})` : t('download.tabFailed')" />
     </t-tabs>
 
     <div class="task-list">
       <div v-if="filteredTasks.length === 0" class="empty-state">
-        <p>{{ searchKeyword ? '没有匹配的任务' : '暂无任务' }}</p>
+        <p>{{ searchKeyword ? t('download.noMatch') : t('download.empty') }}</p>
       </div>
       <div v-else class="tasks">
         <div v-for="task in filteredTasks" :key="task.id" class="task-item">
           <div class="task-info">
-            <div class="task-name">{{ task.song_info?.name || '未知歌曲' }}</div>
+            <div class="task-name">{{ task.song_info?.name || t('download.unknownSong') }}</div>
             <div class="task-meta">
               <t-tag :theme="getStatusTheme(task.status)" variant="light" size="small">
                 {{ getStatusText(task.status) }}
@@ -170,7 +171,7 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
               <span v-if="task.quality" class="quality-tag">{{ task.quality.toUpperCase() }}</span>
               <span v-if="task.status === DownloadStatus.Downloading" class="speed">{{ formatSpeed(task.speed) }}</span>
               <span v-if="task.status === DownloadStatus.Downloading && task.remaining_time" class="remaining">
-                剩余 {{ formatRemaining(task.remaining_time) }}
+                {{ t('download.remaining', { time: formatRemaining(task.remaining_time) }) }}
               </span>
               <span class="size">{{ formatSize(task.downloaded_size) }} / {{ formatSize(task.total_size) }}</span>
             </div>
@@ -186,27 +187,27 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
           <div class="task-actions">
             <t-button v-if="task.status === DownloadStatus.Downloading || task.status === DownloadStatus.Queued"
-              shape="circle" variant="text" size="small" @click="store.pauseTask(task.id)" title="暂停">
+              shape="circle" variant="text" size="small" @click="store.pauseTask(task.id)" :title="t('common.pause')">
               <template #icon><i class="iconfont icon-zanting"></i></template>
             </t-button>
             <t-button v-if="task.status === DownloadStatus.Paused"
-              shape="circle" variant="text" size="small" @click="store.resumeTask(task.id)" title="继续">
+              shape="circle" variant="text" size="small" @click="store.resumeTask(task.id)" :title="t('common.continue_')">
               <template #icon><i class="iconfont icon-bofang"></i></template>
             </t-button>
             <t-button v-if="task.status === DownloadStatus.Error"
-              shape="circle" variant="text" size="small" @click="store.retryTask(task.id)" title="重试">
+              shape="circle" variant="text" size="small" @click="store.retryTask(task.id)" :title="t('common.retry')">
               <template #icon><i class="iconfont icon-shuaxin"></i></template>
             </t-button>
             <t-button v-if="task.status !== DownloadStatus.Completed && task.status !== DownloadStatus.Cancelled"
-              shape="circle" variant="text" size="small" theme="danger" @click="store.cancelTask(task.id)" title="取消">
+              shape="circle" variant="text" size="small" theme="danger" @click="store.cancelTask(task.id)" :title="t('common.cancel')">
               <template #icon><i class="iconfont icon-guanbi"></i></template>
             </t-button>
             <t-button v-if="task.status === DownloadStatus.Completed"
-              shape="circle" variant="text" size="small" @click="store.openFileLocation(task.file_path)" title="打开位置">
+              shape="circle" variant="text" size="small" @click="store.openFileLocation(task.file_path)" :title="t('common.openLocation')">
               <template #icon><i class="iconfont icon-wenjianjia"></i></template>
             </t-button>
             <t-button v-if="task.status === DownloadStatus.Completed || task.status === DownloadStatus.Cancelled || task.status === DownloadStatus.Error"
-              shape="circle" variant="text" size="small" theme="danger" @click="store.deleteTask(task.id)" title="删除">
+              shape="circle" variant="text" size="small" theme="danger" @click="store.deleteTask(task.id)" :title="t('common.delete')">
               <template #icon><i class="iconfont icon-shanchu"></i></template>
             </t-button>
           </div>

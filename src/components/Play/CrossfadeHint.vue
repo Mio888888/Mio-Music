@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { crossfadeState } from '@/utils/audio/crossfade'
 
+const { t } = useI18n()
+
 const visible = computed(() => crossfadeState.active)
 </script>
 
@@ -16,7 +18,7 @@ const visible = computed(() => crossfadeState.active)
       </div>
       <span class="text">
         <span
-          v-for="(ch, i) in '正在平滑过渡'"
+          v-for="(ch, i) in t('play.smoothTransition')"
           :key="i"
           class="ch"
           :style="{ animationDelay: `${-(5.5 - i) * 0.22}s` }"

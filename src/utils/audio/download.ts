@@ -13,6 +13,7 @@ import {
   calculateBestQuality,
   filterByPluginQualities
 } from '@/utils/quality'
+import i18n from '@/locales'
 
 interface MusicItem {
   singer: string
@@ -108,7 +109,7 @@ async function resolveDownloadLyricText(pluginId: string | undefined, songInfo: 
 export function createQualityDialog(
   songInfoOrTypes: MusicItem | Array<{ type: string; size?: string }>,
   userQuality: string,
-  title: string = '选择下载音质(可滚动)',
+  title: string = i18n.global.t('download.selectQuality'),
   pluginQualities?: string[]
 ): Promise<string | null> {
   return new Promise((resolve) => {
@@ -256,17 +257,17 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
       (localUserDetail.userSource.quality as string)
 
     const pluginQualities = (localUserDetail.userInfo.supportedSources || {})[toRaw(songInfo).source as string]?.qualitys
-    const selectedQuality = await createQualityDialog(songInfo, userQuality, '选择下载音质(可滚动)', pluginQualities)
+    const selectedQuality = await createQualityDialog(songInfo, userQuality, i18n.global.t('download.selectQuality'), pluginQualities)
     if (!selectedQuality) return
 
     let quality = selectedQuality as string
     const calculatedQuality = calculateBestQuality(songInfo.types, quality)
     if (calculatedQuality && calculatedQuality !== quality) {
       quality = calculatedQuality
-      MessagePlugin.warning(`所选音质不可用，已自动调整为: ${getQualityDisplayName(quality)}`)
+      MessagePlugin.warning(i18n.global.t('download.qualityUnavailable', { name: getQualityDisplayName(quality) }))
     }
 
-    const tip = MessagePlugin.success('正在获取下载地址：' + songInfo.name)
+    const tip = MessagePlugin.success(i18n.global.t('download.gettingUrl') + songInfo.name)
 
     let rawUrl = ''
     if (songInfo.source === 'subsonic') {
@@ -274,7 +275,7 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
     } else {
       const pluginId = localUserDetail.userSource.pluginId
       if (!pluginId) {
-        MessagePlugin.error('未选择音源插件，请先在设置中选择插件')
+        MessagePlugin.error(i18n.global.t('play.noSourcePlugin'))
         ;(await tip).close()
         return
       }
@@ -289,7 +290,7 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
     ;(await tip).close()
 
     if (!rawUrl || typeof rawUrl !== 'string') {
-      MessagePlugin.error('获取下载地址失败')
+      MessagePlugin.error(i18n.global.t('download.getUrlFailed'))
       return
     }
 
@@ -349,18 +350,18 @@ async function downloadSingleSong(songInfo: MusicItem): Promise<void> {
     }
 
     await NotifyPlugin.success({
-      title: '已添加到下载队列',
-      content: `${songInfo.name} 已添加，可在下载管理中查看进度`
+      title: i18n.global.t('download.addedToQueue'),
+      content: `${songInfo.name} ${i18n.global.t('download.queueViewTip')}`
     })
   } catch (error: any) {
     console.error('下载失败:', error)
     const msg = error?.message || ''
     if (msg.includes('歌曲正在下载中')) {
-      await NotifyPlugin.warning({ title: '提示', content: '该歌曲正在下载中，请勿重复添加' })
+      await NotifyPlugin.warning({ title: i18n.global.t('common.tip'), content: i18n.global.t('download.duplicateDownload') })
     } else if (msg.includes('歌曲已下载完成')) {
-      await NotifyPlugin.info({ title: '提示', content: '该歌曲已下载完成' })
+      await NotifyPlugin.info({ title: i18n.global.t('common.tip'), content: i18n.global.t('download.alreadyDownloaded') })
     } else {
-      await NotifyPlugin.error({ title: '下载失败', content: msg || '未知错误' })
+      await NotifyPlugin.error({ title: i18n.global.t('download.downloadFailed'), content: msg || i18n.global.t('download.unknownError') })
     }
   }
 }

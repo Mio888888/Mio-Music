@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { LocalUserDetailStore } from './LocalUserDetail'
 import PluginRunner from '@/utils/plugin/PluginRunner'
+import i18n from '@/locales'
 
 export interface PluginInfo {
   name: string
@@ -80,7 +81,7 @@ export const usePluginStore = defineStore('plugin', () => {
             const key = src.source_id || src.name
             supportedSourcesForStore[key] = {
               name: src.name,
-              type: '音乐源',
+              type: i18n.global.t('plugin.source'),
               qualitys: src.qualities,
             }
           }
@@ -180,7 +181,7 @@ export const usePluginStore = defineStore('plugin', () => {
       await refresh()
       return res.data as LoadedPlugin
     }
-    throw new Error(res?.error || '添加插件失败')
+    throw new Error(res?.error || i18n.global.t('plugin.addFailed'))
   }
 
   async function uninstallPlugin(pluginId: string) {
@@ -192,7 +193,7 @@ export const usePluginStore = defineStore('plugin', () => {
         clearSelection()
       }
     } else {
-      throw new Error(res?.error || '卸载插件失败')
+      throw new Error(res?.error || i18n.global.t('plugin.uninstallFailed'))
     }
   }
 
@@ -208,7 +209,7 @@ export const usePluginStore = defineStore('plugin', () => {
       await refresh()
       return res.data as LoadedPlugin
     }
-    throw new Error(res?.error || '下载插件失败')
+    throw new Error(res?.error || i18n.global.t('plugin.downloadFailed'))
   }
 
   async function selectAndAdd(pluginType: string) {
@@ -218,7 +219,7 @@ export const usePluginStore = defineStore('plugin', () => {
       await refresh()
       return res.data as LoadedPlugin
     }
-    throw new Error(res?.error || '导入插件失败')
+    throw new Error(res?.error || i18n.global.t('plugin.importFailed'))
   }
 
   async function getPluginLog(pluginId: string) {
@@ -241,13 +242,13 @@ export const usePluginStore = defineStore('plugin', () => {
 
   async function saveConfig(pluginId: string, config: Record<string, any>) {
     const res = await (window as any).api.plugins.saveConfig(pluginId, config)
-    if (!res?.success) throw new Error(res?.error || '保存配置失败')
+    if (!res?.success) throw new Error(res?.error || i18n.global.t('plugin.saveConfigFailed'))
   }
 
   async function testConnection(pluginId: string) {
     const res = await (window as any).api.plugins.testConnection(pluginId)
     if (res?.success) return res.data as { success: boolean; message: string }
-    return { success: false, message: res?.error || '测试连接失败' }
+    return { success: false, message: res?.error || i18n.global.t('plugin.testConnectionFailed') }
   }
 
   return {

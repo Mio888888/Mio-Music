@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import i18n from '@/locales'
 
 export interface EqualizerPreset {
   name: string
@@ -35,17 +36,17 @@ export const useEqualizerStore = defineStore(
 
     function setGains(newGains: number[]) {
       gains.value = newGains
-      addLog(`增益已更新: [${newGains.map(g => g.toFixed(1)).join(', ')}]`)
+      addLog(`${i18n.global.t('play.gainUpdated')} [${newGains.map(g => g.toFixed(1)).join(', ')}]`)
     }
 
     function setCurrentPreset(preset: string) {
       currentPreset.value = preset
-      addLog(`预设已切换: ${preset}`)
+      addLog(`${i18n.global.t('play.presetSwitched')}: ${preset}`)
     }
 
     function setEnabled(val: boolean) {
       enabled.value = val
-      addLog(`均衡器${val ? '已启用' : '已关闭'}`)
+      addLog(val ? i18n.global.t('play.equalizerEnabled') : i18n.global.t('play.equalizerDisabled'))
     }
 
     return {

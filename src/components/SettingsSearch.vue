@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { searchItems, type SearchItem } from '@/views/settings/searchIndex'
+import { getSearchIndex, type SearchItem } from '@/views/settings/searchIndex'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   hiddenCategories?: string[]
@@ -37,7 +39,7 @@ const saveRecentSearch = (query: string) => {
 const filteredItems = computed(() => {
   if (!searchQuery.value.trim()) return []
   const query = searchQuery.value.toLowerCase().trim()
-  return searchItems.filter(
+  return getSearchIndex().filter(
     (item) =>
       !props.hiddenCategories?.includes(item.category) &&
       (item.title.toLowerCase().includes(query) ||
@@ -88,14 +90,14 @@ const handleFocus = () => {
 
 const getCategoryLabel = (category: string) => {
   const labels: Record<string, string> = {
-    appearance: '外观',
-    ai: 'AI',
-    playlist: '播放',
-    hotkeys: '快捷键',
-    plugins: '插件',
-    music: '音乐源',
-    storage: '存储',
-    about: '关于'
+    appearance: t('common.settingsCategory.appearance'),
+    ai: t('common.settingsCategory.ai'),
+    playlist: t('common.settingsCategory.playlist'),
+    hotkeys: t('common.settingsCategory.hotkeys'),
+    plugins: t('common.settingsCategory.plugins'),
+    music: t('common.settingsCategory.music'),
+    storage: t('common.settingsCategory.storage'),
+    about: t('common.settingsCategory.about')
   }
   return labels[category] || category
 }
@@ -105,7 +107,7 @@ const getCategoryLabel = (category: string) => {
   <div class="settings-search">
     <t-input
       v-model="searchQuery"
-      placeholder="搜索设置..."
+      :placeholder="t('common.searchSettings')"
       clearable
       @input="handleInput"
       @keydown="(_val: any, ctx: any) => handleKeydown(ctx.e)"
@@ -133,7 +135,7 @@ const getCategoryLabel = (category: string) => {
         </div>
       </template>
       <template v-else-if="recentSearches.length > 0 && !searchQuery.trim()">
-        <div class="recent-header">最近搜索</div>
+        <div class="recent-header">{{ t('common.recentSearch') }}</div>
         <div
           v-for="query in recentSearches"
           :key="query"

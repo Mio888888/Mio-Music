@@ -54,6 +54,8 @@ import { useDlnaStore } from '@/store/dlna'
 import { crossfadeState } from '@/utils/audio/crossfade'
 import CrossfadeHint from './CrossfadeHint.vue'
 
+const { t } = useI18n()
+
 const dlnaStore = useDlnaStore()
 const controlAudio = ControlAudioStore()
 const localUserStore = LocalUserDetailStore()
@@ -220,19 +222,19 @@ const playModeTip = ref('')
 const playModeIconClass = computed(() => {
   switch (playMode.value) {
     case PlayMode.LIST:
-      playModeTip.value = '列表播放'
+      playModeTip.value = t('play.modeList')
       return 'iconfont icon-shunxubofangtubiao'
     case PlayMode.SEQUENCE:
-      playModeTip.value = '列表循环'
+      playModeTip.value = t('play.modeSequence')
       return 'iconfont icon-bofang-xunhuanbofang'
     case PlayMode.RANDOM:
-      playModeTip.value = '随机播放'
+      playModeTip.value = t('play.modeRandom')
       return 'iconfont icon-suijibofang'
     case PlayMode.SINGLE:
-      playModeTip.value = '单曲循环'
+      playModeTip.value = t('play.modeSingle')
       return 'iconfont icon-bofang-xunhuanbofang'
     default:
-      playModeTip.value = '列表播放'
+      playModeTip.value = t('play.modeList')
       return 'iconfont icon-shunxubofangtubiao'
   }
 })
@@ -473,7 +475,7 @@ const onToggleLike = async () => {
     // 获取当前播放歌曲对象
     const currentSong = list.value.find((s) => s.songmid === userInfo.value.lastPlaySongId)
     if (!currentSong) {
-      MessagePlugin.warning('当前没有正在播放的歌曲')
+      MessagePlugin.warning(t('play.noSongPlaying'))
       return
     }
 
@@ -499,7 +501,7 @@ const onToggleLike = async () => {
       if (!favoritesId) {
         const createRes = await songListAPI.create('我的喜欢', '', 'local')
         if (!createRes.success || !createRes.data?.id) {
-          MessagePlugin.error(createRes.error || '创建"我的喜欢"失败')
+          MessagePlugin.error(createRes.error || t('play.createFavoritesFailed'))
           return
         }
         favoritesId = createRes.data.id
@@ -518,7 +520,7 @@ const onToggleLike = async () => {
         likeState.value = false
         // MessagePlugin.success('已取消喜欢')
       } else {
-        MessagePlugin.error(removeRes.error || '取消喜欢失败')
+        MessagePlugin.error(removeRes.error || t('play.unlikeFailed'))
       }
     } else {
       const addRes = await songListAPI.addSongs(favoritesId!, [
@@ -528,22 +530,22 @@ const onToggleLike = async () => {
         likeState.value = true
         // MessagePlugin.success('已添加到"我的喜欢"')
       } else {
-        MessagePlugin.error(addRes.error || '添加到"我的喜欢"失败')
+        MessagePlugin.error(addRes.error || t('play.addToFavoritesFailed'))
       }
     }
   } catch (error: any) {
     console.error('切换喜欢状态失败:', error)
-    MessagePlugin.error('操作失败，请稍后重试')
+    MessagePlugin.error(t('play.operationFailedRetry'))
   }
 }
 
 const onDownload = async () => {
   try {
     await downloadSingleSong(cloneDeep(toRaw(songInfo.value)) as any)
-    MessagePlugin.success('开始下载当前歌曲')
+    MessagePlugin.success(t('play.startDownload'))
   } catch (e: any) {
     console.error('下载失败:', e)
-    MessagePlugin.error('下载失败，请稍后重试')
+    MessagePlugin.error(t('play.downloadFailedRetry'))
   }
 }
 
@@ -614,7 +616,7 @@ const durationFormatted = computed(() => formatTime(Audio.value.duration))
 // 进度条拖动处理
 const handleProgressClick = (event: MouseEvent) => {
   if (dlnaStore.currentDevice) {
-    MessagePlugin.warning('投屏模式下不支持拖拽进度')
+    MessagePlugin.warning(t('play.screenCastingNoSeek'))
     return
   }
   // 如果刚刚发生了拖动，忽略点击事件（避免重复 seek）
@@ -706,7 +708,7 @@ const handleProgressDragEnd = (event: MouseEvent) => {
 
 const handleProgressDragStart = (event: MouseEvent) => {
   if (dlnaStore.currentDevice) {
-    MessagePlugin.warning('投屏模式下不支持拖拽进度')
+    MessagePlugin.warning(t('play.screenCastingNoSeek'))
     return
   }
   event.preventDefault()
@@ -869,7 +871,7 @@ onBeforeUnmount(() => {
 
         <div class="left-actions">
           <t-tooltip>
-            <template #content>{{ isLiked ? '已喜欢' : '喜欢' }}</template>
+            <template #content>{{ isLiked ? t('play.liked') : t('play.like') }}</template>
             <t-button
               class="control-btn"
               variant="text"
@@ -885,7 +887,7 @@ onBeforeUnmount(() => {
               />
             </t-button>
           </t-tooltip>
-          <t-tooltip content="下载">
+          <t-tooltip :content="t('play.download')">
             <t-button
               class="control-btn"
               variant="text"
@@ -898,7 +900,7 @@ onBeforeUnmount(() => {
           </t-tooltip>
           <Transition name="comment-fade" mode="out-in" appear>
             <div v-if="songInfo.source !== 'local' && showFullPlay" class="comment-btn-wrapper">
-              <t-tooltip content="评论">
+              <t-tooltip :content="t('play.comment')">
                 <t-button
                   class="control-btn"
                   variant="text"
@@ -1036,7 +1038,7 @@ onBeforeUnmount(() => {
           <!-- 桌面歌词开关按钮 -->
           <t-tooltip>
             <template #content>
-              {{ desktopLyricOpen ? (desktopLyricLocked ? '解锁歌词' : '关闭桌面歌词') : '打开桌面歌词' }}
+              {{ desktopLyricOpen ? (desktopLyricLocked ? t('play.unlockLyric') : t('play.closeDesktopLyric')) : t('play.openDesktopLyric') }}
             </template>
             <t-button
               class="control-btn lyric-btn"
@@ -1056,7 +1058,7 @@ onBeforeUnmount(() => {
           </t-tooltip>
 
           <!-- 播放列表按钮 -->
-          <t-tooltip content="播放列表">
+          <t-tooltip :content="t('play.playlist')">
             <n-badge :value="list.length" :max="99" color="#bbb">
               <t-button
                 class="control-btn"

@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import AIFloatBallSettings from '@/components/Settings/AIFloatBallSettings.vue'
 
+const { t } = useI18n()
+
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
 
@@ -34,28 +36,28 @@ const clearAPIKey = (): void => {
 <template>
   <div class="settings-section">
     <div id="ai-api-config" class="setting-group">
-      <h3>DeepSeek API 配置</h3>
-      <p>配置您的 DeepSeek API Key 以使用 AI 功能</p>
+      <h3>{{ t('settings.ai.title') }}</h3>
+      <p>{{ t('settings.ai.description') }}</p>
       <div class="api-key-section">
         <div class="api-key-input-group">
-          <label for="deepseek-api-key">API Key:</label>
+          <label for="deepseek-api-key">{{ t('settings.ai.apiKeyLabel') }}</label>
           <div class="input-container">
             <t-input
               id="deepseek-api-key"
               v-model="deepseekAPIkey"
               :type="isEditingAPIKey ? 'text' : 'password'"
               :readonly="!isEditingAPIKey"
-              :placeholder="isEditingAPIKey ? '请输入您的 DeepSeek API Key' : '未配置 API Key'"
+              :placeholder="isEditingAPIKey ? t('settings.ai.placeholder') : t('settings.ai.notConfigured')"
               class="api-key-input"
             />
             <div class="input-actions">
               <t-button v-if="!isEditingAPIKey" theme="primary" @click="startEditAPIKey">
-                {{ userInfo.deepseekAPIkey ? '编辑' : '配置' }}
+                {{ userInfo.deepseekAPIkey ? t('settings.ai.edit') : t('settings.ai.configure') }}
               </t-button>
               <template v-else>
-                <t-button theme="primary" @click="saveAPIKey">保存</t-button>
-                <t-button theme="default" @click="cancelEditAPIKey">取消</t-button>
-                <t-button theme="danger" @click="clearAPIKey">清空</t-button>
+                <t-button theme="primary" @click="saveAPIKey">{{ t('common.save') }}</t-button>
+                <t-button theme="default" @click="cancelEditAPIKey">{{ t('common.cancel') }}</t-button>
+                <t-button theme="danger" @click="clearAPIKey">{{ t('common.clear') }}</t-button>
               </template>
             </div>
           </div>
@@ -64,23 +66,23 @@ const clearAPIKey = (): void => {
         <div class="api-key-status">
           <div class="status-indicator">
             <span :class="['status-dot', userInfo.deepseekAPIkey ? 'configured' : 'not-configured']"></span>
-            <span class="status-text">{{ userInfo.deepseekAPIkey ? 'API Key 已配置' : 'API Key 未配置' }}</span>
+            <span class="status-text">{{ userInfo.deepseekAPIkey ? t('settings.ai.configured') : t('settings.ai.notConfiguredStatus') }}</span>
           </div>
         </div>
 
         <div class="api-key-tips">
-          <h4>使用说明：</h4>
+          <h4>{{ t('settings.ai.usageTitle') }}</h4>
           <ul>
-            <li>请前往 <a href="https://platform.deepseek.com/" target="_blank">DeepSeek 官网</a> 获取您的 API Key</li>
-            <li>API Key 将安全存储在本地，不会上传到服务器</li>
-            <li>配置后即可使用 AI 相关功能</li>
+            <li>{{ t('settings.ai.usageGetKey') }}</li>
+            <li>{{ t('settings.ai.usageLocalStore') }}</li>
+            <li>{{ t('settings.ai.usageEnableAi') }}</li>
           </ul>
         </div>
       </div>
     </div>
 
     <div id="ai-floatball" class="setting-group">
-      <h3>AI 浮球设置</h3>
+      <h3>{{ t('settings.ai.floatBallTitle') }}</h3>
       <AIFloatBallSettings />
     </div>
   </div>

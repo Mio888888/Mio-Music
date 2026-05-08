@@ -11,6 +11,7 @@ import { musicSdk } from '@/services/musicSdk'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import i18n from '@/locales'
 
 export { isLoadingSong } from './loadingState'
 import { isLoadingSong } from './loadingState'
@@ -62,7 +63,7 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
         const data = res?.success ? res.data : null
         path = data?.path
       }
-      if (!path) throw new Error('本地歌曲缺少文件路径')
+      if (!path) throw new Error(i18n.global.t('play.localNoPath'))
       return path
     }
     if (song.url && typeof song.url === 'string') {
@@ -87,14 +88,14 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
     if (song.source === 'subsonic') {
       const rawUrl = await musicSdk.getMusicUrl(toRaw(song) as any, quality)
       if (!rawUrl || typeof rawUrl !== 'string') {
-        throw new Error('无法获取播放链接')
+        throw new Error(i18n.global.t('play.cannotGetUrl'))
       }
       return rawUrl
     }
 
     const pluginId = localUserStore.userSource.pluginId
     if (!pluginId) {
-      throw new Error('未选择音源插件，请先在设置中选择插件')
+      throw new Error(i18n.global.t('play.noSourcePlugin'))
     }
 
     let rawUrl: string | null = null
@@ -104,16 +105,16 @@ export async function getSongRealUrl(song: SongList): Promise<string> {
         pluginId, song.source || 'kw', toRaw(song) as any, quality
       )
     } catch (e: any) {
-      throw new Error(`插件解析失败: ${e?.message || e}`)
+      throw new Error(i18n.global.t('play.pluginParseFailed', { message: e?.message || e }))
     }
 
     if (!rawUrl || typeof rawUrl !== 'string') {
-      throw new Error('无法获取播放链接')
+      throw new Error(i18n.global.t('play.cannotGetUrl'))
     }
 
     return rawUrl
   } catch (error: any) {
-    throw new Error('获取歌曲播放链接失败: ' + (error.message || ''))
+    throw new Error(i18n.global.t('play.getUrlFailed', { message: error.message || '' }))
   }
 }
 
@@ -157,7 +158,7 @@ export async function autoSwitchSource(song: SongList): Promise<{ url: string; s
   if (candidates.length === 0) return null
 
   for (const candidate of candidates) {
-    const newSource = candidate.source || '未知'
+    const newSource = candidate.source || i18n.global.t('common.unknown')
     try {
       const candidateSong: SongList = {
         ...candidate,
@@ -362,13 +363,13 @@ export async function playSong(song: SongList) {
       if (switched) {
         url = switched.url
         actualSong = switched.song
-        MessagePlugin.success(`已自动切换到 ${switched.song.source || '其他'} 源播放`)
+        MessagePlugin.success(i18n.global.t('play.autoSwitchedSource', { source: switched.song.source || i18n.global.t('common.unknown') }))
       }
     }
     if (currentPlayRequestId !== requestId) return
 
     if (!url || typeof url !== 'string') {
-      MessagePlugin.warning('无法获取播放链接')
+      MessagePlugin.warning(i18n.global.t('play.cannotGetUrl'))
       isLoadingSong.value = false
       return
     }
@@ -379,14 +380,14 @@ export async function playSong(song: SongList) {
     if (currentPlayRequestId !== requestId) return
 
     if (result && !result.success) {
-      throw new Error(result.error || '播放器启动失败')
+      throw new Error(result.error || i18n.global.t('play.playerStartFailed'))
     }
 
     // 更新 macOS 系统媒体控制
     try {
       await invoke('player__update_now_playing', {
-        title: song.name || '未知歌曲',
-        artist: song.singer || '未知艺术家',
+        title: song.name || i18n.global.t('common.unknownSong'),
+        artist: song.singer || i18n.global.t('common.unknownArtist'),
         album: song.albumName || '',
         duration: 0,
         coverUrl: song.img || null
@@ -401,7 +402,7 @@ export async function playSong(song: SongList) {
   } catch (error: any) {
     if (currentPlayRequestId !== requestId) return
     isLoadingSong.value = false
-    MessagePlugin.error(error.message || '播放失败')
+    MessagePlugin.error(error.message || i18n.global.t('play.playFailed'))
   }
 }
 
@@ -487,8 +488,8 @@ function updateSeamlessState() {
 
   try {
     invoke('player__update_now_playing', {
-      title: song.name || '未知歌曲',
-      artist: song.singer || '未知艺术家',
+      title: song.name || i18n.global.t('common.unknownSong'),
+      artist: song.singer || i18n.global.t('common.unknownArtist'),
       album: song.albumName || '',
       duration: 0,
       coverUrl: song.img || null
@@ -524,8 +525,8 @@ export function onCrossfadeSwap() {
 
   try {
     invoke('player__update_now_playing', {
-      title: song.name || '未知歌曲',
-      artist: song.singer || '未知艺术家',
+      title: song.name || i18n.global.t('common.unknownSong'),
+      artist: song.singer || i18n.global.t('common.unknownArtist'),
       album: song.albumName || '',
       duration: 0,
       coverUrl: song.img || null

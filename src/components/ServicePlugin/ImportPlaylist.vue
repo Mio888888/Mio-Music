@@ -8,16 +8,16 @@
     @close="emit('update:visible', false)"
   >
     <template #header>
-      <span>{{ pluginName }} - 导入歌单</span>
+      <span>{{ t('common.importPlaylist.title', { name: pluginName }) }}</span>
     </template>
     <div class="import-container">
       <div v-if="loading" class="state-block">
         <t-loading size="small" />
-        <span>正在获取歌单列表...</span>
+        <span>{{ t('common.importPlaylist.fetchingList') }}</span>
       </div>
       <div v-else-if="error" class="state-block">
         <p>{{ error }}</p>
-        <t-button theme="default" size="small" @click="loadPlaylists">重试</t-button>
+        <t-button theme="default" size="small" @click="loadPlaylists">{{ t('common.retry') }}</t-button>
       </div>
       <div v-else-if="playlists.length > 0" class="playlist-list">
         <div v-for="pl in playlists" :key="pl.id" class="playlist-item">
@@ -29,7 +29,7 @@
           </div>
           <div class="playlist-info">
             <div class="playlist-name">{{ pl.name }}</div>
-            <div class="playlist-meta">{{ pl.songCount }} 首歌曲</div>
+            <div class="playlist-meta">{{ t('common.songCount', { count: pl.songCount }) }}</div>
             <div v-if="pl.description" class="playlist-desc">{{ pl.description }}</div>
           </div>
           <div class="playlist-action">
@@ -41,14 +41,14 @@
               @click="doImport(pl)"
             >
               <template #icon><t-icon name="download" /></template>
-              导入
+              {{ t('common.import') }}
             </t-button>
           </div>
         </div>
       </div>
       <div v-else class="state-block">
         <t-icon name="folder-open" style="font-size: 48px" />
-        <p>没有找到歌单</p>
+        <p>{{ t('common.importPlaylist.noPlaylistFound') }}</p>
       </div>
     </div>
   </t-dialog>
@@ -59,6 +59,8 @@ import { ref, watch } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import type { SongList } from '@/types/audio'
+
+const { t } = useI18n()
 
 interface ServicePlaylist {
   id: string
@@ -103,7 +105,7 @@ async function loadPlaylists() {
       JSON.stringify([])
     )
     if (!res?.success) {
-      throw new Error(res?.error || '获取歌单失败')
+      throw new Error(res?.error || t('common.importPlaylist.fetchFailed'))
     }
 
     const payload = res.data
@@ -113,7 +115,7 @@ async function loadPlaylists() {
         ? payload.playlists
         : []
   } catch (e: any) {
-    error.value = e.message || '获取歌单失败'
+    error.value = e.message || t('common.importPlaylist.fetchFailed')
   } finally {
     loading.value = false
   }
@@ -129,7 +131,7 @@ async function doImport(pl: ServicePlaylist) {
     )
 
     if (!songsRes?.success) {
-      throw new Error(songsRes?.error || '获取歌单歌曲失败')
+      throw new Error(songsRes?.error || t('common.importPlaylist.fetchSongsFailed'))
     }
 
     const payload = songsRes.data
@@ -140,19 +142,19 @@ async function doImport(pl: ServicePlaylist) {
         : []
 
     if (songs.length === 0) {
-      MessagePlugin.warning(`歌单 "${pl.name}" 没有可导入歌曲`)
+      MessagePlugin.warning(t('common.importPlaylist.noImportableSongs', { name: pl.name }))
       return
     }
 
     const localUserStore = LocalUserDetailStore()
     const created = await localUserStore.createPlaylist(
       pl.name,
-      `从${props.pluginName}导入，共 ${songs.length} 首`,
+      t('common.importPlaylist.importFrom', { name: props.pluginName, count: songs.length }),
       'service'
     )
 
     if (!created) {
-      throw new Error('创建本地歌单失败')
+      throw new Error(t('common.importPlaylist.createLocalFailed'))
     }
 
     const added = await localUserStore.addSongsToPlaylist(created.id, songs)
@@ -161,12 +163,12 @@ async function doImport(pl: ServicePlaylist) {
     }
 
     if (added > 0) {
-      MessagePlugin.success(`成功导入 ${added} 首歌曲到歌单 "${pl.name}"`)
+      MessagePlugin.success(t('common.importPlaylist.importSuccess', { count: added, name: pl.name }))
     } else {
-      MessagePlugin.warning(`歌单 "${pl.name}" 没有新增歌曲`)
+      MessagePlugin.warning(t('common.importPlaylist.noNewSongs', { name: pl.name }))
     }
   } catch (e: any) {
-    MessagePlugin.error(`导入失败: ${e.message}`)
+    MessagePlugin.error(t('common.importPlaylist.importFailed', { error: e.message }))
   } finally {
     importingId.value = null
   }

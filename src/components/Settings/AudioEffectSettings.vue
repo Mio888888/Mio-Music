@@ -31,7 +31,7 @@
                 :class="{ 'is-effect-disabled': !bassBoost.enabled }"
                 variant="default-filled"
                 :disabled="!bassBoost.enabled"
-                @change="(val) => applyBassPreset(val as string)"
+                @change="(val: string | number | boolean) => applyBassPreset(val as string)"
               >
                 <t-radio-button value="light">轻度</t-radio-button>
                 <t-radio-button value="medium">中度</t-radio-button>

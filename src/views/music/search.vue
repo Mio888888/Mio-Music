@@ -8,6 +8,7 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter } from 'vue-router'
 
+const { t } = useI18n()
 const searchStore = useSearchStore()
 const router = useRouter()
 
@@ -140,15 +141,15 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
   <div class="search-container">
     <div class="search-header">
       <div class="header-row">
-        <h2 class="search-title">搜索"<span class="keyword">{{ keyword }}</span>"</h2>
+        <h2 class="search-title">{{ t('music.search.searchKeyword') }}"<span class="keyword">{{ keyword }}</span>"</h2>
         <div class="result-info">
-          <span v-if="activeTab === 'songs'">找到 {{ totalItems }} 首单曲</span>
-          <span v-else>找到 {{ playlistTotal }} 个歌单</span>
+          <span v-if="activeTab === 'songs'">{{ t('music.search.foundSongs', { count: totalItems }) }}</span>
+          <span v-else>{{ t('music.search.foundPlaylists', { count: playlistTotal }) }}</span>
         </div>
       </div>
       <n-tabs v-model:value="activeTab" type="line" size="small">
-        <n-tab-pane name="songs" tab="单曲" />
-        <n-tab-pane name="playlists" tab="歌单" />
+        <n-tab-pane name="songs" :tab="t('music.search.tabSongs')" />
+        <n-tab-pane name="playlists" :tab="t('music.search.tabPlaylists')" />
       </n-tabs>
     </div>
 
@@ -172,7 +173,7 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
             <span class="song-duration">{{ song.interval || '--:--' }}</span>
           </div>
         </div>
-        <div v-else-if="!loading" class="empty-state"><div class="empty-content"><h3>未找到相关歌曲</h3><p>请尝试其他关键词</p></div></div>
+        <div v-else-if="!loading" class="empty-state"><div class="empty-content"><h3>{{ t('music.search.noSongResults') }}</h3><p>{{ t('music.search.tryOther') }}</p></div></div>
         <SkeletonLoader v-if="loading && searchResults.length === 0" type="song-list" :rows="10" />
       </div>
 
@@ -183,11 +184,11 @@ const unescape = (str: string) => str.replace(/&#(\d+);/g, (_, dec) => String.fr
               <div class="playlist-cover"><img :src="playlist.cover || '/default-cover.png'" :alt="playlist.title" loading="lazy" /></div>
               <div class="playlist-info">
                 <h4 class="playlist-title">{{ unescape(playlist.title) }}</h4>
-                <p class="playlist-desc">{{ playlist.description || '精选歌单' }}</p>
+                <p class="playlist-desc">{{ playlist.description || t('music.search.featuredPlaylist') }}</p>
               </div>
             </div>
           </TransitionGroup>
-          <div v-else-if="!playlistLoading" class="empty-state"><div class="empty-content"><h3>未找到相关歌单</h3><p>请尝试其他关键词</p></div></div>
+          <div v-else-if="!playlistLoading" class="empty-state"><div class="empty-content"><h3>{{ t('music.search.noPlaylistResults') }}</h3><p>{{ t('music.search.tryOther') }}</p></div></div>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { DialogPlugin } from 'tdesign-vue-next'
 import SongVirtualList from '@/components/Music/SongVirtualList.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const playStatus = useGlobalPlayStatusStore()
 const localUserStore = LocalUserDetailStore()
@@ -91,10 +92,10 @@ function handlePlay(song: MusicItem) {
 function handlePlayAll() {
   if (songs.value.length === 0) return
   const dialog = DialogPlugin.confirm({
-    header: '播放全部',
-    body: `确定要用歌手"${singerInfo.value?.info.name || ''}"的 ${songs.value.length} 首歌曲替换当前播放列表吗？`,
-    confirmBtn: '确定替换',
-    cancelBtn: '取消',
+    header: t('common.playAll'),
+    body: t('music.singer.replaceConfirm', { name: singerInfo.value?.info.name || '', count: songs.value.length }),
+    confirmBtn: t('music.list.confirmReplace'),
+    cancelBtn: t('common.cancel'),
     onConfirm: () => {
       dialog.destroy()
       const sourceSongs = songListRef.value?.sortedSongs ?? songs.value
@@ -159,18 +160,18 @@ onActivated(() => {
             <div v-else class="cover-placeholder" />
           </div>
           <div class="singer-info">
-            <h1 class="singer-name">{{ singerInfo?.info.name || '加载中...' }}</h1>
+            <h1 class="singer-name">{{ singerInfo?.info.name || t('music.singer.loading') }}</h1>
             <div class="singer-stats" v-if="singerInfo">
-              <span>{{ singerInfo.count.music }} 首歌曲</span>
-              <span class="dot">·</span>
-              <span>{{ singerInfo.count.album }} 张专辑</span>
+              <span>{{ t('music.singer.songCount', { count: singerInfo.count.music }) }}</span>
+              <span class="dot">&middot;</span>
+              <span>{{ t('music.singer.albumCount', { count: singerInfo.count.album }) }}</span>
             </div>
             <p class="singer-desc" v-if="singerInfo?.info.desc">{{ singerInfo.info.desc }}</p>
           </div>
         </div>
 
         <div class="header-actions" v-if="songs.length > 0">
-          <button class="play-all-btn" @click="handlePlayAll">播放全部</button>
+          <button class="play-all-btn" @click="handlePlayAll">{{ t('music.singer.playAll') }}</button>
         </div>
       </div>
     </div>
@@ -181,13 +182,13 @@ onActivated(() => {
         class="tab" :class="{ active: activeTab === 'songs' }"
         @click="switchTab('songs')"
       >
-        歌曲({{ totalCount }})
+        {{ t('music.singer.tabSongs') }}({{ totalCount }})
       </div>
       <div
         class="tab" :class="{ active: activeTab === 'albums' }"
         @click="switchTab('albums')"
       >
-        专辑({{ singerInfo?.count.album || 0 }})
+        {{ t('music.singer.tabAlbums') }}({{ singerInfo?.count.album || 0 }})
       </div>
     </div>
 
@@ -201,14 +202,14 @@ onActivated(() => {
         :showDuration="true"
         @play="handlePlay"
       />
-      <div v-if="loading" class="loading-more">加载中...</div>
-      <div v-if="!hasMore && songs.length > 0" class="no-more">没有更多了</div>
+      <div v-if="loading" class="loading-more">{{ t('common.loading') }}</div>
+      <div v-if="!hasMore && songs.length > 0" class="no-more">{{ t('music.singer.noMore') }}</div>
     </div>
 
     <!-- Album List -->
     <div v-show="activeTab === 'albums'" class="singer-content">
-      <div v-if="loading" class="loading-more">加载中...</div>
-      <div v-else-if="albums.length === 0" class="empty-state">暂无专辑</div>
+      <div v-if="loading" class="loading-more">{{ t('common.loading') }}</div>
+      <div v-else-if="albums.length === 0" class="empty-state">{{ t('music.singer.noAlbums') }}</div>
       <div v-else class="album-grid">
         <div
           v-for="album in albums"
@@ -221,7 +222,7 @@ onActivated(() => {
             <div v-else class="cover-placeholder" />
           </div>
           <div class="album-title">{{ album.info.name }}</div>
-          <div class="album-meta">{{ album.count }} 首</div>
+          <div class="album-meta">{{ t('music.songList.songsUnit', { count: album.count }) }}</div>
         </div>
       </div>
     </div>

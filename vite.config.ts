@@ -5,6 +5,7 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { TDesignResolver } from '@tdesign-vue-next/auto-import-resolver'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 
 const host = process.env.TAURI_DEV_HOST
 
@@ -20,7 +21,8 @@ export default defineConfig(async () => ({
       imports: [
         'vue',
         {
-          'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar']
+          'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar'],
+          'vue-i18n': ['useI18n']
         }
       ],
       dts: 'src/auto-imports.d.ts'
@@ -33,6 +35,22 @@ export default defineConfig(async () => ({
         NaiveUiResolver()
       ],
       dts: 'src/components.d.ts'
+    }),
+    VueI18nPlugin({
+      include: [
+        resolve(__dirname, 'src/locales/*/common.ts'),
+        resolve(__dirname, 'src/locales/*/music.ts'),
+        resolve(__dirname, 'src/locales/*/settings.ts'),
+        resolve(__dirname, 'src/locales/*/play.ts'),
+        resolve(__dirname, 'src/locales/*/download.ts'),
+        resolve(__dirname, 'src/locales/*/auth.ts'),
+        resolve(__dirname, 'src/locales/*/backup.ts'),
+        resolve(__dirname, 'src/locales/*/plugin.ts'),
+        resolve(__dirname, 'src/locales/*/error.ts'),
+        resolve(__dirname, 'src/locales/*/quality.ts'),
+        resolve(__dirname, 'src/locales/*/ai.ts')
+      ],
+      fullInstall: false
     })
   ],
   resolve: {

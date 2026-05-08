@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import i18n from '@/locales'
 
 export interface S3Config {
   endpoint: string
@@ -40,11 +41,11 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
   const maxBackups = ref(10)
 
   const statusText = computed(() => {
-    if (isConnecting.value) return '连接中...'
-    if (isBackingUp.value) return '备份中...'
-    if (isRestoring.value) return '恢复中...'
-    if (isConnected.value) return '已连接'
-    return '未连接'
+    if (isConnecting.value) return i18n.global.t('backup.connecting')
+    if (isBackingUp.value) return i18n.global.t('backup.backingUp')
+    if (isRestoring.value) return i18n.global.t('backup.restoring')
+    if (isConnected.value) return i18n.global.t('backup.connected')
+    return i18n.global.t('backup.disconnected')
   })
 
   function loadConfig() {
@@ -88,7 +89,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
       return true
     } catch (e: any) {
       isConnected.value = false
-      errorMessage.value = e?.message || e?.toString() || '连接失败'
+      errorMessage.value = e?.message || e?.toString() || i18n.global.t('backup.connectFailed')
       return false
     } finally {
       isConnecting.value = false
@@ -97,11 +98,11 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
   async function backup(): Promise<boolean> {
     if (!isConnected.value) {
-      errorMessage.value = '请先连接 S3'
+      errorMessage.value = i18n.global.t('backup.connectFirst')
       return false
     }
     if (!backupPassword.value) {
-      errorMessage.value = '请设置备份密码'
+      errorMessage.value = i18n.global.t('backup.setPassword')
       return false
     }
 
@@ -123,7 +124,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
       localStorage.setItem('lastBackupTime', result.timestamp)
       return true
     } catch (e: any) {
-      errorMessage.value = e?.message || e?.toString() || '备份失败'
+      errorMessage.value = e?.message || e?.toString() || i18n.global.t('backup.backupFailed')
       return false
     } finally {
       isBackingUp.value = false
@@ -132,11 +133,11 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
   async function restore(mode: RestoreMode = 'overwrite', password: string): Promise<boolean> {
     if (!isConnected.value) {
-      errorMessage.value = '请先连接 S3'
+      errorMessage.value = i18n.global.t('backup.connectFirst')
       return false
     }
     if (!password) {
-      errorMessage.value = '请输入恢复密码'
+      errorMessage.value = i18n.global.t('backup.inputRestorePassword')
       return false
     }
 
@@ -166,7 +167,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
       return true
     } catch (e: any) {
-      errorMessage.value = e?.message || e?.toString() || '恢复失败'
+      errorMessage.value = e?.message || e?.toString() || i18n.global.t('backup.restoreFailed')
       return false
     } finally {
       isRestoring.value = false

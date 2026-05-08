@@ -6,6 +6,7 @@ import PlaylistCategory from '@/components/Find/PlaylistCategory.vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { usePluginStore } from '@/store/plugin'
 
+const { t } = useI18n()
 const router = useRouter()
 const pluginStore = usePluginStore()
 const localUserStore = LocalUserDetailStore()
@@ -64,12 +65,12 @@ onActivated(() => {
 <template>
   <div class="find-container" :aria-busy="isCheckingSourceState">
     <div class="page-header">
-      <h2>发现音乐</h2>
-      <p>探索最新最热的音乐内容</p>
+      <h2>{{ t('music.find.title') }}</h2>
+      <p>{{ t('music.find.subtitle') }}</p>
     </div>
 
     <div v-if="isCheckingSourceState" class="source-state source-loading" role="status" aria-live="polite">
-      <t-loading size="large" text="正在检查音乐源..." />
+      <t-loading size="large" :text="t('music.find.checkingSource')" />
     </div>
 
     <div v-else-if="shouldShowSetupGuide" class="source-state setup-guide" aria-labelledby="source-setup-title">
@@ -77,23 +78,23 @@ onActivated(() => {
         <img class="setup-logo" src="/icon.png" alt="" />
       </div>
       <div class="setup-copy">
-        <h3 id="source-setup-title">配置音乐源以开始发现音乐</h3>
-        <p>Mio 需要连接 Subsonic 兼容服务，或安装一个音源插件后，才能展示歌单和排行榜内容。</p>
+        <h3 id="source-setup-title">{{ t('music.find.configGuide') }}</h3>
+        <p>{{ t('music.find.guideDescription') }}</p>
       </div>
       <div class="setup-actions">
         <div class="setup-action-card primary-card">
           <div>
-            <h4>配置 Subsonic</h4>
-            <p>连接 Navidrome、Subsonic 等兼容服务。</p>
+            <h4>{{ t('music.find.configSubsonic') }}</h4>
+            <p>{{ t('music.find.subsonicDesc') }}</p>
           </div>
-          <t-button theme="primary" @click="goMusicSettings">前往音乐源设置</t-button>
+          <t-button theme="primary" @click="goMusicSettings">{{ t('music.find.goToSourceSettings') }}</t-button>
         </div>
         <div class="setup-action-card">
           <div>
-            <h4>安装音源插件</h4>
-            <p>导入本地或在线插件，启用更多音乐源。</p>
+            <h4>{{ t('music.find.installPlugin') }}</h4>
+            <p>{{ t('music.find.installPluginDesc') }}</p>
           </div>
-          <t-button variant="outline" @click="goPluginSettings">前往插件管理</t-button>
+          <t-button variant="outline" @click="goPluginSettings">{{ t('music.find.goToPluginManage') }}</t-button>
         </div>
       </div>
     </div>
@@ -105,14 +106,14 @@ onActivated(() => {
           :class="{ active: activeTab === 'songlist' }"
           @click="activeTab = 'songlist'"
         >
-          歌单
+          {{ t('music.find.tabPlaylist') }}
         </button>
         <button
           class="segment-tab"
           :class="{ active: activeTab === 'leaderboard' }"
           @click="activeTab = 'leaderboard'"
         >
-          排行榜
+          {{ t('music.find.tabLeaderboard') }}
         </button>
       </div>
 

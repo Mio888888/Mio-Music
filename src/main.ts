@@ -8,6 +8,7 @@ import { createApp } from 'vue'
 import router from './router'
 import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import i18n from './locales'
 import LogtoClient from '@logto/browser'
 import { performanceTelemetry } from '@/utils/performanceMonitor'
 
@@ -41,5 +42,6 @@ app.config.warnHandler = (msg) => {
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 app.use(pinia)
+app.use(i18n)
 app.use(router)
 app.mount('#app')

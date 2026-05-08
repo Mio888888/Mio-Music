@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/store/Settings'
 import DirectorySettings from '@/components/Settings/DirectorySettings.vue'
 import MusicCache from '@/components/Settings/MusicCache.vue'
 import { formatMusicInfo } from '@/utils/format'
 import { invoke } from '@tauri-apps/api/core'
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
@@ -63,14 +65,14 @@ const updateAutoCache = async (enabled: any) => {
 
 // Filename template logic
 const filenameTemplate = ref(settings.value.filenameTemplate || '%t - %s')
-const previewSongInfo: any = {
-  name: '半岛铁盒',
-  singer: '周杰伦',
-  albumName: '八度空间',
+const previewSongInfo = computed(() => ({
+  name: t('settings.storage.templateSongName'),
+  singer: t('settings.storage.templateSinger'),
+  albumName: t('settings.storage.templateAlbum'),
   platform: 'tx',
   quality: 'master',
   date: '2026-01-01'
-}
+}))
 
 const updateFilenameTemplate = () => {
   settingsStore.updateSettings({
@@ -95,12 +97,12 @@ const updateTagWriteOptions = () => {
 
 const getTagOptionsStatus = () => {
   const enabled: string[] = []
-  if (tagWriteOptions.value.basicInfo) enabled.push('基础信息')
-  if (tagWriteOptions.value.cover) enabled.push('封面')
-  if (tagWriteOptions.value.lyrics) enabled.push('歌词')
-  if (tagWriteOptions.value.downloadLyrics) enabled.push('单独下载歌词')
+  if (tagWriteOptions.value.basicInfo) enabled.push(t('settings.storage.tagBasicInfo'))
+  if (tagWriteOptions.value.cover) enabled.push(t('settings.storage.tagCover'))
+  if (tagWriteOptions.value.lyrics) enabled.push(t('settings.storage.tagLyricsInfo'))
+  if (tagWriteOptions.value.downloadLyrics) enabled.push(t('settings.storage.tagDownloadLyricsFile'))
 
-  return enabled.length > 0 ? enabled.join('、') : '未选择任何选项'
+  return enabled.length > 0 ? enabled.join('、') : t('settings.storage.tagNoSelection')
 }
 </script>
 
@@ -120,11 +122,11 @@ const getTagOptionsStatus = () => {
 
     <!-- 缓存策略 -->
     <div id="storage-cache-strategy" class="setting-group">
-      <h3>缓存策略</h3>
+      <h3>{{ t('settings.storage.cacheStrategy') }}</h3>
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">自动缓存音乐</div>
-          <div class="item-desc">播放时自动读取/写入缓存，加速后续播放</div>
+          <div class="item-title">{{ t('settings.storage.autoCacheMusic') }}</div>
+          <div class="item-desc">{{ t('settings.storage.autoCacheMusicDesc') }}</div>
         </div>
         <t-switch
           v-model="settings.autoCacheMusic"
@@ -133,8 +135,8 @@ const getTagOptionsStatus = () => {
       </div>
       <div class="setting-item" v-if="settings.autoCacheMusic !== false">
         <div class="item-info">
-          <div class="item-title">缓存大小上限</div>
-          <div class="item-desc">超过上限时自动清理最久未播放的缓存</div>
+          <div class="item-title">{{ t('settings.storage.cacheSizeLimit') }}</div>
+          <div class="item-desc">{{ t('settings.storage.cacheSizeLimitDesc') }}</div>
         </div>
         <t-radio-group
           :value="settings.cacheSizeLimit || 1073741824"
@@ -150,85 +152,85 @@ const getTagOptionsStatus = () => {
 
     <!-- 下载文件名格式设置 -->
     <div id="storage-filename" class="setting-group">
-      <h3>下载文件名格式设置</h3>
-      <p>选择下载歌曲时要保存的文件名格式</p>
+      <h3>{{ t('settings.storage.filenameFormat') }}</h3>
+      <p>{{ t('settings.storage.filenameFormatDesc') }}</p>
 
       <div class="template-tip">
         <div class="template-tip-item">
           <t-tag>%t</t-tag>
-          <span>歌曲名称</span>
+          <span>{{ t('settings.storage.templateSongName') }}</span>
         </div>
         <div class="template-tip-item">
           <t-tag>%s</t-tag>
-          <span>歌手</span>
+          <span>{{ t('settings.storage.templateSinger') }}</span>
         </div>
         <div class="template-tip-item">
           <t-tag>%a</t-tag>
-          <span>专辑</span>
+          <span>{{ t('settings.storage.templateAlbum') }}</span>
         </div>
         <div class="template-tip-item">
           <t-tag>%u</t-tag>
-          <span>平台</span>
+          <span>{{ t('settings.storage.templatePlatform') }}</span>
         </div>
-        <t-tooltip content="例如:128k/320k/flac/hires/master...">
+        <t-tooltip :content="t('settings.storage.templateQualityTip')">
           <div class="template-tip-item">
             <t-tag>%q</t-tag>
             <span style="display: flex; align-items: center">
-              音质
+              {{ t('settings.storage.templateQuality') }}
               <t-icon name="info-circle" size="12" style="margin-left: 0.2em" />
             </span>
           </div>
         </t-tooltip>
         <div class="template-tip-item">
           <t-tag>%d</t-tag>
-          <span>日期</span>
+          <span>{{ t('settings.storage.templateDate') }}</span>
         </div>
       </div>
 
       <div class="setting-item">
         <t-input
           v-model="filenameTemplate"
-          placeholder="文件名格式"
+          :placeholder="t('settings.storage.filenamePlaceholder')"
           @change="updateFilenameTemplate"
         />
       </div>
 
       <div class="preview-container">
-        <div>预览：</div>
+        <div>{{ t('settings.storage.preview') }}</div>
         <div>{{ formatMusicInfo(filenameTemplate || '%t - %s', previewSongInfo) }}</div>
       </div>
     </div>
 
     <!-- 标签写入设置 -->
     <div id="storage-tags" class="setting-group">
-      <h3>下载标签写入设置</h3>
-      <p>选择下载歌曲时要写入的标签信息</p>
+      <h3>{{ t('settings.storage.tagWriteSettings') }}</h3>
+      <p>{{ t('settings.storage.tagWriteDesc') }}</p>
 
       <div class="tag-options">
         <div class="tag-option">
           <t-checkbox v-model="tagWriteOptions.basicInfo" @change="updateTagWriteOptions">
-            基础信息
+            {{ t('settings.storage.tagBasicInfo') }}
           </t-checkbox>
-          <p class="option-desc">包括歌曲标题、艺术家、专辑名称等基本信息</p>
+          <p class="option-desc">{{ t('settings.storage.tagBasicInfoDesc') }}</p>
         </div>
 
         <div class="tag-option">
           <t-checkbox v-model="tagWriteOptions.cover" @change="updateTagWriteOptions">
-            封面
+            {{ t('settings.storage.tagCover') }}
           </t-checkbox>
-          <p class="option-desc">将专辑封面嵌入到音频文件中</p>
+          <p class="option-desc">{{ t('settings.storage.tagCoverDesc') }}</p>
         </div>
 
         <div class="tag-option">
           <t-checkbox v-model="tagWriteOptions.lyrics" @change="updateTagWriteOptions">
-            歌词信息
+            {{ t('settings.storage.tagLyricsInfo') }}
           </t-checkbox>
-          <p class="option-desc">将歌词信息写入音频文件的元信息中</p>
+          <p class="option-desc">{{ t('settings.storage.tagLyricsInfoDesc') }}</p>
         </div>
 
         <div class="tag-option">
           <t-checkbox v-model="tagWriteOptions.downloadLyrics" @change="updateTagWriteOptions">
-            单独下载歌词文件
+            {{ t('settings.storage.tagDownloadLyricsFile') }}
           </t-checkbox>
           <p class="option-desc">在下载歌曲的同时，在相同目录下保存一个独立的LRC歌词文件</p>
         </div>
@@ -239,16 +241,16 @@ const getTagOptionsStatus = () => {
             :disabled="!tagWriteOptions.lyrics && !tagWriteOptions.downloadLyrics"
             @change="updateTagWriteOptions"
           >
-            <t-radio-button value="lrc">标准LRC歌词</t-radio-button>
-            <t-radio-button value="word-by-word">逐字歌词</t-radio-button>
+            <t-radio-button value="lrc">{{ t('settings.storage.tagStandardLrc') }}</t-radio-button>
+            <t-radio-button value="word-by-word">{{ t('settings.storage.tagWordByWord') }}</t-radio-button>
           </t-radio-group>
-          <p class="option-desc">选择写入或下载的歌词格式</p>
+          <p class="option-desc">{{ t('settings.storage.tagLyricFormatDesc') }}</p>
         </div>
       </div>
 
       <div class="tag-options-status">
         <div class="status-summary">
-          <span class="status-label">当前配置：</span>
+          <span class="status-label">{{ t('settings.storage.tagCurrentConfig') }}</span>
           <span class="status-value">
             {{ getTagOptionsStatus() }}
           </span>

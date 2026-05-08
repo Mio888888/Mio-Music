@@ -58,6 +58,7 @@ const emit = defineEmits([
 ])
 
 const router = useRouter()
+const { t } = useI18n()
 
 function handleSingerClick(song: MusicItem) {
   if (!song.singerId || !song.source || song.source === 'local') return
@@ -70,7 +71,7 @@ const getLocalQualityLabel = (song: MusicItem): string => {
   if ((song as any).sampleRate && (song as any).sampleRate > 48000) return 'Hi-Res'
   if (song.hash) {
     const ext = song.hash.split('.').pop()?.toLowerCase()
-    if (ext === 'flac' || ext === 'wav' || ext === 'ape' || ext === 'dsd' || ext === 'dff') return 'FLAC 无损'
+    if (ext === 'flac' || ext === 'wav' || ext === 'ape' || ext === 'dsd' || ext === 'dff') return t('music.songList.flacLossless')
   }
   return ''
 }
@@ -217,7 +218,7 @@ const playSelected = () => {
 }
 const downloadSelected = () => {
   const nonLocal = selectedSongs.value.filter(s => s.source !== 'local')
-  if (nonLocal.length === 0) { MessagePlugin.warning('未选择可下载的歌曲'); return }
+  if (nonLocal.length === 0) { MessagePlugin.warning(t('music.songList.noDownloadableSongs')); return }
   emit('downloadBatch', nonLocal)
 }
 const removeSelected = () => {
@@ -268,7 +269,7 @@ const onToggleLike = async (song: MusicItem) => {
   try {
     let favId = await localUserStore.getFavoritesId()
     if (!favId) {
-      const pl = await localUserStore.createPlaylist('我喜欢的音乐', '收藏的歌曲')
+      const pl = await localUserStore.createPlaylist(t('music.songList.myFavoriteMusic'), t('music.songList.collectedSongs'))
       if (!pl) return
       await localUserStore.setFavoritesId(pl.id)
       favId = pl.id
@@ -282,7 +283,7 @@ const onToggleLike = async (song: MusicItem) => {
     }
   } catch (e) {
     console.error('Toggle like failed:', e)
-    MessagePlugin.error('操作失败')
+    MessagePlugin.error(t('common.failed'))
   }
 }
 
@@ -377,26 +378,26 @@ watch(() => props.songs, (newSongs) => {
             @mouseleave="hoveredHeader = null"
             @click="enableSort && handleSort('title')"
           >
-            标题
+            {{ t('music.songList.title') }}
             <div
               v-if="enableSort"
               v-show="hoveredHeader === 'title' || isTitleSortActive"
               class="sort-icon-container"
             >
               <span v-if="sortType === 'title_asc'" class="sort-icon active">
-                <ArrowUpIcon class="sort-icon-arrow" /> 标题升序
+                <ArrowUpIcon class="sort-icon-arrow" /> {{ t('music.songList.titleAsc') }}
               </span>
               <span v-else-if="sortType === 'title_desc'" class="sort-icon active">
-                <ArrowDownIcon class="sort-icon-arrow" /> 标题降序
+                <ArrowDownIcon class="sort-icon-arrow" /> {{ t('music.songList.titleDesc') }}
               </span>
               <span v-else-if="sortType === 'artist_asc'" class="sort-icon active">
-                <ArrowUpIcon class="sort-icon-arrow" /> 歌手升序
+                <ArrowUpIcon class="sort-icon-arrow" /> {{ t('music.songList.artistAsc') }}
               </span>
               <span v-else-if="sortType === 'artist_desc'" class="sort-icon active">
-                <ArrowDownIcon class="sort-icon-arrow" /> 歌手降序
+                <ArrowDownIcon class="sort-icon-arrow" /> {{ t('music.songList.artistDesc') }}
               </span>
               <span v-else class="sort-icon default">
-                <TimeIcon class="sort-icon-arrow" /> 默认排序
+                <TimeIcon class="sort-icon-arrow" /> {{ t('music.songList.defaultSort') }}
               </span>
             </div>
           </div>
@@ -408,14 +409,14 @@ watch(() => props.songs, (newSongs) => {
             @mouseleave="hoveredHeader = null"
             @click="enableSort && handleSort('album')"
           >
-            专辑
+            {{ t('music.songList.album') }}
             <div v-if="enableSort" v-show="hoveredHeader === 'album' || isAlbumSortActive" class="sort-icon-container">
               <span v-if="sortType === 'album_asc'" class="sort-icon active"><ArrowUpIcon /></span>
               <span v-else-if="sortType === 'album_desc'" class="sort-icon active"><ArrowDownIcon /></span>
-              <span v-else class="sort-icon default"><TimeIcon class="sort-icon-arrow" /> 默认排序</span>
+              <span v-else class="sort-icon default"><TimeIcon class="sort-icon-arrow" /> {{ t('music.songList.defaultSort') }}</span>
             </div>
           </div>
-          <div class="col-like">喜欢</div>
+          <div class="col-like">{{ t('music.songList.liked') }}</div>
           <div
             v-if="showDuration"
             class="col-duration"
@@ -424,7 +425,7 @@ watch(() => props.songs, (newSongs) => {
             @mouseleave="hoveredHeader = null"
             @click="enableSort && handleSort('duration')"
           >
-            时长
+            {{ t('music.songList.duration') }}
             <div v-if="enableSort" v-show="hoveredHeader === 'duration' || isDurationSortActive" class="sort-icon-container">
               <span v-if="sortType === 'duration_asc'" class="sort-icon active"><ArrowUpIcon /></span>
               <span v-else-if="sortType === 'duration_desc'" class="sort-icon active"><ArrowDownIcon /></span>
@@ -441,7 +442,7 @@ watch(() => props.songs, (newSongs) => {
                 :checked="isAllSelected"
                 @change="toggleSelectAll"
               >
-                全选
+                {{ t('music.songList.selectAll') }}
               </t-checkbox>
             </div>
             <t-button
@@ -463,11 +464,11 @@ watch(() => props.songs, (newSongs) => {
               :disabled="selectedNonLocalCount === 0"
               @click="downloadSelected"
             >
-              批量下载
+              {{ t('music.songList.batchDownload') }}
             </t-button>
           </div>
           <div class="multi-right">
-            <span class="selected-info">已选 {{ selectedCount }} 首</span>
+            <span class="selected-info">{{ t('music.songList.selectedCount', { count: selectedCount }) }}</span>
             <t-button
               v-if="isLocalPlaylist"
               class="action-btn-compact"
@@ -486,7 +487,7 @@ watch(() => props.songs, (newSongs) => {
               variant="outline"
               @click="emit('exitMultiSelect')"
             >
-              完成
+              {{ t('music.songList.done') }}
             </t-button>
           </div>
         </div>
@@ -528,7 +529,7 @@ watch(() => props.songs, (newSongs) => {
                 </span>
                 <button
                   class="play-btn-overlay"
-                  title="播放"
+                  :title="t('music.songList.play')"
                   @click.stop="emit('play', getSong(virtualRow.index)!)"
                 >
                   <i class="iconfont icon-bofang"></i>
@@ -596,7 +597,7 @@ watch(() => props.songs, (newSongs) => {
             <div class="col-like">
               <button
                 class="like-btn"
-                title="喜欢"
+                :title="t('music.songList.liked')"
                 @click.stop="onToggleLike(getSong(virtualRow.index)!)"
               >
                 <HeartIcon
@@ -618,14 +619,14 @@ watch(() => props.songs, (newSongs) => {
                   <button
                     v-if="enableDownload && getSong(virtualRow.index)?.source !== 'local'"
                     class="action-btn-small"
-                    title="下载"
+                    :title="t('music.songList.download')"
                     @click.stop="emit('download', getSong(virtualRow.index)!)"
                   >
                     <DownloadIcon size="16" />
                   </button>
                   <button
                     class="action-btn-small"
-                    title="添加到播放列表"
+                    :title="t('music.songList.addToPlaylist')"
                     @click.stop="emit('addToPlaylist', getSong(virtualRow.index)!)"
                   >
                     <i class="iconfont icon-zengjia"></i>
@@ -646,27 +647,27 @@ watch(() => props.songs, (newSongs) => {
         @click.stop
       >
         <div class="ctx-item" @click="handleMenuAction('play')">
-          <i class="iconfont icon-bofang"></i> 播放
+          <i class="iconfont icon-bofang"></i> {{ t('music.songList.play') }}
         </div>
         <div class="ctx-item" @click="handleMenuAction('addToPlaylist')">
-          <i class="iconfont icon-zengjia"></i> 添加到播放列表
+          <i class="iconfont icon-zengjia"></i> {{ t('music.songList.addToPlaylist') }}
         </div>
         <div class="ctx-item" @click="handleMenuAction('favorite')">
-          <HeartIcon size="14" style="margin-right: 6px" /> {{ isLiked(contextMenuSong!) ? '取消喜欢' : '喜欢' }}
+          <HeartIcon size="14" style="margin-right: 6px" /> {{ isLiked(contextMenuSong!) ? t('music.songList.cancelLike') : t('music.songList.liked') }}
         </div>
         <template v-if="enableDownload && contextMenuSong?.source !== 'local'">
           <div class="ctx-separator"></div>
           <div class="ctx-item" @click="handleMenuAction('download')">
-            <DownloadIcon size="14" style="margin-right: 6px" /> 下载
+            <DownloadIcon size="14" style="margin-right: 6px" /> {{ t('music.songList.download') }}
           </div>
         </template>
         <template v-if="isLocalPlaylist">
           <div class="ctx-separator"></div>
           <div class="ctx-item" @click="handleMenuAction('moveToPosition')">
-            <SwapIcon size="14" style="margin-right: 6px" /> 移动到位置...
+            <SwapIcon size="14" style="margin-right: 6px" /> {{ t('music.songList.moveToPosition') }}
           </div>
           <div class="ctx-item danger" @click="handleMenuAction('remove')">
-            <DeleteIcon size="14" style="margin-right: 6px" /> 从歌单移出
+            <DeleteIcon size="14" style="margin-right: 6px" /> {{ t('music.songList.removeFromPlaylist') }}
           </div>
         </template>
       </div>

@@ -14,6 +14,7 @@ import {
   parseQrc,
   parseTTML
 } from '@applemusic-like-lyrics/lyric'
+import i18n from '@/locales'
 
 function parseLyricByFormat(raw: string): LyricLine[] {
   if (!raw) return []
@@ -368,8 +369,8 @@ interface PlayerState {
 const DEFAULT_SONG_INFO = {
   songmid: null,
   hash: '',
-  name: '欢迎使用 Mio Music',
-  singer: '可以配置音源插件来播放你的歌曲',
+  name: i18n.global.t('play.welcomeSong'),
+  singer: i18n.global.t('play.welcomeSinger'),
   albumName: '',
   albumId: '0',
   source: '',

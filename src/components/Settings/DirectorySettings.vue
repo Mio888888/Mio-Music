@@ -1,13 +1,13 @@
 <template>
   <div class="directory-settings">
-    <t-card title="存储目录配置" hover-shadow>
+    <t-card :title="t('settings.storage.directoryConfig')" hover-shadow>
       <template #actions>
-        <t-button theme="default" size="small" @click="resetDirectories"> 重置为默认 </t-button>
+        <t-button theme="default" size="small" @click="resetDirectories"> {{ t('settings.storage.resetToDefault') }} </t-button>
       </template>
 
       <div class="directory-section">
-        <h4>缓存目录</h4>
-        <p class="directory-description">用于存储歌曲缓存文件，提高播放速度</p>
+        <h4>{{ t('settings.storage.cacheDirectory') }}</h4>
+        <p class="directory-description">{{ t('settings.storage.cacheDirectoryDesc') }}</p>
 
         <div class="directory-item">
           <div class="directory-info">
@@ -15,7 +15,7 @@
               <t-input
                 v-model="directories.cacheDir"
                 readonly
-                placeholder="缓存目录路径"
+                :placeholder="t('settings.storage.cacheDirPlaceholder')"
                 class="path-input"
               />
             </div>
@@ -27,8 +27,8 @@
           </div>
 
           <div class="directory-actions">
-            <t-button theme="default" @click="selectCacheDir"> 选择目录 </t-button>
-            <t-button theme="default" variant="outline" @click="openCacheDir"> 打开目录 </t-button>
+            <t-button theme="default" @click="selectCacheDir"> {{ t('settings.storage.selectDirectory') }} </t-button>
+            <t-button theme="default" variant="outline" @click="openCacheDir"> {{ t('settings.storage.openDirectory') }} </t-button>
           </div>
         </div>
       </div>
@@ -36,8 +36,8 @@
       <t-divider />
 
       <div class="directory-section">
-        <h4>下载目录</h4>
-        <p class="directory-description">用于存储下载的音乐文件</p>
+        <h4>{{ t('settings.storage.downloadDirectory') }}</h4>
+        <p class="directory-description">{{ t('settings.storage.downloadDirectoryDesc') }}</p>
 
         <div class="directory-item">
           <div class="directory-info">
@@ -45,7 +45,7 @@
               <t-input
                 v-model="directories.downloadDir"
                 readonly
-                placeholder="下载目录路径"
+                :placeholder="t('settings.storage.downloadDirPlaceholder')"
                 class="path-input"
               />
             </div>
@@ -57,9 +57,9 @@
           </div>
 
           <div class="directory-actions">
-            <t-button theme="default" @click="selectDownloadDir"> 选择目录 </t-button>
+            <t-button theme="default" @click="selectDownloadDir"> {{ t('settings.storage.selectDirectory') }} </t-button>
             <t-button theme="default" variant="outline" @click="openDownloadDir">
-              打开目录
+              {{ t('settings.storage.openDirectory') }}
             </t-button>
           </div>
         </div>
@@ -67,7 +67,7 @@
 
       <div class="save-section">
         <t-button theme="primary" size="large" :loading="isSaving" @click="saveDirectories">
-          保存设置
+          {{ t('settings.storage.saveSettings') }}
         </t-button>
       </div>
     </t-card>
@@ -77,6 +77,8 @@
 <script setup lang="ts">
 import { ref, onMounted, toRaw } from 'vue'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
+
+const { t } = useI18n()
 
 // 定义事件
 const emit = defineEmits<{
@@ -115,7 +117,7 @@ const loadDirectories = async () => {
     await Promise.all([updateCacheDirSize(), updateDownloadDirSize()])
   } catch (error) {
     console.error('加载目录配置失败:', error)
-    MessagePlugin.error('加载目录配置失败')
+    MessagePlugin.error(t('settings.storage.loadDirFailed'))
   }
 }
 
@@ -150,11 +152,11 @@ const selectCacheDir = async () => {
       const path = typeof selected === 'string' ? selected : (selected as string[])[0]
       directories.value.cacheDir = path
       await updateCacheDirSize()
-      MessagePlugin.success('缓存目录已选择,记得保存奥')
+      MessagePlugin.success(t('settings.storage.cacheDirSelected'))
     }
   } catch (error) {
     console.error('选择缓存目录失败:', error)
-    MessagePlugin.error('选择目录失败')
+    MessagePlugin.error(t('settings.storage.selectDirFailed'))
   }
 }
 
@@ -167,11 +169,11 @@ const selectDownloadDir = async () => {
       const path = typeof selected === 'string' ? selected : (selected as string[])[0]
       directories.value.downloadDir = path
       await updateDownloadDirSize()
-      MessagePlugin.success('下载目录已选择,记得保存奥')
+      MessagePlugin.success(t('settings.storage.downloadDirSelected'))
     }
   } catch (error) {
     console.error('选择下载目录失败:', error)
-    MessagePlugin.error('选择目录失败')
+    MessagePlugin.error(t('settings.storage.selectDirFailed'))
   }
 }
 
@@ -182,7 +184,7 @@ const openCacheDir = async () => {
     await invoke('open_directory', { path: directories.value.cacheDir })
   } catch (error) {
     console.error('打开缓存目录失败:', error)
-    MessagePlugin.error('打开目录失败')
+    MessagePlugin.error(t('settings.storage.openDirFailed'))
   }
 }
 
@@ -193,7 +195,7 @@ const openDownloadDir = async () => {
     await invoke('open_directory', { path: directories.value.downloadDir })
   } catch (error) {
     console.error('打开下载目录失败:', error)
-    MessagePlugin.error('打开目录失败')
+    MessagePlugin.error(t('settings.storage.openDirFailed'))
   }
 }
 
@@ -204,11 +206,11 @@ const saveDirectories = async () => {
   try {
     const { invoke } = await import('@tauri-apps/api/core')
     await invoke('save_directories', { directories: toRaw(directories.value) })
-    MessagePlugin.success('目录设置已保存')
+    MessagePlugin.success(t('settings.storage.saveDirSuccess'))
     emit('directory-changed')
   } catch (error) {
     console.error('保存目录设置失败:', error)
-    MessagePlugin.error('保存设置失败')
+    MessagePlugin.error(t('settings.storage.saveSettingsFailed'))
   } finally {
     isSaving.value = false
   }
@@ -217,10 +219,10 @@ const saveDirectories = async () => {
 // 重置为默认目录
 const resetDirectories = async () => {
   const confirm = DialogPlugin.confirm({
-    header: '重置目录设置',
-    body: '确定要重置为默认目录吗？这将清除当前的自定义目录设置。',
-    confirmBtn: '确定重置',
-    cancelBtn: '取消',
+    header: t('settings.storage.resetDirTitle'),
+    body: t('settings.storage.resetDirBody'),
+    confirmBtn: t('settings.storage.confirmReset'),
+    cancelBtn: t('common.cancel'),
     onConfirm: async () => {
       try {
         const { invoke } = await import('@tauri-apps/api/core')
@@ -228,12 +230,12 @@ const resetDirectories = async () => {
         if (result) {
           directories.value = result
           await Promise.all([updateCacheDirSize(), updateDownloadDirSize()])
-          MessagePlugin.success('已重置为默认目录')
+          MessagePlugin.success(t('settings.storage.resetSuccess'))
           emit('directory-changed')
         }
       } catch (error) {
         console.error('重置目录设置失败:', error)
-        MessagePlugin.error('重置失败')
+        MessagePlugin.error(t('settings.storage.resetFailed'))
       }
       confirm.hide()
     }

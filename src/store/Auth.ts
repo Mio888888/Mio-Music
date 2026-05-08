@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import LogtoClient, { type UserInfoResponse } from '@logto/browser'
 import { MessagePlugin } from 'tdesign-vue-next'
 import config from '@/config'
+import i18n from '@/locales'
 
 const { redirectUri, postLogoutRedirectUri } = config
 
@@ -20,7 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error: any) {
       console.error('Failed to init auth:', error)
       if (error?.cause?.status >= 400 && error?.cause?.status < 500) {
-        MessagePlugin.error('登录过期，请重新登录')
+        MessagePlugin.error(i18n.global.t('auth.loginExpired'))
         forceLogout()
       }
     } finally {
@@ -46,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error) {
       console.error('Sign out failed:', error)
     }
-    MessagePlugin.success('退出成功')
+    MessagePlugin.success(i18n.global.t('auth.logoutSuccess'))
   }
 
   const forceLogout = async () => {
@@ -62,13 +63,13 @@ export const useAuthStore = defineStore('auth', () => {
       await logtoClient.handleSignInCallback(callbackUrl)
       await updateUserInfo()
       if (isAuthenticated.value) {
-        MessagePlugin.success('登录成功')
+        MessagePlugin.success(i18n.global.t('auth.loginSuccess'))
       } else {
-        MessagePlugin.error('登录失败')
+        MessagePlugin.error(i18n.global.t('auth.loginFailed'))
       }
     } catch (error) {
       console.error('Callback handling failed:', error)
-      MessagePlugin.error('登录回调处理失败')
+      MessagePlugin.error(i18n.global.t('auth.loginCallbackFailed'))
     } finally {
       loading.value = false
     }

@@ -1,13 +1,13 @@
 <template>
   <div class="plugin-section">
     <div class="section-header">
-      <h2>插件管理</h2>
+      <h2>{{ t('settings.plugin.title') }}</h2>
       <div class="header-actions">
         <t-button theme="primary" @click="showTypeDialog = true">
-          <template #icon><t-icon name="add" /></template> 添加插件
+          <template #icon><t-icon name="add" /></template> {{ t('settings.plugin.addPlugin') }}
         </t-button>
         <t-button theme="default" @click="doRefresh">
-          <template #icon><t-icon name="refresh" /></template> 刷新
+          <template #icon><t-icon name="refresh" /></template> {{ t('common.refresh') }}
         </t-button>
       </div>
     </div>
@@ -15,24 +15,24 @@
     <!-- Loading -->
     <div v-if="store.loading && store.plugins.length === 0" class="state-block loading-state">
       <t-loading size="medium" />
-      <span>加载中...</span>
+      <span>{{ t('settings.plugin.loading') }}</span>
     </div>
 
     <!-- Error -->
     <div v-else-if="error" class="state-block error-state">
       <t-icon name="error-circle" style="font-size: 48px; color: var(--td-error-color)" />
-      <p>加载插件时出错</p>
+      <p>{{ t('settings.plugin.loadError') }}</p>
       <p class="error-msg">{{ error }}</p>
       <t-button theme="default" size="small" @click="doRefresh">
-        <template #icon><t-icon name="refresh" /></template> 重试
+        <template #icon><t-icon name="refresh" /></template> {{ t('common.retry') }}
       </t-button>
     </div>
 
     <!-- Empty -->
     <div v-else-if="store.plugins.length === 0" class="state-block empty-state">
       <t-icon name="app" style="font-size: 48px" />
-      <p>暂无已安装的插件</p>
-      <p class="hint">点击"添加插件"按钮来安装新插件</p>
+      <p>{{ t('settings.plugin.noPlugins') }}</p>
+      <p class="hint">{{ t('settings.plugin.noPluginsHint') }}</p>
     </div>
 
     <!-- Plugin List -->
@@ -47,13 +47,13 @@
           <h3>
             {{ plugin.plugin_info.name }}
             <span class="version">v{{ plugin.plugin_info.version }}</span>
-            <span v-if="store.isSelected(plugin.plugin_id)" class="tag tag-current">当前使用</span>
-            <span v-if="store.isServicePlugin(plugin)" class="tag tag-service">服务插件</span>
+            <span v-if="store.isSelected(plugin.plugin_id)" class="tag tag-current">{{ t('settings.plugin.currentUsing') }}</span>
+            <span v-if="store.isServicePlugin(plugin)" class="tag tag-service">{{ t('settings.plugin.servicePlugin') }}</span>
           </h3>
-          <p class="author">作者: {{ plugin.plugin_info.author }}</p>
-          <p class="description">{{ plugin.plugin_info.description || '无描述' }}</p>
+          <p class="author">{{ t('settings.plugin.author', { name: plugin.plugin_info.author }) }}</p>
+          <p class="description">{{ plugin.plugin_info.description || t('settings.plugin.noDescription') }}</p>
           <div v-if="plugin.supported_sources.length > 0" class="sources">
-            <span class="source-label">支持的音源:</span>
+            <span class="source-label">{{ t('settings.plugin.supportedSources') }}</span>
             <span v-for="source in plugin.supported_sources" :key="source.name" class="source-tag">
               {{ source.name }}
             </span>
@@ -65,7 +65,7 @@
             size="small"
             @click="viewLogs(plugin)"
           >
-            <template #icon><t-icon name="view-list" /></template> 日志
+            <template #icon><t-icon name="view-list" /></template> {{ t('settings.plugin.logs') }}
           </t-button>
           <t-button
             v-if="store.isServicePlugin(plugin)"
@@ -73,7 +73,7 @@
             size="small"
             @click="openConfig(plugin)"
           >
-            <template #icon><t-icon name="setting" /></template> 配置
+            <template #icon><t-icon name="setting" /></template> {{ t('settings.plugin.config') }}
           </t-button>
           <t-button
             v-if="store.isServicePlugin(plugin)"
@@ -81,7 +81,7 @@
             size="small"
             @click="openImport(plugin)"
           >
-            <template #icon><t-icon name="download" /></template> 导入歌单
+            <template #icon><t-icon name="download" /></template> {{ t('settings.plugin.importPlaylist') }}
           </t-button>
           <t-button
             v-if="!store.isSelected(plugin.plugin_id) && !store.isServicePlugin(plugin)"
@@ -89,7 +89,7 @@
             size="small"
             @click="doSelect(plugin)"
           >
-            <template #icon><t-icon name="check" /></template> 使用
+            <template #icon><t-icon name="check" /></template> {{ t('settings.plugin.use') }}
           </t-button>
           <t-button
             theme="danger"
@@ -97,7 +97,7 @@
             variant="outline"
             @click="confirmUninstall(plugin)"
           >
-            <template #icon><t-icon name="delete" /></template> 卸载
+            <template #icon><t-icon name="delete" /></template> {{ t('settings.plugin.uninstall') }}
           </t-button>
         </div>
       </div>
@@ -106,42 +106,42 @@
     <!-- Step 1: Select Plugin Type -->
     <t-dialog
       v-model:visible="showTypeDialog"
-      header="选择插件类别"
-      :confirm-btn="{ content: '下一步' }"
-      :cancel-btn="{ content: '取消' }"
+      :header="t('settings.plugin.selectPluginType')"
+      :confirm-btn="{ content: t('settings.plugin.nextStep') }"
+      :cancel-btn="{ content: t('common.cancel') }"
       @confirm="goToImportMethod"
     >
-      <p class="dialog-tip">Tips: 如果插件提供者有提供澜音插件格式，建议使用澜音格式插件导入</p>
+      <p class="dialog-tip">{{ t('settings.plugin.pluginTypeTip') }}</p>
       <t-radio-group v-model="addPluginType" variant="primary-filled">
-        <t-radio-button value="cr">澜音插件</t-radio-button>
-        <t-radio-button value="lx">洛雪插件</t-radio-button>
+        <t-radio-button value="cr">{{ t('settings.plugin.cranPlugin') }}</t-radio-button>
+        <t-radio-button value="lx">{{ t('settings.plugin.lxPlugin') }}</t-radio-button>
       </t-radio-group>
     </t-dialog>
 
     <!-- Step 2: Select Import Method -->
     <t-dialog
       v-model:visible="showImportDialog"
-      header="选择导入方式"
-      :confirm-btn="{ content: '确定' }"
-      :cancel-btn="{ content: '返回' }"
+      :header="t('settings.plugin.selectImportMethod')"
+      :confirm-btn="{ content: t('common.confirm') }"
+      :cancel-btn="{ content: t('common.back') }"
       @confirm="doImport"
       @cancel="backToTypeSelection"
     >
       <div class="import-method-container">
         <t-radio-group v-model="importMethod" variant="primary-filled">
-          <t-radio-button value="local">本地导入</t-radio-button>
-          <t-radio-button value="online">在线导入</t-radio-button>
+          <t-radio-button value="local">{{ t('settings.plugin.localImport') }}</t-radio-button>
+          <t-radio-button value="online">{{ t('settings.plugin.onlineImport') }}</t-radio-button>
         </t-radio-group>
         <div v-if="importMethod === 'online'" class="online-section">
           <t-input
             v-model="onlineUrl"
-            placeholder="请输入插件下载地址"
+            :placeholder="t('settings.plugin.onlineUrlPlaceholder')"
             size="large"
           />
-          <p class="dialog-tip">支持 HTTP/HTTPS 链接，插件文件应为 .js 格式</p>
+          <p class="dialog-tip">{{ t('settings.plugin.onlineUrlTip') }}</p>
         </div>
         <div v-else class="dialog-tip">
-          Tips: 点击"确定"将从本地文件选择插件文件进行导入
+          {{ t('settings.plugin.localImportTip') }}
         </div>
       </div>
     </t-dialog>
@@ -160,11 +160,11 @@
         <div class="log-dialog-header">
           <div class="log-title">
             <t-icon name="view-list" />
-            {{ currentLogName }} - 插件日志
+            {{ t('settings.plugin.pluginLog', { name: currentLogName }) }}
           </div>
           <div class="log-actions">
             <t-button size="small" variant="outline" :loading="logsLoading" @click="refreshLogs">
-              刷新
+              {{ t('common.refresh') }}
             </t-button>
           </div>
           <div class="mac-controls">
@@ -185,13 +185,13 @@
         <div ref="logContentRef" class="console-content">
           <div v-if="logsLoading" class="console-loading">
             <t-loading size="small" />
-            <span>正在加载日志...</span>
+            <span>{{ t('settings.plugin.loadingLogs') }}</span>
           </div>
           <div v-else-if="logsError" class="console-error">
-            <span>加载日志失败: {{ logsError }}</span>
+            <span>{{ t('settings.plugin.loadLogsFailed', { msg: logsError }) }}</span>
           </div>
           <div v-else-if="logs.length === 0" class="console-empty">
-            <span>暂无日志记录</span>
+            <span>{{ t('settings.plugin.noLogs') }}</span>
           </div>
           <div v-else class="log-entries">
             <div
@@ -211,9 +211,9 @@
     <!-- Config Dialog -->
     <t-dialog
       v-model:visible="configDialogVisible"
-      :header="`${configPluginName} - 配置`"
-      :confirm-btn="{ content: '保存' }"
-      :cancel-btn="{ content: '取消' }"
+      :header="t('settings.plugin.configTitle', { name: configPluginName })"
+      :confirm-btn="{ content: t('common.save') }"
+      :cancel-btn="{ content: t('common.cancel') }"
       @confirm="doSaveConfig"
     >
       <div class="config-form">
@@ -242,7 +242,7 @@
           <t-select
             v-else-if="field.type === 'select'"
             v-model="configValues[field.key]"
-            :placeholder="field.placeholder || '请选择'"
+            :placeholder="field.placeholder || t('settings.plugin.selectPlaceholder')"
           >
             <t-option
               v-for="opt in field.options"
@@ -259,7 +259,7 @@
             :loading="configTesting"
             @click="doTestConnection"
           >
-            测试连接
+            {{ t('settings.plugin.testConnection') }}
           </t-button>
           <span
             v-if="configTestResult"
@@ -289,6 +289,7 @@ import type { LoadedPlugin, PluginConfigField } from '@/store/plugin'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import ImportPlaylist from '@/components/ServicePlugin/ImportPlaylist.vue'
 
+const { t } = useI18n()
 const store = usePluginStore()
 const userStore = LocalUserDetailStore()
 const error = ref<string | null>(null)
@@ -332,7 +333,7 @@ async function doRefresh() {
   try {
     await store.initialize()
   } catch (e: any) {
-    error.value = e.message || '未知错误'
+    error.value = e.message || t('settings.plugin.unknownError')
   }
 }
 
@@ -355,25 +356,25 @@ async function doImport() {
     if (importMethod.value === 'local') {
       const result = await store.selectAndAdd(addPluginType.value)
       if (!result) return // canceled
-      MessagePlugin.success(`插件 "${result.plugin_info.name}" 安装成功！`)
+      MessagePlugin.success(t('settings.plugin.installSuccess', { name: result.plugin_info.name }))
     } else {
       if (!onlineUrl.value.trim()) {
-        MessagePlugin.warning('请输入插件下载地址')
+        MessagePlugin.warning(t('settings.plugin.enterUrl'))
         showImportDialog.value = true
         return
       }
       try { new URL(onlineUrl.value) } catch {
-        MessagePlugin.warning('请输入有效的URL地址')
+        MessagePlugin.warning(t('settings.plugin.invalidUrl'))
         showImportDialog.value = true
         return
       }
       const result = await store.downloadAndAdd(onlineUrl.value.trim(), addPluginType.value)
-      MessagePlugin.success(`插件 "${result.plugin_info.name}" 安装成功！`)
+      MessagePlugin.success(t('settings.plugin.installSuccess', { name: result.plugin_info.name }))
     }
     onlineUrl.value = ''
   } catch (e: any) {
-    const msg = typeof e === 'string' ? e : (e.message || '未知错误')
-    MessagePlugin.error(`安装插件失败: ${msg}`)
+    const msg = typeof e === 'string' ? e : (e.message || t('settings.plugin.unknownError'))
+    MessagePlugin.error(t('settings.plugin.installFailed', { msg }))
   }
 }
 
@@ -390,7 +391,7 @@ function doSelect(plugin: LoadedPlugin) {
     userStore.userInfo.supportedSources = {}
     userStore.userInfo.selectSources = ''
     userStore.userInfo.selectQuality = ''
-    MessagePlugin.success(`已选择插件: ${plugin_info.name}（无可用音源）`)
+    MessagePlugin.success(t('settings.plugin.selectPluginNoSource', { name: plugin_info.name }))
     return
   }
 
@@ -400,7 +401,7 @@ function doSelect(plugin: LoadedPlugin) {
     const key = src.source_id || src.name
     supportedSourcesForStore[key] = {
       name: src.name,
-      type: '音乐源',
+      type: t('settings.plugin.sourceType'),
       qualitys: src.qualities,
     }
   }
@@ -430,15 +431,15 @@ function doSelect(plugin: LoadedPlugin) {
   userStore.userInfo.selectSources = selectSources
   userStore.userInfo.selectQuality = selectQuality
 
-  MessagePlugin.success(`已选择插件: ${plugin_info.name}`)
+  MessagePlugin.success(t('settings.plugin.selectPlugin', { name: plugin_info.name }))
 }
 
 function confirmUninstall(plugin: LoadedPlugin) {
   const dialog = DialogPlugin.confirm({
-    header: '确认卸载',
-    body: `确定要卸载插件 "${plugin.plugin_info.name}" 吗？`,
-    confirmBtn: { content: '确认卸载', theme: 'danger' },
-    cancelBtn: { content: '取消' },
+    header: t('settings.plugin.confirmUninstallTitle'),
+    body: t('settings.plugin.confirmUninstallBody', { name: plugin.plugin_info.name }),
+    confirmBtn: { content: t('settings.plugin.confirmUninstallBtn'), theme: 'danger' },
+    cancelBtn: { content: t('common.cancel') },
     onConfirm: async () => {
       try {
         await store.uninstallPlugin(plugin.plugin_id)
@@ -449,10 +450,10 @@ function confirmUninstall(plugin: LoadedPlugin) {
           userStore.userInfo.selectSources = ''
           userStore.userInfo.selectQuality = ''
         }
-        MessagePlugin.success(`插件 "${plugin.plugin_info.name}" 卸载成功！`)
+        MessagePlugin.success(t('settings.plugin.uninstallSuccess', { name: plugin.plugin_info.name }))
         dialog.destroy()
       } catch (e: any) {
-        MessagePlugin.error(`卸载失败: ${e.message}`)
+        MessagePlugin.error(t('settings.plugin.uninstallFailed', { msg: e.message }))
       }
     }
   })
@@ -522,7 +523,7 @@ async function openConfig(plugin: LoadedPlugin) {
     configValues.value = values
     configDialogVisible.value = true
   } catch (e: any) {
-    MessagePlugin.error(`获取插件配置失败: ${e.message}`)
+    MessagePlugin.error(t('settings.plugin.getPluginConfigFailed', { msg: e.message }))
   }
 }
 
@@ -530,15 +531,15 @@ async function doSaveConfig() {
   try {
     for (const field of configSchema.value) {
       if (field.required && !configValues.value[field.key]) {
-        MessagePlugin.warning(`请填写 ${field.label}`)
+        MessagePlugin.warning(t('settings.plugin.requiredField', { label: field.label }))
         return
       }
     }
     await store.saveConfig(configPluginId.value, JSON.parse(JSON.stringify(configValues.value)))
-    MessagePlugin.success('配置已保存')
+    MessagePlugin.success(t('settings.plugin.configSaved'))
     configDialogVisible.value = false
   } catch (e: any) {
-    MessagePlugin.error(`保存配置失败: ${e.message}`)
+    MessagePlugin.error(t('settings.plugin.saveConfigFailed', { msg: e.message }))
   }
 }
 
@@ -555,7 +556,7 @@ async function doTestConnection() {
     }
   } catch (e: any) {
     configTestResult.value = { success: false, message: e.message }
-    MessagePlugin.error(`测试连接失败: ${e.message}`)
+    MessagePlugin.error(t('settings.plugin.testConnectionFailed', { msg: e.message }))
   } finally {
     configTesting.value = false
   }

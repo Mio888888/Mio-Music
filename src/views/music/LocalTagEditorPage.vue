@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const songmid = ref((route.query.songmid as string) || '')
@@ -34,7 +35,7 @@ const fetchTags = async () => {
 }
 
 const saveTags = async () => {
-  if (!form.value.filePath) { MessagePlugin.warning('无文件路径'); return }
+  if (!form.value.filePath) { MessagePlugin.warning(t('music.tagEditor.noPath')); return }
   saving.value = true
   try {
     await (window as any).api?.localMusic?.writeTags?.(
@@ -42,8 +43,8 @@ const saveTags = async () => {
       { name: form.value.name, singer: form.value.singer, albumName: form.value.albumName, year: form.value.year },
       {}
     )
-    MessagePlugin.success('标签保存成功')
-  } catch (e) { console.error('保存标签失败:', e); MessagePlugin.error('保存失败') }
+    MessagePlugin.success(t('music.tagEditor.saveSuccess'))
+  } catch (e) { console.error('保存标签失败:', e); MessagePlugin.error(t('music.tagEditor.saveFailed')) }
   finally { saving.value = false }
 }
 
@@ -55,37 +56,37 @@ onMounted(() => fetchTags())
     <div class="editor-header">
       <t-button variant="text" @click="router.back()">
         <template #icon><i class="iconfont icon-xiangzuo"></i></template>
-        返回
+        {{ t('common.back') }}
       </t-button>
-      <h2>标签编辑</h2>
+      <h2>{{ t('music.tagEditor.title') }}</h2>
     </div>
 
     <div v-if="loading" class="loading-state">
-      <div class="loading-spinner"></div><p>加载中...</p>
+      <div class="loading-spinner"></div><p>{{ t('common.loading') }}</p>
     </div>
     <div v-else class="editor-form">
       <div class="form-item">
-        <label>歌曲名</label>
-        <t-input v-model="form.name" placeholder="歌曲名" />
+        <label>{{ t('music.tagEditor.songName') }}</label>
+        <t-input v-model="form.name" :placeholder="t('music.tagEditor.songName')" />
       </div>
       <div class="form-item">
-        <label>歌手</label>
-        <t-input v-model="form.singer" placeholder="歌手" />
+        <label>{{ t('music.tagEditor.artist') }}</label>
+        <t-input v-model="form.singer" :placeholder="t('music.tagEditor.artist')" />
       </div>
       <div class="form-item">
-        <label>专辑</label>
-        <t-input v-model="form.albumName" placeholder="专辑" />
+        <label>{{ t('music.tagEditor.album') }}</label>
+        <t-input v-model="form.albumName" :placeholder="t('music.tagEditor.album')" />
       </div>
       <div class="form-item">
-        <label>年份</label>
-        <t-input-number v-model="form.year" :min="0" :max="2099" placeholder="年份" />
+        <label>{{ t('music.tagEditor.year') }}</label>
+        <t-input-number v-model="form.year" :min="0" :max="2099" :placeholder="t('music.tagEditor.year')" />
       </div>
       <div class="form-item">
-        <label>文件路径</label>
+        <label>{{ t('music.tagEditor.filePath') }}</label>
         <div class="file-path">{{ form.filePath }}</div>
       </div>
       <div class="form-actions">
-        <t-button theme="primary" :loading="saving" @click="saveTags">保存标签</t-button>
+        <t-button theme="primary" :loading="saving" @click="saveTags">{{ t('music.tagEditor.saveTag') }}</t-button>
       </div>
     </div>
   </div>

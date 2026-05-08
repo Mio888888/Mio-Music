@@ -7,6 +7,7 @@ import { BACKGROUND_PRESETS } from '@/types/background'
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
+const { t } = useI18n()
 
 // 确保配置存在
 if (!settings.value.backgroundRender) {
@@ -30,10 +31,10 @@ const fullPlayConfig = computed(() => bgSettings.value.fullPlay)
 
 // 预设选项
 const presetOptions = computed(() => [
-  { label: '自动', value: 'auto', desc: '根据设备性能自动调整' },
-  { label: '性能模式', value: 'performance', desc: '降低效果以提升性能' },
-  { label: '质量模式', value: 'quality', desc: '最佳视觉效果，消耗更多资源' },
-  { label: '自定义', value: 'custom', desc: '手动调整所有参数' }
+  { label: t('settings.backgroundRender.presetAuto'), value: 'auto', desc: t('settings.backgroundRender.presetAutoDesc') },
+  { label: t('settings.backgroundRender.presetPerformance'), value: 'performance', desc: t('settings.backgroundRender.presetPerformanceDesc') },
+  { label: t('settings.backgroundRender.presetQuality'), value: 'quality', desc: t('settings.backgroundRender.presetQualityDesc') },
+  { label: t('settings.backgroundRender.presetCustom'), value: 'custom', desc: t('settings.backgroundRender.presetCustomDesc') }
 ])
 
 // 更新 FullPlay 配置
@@ -72,18 +73,18 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
   <div class="background-render-settings">
     <!-- FullPlay 背景效果 -->
     <div class="settings-section">
-      <h3>全屏播放 - 背景效果</h3>
+      <h3>{{ t('settings.backgroundRender.title') }}</h3>
 
       <!-- 预设选择 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">预设模式</div>
-          <div class="item-desc">选择预设快速配置，或选择"自定义"手动调整</div>
+          <div class="item-title">{{ t('settings.backgroundRender.presetMode') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.presetModeDesc') }}</div>
         </div>
         <t-select
           :value="fullPlayConfig.preset"
           :options="presetOptions"
-          @change="(val) => applyPreset(val as BackgroundRenderPreset)"
+          @change="(val: unknown) => applyPreset(val as BackgroundRenderPreset)"
           style="width: 200px"
         />
       </div>
@@ -91,8 +92,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 总开关 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">启用背景效果</div>
-          <div class="item-desc">开启后显示动态背景</div>
+          <div class="item-title">{{ t('settings.backgroundRender.enableBgEffect') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.enableBgEffectDesc') }}</div>
         </div>
         <t-switch
           :value="fullPlayConfig.enabled"
@@ -103,8 +104,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 音频响应 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">音频响应</div>
-          <div class="item-desc">背景随音乐低频跳动，增强沉浸感</div>
+          <div class="item-title">{{ t('settings.backgroundRender.audioResponse') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.audioResponseDesc') }}</div>
         </div>
         <t-switch
           :value="fullPlayConfig.audioResponse"
@@ -116,12 +117,12 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 渲染强度 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">效果强度</div>
+          <div class="item-title">{{ t('settings.backgroundRender.effectIntensity') }}</div>
           <div class="item-desc">
-            渲染缩放比例 ({{ fullPlayConfig.renderScale.toFixed(1) }})
-            <span v-if="fullPlayConfig.renderScale <= 0.3" class="tag-low">低</span>
-            <span v-else-if="fullPlayConfig.renderScale <= 0.6" class="tag-medium">中</span>
-            <span v-else class="tag-high">高</span>
+            {{ t('settings.backgroundRender.renderScaleDesc', { value: fullPlayConfig.renderScale.toFixed(1) }) }}
+            <span v-if="fullPlayConfig.renderScale <= 0.3" class="tag-low">{{ t('settings.backgroundRender.intensityLow') }}</span>
+            <span v-else-if="fullPlayConfig.renderScale <= 0.6" class="tag-medium">{{ t('settings.backgroundRender.intensityMedium') }}</span>
+            <span v-else class="tag-high">{{ t('settings.backgroundRender.intensityHigh') }}</span>
           </div>
         </div>
         <t-slider
@@ -138,8 +139,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 流动速度 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">流动速度</div>
-          <div class="item-desc">背景动画速度 ({{ fullPlayConfig.flowSpeed.toFixed(1) }})</div>
+          <div class="item-title">{{ t('settings.backgroundRender.flowSpeed') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.flowSpeedDesc', { value: fullPlayConfig.flowSpeed.toFixed(1) }) }}</div>
         </div>
         <t-slider
           :value="fullPlayConfig.flowSpeed"
@@ -155,8 +156,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 静态模式 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">静态模式</div>
-          <div class="item-desc">开启后背景几乎静止，降低性能消耗</div>
+          <div class="item-title">{{ t('settings.backgroundRender.staticMode') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.staticModeDesc') }}</div>
         </div>
         <t-switch
           :value="fullPlayConfig.staticMode"
@@ -168,8 +169,8 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- FPS 限制 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">帧率限制</div>
-          <div class="item-desc">FPS 上限 ({{ fullPlayConfig.fps }})</div>
+          <div class="item-title">{{ t('settings.backgroundRender.fpsLimit') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.fpsLimitDesc', { value: fullPlayConfig.fps }) }}</div>
         </div>
         <t-slider
           :value="fullPlayConfig.fps"
@@ -185,11 +186,11 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
       <!-- 重置按钮 -->
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">重置配置</div>
-          <div class="item-desc">恢复到默认预设</div>
+          <div class="item-title">{{ t('settings.backgroundRender.resetConfig') }}</div>
+          <div class="item-desc">{{ t('settings.backgroundRender.resetConfigDesc') }}</div>
         </div>
         <t-button size="small" variant="outline" @click="applyPreset('auto')">
-          重置
+          {{ t('settings.backgroundRender.resetConfig') }}
         </t-button>
       </div>
     </div>
@@ -197,7 +198,7 @@ const applyPreset = (preset: BackgroundRenderPreset) => {
     <!-- 性能提示 -->
     <div v-if="fullPlayConfig.renderScale > 0.7 && fullPlayConfig.fps > 45" class="performance-warning">
       <t-icon name="info-circle" />
-      <span>当前配置较高，如果遇到卡顿可以降低效果强度或 FPS</span>
+      <span>{{ t('settings.backgroundRender.performanceWarning') }}</span>
     </div>
   </div>
 </template>

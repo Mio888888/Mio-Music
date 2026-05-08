@@ -3,10 +3,11 @@ import { computed, ref, watch, toRaw } from 'vue'
 import { ControlAudioStore } from './ControlAudio'
 import type { SongList } from '../types/audio'
 import type { MusicSource, UserInfo } from '../types/userInfo'
+import i18n from '@/locales'
 
 const SUBSONIC_SOURCE: MusicSource = {
   name: 'Subsonic',
-  type: '内置音源',
+  type: i18n.global.t('plugin.builtInSource'),
   qualitys: ['128k', '320k', 'flac'],
 }
 

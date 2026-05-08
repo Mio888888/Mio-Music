@@ -27,7 +27,7 @@
       <t-avatar size="small" style="margin-right: 4px; background: rgba(125,125,125,0.2); color: inherit">
         <template #icon><i class="iconfont icon-weidenglu" /></template>
       </t-avatar>
-      <span class="user-name">未登录</span>
+      <span class="user-name">{{ t('common.notLoggedIn') }}</span>
     </div>
   </div>
 </template>
@@ -41,16 +41,17 @@ import displayName from '@/utils/auth/displayName'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { t } = useI18n()
 
 const userName = computed(() => displayName(authStore.user))
 
 const renderIcon = (icon: Component) => () => h(NIcon, null, { default: () => h(icon) })
 
-const userOpt = [
-  { label: '我的个人信息', key: 'myInfo', icon: renderIcon(h('i', { class: 'iconfont icon-gerenzhongxin' })) },
+const userOpt = computed(() => [
+  { label: t('common.userMenu.myInfo'), key: 'myInfo', icon: renderIcon(h('i', { class: 'iconfont icon-gerenzhongxin' })) },
   { type: 'divider', key: 'd1' },
-  { label: '注销登录', key: 'logout', icon: renderIcon(h('i', { class: 'iconfont icon-tuichu' })) }
-]
+  { label: t('common.userMenu.logout'), key: 'logout', icon: renderIcon(h('i', { class: 'iconfont icon-tuichu' })) }
+])
 
 const handleLogin = () => authStore.login()
 

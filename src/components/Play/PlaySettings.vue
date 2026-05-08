@@ -4,6 +4,8 @@ import { playSetting as usePlaySettingStore } from '@/store/playSetting'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { storeToRefs } from 'pinia'
 
+const { t } = useI18n()
+
 const playSetting = usePlaySettingStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
 const { player } = storeToRefs(globalPlayStatus)
@@ -12,63 +14,65 @@ const lightMainColor = computed(() => {
   return player.value.coverDetail.lightMainColor || 'rgba(255, 255, 255, 0.9)'
 })
 
-const seamlessModeOptions = [
-  { label: '无缝衔接', value: 'gapless' },
-  { label: '渐入渐出', value: 'crossfade' },
-]
+const seamlessModeOptions = computed(() => [
+  { label: t('play.gaplessMode'), value: 'gapless' },
+  { label: t('play.crossfadeMode'), value: 'crossfade' },
+])
 
 const settingSections = computed(() => [
   {
-    title: '界面设置',
+    id: 'ui',
+    title: t('play.uiSettings'),
     items: [
       {
-        label: '显示左侧面板',
+        label: t('play.showLeftPanel'),
         value: playSetting.getShowLeftPanel,
         update: (val: boolean) => playSetting.setShowLeftPanel(val)
       },
       {
-        label: '沉浸色歌词',
+        label: t('play.immersiveLyricColor'),
         value: playSetting.getIsImmersiveLyricColor,
         update: (val: boolean) => playSetting.setIsImmersiveLyricColor(val)
       },
       {
-        label: '歌词模糊效果',
+        label: t('play.lyricBlurEffect'),
         value: playSetting.getIsBlurLyric,
         update: (val: boolean) => playSetting.setIsBlurLyric(val)
       },
       {
-        label: '音频可视化',
+        label: t('play.audioVisualization'),
         value: playSetting.getIsAudioVisualizer,
         update: (val: boolean) => playSetting.setIsAudioVisualizer(val)
       },
       {
-        label: '自动隐藏控制栏',
+        label: t('play.autoHideControlBar'),
         value: playSetting.getAutoHideBottom,
         update: (val: boolean) => playSetting.setAutoHideBottom(val)
       }
     ]
   },
   {
-    title: '播放设置',
+    id: 'playback',
+    title: t('play.playbackSettings'),
     items: [
       {
-        label: '暂停播放过渡',
+        label: t('play.pauseTransition'),
         value: playSetting.getIsPauseTransition,
         update: (val: boolean) => playSetting.setIsPauseTransition(val)
       },
-      // 无感过渡单独渲染
     ]
   },
   {
-    title: '歌词设置',
+    id: 'lyrics',
+    title: t('play.lyricSettings'),
     items: [
       {
-        label: '过滤歌词歌曲信息(下一首生效)',
+        label: t('play.filterLyricSongInfo'),
         value: playSetting.getIsGrepLyricInfo,
         update: (val: boolean) => playSetting.setIsGrepLyricInfo(val)
       },
       {
-        label: '严格过滤模式(可能误伤)',
+        label: t('play.strictFilterMode'),
         value: playSetting.getStrictGrep,
         update: (val: boolean) => playSetting.setStrictGrep(val)
       }
@@ -79,7 +83,7 @@ const settingSections = computed(() => [
 
 <template>
   <div class="container">
-    <div class="panel-header">播放器样式</div>
+    <div class="panel-header">{{ t('play.playerStyle') }}</div>
     <div class="style-cards">
       <div
         class="style-card"
@@ -89,7 +93,7 @@ const settingSections = computed(() => [
         <div class="card-preview cd-preview">
           <img src="../../assets/images/cd.png" shape="circle" class="cover" width="100%" />
         </div>
-        <span>经典黑胶</span>
+        <span>{{ t('play.classicVinyl') }}</span>
       </div>
       <div
         class="style-card"
@@ -99,25 +103,25 @@ const settingSections = computed(() => [
         <div class="card-preview cover-preview">
           <img src="../../assets/images/cover-play.png" shape="circle" class="cover" width="100%" />
         </div>
-        <span>沉浸封面</span>
+        <span>{{ t('play.immersiveCover') }}</span>
       </div>
     </div>
 
     <template v-for="section in settingSections" :key="section.title">
       <div class="panel-header" style="margin-top: 24px">{{ section.title }}</div>
-      <template v-if="section.title === '播放设置'">
+      <template v-if="section.id === 'playback'">
         <div v-for="item in section.items" :key="item.label" class="control-row">
           <span>{{ item.label }}</span>
           <t-switch :value="item.value" @update:value="item.update" />
         </div>
         <!-- 无缝换曲 -->
         <div class="control-row">
-          <span>无缝换曲</span>
+          <span>{{ t('play.seamlessSwitch') }}</span>
           <t-switch :value="playSetting.getIsSeamlessTransition" @update:value="(v: boolean) => playSetting.setIsSeamlessTransition(v)" />
         </div>
         <template v-if="playSetting.getIsSeamlessTransition">
           <div class="control-row sub-control">
-            <span>过渡模式</span>
+            <span>{{ t('play.transitionMode') }}</span>
             <t-radio-group
               variant="default-filled"
               :value="playSetting.getSeamlessMode"
@@ -130,7 +134,7 @@ const settingSections = computed(() => [
             </t-radio-group>
           </div>
           <div v-if="playSetting.getSeamlessMode === 'crossfade'" class="control-row sub-control">
-            <span>过渡时长 {{ (playSetting.getCrossfadeDuration / 1000).toFixed(1) }}s</span>
+            <span>{{ t('play.transitionDuration', { duration: (playSetting.getCrossfadeDuration / 1000).toFixed(1) }) }}</span>
             <t-slider
               :value="playSetting.getCrossfadeDuration"
               :min="500"

@@ -9,6 +9,8 @@ import EqualizerSettings from '@/components/Settings/EqualizerSettings.vue'
 import AudioEffectSettings from '@/components/Settings/AudioEffectSettings.vue'
 import BackgroundRenderSettings from '@/components/Settings/BackgroundRenderSettings.vue'
 
+const { t } = useI18n()
+
 const playSettingStore = usePlaySetting()
 const { isJumpLyric, bgPlaying, isAudioVisualizer } = storeToRefs(playSettingStore)
 const settingsStore = useSettingsStore()
@@ -18,12 +20,12 @@ const { settings } = storeToRefs(settingsStore)
 <template>
   <div class="settings-section">
     <div id="playback-playlist" class="setting-group">
-      <h3>播放列表管理</h3>
+      <h3>{{ t('settings.playback.playlistManagement') }}</h3>
       <PlaylistSettings />
     </div>
 
     <div id="playback-audio-output" class="setting-group">
-      <h3>音频输出</h3>
+      <h3>{{ t('settings.playback.audioOutput') }}</h3>
       <AudioOutputSettings />
     </div>
 
@@ -32,12 +34,12 @@ const { settings } = storeToRefs(settingsStore)
     </div>
 
     <div id="playback-equalizer" class="setting-group">
-      <h3>音频均衡器</h3>
+      <h3>{{ t('settings.playback.equalizer') }}</h3>
       <EqualizerSettings />
     </div>
 
     <div id="playback-audio-effect" class="setting-group">
-      <h3>高级音效处理</h3>
+      <h3>{{ t('settings.playback.audioEffect') }}</h3>
       <AudioEffectSettings />
     </div>
 
@@ -48,28 +50,28 @@ const { settings } = storeToRefs(settingsStore)
 
     <!-- 播放显示 -->
     <div id="playback-performance" class="setting-group">
-      <h3>全屏播放-性能优化</h3>
+      <h3>{{ t('settings.playback.fullscreenPerformance') }}</h3>
 
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">跳动歌词</div>
-          <div class="item-desc">使用弹簧引擎效果跳动歌词、占用更高的性能</div>
+          <div class="item-title">{{ t('settings.playback.jumpLyric') }}</div>
+          <div class="item-desc">{{ t('settings.playback.jumpLyricDesc') }}</div>
         </div>
         <t-switch v-model="isJumpLyric" @change="playSettingStore.setIsDumpLyric(isJumpLyric)" />
       </div>
 
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">背景动画</div>
-          <div class="item-desc">启用布朗运动背景动画、占用更高的性能</div>
+          <div class="item-title">{{ t('settings.playback.bgAnimation') }}</div>
+          <div class="item-desc">{{ t('settings.playback.bgAnimationDesc') }}</div>
         </div>
         <t-switch v-model="bgPlaying" @change="playSettingStore.setBgPlaying(bgPlaying)" />
       </div>
 
       <div class="setting-item">
         <div class="item-info">
-          <div class="item-title">音频可视化</div>
-          <div class="item-desc">显示实时频谱/波形可视化、占用更高的性能</div>
+          <div class="item-title">{{ t('settings.playback.audioVisualizer') }}</div>
+          <div class="item-desc">{{ t('settings.playback.audioVisualizerDesc') }}</div>
         </div>
         <t-switch
           v-model="isAudioVisualizer"
@@ -79,12 +81,12 @@ const { settings } = storeToRefs(settingsStore)
 
       <div id="playback-route-preload" class="setting-item">
         <div class="item-info">
-          <div class="item-title">路由预加载</div>
-          <div class="item-desc">空闲时预加载页面组件，提升页面切换速度</div>
+          <div class="item-title">{{ t('settings.playback.routePreload') }}</div>
+          <div class="item-desc">{{ t('settings.playback.routePreloadDesc') }}</div>
         </div>
         <t-switch
           :value="settings.routePreloadEnabled"
-          @change="(val) => settingsStore.updateSettings({ routePreloadEnabled: Boolean(val) })"
+          @change="(val: unknown) => settingsStore.updateSettings({ routePreloadEnabled: Boolean(val) })"
         />
       </div>
     </div>

@@ -13,6 +13,8 @@ import { CloudDownloadIcon } from 'tdesign-icons-vue-next'
 import type { SongList } from '@/types/audio'
 import { storeToRefs } from 'pinia'
 
+const { t } = useI18n()
+
 const localUserStore = LocalUserDetailStore()
 const { list } = storeToRefs(localUserStore)
 
@@ -24,28 +26,28 @@ const uploadedFile = ref<File | null>(null)
 const handleExportToFile = async () => {
   try {
     if (list.value.length === 0) {
-      MessagePlugin.warning('播放列表为空，无法导出')
+      MessagePlugin.warning(t('play.playlistEmptyCannotExport'))
       return
     }
     const fileName = await exportPlaylistToFile(list.value)
-    MessagePlugin.success(`播放列表已成功导出为 ${fileName}`)
+    MessagePlugin.success(t('play.playlistExported', { fileName }))
     exportDialogVisible.value = false
   } catch (error) {
-    MessagePlugin.error(`导出失败: ${(error as Error).message}`)
+    MessagePlugin.error(`${t('play.exportFailed')}: ${(error as Error).message}`)
   }
 }
 
 const handleCopyToClipboard = async () => {
   try {
     if (list.value.length === 0) {
-      MessagePlugin.warning('播放列表为空，无法复制')
+      MessagePlugin.warning(t('play.playlistEmptyCannotCopy'))
       return
     }
     await copyPlaylistToClipboard(list.value)
-    MessagePlugin.success('播放列表已复制到剪贴板')
+    MessagePlugin.success(t('play.playlistCopied'))
     exportDialogVisible.value = false
   } catch (error) {
-    MessagePlugin.error(`复制失败: ${(error as Error).message}`)
+    MessagePlugin.error(`${t('play.copyFailed')}: ${(error as Error).message}`)
   }
 }
 
@@ -63,21 +65,21 @@ const handleFileChange = (event: Event) => {
 const handleImportFromFile = async () => {
   try {
     if (!uploadedFile.value) {
-      MessagePlugin.warning('请先选择文件')
+      MessagePlugin.warning(t('play.selectFileFirst'))
       return
     }
     const importedPlaylist = await importPlaylistFromFile(uploadedFile.value)
     if (!validateImportedPlaylist(importedPlaylist)) {
-      throw new Error('导入的播放列表格式不正确')
+      throw new Error(t('play.importFormatIncorrect'))
     }
     const mergedList = mergePlaylist(list.value, importedPlaylist)
     list.value = mergedList
-    MessagePlugin.success(`成功导入 ${importedPlaylist.length} 首歌曲`)
+    MessagePlugin.success(t('play.importedSongs', { count: importedPlaylist.length }))
     importDialogVisible.value = false
     uploadedFile.value = null
     if (fileInputRef.value) fileInputRef.value.value = ''
   } catch (error) {
-    MessagePlugin.error(`导入失败: ${(error as Error).message}`)
+    MessagePlugin.error(`${t('play.importFailed')}: ${(error as Error).message}`)
   }
 }
 
@@ -85,14 +87,14 @@ const handleImportFromClipboard = async () => {
   try {
     const importedPlaylist = await importPlaylistFromClipboard()
     if (!validateImportedPlaylist(importedPlaylist)) {
-      throw new Error('剪贴板中的播放列表格式不正确')
+      throw new Error(t('play.clipboardFormatIncorrect'))
     }
     const mergedList = mergePlaylist(list.value, importedPlaylist)
     list.value = mergedList
-    MessagePlugin.success(`成功导入 ${importedPlaylist.length} 首歌曲`)
+    MessagePlugin.success(t('play.importedSongs', { count: importedPlaylist.length }))
     importDialogVisible.value = false
   } catch (error) {
-    MessagePlugin.error(`从剪贴板导入失败: ${(error as Error).message}`)
+    MessagePlugin.error(`${t('play.clipboardImportFailed')}: ${(error as Error).message}`)
   }
 }
 
@@ -110,15 +112,15 @@ const mergePlaylist = (currentList: SongList[], importedList: SongList[]): SongL
 
 const handleClearPlaylist = () => {
   const dialog = DialogPlugin.confirm({
-    header: '确认清空',
-    body: '确定要清空播放列表吗？此操作不可恢复。',
+    header: t('play.confirmClearTitle'),
+    body: t('play.confirmClearBody'),
     theme: 'warning',
-    confirmBtn: { theme: 'danger', content: '清空' },
-    cancelBtn: '取消',
+    confirmBtn: { theme: 'danger', content: t('common.clear') },
+    cancelBtn: t('common.cancel'),
     onConfirm: () => {
       list.value = []
       dialog.destroy()
-      MessagePlugin.success('播放列表已清空')
+      MessagePlugin.success(t('play.playlistCleared'))
     }
   })
 }
@@ -129,37 +131,37 @@ const handleClearPlaylist = () => {
     <div class="action-buttons">
       <t-button theme="primary" variant="outline" @click="exportDialogVisible = true">
         <CloudDownloadIcon />
-        导出播放列表
+        {{ t('play.exportPlaylist') }}
       </t-button>
       <t-button theme="primary" variant="outline" @click="importDialogVisible = true">
-        导入播放列表
+        {{ t('play.importPlaylist') }}
       </t-button>
       <t-button theme="danger" variant="outline" @click="handleClearPlaylist">
-        清空播放列表
+        {{ t('play.clearPlaylistAction') }}
       </t-button>
     </div>
     <t-dialog
       v-model:visible="exportDialogVisible"
-      header="导出播放列表"
+      :header="t('play.exportPlaylist')"
       :on-close="() => (exportDialogVisible = false)"
       width="500px"
       attach="body"
     >
       <template #body>
         <div class="dialog-content">
-          <p class="dialog-description">请选择导出方式：</p>
+          <p class="dialog-description">{{ t('play.selectExportMethod') }}</p>
           <div class="export-options">
             <t-card
-              title="导出为文件"
-              description="将播放列表导出为加密文件，可用于备份或分享"
+              :title="t('play.exportToFile')"
+              :description="t('play.exportToFileDesc')"
               class="export-option-card"
               @click="handleExportToFile"
             >
               <template #avatar><t-icon name="file" size="large" /></template>
             </t-card>
             <t-card
-              title="复制到剪贴板"
-              description="将加密的播放列表数据复制到剪贴板，方便快速分享"
+              :title="t('play.copyToClipboard')"
+              :description="t('play.copyToClipboardDesc')"
               class="export-option-card"
               @click="handleCopyToClipboard"
             >
@@ -169,23 +171,23 @@ const handleClearPlaylist = () => {
         </div>
       </template>
       <template #footer>
-        <t-button theme="default" @click="exportDialogVisible = false">取消</t-button>
+        <t-button theme="default" @click="exportDialogVisible = false">{{ t('common.cancel') }}</t-button>
       </template>
     </t-dialog>
     <t-dialog
       v-model:visible="importDialogVisible"
-      header="导入播放列表"
+      :header="t('play.importPlaylist')"
       :on-close="() => (importDialogVisible = false)"
       width="500px"
       attach="body"
     >
       <template #body>
         <div class="dialog-content">
-          <p class="dialog-description">请选择导入方式：</p>
+          <p class="dialog-description">{{ t('play.selectImportMethod') }}</p>
           <div class="import-options">
             <t-card
-              title="从文件导入"
-              description="从.cpl格式的加密文件中导入播放列表"
+              :title="t('play.importFromFile')"
+              :description="t('play.importFromFileDesc')"
               class="import-option-card"
             >
               <template #avatar><t-icon name="file" size="large" /></template>
@@ -199,23 +201,23 @@ const handleClearPlaylist = () => {
                     @change="handleFileChange"
                   />
                   <t-button theme="primary" variant="outline" @click="triggerFileInput">
-                    选择文件
+                    {{ t('play.selectFile') }}
                   </t-button>
                   <t-button theme="primary" :disabled="!uploadedFile" @click="handleImportFromFile">
-                    导入
+                    {{ t('play.importBtn') }}
                   </t-button>
                 </div>
               </template>
             </t-card>
             <t-card
-              title="从剪贴板导入"
-              description="从剪贴板中导入加密的播放列表数据"
+              :title="t('play.importFromClipboard')"
+              :description="t('play.importFromClipboardDesc')"
               class="import-option-card"
             >
               <template #avatar><t-icon name="paste" size="large" /></template>
               <template #footer>
                 <t-button theme="primary" @click="handleImportFromClipboard">
-                  从剪贴板导入
+                  {{ t('play.importFromClipboardBtn') }}
                 </t-button>
               </template>
             </t-card>
@@ -223,7 +225,7 @@ const handleClearPlaylist = () => {
         </div>
       </template>
       <template #footer>
-        <t-button theme="default" @click="importDialogVisible = false">取消</t-button>
+        <t-button theme="default" @click="importDialogVisible = false">{{ t('common.cancel') }}</t-button>
       </template>
     </t-dialog>
   </div>

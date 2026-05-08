@@ -23,6 +23,8 @@ const props = withDefaults(defineProps<Props>(), {
   color: ''
 })
 
+const { t } = useI18n()
+
 const router = useRouter()
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
@@ -103,7 +105,7 @@ const handleBack = () => {
           theme="default"
           variant="text"
           class="control-btn back-btn"
-          title="返回"
+          :title="t('common.titleBar.back')"
           @click="handleBack"
         >
           <i class="iconfont icon-xiangzuo"></i>
@@ -123,7 +125,7 @@ const handleBack = () => {
         theme="default"
         variant="text"
         class="control-btn settings-btn"
-        title="设置"
+        :title="t('common.titleBar.settings')"
         @click="handleSettings"
       >
         <i class="iconfont icon-shezhi"></i>
@@ -139,7 +141,7 @@ const handleBack = () => {
         theme="default"
         variant="text"
         class="control-btn minimize-btn"
-        title="最小化"
+        :title="t('common.titleBar.minimize')"
         @click="handleMinimize"
       >
         <i
@@ -154,7 +156,7 @@ const handleBack = () => {
         theme="default"
         variant="text"
         class="control-btn maximize-btn"
-        title="最大化"
+        :title="t('common.titleBar.maximize')"
         @click="handleMaximize"
       >
         <i
@@ -169,7 +171,7 @@ const handleBack = () => {
         theme="default"
         variant="text"
         class="control-btn close-btn"
-        title="关闭"
+        :title="t('common.titleBar.close')"
         @click="handleClose"
       >
         <i
@@ -180,17 +182,17 @@ const handleBack = () => {
       </t-button>
     </div>
 
-    <t-dialog v-model:visible="showCloseDialog" header="关闭提示" :close-btn="true" placement="top">
-      <div>您希望如何处理关闭操作？</div>
+    <t-dialog v-model:visible="showCloseDialog" :header="t('common.titleBar.closeTip')" :close-btn="true" placement="top">
+      <div>{{ t('common.titleBar.closeQuestion') }}</div>
       <div style="margin-top: 10px">
-        <t-checkbox v-model="rememberChoice">记住我的选择，下次不再询问</t-checkbox>
+        <t-checkbox v-model="rememberChoice">{{ t('common.titleBar.rememberChoice') }}</t-checkbox>
       </div>
       <template #footer>
         <t-button theme="default" @click="handleCloseChoice(false)">
-          直接退出
+          {{ t('common.titleBar.exitDirectly') }}
         </t-button>
         <t-button theme="primary" @click="handleCloseChoice(true)">
-          最小化到托盘
+          {{ t('common.titleBar.minimizeToTray') }}
         </t-button>
       </template>
     </t-dialog>

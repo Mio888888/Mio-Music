@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useSettingsStore } from '@/store/Settings'
@@ -7,10 +7,18 @@ import TitleBarControls from '@/components/TitleBarControls.vue'
 import LyricFontSettings from '@/components/Settings/LyricFontSettings.vue'
 import DesktopLyricStyle from '@/components/Settings/DesktopLyricStyle.vue'
 
+const { t } = useI18n()
+
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
+
+const languageOptions = computed(() => [
+  { label: t('settings.languageSystem'), value: 'system' },
+  { label: t('settings.languageZhCN'), value: 'zh-CN' },
+  { label: t('settings.languageEnUS'), value: 'en-US' }
+])
 
 const currentStyle = ref<'windows' | 'traffic-light'>(
   userInfo.value.topBarStyle ? 'traffic-light' : 'windows'
@@ -24,32 +32,47 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
 
 <template>
   <div class="settings-section">
-    <t-card title="基础外观" class="setting-card" hover-shadow>
+    <t-card :title="t('settings.appearance.title')" class="setting-card" hover-shadow>
+      <div id="appearance-language" class="setting-group-item">
+        <div class="setting-label">
+          <h4>{{ t('settings.language') }}</h4>
+          <p>{{ t('settings.languageDesc') }}</p>
+        </div>
+        <t-select
+          :value="settings.language || 'system'"
+          :options="languageOptions"
+          style="max-width: 260px"
+          @change="(val: unknown) => settingsStore.updateLanguage(val as 'system' | 'zh-CN' | 'en-US')"
+        />
+      </div>
+
+      <t-divider />
+
       <div id="appearance-titlebar" class="setting-group-item mobile-hidden">
         <div class="setting-label">
-          <h4>标题栏风格</h4>
-          <p>选择您喜欢的标题栏控制按钮风格</p>
+          <h4>{{ t('settings.appearance.titleBarStyle') }}</h4>
+          <p>{{ t('settings.appearance.titleBarStyleDesc') }}</p>
         </div>
         <div class="style-buttons">
           <t-button :theme="currentStyle === 'windows' ? 'primary' : 'default'" @click="switchStyle('windows')">
-            Windows 风格
+            {{ t('settings.appearance.windowsStyle') }}
           </t-button>
           <t-button :theme="currentStyle === 'traffic-light' ? 'primary' : 'default'" @click="switchStyle('traffic-light')">
-            红绿灯风格
+            {{ t('settings.appearance.trafficLightStyle') }}
           </t-button>
         </div>
         <div class="style-preview">
           <div class="preview-item">
-            <h4>Windows 风格</h4>
+            <h4>{{ t('settings.appearance.windowsPreviewTitle') }}</h4>
             <div class="mock-titlebar">
-              <div class="mock-title">Windows 风格标题栏</div>
+              <div class="mock-title">{{ t('settings.appearance.windowsPreviewBar') }}</div>
               <TitleBarControls control-style="windows" />
             </div>
           </div>
           <div class="preview-item">
-            <h4>红绿灯风格 (macOS)</h4>
+            <h4>{{ t('settings.appearance.trafficLightPreviewTitle') }}</h4>
             <div class="mock-titlebar">
-              <div class="mock-title">红绿灯风格标题栏</div>
+              <div class="mock-title">{{ t('settings.appearance.trafficLightPreviewBar') }}</div>
               <TitleBarControls control-style="traffic-light" />
             </div>
           </div>
@@ -60,15 +83,15 @@ const switchStyle = (style: 'windows' | 'traffic-light'): void => {
 
       <div id="appearance-close-behavior" class="setting-group-item mobile-hidden">
         <div class="setting-label">
-          <h4>关闭按钮行为</h4>
-          <p>设置点击窗口关闭按钮时的行为</p>
+          <h4>{{ t('settings.appearance.closeBehavior') }}</h4>
+          <p>{{ t('settings.appearance.closeBehaviorDesc') }}</p>
         </div>
         <div class="setting-control" style="display: flex; align-items: center; gap: 10px">
           <t-switch
             :value="settings.closeToTray"
             @change="(val: any) => settingsStore.updateSettings({ closeToTray: Boolean(val) })"
           />
-          <span class="setting-text">{{ settings.closeToTray ? '最小化到托盘' : '直接退出应用' }}</span>
+          <span class="setting-text">{{ settings.closeToTray ? t('settings.appearance.closeToTray') : t('settings.appearance.directExit') }}</span>
         </div>
       </div>
     </t-card>

@@ -1,9 +1,9 @@
 <template>
   <div class="music-cache">
-    <t-card hover-shadow :loading="cacheInfo.clearing" title="本地歌曲缓存配置">
+    <t-card hover-shadow :loading="cacheInfo.clearing" :title="t('settings.storage.localCacheConfig')">
       <template #actions>
-        已有歌曲缓存大小：{{ cacheInfo.sizeFormatted || '0 B' }}
-        <span v-if="cacheInfo.count > 0">（{{ cacheInfo.count }} 个文件）</span>
+        {{ t('settings.storage.existingCacheSize') }}{{ cacheInfo.sizeFormatted || '0 B' }}
+        <span v-if="cacheInfo.count > 0">（{{ t('settings.storage.fileCount', { count: cacheInfo.count }) }}）</span>
       </template>
       <div class="card-body">
         <t-button
@@ -12,10 +12,10 @@
           :disabled="!cacheInfo.count || cacheInfo.count === 0"
           @click="clearCache"
         >
-          {{ cacheInfo.clearing ? '正在清除...' : '清除本地缓存' }}
+          {{ cacheInfo.clearing ? t('settings.storage.clearingCache') : t('settings.storage.clearLocalCache') }}
         </t-button>
         <div v-if="!cacheInfo.count || cacheInfo.count === 0" class="no-cache-tip">
-          暂无缓存文件
+          {{ t('settings.storage.noCache') }}
         </div>
       </div>
     </t-card>
@@ -25,6 +25,8 @@
 <script lang="ts" setup>
 import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
 import { onMounted, ref } from 'vue'
+
+const { t } = useI18n()
 
 // 定义事件
 const emit = defineEmits<{
@@ -67,7 +69,7 @@ const loadCacheInfo = async (forceRefresh = false) => {
     }
   } catch (error) {
     console.error('获取缓存信息失败:', error)
-    MessagePlugin.error('获取缓存信息失败')
+    MessagePlugin.error(t('settings.storage.getCacheInfoFailed'))
   }
 }
 
@@ -77,10 +79,10 @@ onMounted(() => {
 
 const clearCache = () => {
   const confirm = DialogPlugin.confirm({
-    header: '确认清除缓存吗',
-    body: '这可能会导致歌曲加载缓慢，你确定要清除所有缓存吗？',
-    confirmBtn: '确定清除',
-    cancelBtn: '我再想想',
+    header: t('settings.storage.confirmClearCache'),
+    body: t('settings.storage.clearCacheBody'),
+    confirmBtn: t('settings.storage.confirmClear'),
+    cancelBtn: t('settings.storage.letMeThink'),
     placement: 'center',
     onClose: () => {
       confirm.hide()
@@ -96,7 +98,7 @@ const clearCache = () => {
         const { invoke } = await import('@tauri-apps/api/core')
         await invoke('clear_cache')
 
-        MessagePlugin.success('缓存清除成功')
+        MessagePlugin.success(t('settings.storage.clearSuccess'))
 
         // 发射缓存清除事件
         emit('cache-cleared')
@@ -126,7 +128,7 @@ const clearCache = () => {
         setTimeout(reloadWithRetry, 300)
       } catch (error) {
         console.error('清除缓存失败:', error)
-        MessagePlugin.error('清除缓存失败，请重试')
+        MessagePlugin.error(t('settings.storage.clearCacheFailed'))
         // 清除加载状态
         cacheInfo.value = { ...cacheInfo.value, clearing: false }
       }

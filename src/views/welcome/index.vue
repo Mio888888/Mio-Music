@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 
 const router = useRouter()
+const { t } = useI18n()
 const containerRef = ref<HTMLDivElement>()
 const countdown = ref(0)
 const showSkip = ref(false)
@@ -438,7 +439,7 @@ onUnmounted(() => {
       </div>
       <transition name="fade">
         <button v-if="showSkip" class="skip-section" type="button" @click="skipToHome">
-          <span class="skip-text">跳过 <span class="countdown-num">{{ countdown }}s</span></span>
+          <span class="skip-text">{{ t('music.welcome.skip') }} <span class="countdown-num">{{ countdown }}s</span></span>
         </button>
       </transition>
     </div>

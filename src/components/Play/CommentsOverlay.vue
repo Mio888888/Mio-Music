@@ -16,6 +16,8 @@ const props = withDefaults(
 
 const emit = defineEmits(['close'])
 
+const { t } = useI18n()
+
 const globalPlayStatus = useGlobalPlayStatusStore()
 const { player } = storeToRefs(globalPlayStatus)
 
@@ -201,7 +203,8 @@ const onLeave = (el: Element) => {
                 class="tab-item"
                 :class="{ active: currentType === 'hot' }"
                 @click="switchType('hot')"
-                >热门评论
+              >
+                {{ t('play.comments.hot') }}
                 <span
                   v-if="
                     player.comments.hotTotal &&
@@ -215,11 +218,12 @@ const onLeave = (el: Element) => {
                 class="tab-item"
                 :class="{ active: currentType === 'latest' }"
                 @click="switchType('latest')"
-                >最新评论
+              >
+                {{ t('play.comments.latest') }}
                 <span v-if="player.comments.latestTotal" class="count">{{
                   formatNumber(player.comments.latestTotal)
-                }}</span></span
-              >
+                }}</span>
+              </span>
             </div>
             <button class="close-btn" @click="$emit('close')">
               <CloseIcon size="24" />
@@ -228,9 +232,9 @@ const onLeave = (el: Element) => {
 
           <div ref="contentRef" class="content custom-scrollbar">
             <div v-if="isLoading && list.length === 0" class="loading-state">
-              <t-loading text="加载中..." size="small" />
+              <t-loading :text="t('common.loading')" size="small" />
             </div>
-            <div v-else-if="list.length === 0" class="empty-state">暂无评论</div>
+            <div v-else-if="list.length === 0" class="empty-state">{{ t('play.comments.empty') }}</div>
             <div v-else class="comment-list">
               <div v-for="item in list" :key="item.id" class="comment-item">
                 <t-avatar :image="item.avatar" size="40px" shape="circle" class="avatar" />

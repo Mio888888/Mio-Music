@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 
+const { t } = useI18n()
+
 interface LyricOption {
   fontSize: number
   mainColor: string
@@ -75,19 +77,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <t-card title="桌面歌词样式" hover-shadow>
+  <t-card :title="t('settings.desktopLyric.title')" hover-shadow>
     <div class="desktop-lyric-style">
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">桌面歌词开关</div>
-          <div class="setting-desc">开启/关闭桌面歌词窗口</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.lyricSwitch') }}</div>
+          <div class="setting-desc">{{ t('settings.desktopLyric.lyricSwitchDesc') }}</div>
         </div>
         <t-switch :value="isDesktopLyricOpen" @change="toggleDesktopLyric" />
       </div>
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">字体大小</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.fontSize') }}</div>
           <div class="setting-desc">{{ options.fontSize }}px</div>
         </div>
         <t-input-number v-model="options.fontSize" :min="12" :max="96" :step="1" style="width: 120px;" @change="applyOptions" />
@@ -95,47 +97,47 @@ onMounted(() => {
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">字体粗细</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.fontWeight') }}</div>
         </div>
         <t-select :value="options.fontWeight" style="width: 120px;" @change="(v: any) => updateOption('fontWeight', Number(v))">
-          <t-option :value="400" label="细体 (400)" />
-          <t-option :value="500" label="中等 (500)" />
-          <t-option :value="600" label="半粗 (600)" />
-          <t-option :value="700" label="粗体 (700)" />
-          <t-option :value="800" label="特粗 (800)" />
+          <t-option :value="400" :label="t('settings.desktopLyric.fontWeightThin')" />
+          <t-option :value="500" :label="t('settings.desktopLyric.fontWeightMedium')" />
+          <t-option :value="600" :label="t('settings.desktopLyric.fontWeightSemibold')" />
+          <t-option :value="700" :label="t('settings.desktopLyric.fontWeightBold')" />
+          <t-option :value="800" :label="t('settings.desktopLyric.fontWeightExtraBold')" />
         </t-select>
       </div>
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">歌词颜色</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.lyricColor') }}</div>
         </div>
         <t-color-picker :value="options.mainColor" @change="(v: string) => updateOption('mainColor', v)" />
       </div>
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">歌词位置</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.lyricPosition') }}</div>
         </div>
         <t-select :value="options.position" style="width: 120px;" @change="(v: any) => updateOption('position', v)">
-          <t-option value="left" label="居左" />
-          <t-option value="center" label="居中" />
-          <t-option value="right" label="居右" />
-          <t-option value="both" label="双行" />
+          <t-option value="left" :label="t('settings.desktopLyric.positionLeft')" />
+          <t-option value="center" :label="t('settings.desktopLyric.positionCenter')" />
+          <t-option value="right" :label="t('settings.desktopLyric.positionRight')" />
+          <t-option value="both" :label="t('settings.desktopLyric.positionBoth')" />
         </t-select>
       </div>
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">显示逐字歌词</div>
-          <div class="setting-desc">开启后显示逐字滚动效果</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.showYrc') }}</div>
+          <div class="setting-desc">{{ t('settings.desktopLyric.showYrcDesc') }}</div>
         </div>
         <t-switch :value="options.showYrc" @change="(v: any) => updateOption('showYrc', Boolean(v))" />
       </div>
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">显示翻译</div>
+          <div class="setting-title">{{ t('settings.desktopLyric.showTran') }}</div>
         </div>
         <t-switch :value="options.showTran" @change="(v: any) => updateOption('showTran', Boolean(v))" />
       </div>

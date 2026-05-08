@@ -8,6 +8,8 @@ import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
 
+const { t } = useI18n()
+
 let stopWatchEffect: (() => void) | null = null
 
 onMounted(() => {
@@ -38,16 +40,16 @@ const sourceicon: Record<string, string> = {
 const source = ref('')
 
 interface MenuItem {
-  name: string
+  nameKey: string
   icon: string
   path: string
 }
 
 const menuList: MenuItem[] = [
-  { name: '发现', icon: 'icon-faxian', path: '/home/find' },
-  { name: '歌单', icon: 'icon-yanchu', path: '/home/songlist' },
-  { name: '本地', icon: 'icon-shouye', path: '/home/local' },
-  { name: '下载', icon: 'icon-xiazai', path: '/home/download' }
+  { nameKey: 'common.homeNav.discover', icon: 'icon-faxian', path: '/home/find' },
+  { nameKey: 'common.homeNav.playlists', icon: 'icon-yanchu', path: '/home/songlist' },
+  { nameKey: 'common.homeNav.local', icon: 'icon-shouye', path: '/home/local' },
+  { nameKey: 'common.homeNav.download', icon: 'icon-xiazai', path: '/home/download' }
 ]
 
 const menuActive = ref(0)
@@ -188,7 +190,7 @@ const handleKeyDown = () => {
             @click="handleClick(index)"
           >
             <i :class="`iconfont ${item.icon} nav-icon`"></i>
-            {{ item.name }}
+            {{ t(item.nameKey) }}
           </t-button>
         </nav>
       </div>
@@ -236,7 +238,7 @@ const handleKeyDown = () => {
                 <t-input
                   ref="inputRef"
                   v-model="SearchStore.value"
-                  placeholder="搜索音乐、歌手"
+                  :placeholder="t('common.searchMusicArtist')"
                   style="width: 100%"
                   @enter="handleKeyDown"
                   @focus="SearchStore.setFocus(true)"
@@ -289,13 +291,13 @@ const handleKeyDown = () => {
         :key="index"
         class="mobile-nav-item"
         :class="{ active: menuActive === index }"
-        :aria-label="item.name"
+        :aria-label="t(item.nameKey)"
         :aria-current="menuActive === index ? 'page' : undefined"
         @click="handleClick(index)"
       >
         <span class="mobile-nav-indicator" aria-hidden="true"></span>
         <i :class="`iconfont ${item.icon}`" aria-hidden="true"></i>
-        <span class="mobile-nav-label">{{ item.name }}</span>
+        <span class="mobile-nav-label">{{ t(item.nameKey) }}</span>
       </button>
     </nav>
   </t-layout>

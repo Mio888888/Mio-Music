@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useSettingsStore } from '@/store/Settings'
 
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 const fontList = ref<string[]>([])
 const loading = ref(false)
@@ -54,12 +55,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <t-card title="歌词字体设置" hover-shadow>
+  <t-card :title="t('settings.lyricFont.title')" hover-shadow>
     <div class="lyric-font-settings">
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">歌词字体</div>
-          <div class="setting-desc">选择歌词显示使用的字体</div>
+          <div class="setting-title">{{ t('settings.lyricFont.lyricFont') }}</div>
+          <div class="setting-desc">{{ t('settings.lyricFont.lyricFontDesc') }}</div>
         </div>
         <t-select
           v-model="fontFamilyArray"
@@ -68,7 +69,7 @@ onMounted(() => {
           filterable
           creatable
           style="width: 280px;"
-          placeholder="选择字体"
+          :placeholder="t('settings.lyricFont.selectFont')"
         >
           <t-option v-for="font in fontList" :key="font" :value="font" :label="font" />
         </t-select>
@@ -76,7 +77,7 @@ onMounted(() => {
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">字体倍率</div>
+          <div class="setting-title">{{ t('settings.lyricFont.fontRate') }}</div>
           <div class="setting-desc">{{ (settingsStore.settings.FullPlayLyricFontRate || 1).toFixed(1) }}x</div>
         </div>
         <t-input-number
@@ -91,7 +92,7 @@ onMounted(() => {
 
       <div class="setting-item">
         <div class="setting-info">
-          <div class="setting-title">字体粗细</div>
+          <div class="setting-title">{{ t('settings.lyricFont.fontWeight') }}</div>
           <div class="setting-desc">{{ settingsStore.settings.lyricFontWeight || 700 }}</div>
         </div>
         <t-slider
@@ -105,7 +106,7 @@ onMounted(() => {
       </div>
 
       <div class="font-preview">
-        <div class="preview-label">字体预览</div>
+        <div class="preview-label">{{ t('settings.lyricFont.fontPreview') }}</div>
         <div
           class="preview-text"
           :style="{
@@ -114,7 +115,7 @@ onMounted(() => {
             fontWeight: settingsStore.settings.lyricFontWeight || 700
           }"
         >
-          歌词预览文本 Lyrics Preview
+          {{ t('settings.lyricFont.fontPreviewText') }}
         </div>
       </div>
     </div>
