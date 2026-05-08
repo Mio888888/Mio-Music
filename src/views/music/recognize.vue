@@ -24,6 +24,7 @@ const audioStore = ControlAudioStore()
 const localUserStore = LocalUserDetailStore()
 const searchStore = searchValue()
 const router = useRouter()
+const { t } = useI18n()
 
 const MAX_DURATION = 15
 
@@ -89,12 +90,12 @@ function clearHistory() {
 function formatHistoryTime(ts: number): string {
   const diff = Date.now() - ts
   const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
+  if (minutes < 1) return t('common.justNow')
+  if (minutes < 60) return t('common.minutesAgo', { minutes })
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}小时前`
+  if (hours < 24) return t('common.hoursAgo', { hours })
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}天前`
+  if (days < 7) return t('common.daysAgo', { days })
   const d = new Date(ts)
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
@@ -314,7 +315,7 @@ async function start() {
 
     const granted = await invoke<boolean>('request_mic_permission')
     if (!granted) {
-      MessagePlugin.error('需要麦克风权限才能使用听歌识曲')
+      MessagePlugin.error(t('music.recognize.needMic'))
       reset()
       return
     }
@@ -336,7 +337,7 @@ async function start() {
       stopRecording(false)
       const msg = event.payload.error
       if (msg.includes('未找到') || msg.includes('麦克风设备')) {
-        MessagePlugin.warning('未检测到麦克风，请连接音频输入设备后重试')
+        MessagePlugin.warning(t('music.recognize.noMic'))
       } else {
         MessagePlugin.error(msg)
       }
@@ -371,7 +372,7 @@ async function start() {
       }
     }, 1000)
   } catch {
-    MessagePlugin.error('启动录音失败，请检查麦克风权限')
+    MessagePlugin.error(t('music.recognize.startFailed'))
     reset()
   }
 }
@@ -472,7 +473,7 @@ async function onFilePicked(e: Event) {
         const fp = await gen(slice)
         if (!fp) {
           status.value = 'failed'
-          MessagePlugin.warning('未识别到歌曲')
+          MessagePlugin.warning(t('music.recognize.notRecognized'))
           return
         }
         const resp = await queryNetease(fp, slice.length / 8000)
@@ -483,18 +484,18 @@ async function onFilePicked(e: Event) {
           addToHistory(result)
         } else {
           status.value = 'failed'
-          MessagePlugin.warning('未识别到歌曲')
+          MessagePlugin.warning(t('music.recognize.notRecognized'))
         }
       } else {
         status.value = 'failed'
-        MessagePlugin.error('音频指纹模块未加载')
+        MessagePlugin.error(t('music.recognize.moduleNotLoaded'))
       }
     } finally {
       ctx.close()
     }
   } catch {
     status.value = 'failed'
-    MessagePlugin.error('识别失败')
+    MessagePlugin.error(t('music.recognize.recognizeFailed'))
   } finally {
     running.value = false
   }
@@ -533,7 +534,7 @@ async function handlePlayResult(song: any) {
       try {
         await invoke('player__seek', { position: seconds })
       } catch {}
-      MessagePlugin.success(`已跳转至识别片段: ${formatTime(seconds)}`)
+      MessagePlugin.success(t('music.recognize.jumpedTo', { time: formatTime(seconds) }))
     }, 500)
   }
 }
@@ -591,7 +592,7 @@ onUnmounted(() => {
               'is-loading': status === 'initializing' || status === 'processing'
             }"
             :disabled="status === 'initializing' || status === 'processing'"
-            :aria-label="running ? '停止识别' : '开始听歌识曲'"
+            :aria-label="running ? t('music.recognize.stopRecognize') : t('music.recognize.startRecognize')"
             :aria-busy="status === 'initializing' || status === 'processing'"
             @click="running ? stopRecording(false) : start()"
           >
@@ -606,27 +607,27 @@ onUnmounted(() => {
           <template v-if="running">
             <h3 class="status-title">
               <span class="recording-dot"></span>
-              正在识别中...
+              {{ t('music.recognize.recognizing') }}
             </h3>
-            <p class="status-desc">请尽量靠近音源，以便更精准地捕捉旋律</p>
+            <p class="status-desc">{{ t('music.recognize.recognizingTip') }}</p>
             <div class="progress-bar">
               <div class="progress-fill" :style="{ transform: `scaleX(${currentDuration / MAX_DURATION})` }"></div>
             </div>
             <span class="progress-time">{{ currentDuration }}s / {{ MAX_DURATION }}s</span>
           </template>
           <template v-else-if="status === 'failed'">
-            <h3 class="status-title error">未能识别到歌曲</h3>
+            <h3 class="status-title error">{{ t('music.recognize.notFound') }}</h3>
             <div class="failed-actions">
               <button class="action-chip" @click="start">
-                <RefreshIcon size="16px" /> 重试
+                <RefreshIcon size="16px" /> {{ t('common.retry') }}
               </button>
             </div>
           </template>
           <template v-else-if="!recognizedSongs.length">
-            <h3 class="status-title">点击开始识别</h3>
-            <p class="status-desc">识别电脑正在播放的声音</p>
+            <h3 class="status-title">{{ t('music.recognize.tapToStart') }}</h3>
+            <p class="status-desc">{{ t('music.recognize.recordTip') }}</p>
             <div class="upload-chip" @click="triggerUpload">
-              <UploadIcon size="16px" /> 或上传音频文件
+              <UploadIcon size="16px" /> {{ t('music.recognize.orUpload') }}
             </div>
           </template>
         </div>
@@ -649,14 +650,14 @@ onUnmounted(() => {
               <h4 class="result-name">{{ song.name }}</h4>
               <p class="result-artist">{{ song.singer }}</p>
               <span v-if="song.startTime > 0" class="result-tag">
-                识别片段: {{ formatTime(song.startTime / 1000) }}
+                {{ t('music.recognize.segment', { time: formatTime(song.startTime / 1000) }) }}
               </span>
             </div>
             <div class="result-actions">
-              <button class="result-btn primary" :aria-label="`播放 ${song.name}`" @click="handlePlayResult(song)">
+              <button class="result-btn primary" :aria-label="`${t('common.play')} ${song.name}`" @click="handlePlayResult(song)">
                 <PlayCircleIcon size="22px" />
               </button>
-              <button class="result-btn" :aria-label="`搜索 ${song.name}`" @click="handleSearchResult(song)">
+              <button class="result-btn" :aria-label="`${t('common.search')} ${song.name}`" @click="handleSearchResult(song)">
                 <SearchIcon size="18px" />
               </button>
             </div>
@@ -664,7 +665,7 @@ onUnmounted(() => {
         </div>
         <div class="result-footer">
           <button class="action-chip" @click="backToInitial">
-            <RefreshIcon size="16px" /> 继续识别
+            <RefreshIcon size="16px" /> {{ t('music.recognize.continueRecognize') }}
           </button>
         </div>
       </section>
@@ -674,11 +675,11 @@ onUnmounted(() => {
         <div class="history-header">
           <h4 class="history-title">
             <TimeIcon size="18px" />
-            识别历史
+            {{ t('music.recognize.history') }}
           </h4>
           <button class="history-clear" @click="clearHistory">
             <DeleteIcon size="14px" />
-            清空
+            {{ t('music.recognize.clearHistory') }}
           </button>
         </div>
         <div class="history-grid">

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { MessagePlugin } from 'tdesign-vue-next'
 
+const { t } = useI18n()
 const duration = 3
 const running = ref(false)
 const progress = ref(0)
@@ -43,7 +44,7 @@ async function init() {
 async function start() {
   results.value = []
   if (!(await init())) {
-    MessagePlugin.warning('音频上下文未能初始化')
+    MessagePlugin.warning(t('play.audioContextInitFailed'))
     return
   }
   try {
@@ -51,7 +52,7 @@ async function start() {
     running.value = true
   } catch (e: any) {
     running.value = false
-    MessagePlugin.error('录制启动失败')
+    MessagePlugin.error(t('play.recordStartFailed'))
   }
 }
 
@@ -59,13 +60,13 @@ async function generateAndQuery(buffer: Float32Array) {
   try {
     const gen = (window as any).GenerateFP
     if (typeof gen !== 'function') {
-      MessagePlugin.error('缺少指纹模块，请将 afp.wasm.js 与 afp.js 放入 public 并刷新')
+      MessagePlugin.error(t('play.fingerprintModuleMissing'))
       return
     }
     const fp: string = await gen(new Float32Array(buffer.subarray(0, duration * 8000)))
     await query(fp)
   } catch (e: any) {
-    MessagePlugin.error('指纹生成失败')
+    MessagePlugin.error(t('play.fingerprintGenFailed'))
   }
 }
 
@@ -91,7 +92,7 @@ async function query(fp: string) {
       const body = await tryFetch('https://cors-anywhere.herokuapp.com/' + url)
       handleResult(body)
     } catch (e: any) {
-      MessagePlugin.error('识曲请求失败')
+      MessagePlugin.error(t('play.matchRequestFailed'))
     }
   }
 }
@@ -99,7 +100,7 @@ async function query(fp: string) {
 function handleResult(resp: any) {
   const list = (resp?.data?.result || []) as any[]
   if (!Array.isArray(list) || list.length === 0) {
-    MessagePlugin.warning('未匹配到结果')
+    MessagePlugin.warning(t('play.noMatchResult'))
     results.value = []
     return
   }
@@ -115,7 +116,7 @@ function handleResult(resp: any) {
 <template>
   <div class="audio-match">
     <t-button size="small" variant="text" :disabled="running" @click.stop="start">
-      {{ running ? `${(duration * (1 - progress)).toFixed(2)}s` : '识曲' }}
+      {{ running ? `${(duration * (1 - progress)).toFixed(2)}s` : t('play.audioMatch') }}
     </t-button>
     <div v-if="results.length" class="match-results">
       <a

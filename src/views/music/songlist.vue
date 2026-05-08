@@ -14,6 +14,7 @@ import defaultCover from '/default-cover.png'
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
 const playStatus = useGlobalPlayStatusStore()
+const { t } = useI18n()
 
 const playlists = ref<PlaylistRow[]>([])
 const loading = ref(false)
@@ -59,7 +60,7 @@ const loadPlaylists = async () => {
       }
     } catch {}
   } catch {
-    MessagePlugin.error('加载歌单失败')
+    MessagePlugin.error(t('music.songlist.loadFailed'))
   } finally {
     loading.value = false
   }
@@ -68,7 +69,7 @@ const loadPlaylists = async () => {
 // 创建歌单
 const createPlaylist = async () => {
   if (!newPlaylistForm.value.name.trim()) {
-    MessagePlugin.warning('歌单名称不能为空')
+    MessagePlugin.warning(t('music.songlist.nameEmpty'))
     return
   }
   try {
@@ -78,14 +79,14 @@ const createPlaylist = async () => {
       'local'
     )
     if (created) {
-      MessagePlugin.success('歌单创建成功')
+      MessagePlugin.success(t('music.songlist.createSuccess'))
       showCreatePlaylistDialog.value = false
       newPlaylistForm.value = { name: '', description: '' }
     } else {
-      MessagePlugin.error('创建歌单失败')
+      MessagePlugin.error(t('music.songlist.createFailed'))
     }
   } catch {
-    MessagePlugin.error('创建歌单失败')
+    MessagePlugin.error(t('music.songlist.createFailed'))
   }
 }
 
@@ -102,7 +103,7 @@ const editPlaylist = (playlist: PlaylistRow) => {
 const savePlaylistEdit = async () => {
   if (!currentEditingPlaylist.value) return
   if (!editPlaylistForm.value.name.trim()) {
-    MessagePlugin.warning('歌单名称不能为空')
+    MessagePlugin.warning(t('music.songlist.nameEmpty'))
     return
   }
   try {
@@ -112,37 +113,37 @@ const savePlaylistEdit = async () => {
       editPlaylistForm.value.description.trim()
     )
     if (ok) {
-      MessagePlugin.success('歌单信息更新成功')
+      MessagePlugin.success(t('music.songlist.updateSuccess'))
       showEditPlaylistDialog.value = false
       currentEditingPlaylist.value = null
       await loadPlaylists()
     } else {
-      MessagePlugin.error('更新歌单信息失败')
+      MessagePlugin.error(t('music.songlist.updateFailed'))
     }
   } catch {
-    MessagePlugin.error('更新歌单信息失败')
+    MessagePlugin.error(t('music.songlist.updateFailed'))
   }
 }
 
 // 删除歌单
 const deletePlaylist = (playlist: PlaylistRow) => {
   const confirmDialog = DialogPlugin.confirm({
-    header: '确认删除',
-    body: `确定要删除歌单"${playlist.name}"吗？此操作不可撤销。`,
-    confirmBtn: '删除',
-    cancelBtn: '取消',
+    header: t('music.songlist.confirmDelete'),
+    body: t('music.songlist.deleteConfirm', { name: playlist.name }),
+    confirmBtn: t('common.delete'),
+    cancelBtn: t('common.cancel'),
     theme: 'danger',
     onConfirm: async () => {
       try {
         const ok = await localUserStore.deletePlaylist(playlist.id)
         if (ok) {
-          MessagePlugin.success('歌单删除成功')
+          MessagePlugin.success(t('music.songlist.deleteSuccess'))
           playlists.value = playlists.value.filter(p => p.id !== playlist.id)
         } else {
-          MessagePlugin.error('删除歌单失败')
+          MessagePlugin.error(t('music.songlist.deleteFailed'))
         }
       } catch {
-        MessagePlugin.error('删除歌单失败')
+        MessagePlugin.error(t('music.songlist.deleteFailed'))
       }
       confirmDialog.destroy()
     },
@@ -170,7 +171,7 @@ const playPlaylist = async (playlist: PlaylistRow) => {
   try {
     const rows = await localUserStore.getSongsForPlaylist(playlist.id)
     if (!rows || rows.length === 0) {
-      MessagePlugin.warning('歌单中没有歌曲')
+      MessagePlugin.warning(t('music.songlist.noSongs'))
       return
     }
     const songs: SongList[] = rows.map(r => {
@@ -186,9 +187,9 @@ const playPlaylist = async (playlist: PlaylistRow) => {
     localUserStore.replaceSongList(songs)
     playSong(songs[0] as any)
     playStatus.updatePlayerInfo(songs[0] as any)
-    MessagePlugin.success(`正在播放歌单"${playlist.name}"`)
+    MessagePlugin.success(t('music.songlist.playingPlaylist', { name: playlist.name }))
   } catch {
-    MessagePlugin.error('播放歌单失败')
+    MessagePlugin.error(t('music.songlist.playFailed'))
   }
 }
 
@@ -197,7 +198,7 @@ const downloadPlaylist = async (playlist: PlaylistRow) => {
   try {
     const rows = await localUserStore.getSongsForPlaylist(playlist.id)
     if (!rows || rows.length === 0) {
-      MessagePlugin.warning('歌单中没有歌曲')
+      MessagePlugin.warning(t('music.songlist.noSongs'))
       return
     }
     const songs: any[] = rows.map(r => {
@@ -205,10 +206,10 @@ const downloadPlaylist = async (playlist: PlaylistRow) => {
         return { songmid: r.songmid, name: r.name, singer: r.singer, albumName: r.albumName, img: r.img, source: 'local' }
       }
     })
-    MessagePlugin.info(`开始下载 ${songs.length} 首歌曲`)
+    MessagePlugin.info(t('music.songlist.startDownloadCount', { count: songs.length }))
     songs.forEach(s => downloadSingleSong(s as any))
   } catch {
-    MessagePlugin.error('下载失败')
+    MessagePlugin.error(t('music.songlist.downloadFailed'))
   }
 }
 
@@ -219,22 +220,22 @@ const importFromPlaylist = async () => {
   showImportDialog.value = false
   const currentList = JSON.parse(JSON.stringify(localUserStore.list))
   if (!currentList || currentList.length === 0) {
-    MessagePlugin.warning('当前播放列表为空，无法导入')
+    MessagePlugin.warning(t('music.songlist.playingListEmpty'))
     return
   }
   try {
     const now = new Date()
     const playlistName = `播放列表 ${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-    const created = await localUserStore.createPlaylist(playlistName, `从播放列表导入，共 ${currentList.length} 首歌曲`, 'local')
+    const created = await localUserStore.createPlaylist(playlistName, t('music.songlist.fromPlaylistImport', { count: currentList.length }), 'local')
     if (created) {
       const added = await localUserStore.addSongsToPlaylist(created.id, currentList)
-      MessagePlugin.success(`成功从播放列表导入 ${added} 首歌曲到歌单"${playlistName}"`)
+      MessagePlugin.success(t('music.songlist.fromPlaylistSuccess', { count: added, name: playlistName }))
       await loadPlaylists()
     } else {
-      MessagePlugin.error('创建歌单失败')
+      MessagePlugin.error(t('music.songlist.createFailed'))
     }
   } catch {
-    MessagePlugin.error('从播放列表导入失败')
+    MessagePlugin.error(t('music.songlist.fromPlaylistFailed'))
   }
 }
 
@@ -254,22 +255,22 @@ const handleSonglistFileChange = async (e: Event) => {
     try {
       imported = JSON.parse(text)
     } catch {
-      MessagePlugin.error('无法解析歌单文件')
+      MessagePlugin.error(t('music.songlist.parseFileFailed'))
       return
     }
     if (!Array.isArray(imported)) {
-      MessagePlugin.error('歌单格式不正确')
+      MessagePlugin.error(t('music.songlist.fileFormatError'))
       return
     }
     const rawName = file.name.replace(/\.(cmpl|cpl|json)$/i, '')
-    const created = await localUserStore.createPlaylist(rawName, '从本地文件导入', 'local')
+    const created = await localUserStore.createPlaylist(rawName, t('music.songlist.fromFileImport'), 'local')
     if (created) {
       const added = await localUserStore.addSongsToPlaylist(created.id, imported)
-      MessagePlugin.success(`成功导入 ${added} 首歌曲到歌单"${rawName}"`)
+      MessagePlugin.success(t('music.songlist.fromFileSuccess', { count: added, name: rawName }))
       await loadPlaylists()
     }
   } catch (err) {
-    MessagePlugin.error(`导入失败: ${(err as Error).message}`)
+    MessagePlugin.error(t('music.songlist.importFailed', { error: (err as Error).message }))
   } finally {
     input.value = ''
   }
@@ -285,7 +286,7 @@ const importFromNetwork = () => {
 
 const confirmNetworkImport = async () => {
   if (!networkPlaylistUrl.value.trim()) {
-    MessagePlugin.warning('请输入有效的歌单链接')
+    MessagePlugin.warning(t('music.songlist.invalidLink'))
     return
   }
   showNetworkImportDialog.value = false
@@ -326,22 +327,22 @@ const resolvePlaylistId = (input: string, platform: string): string | null => {
   return isNumeric ? input : null
 }
 
-const platformNames: Record<string, string> = {
-  wy: '网易云音乐', tx: 'QQ音乐', kw: '酷我音乐',
-  bd: '波点音乐', kg: '酷狗音乐', mg: '咪咕音乐'
-}
+const platformNames = computed<Record<string, string>>(() => ({
+  wy: t('music.songlist.netease'), tx: t('music.songlist.qq'), kw: t('music.songlist.kuwo'),
+  bd: t('music.songlist.bodo'), kg: t('music.songlist.kugou'), mg: t('music.songlist.migu')
+}))
 
 const handleNetworkPlaylistImport = async (input: string) => {
   const platform = importPlatformType.value
-  const pName = platformNames[platform] || '音乐平台'
+  const pName = platformNames.value[platform] || t('music.songlist.selectPlatform')
   const playlistId = resolvePlaylistId(input, platform)
 
   if (!playlistId) {
-    MessagePlugin.error(`无法识别的${pName}歌单链接或ID格式`)
+    MessagePlugin.error(t('music.songlist.unrecognizedLink', { platform: pName }))
     return
   }
 
-  const loadMsg = MessagePlugin.loading('正在获取歌单信息...', 0)
+  const loadMsg = MessagePlugin.loading(t('music.songlist.fetchingInfo'), 0)
   try {
     let allSongs: any[] = []
     let detailInfo: any = {}
@@ -355,7 +356,7 @@ const handleNetworkPlaylistImport = async (input: string) => {
         page
       })
       if (!detailResult || detailResult.error) {
-        MessagePlugin.error(`获取${pName}歌单详情失败` + (detailResult?.error ? `：${detailResult.error}` : ''))
+        MessagePlugin.error(t('music.songlist.fetchDetailFailed', { platform: pName }) + (detailResult?.error ? `：${detailResult.error}` : ''))
         return
       }
       const list = detailResult.list || []
@@ -367,7 +368,7 @@ const handleNetworkPlaylistImport = async (input: string) => {
     }
 
     if (allSongs.length === 0) {
-      MessagePlugin.warning('该歌单没有歌曲')
+      MessagePlugin.warning(t('music.songlist.emptyPlaylist'))
       return
     }
 
@@ -387,16 +388,16 @@ const handleNetworkPlaylistImport = async (input: string) => {
 
     // 创建本地歌单
     const coverImg = detailInfo.cover || detailInfo.img || ''
-    const name = `导入自${pName}`
-    const created = await localUserStore.createPlaylist(name, `从${pName}导入，共 ${allSongs.length} 首`, platform)
+    const name = t('music.songlist.importedFrom', { platform: pName })
+    const created = await localUserStore.createPlaylist(name, t('music.songlist.fromNetworkImport', { platform: pName, count: allSongs.length }), platform)
     if (created) {
       const added = await localUserStore.addSongsToPlaylist(created.id, allSongs)
       if (coverImg) await localUserStore.updatePlaylistCover(created.id, coverImg)
-      MessagePlugin.success(`成功导入 ${added} 首歌曲到歌单"${name}"`)
+      MessagePlugin.success(t('music.songlist.networkImportSuccess', { count: added, name }))
       await loadPlaylists()
     }
   } catch (err) {
-    MessagePlugin.error(`导入失败: ${(err as Error).message}`)
+    MessagePlugin.error(t('music.songlist.importFailed', { error: (err as Error).message }))
   } finally {
     loadMsg.then((inst: any) => inst.close())
   }
@@ -468,16 +469,16 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
       <!-- 页面标题 -->
       <div class="page-header">
         <div class="header-left">
-          <h2>本地歌单</h2>
+          <h2>{{ t('music.songlist.title') }}</h2>
         </div>
         <div class="header-actions">
           <t-button theme="primary" variant="outline" @click="showCreatePlaylistDialog = true">
             <i class="iconfont icon-zengjia"></i>
-            新建歌单
+            {{ t('music.songlist.newPlaylist') }}
           </t-button>
           <t-button theme="primary" @click="showImportDialog = true">
             <i class="iconfont icon-daoru"></i>
-            导入
+            {{ t('common.import') }}
           </t-button>
         </div>
       </div>
@@ -485,18 +486,18 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
       <!-- 歌单区域 -->
       <div class="playlists-section">
         <div class="section-header">
-          <h3>我的歌单 ({{ playlists.length }})</h3>
+          <h3>{{ t('music.songlist.myPlaylists', { count: playlists.length }) }}</h3>
           <div class="section-actions">
             <t-button :loading="loading" size="small" theme="primary" variant="text" @click="loadPlaylists">
               <i class="iconfont icon-shuaxin"></i>
-              刷新
+              {{ t('common.refresh') }}
             </t-button>
           </div>
         </div>
 
         <!-- 加载状态 -->
         <div v-if="loading" class="loading-state">
-          <t-loading size="large" text="加载中..." />
+          <t-loading size="large" :text="t('common.loading')" />
         </div>
 
         <!-- 歌单网格 -->
@@ -526,34 +527,34 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
                   {{ playlist.name }}
                 </div>
                 <div v-if="playlist.id === favoritesId" class="playlist-tags">
-                  <t-tag size="small" theme="danger" variant="light-outline">我的喜欢</t-tag>
+                  <t-tag size="small" theme="danger" variant="light-outline">{{ t('music.songlist.myFavorite') }}</t-tag>
                 </div>
               </div>
               <div :title="playlist.description" class="playlist-description">
-                {{ playlist.description || '这个人很懒并没有留下任何描述...' }}
+                {{ playlist.description || t('music.songlist.noDescription') }}
               </div>
               <div class="playlist-meta">
                 <span class="source-tag">{{ playlist.source || 'local' }}</span>
-                <span v-if="playlist.createTime">创建于 {{ formatDate(playlist.createTime) }}</span>
+                <span v-if="playlist.createTime">{{ t('music.songlist.createdAt', { date: formatDate(playlist.createTime) }) }}</span>
               </div>
             </div>
             <div class="playlist-actions">
-              <t-tooltip content="播放歌单">
+              <t-tooltip :content="t('music.songlist.playPlaylist')">
                 <t-button shape="circle" size="small" theme="primary" variant="text" @click="playPlaylist(playlist)">
                   <i class="iconfont icon-bofang"></i>
                 </t-button>
               </t-tooltip>
-              <t-tooltip content="查看详情">
+              <t-tooltip :content="t('music.songlist.viewDetail')">
                 <t-button shape="circle" size="small" theme="default" variant="text" @click="viewPlaylist(playlist)">
                   <ViewListIcon :stroke-width="1.5" />
                 </t-button>
               </t-tooltip>
-              <t-tooltip content="编辑歌单">
+              <t-tooltip :content="t('music.songlist.editPlaylist')">
                 <t-button shape="circle" size="small" theme="success" variant="text" @click="editPlaylist(playlist)">
                   <Edit2Icon />
                 </t-button>
               </t-tooltip>
-              <t-tooltip content="删除歌单">
+              <t-tooltip :content="t('music.songlist.deletePlaylist')">
                 <t-button shape="circle" size="small" theme="danger" variant="text" @click="deletePlaylist(playlist)">
                   <i class="iconfont icon-shanchu"></i>
                 </t-button>
@@ -567,11 +568,11 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
           <div class="empty-icon">
             <i class="iconfont icon-gedan"></i>
           </div>
-          <h4>暂无歌单</h4>
-          <p>创建您的第一个歌单来管理音乐</p>
+          <h4>{{ t('music.songlist.emptyTitle') }}</h4>
+          <p>{{ t('music.songlist.emptyDesc') }}</p>
           <t-button theme="primary" @click="showCreatePlaylistDialog = true">
             <i class="iconfont icon-zengjia"></i>
-            创建歌单
+            {{ t('music.songlist.createPlaylist') }}
           </t-button>
         </div>
       </div>
@@ -580,29 +581,29 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     <!-- 创建歌单对话框 -->
     <t-dialog
       v-model:visible="showCreatePlaylistDialog"
-      :cancel-btn="{ content: '取消' }"
-      :confirm-btn="{ content: '创建', theme: 'primary' }"
-      header="创建新歌单"
+      :cancel-btn="{ content: t('common.cancel') }"
+      :confirm-btn="{ content: t('common.create'), theme: 'primary' }"
+      :header="t('music.songlist.createNewPlaylist')"
       placement="center"
       width="500px"
       @confirm="createPlaylist"
     >
       <div class="create-form">
         <t-form :data="newPlaylistForm" layout="vertical">
-          <t-form-item label="歌单名称" name="name" required>
+          <t-form-item :label="t('music.songlist.playlistName')" name="name" required>
             <t-input
               v-model="newPlaylistForm.name"
               clearable
-              placeholder="请输入歌单名称"
+              :placeholder="t('music.songlist.playlistNamePlaceholder')"
               @keyup.enter="createPlaylist"
             />
           </t-form-item>
-          <t-form-item label="歌单描述" name="description">
+          <t-form-item :label="t('music.songlist.playlistDesc')" name="description">
             <t-textarea
               v-model="newPlaylistForm.description"
               :autosize="{ minRows: 3, maxRows: 5 }"
               :maxlength="200"
-              placeholder="请输入歌单描述（可选）"
+              :placeholder="t('music.songlist.playlistDescPlaceholder')"
             />
           </t-form-item>
         </t-form>
@@ -612,32 +613,32 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     <!-- 编辑歌单对话框 -->
     <t-dialog
       v-model:visible="showEditPlaylistDialog"
-      :cancel-btn="{ content: '取消', variant: 'outline' }"
-      :confirm-btn="{ content: '保存', theme: 'primary' }"
-      header="编辑歌单信息"
+      :cancel-btn="{ content: t('common.cancel'), variant: 'outline' }"
+      :confirm-btn="{ content: t('common.save'), theme: 'primary' }"
+      :header="t('music.songlist.editPlaylistInfo')"
       placement="center"
       width="500px"
       @confirm="savePlaylistEdit"
     >
       <div class="edit-playlist-content">
         <div class="form-item">
-          <label class="form-label">歌单名称</label>
+          <label class="form-label">{{ t('music.songlist.playlistName') }}</label>
           <t-input
             v-model="editPlaylistForm.name"
             autofocus
             clearable
             maxlength="50"
-            placeholder="请输入歌单名称"
+            :placeholder="t('music.songlist.playlistNamePlaceholder')"
             show-word-limit
           />
         </div>
         <div class="form-item">
-          <label class="form-label">歌单描述</label>
+          <label class="form-label">{{ t('music.songlist.playlistDesc') }}</label>
           <t-textarea
             v-model="editPlaylistForm.description"
             :autosize="{ minRows: 3, maxRows: 6 }"
             maxlength="200"
-            placeholder="请输入歌单描述（可选）"
+            :placeholder="t('music.songlist.playlistDescPlaceholder')"
             show-word-limit
           />
         </div>
@@ -648,7 +649,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     <t-dialog
       v-model:visible="showImportDialog"
       :footer="false"
-      header="选择导入方式"
+      :header="t('music.songlist.selectImportMethod')"
       placement="center"
       width="400px"
     >
@@ -658,8 +659,8 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
             <i class="iconfont icon-liebiao"></i>
           </div>
           <div class="option-content">
-            <h4>从播放列表</h4>
-            <p>将当前播放列表保存为歌单</p>
+            <h4>{{ t('music.songlist.fromPlayingList') }}</h4>
+            <p>{{ t('music.songlist.fromPlayingListDesc') }}</p>
           </div>
           <div class="option-arrow">
             <i class="iconfont icon-youjiantou"></i>
@@ -670,8 +671,8 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
             <i class="iconfont icon-daoru"></i>
           </div>
           <div class="option-content">
-            <h4>从本地歌单文件</h4>
-            <p>导入歌单文件（.cmpl/.cpl/.json）</p>
+            <h4>{{ t('music.songlist.fromLocalFile') }}</h4>
+            <p>{{ t('music.songlist.fromLocalFileDesc') }}</p>
           </div>
           <div class="option-arrow">
             <i class="iconfont icon-youjiantou"></i>
@@ -682,9 +683,9 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
             <i class="iconfont icon-wangluo"></i>
           </div>
           <div class="option-content">
-            <h4>从网络歌单</h4>
-            <p>导入网易云音乐、QQ音乐等平台歌单</p>
-            <span class="coming-soon">实验性功能</span>
+            <h4>{{ t('music.songlist.fromNetwork') }}</h4>
+            <p>{{ t('music.songlist.fromNetworkDesc') }}</p>
+            <span class="coming-soon">{{ t('common.experimental') }}</span>
           </div>
           <div class="option-arrow">
             <i class="iconfont icon-youjiantou"></i>
@@ -696,10 +697,10 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     <!-- 网络歌单导入对话框 -->
     <t-dialog
       v-model:visible="showNetworkImportDialog"
-      :cancel-btn="{ content: '取消', variant: 'outline' }"
-      :confirm-btn="{ content: '开始导入', theme: 'primary' }"
+      :cancel-btn="{ content: t('common.cancel'), variant: 'outline' }"
+      :confirm-btn="{ content: t('music.songlist.startImport'), theme: 'primary' }"
       :style="{ maxHeight: '80vh' }"
-      header="导入网络歌单"
+      :header="t('music.songlist.importNetworkPlaylist')"
       placement="center"
       width="600px"
       @cancel="cancelNetworkImport"
@@ -707,39 +708,31 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     >
       <div class="network-import-content">
         <div class="platform-selector">
-          <label class="form-label">选择导入平台</label>
+          <label class="form-label">{{ t('music.songlist.selectPlatform') }}</label>
           <t-radio-group v-model="importPlatformType" variant="primary-filled">
-            <t-radio-button value="wy">网易云音乐</t-radio-button>
-            <t-radio-button value="tx">QQ音乐</t-radio-button>
-            <t-radio-button value="kw">酷我音乐</t-radio-button>
-            <t-radio-button value="bd">波点音乐</t-radio-button>
-            <t-radio-button value="kg">酷狗音乐</t-radio-button>
-            <t-radio-button value="mg">咪咕音乐</t-radio-button>
+            <t-radio-button value="wy">{{ t('music.songlist.netease') }}</t-radio-button>
+            <t-radio-button value="tx">{{ t('music.songlist.qq') }}</t-radio-button>
+            <t-radio-button value="kw">{{ t('music.songlist.kuwo') }}</t-radio-button>
+            <t-radio-button value="bd">{{ t('music.songlist.bodo') }}</t-radio-button>
+            <t-radio-button value="kg">{{ t('music.songlist.kugou') }}</t-radio-button>
+            <t-radio-button value="mg">{{ t('music.songlist.migu') }}</t-radio-button>
           </t-radio-group>
         </div>
 
         <div class="import-content-wrapper">
           <div :key="importPlatformType" class="import-content">
             <div style="margin-bottom: 1em">
-              请输入{{ platformNames[importPlatformType] || '音乐平台' }}歌单链接或歌单ID，系统将自动识别格式并导入歌单中的所有歌曲到本地歌单。
+              {{ t('music.songlist.networkImportGuide', { platform: platformNames[importPlatformType] || t('music.songlist.selectPlatform') }) }}
             </div>
             <t-input
               v-model="networkPlaylistUrl"
-              :placeholder="
-                importPlatformType === 'wy' ? 'https://music.163.com/playlist?id=123456789 或 123456789'
-                : importPlatformType === 'tx' ? 'https://y.qq.com/n/ryqq/playlist/123456789 或 123456789'
-                : importPlatformType === 'kw' ? 'http://www.kuwo.cn/playlist_detail/123456789 或 123456789'
-                : importPlatformType === 'bd' ? 'https://h5app.kuwo.cn/m/bodian/collection.html?playlistId=123456789 或 123456789'
-                : importPlatformType === 'kg' ? 'https://www.kugou.com/yy/special/single/123456789 或 123456789'
-                : importPlatformType === 'mg' ? 'https://music.migu.cn/v3/music/playlist/123456789 或 123456789'
-                : '请输入歌单链接或ID'
-              "
+              :placeholder="t('music.songlist.networkImportPlaceholder')"
               autofocus
               clearable
               @enter="confirmNetworkImport"
             />
             <div class="import-tips">
-              <p class="tip-title">{{ platformNames[importPlatformType] || '音乐平台' }}支持的输入格式：</p>
+              <p class="tip-title">{{ t('music.songlist.networkImportFormats', { platform: platformNames[importPlatformType] || t('music.songlist.selectPlatform') }) }}</p>
               <ul class="tip-list">
                 <li v-if="importPlatformType === 'wy'">完整链接：https://music.163.com/playlist?id=123456789</li>
                 <li v-if="importPlatformType === 'wy'">手机链接：https://music.163.com/m/playlist?id=123456789</li>
@@ -758,7 +751,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
                 <li v-if="importPlatformType === 'mg'">完整链接：https://music.migu.cn/v3/music/playlist/123456789</li>
                 <li v-if="importPlatformType === 'mg'">纯数字ID：123456789</li>
               </ul>
-              <p class="tip-note">智能识别：系统会自动从输入中提取歌单ID</p>
+              <p class="tip-note">{{ t('music.songlist.smartParse') }}</p>
             </div>
           </div>
         </div>
@@ -774,20 +767,20 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
         @click.stop
       >
         <div class="menu-item" @click="handleMenuAction('play')">
-          <i class="iconfont icon-bofang"></i> 播放歌单
+          <i class="iconfont icon-bofang"></i> {{ t('music.songlist.playPlaylist') }}
         </div>
         <div class="menu-item" @click="handleMenuAction('view')">
-          <ViewListIcon :stroke-width="1.5" style="width:14px;height:14px" /> 查看详情
+          <ViewListIcon :stroke-width="1.5" style="width:14px;height:14px" /> {{ t('music.songlist.viewDetail') }}
         </div>
         <div class="menu-item" @click="handleMenuAction('download')">
-          <DownloadIcon style="width:14px;height:14px" /> 全部下载
+          <DownloadIcon style="width:14px;height:14px" /> {{ t('music.songlist.downloadAll') }}
         </div>
         <div class="menu-separator"></div>
         <div class="menu-item" @click="handleMenuAction('edit')">
-          <Edit2Icon style="width:14px;height:14px" /> 编辑歌单
+          <Edit2Icon style="width:14px;height:14px" /> {{ t('music.songlist.editPlaylist') }}
         </div>
         <div class="menu-item danger" @click="handleMenuAction('delete')">
-          <DeleteIcon style="width:14px;height:14px" /> 删除歌单
+          <DeleteIcon style="width:14px;height:14px" /> {{ t('music.songlist.deletePlaylist') }}
         </div>
       </div>
     </Teleport>

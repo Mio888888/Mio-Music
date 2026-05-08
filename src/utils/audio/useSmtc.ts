@@ -1,3 +1,5 @@
+import i18n from '@/locales'
+
 interface MediaSessionCallbacks { play: () => void; pause: () => void; playPrevious: () => void; playNext: () => void }
 interface TrackMetadata { title: string; artist: string; album: string; artworkUrl: string }
 
@@ -11,9 +13,10 @@ class MediaSessionController {
   updateMetadata(metadata: TrackMetadata): void {
     if (!this.isSupported) return
     try {
+      const t = i18n.global.t
       navigator.mediaSession.metadata = new MediaMetadata({
-        title: metadata.title || '未知歌曲', artist: metadata.artist || '未知艺术家',
-        album: metadata.album || '未知专辑',
+        title: metadata.title || t('common.unknownSong'), artist: metadata.artist || t('common.unknownArtist'),
+        album: metadata.album || t('common.unknownAlbum'),
         artwork: metadata.artworkUrl ? ['96x96','128x128','192x192','256x256','384x384','512x512'].map(s => ({ src: metadata.artworkUrl, sizes: s, type: 'image/png' })) : []
       })
       if (this.audioElement) navigator.mediaSession.playbackState = this.audioElement.paused ? 'paused' : 'playing'

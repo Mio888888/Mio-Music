@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onActivated, onDeactivated, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { storeToRefs } from 'pinia'
 import { musicSdk } from '@/services/musicSdk'
 
 const router = useRouter()
+const { t } = useI18n()
 const localUserStore = LocalUserDetailStore()
 const { userSource } = storeToRefs(localUserStore)
 
@@ -15,7 +17,7 @@ const error = ref('')
 
 const tags = ref<any[]>([])
 const hotTag = ref<any[]>([])
-const activeCategoryName = ref('热门')
+const activeCategoryName = ref(t('music.playlistCategory.hot'))
 const activeTagId = ref('')
 const showMore = ref(false)
 const activeGroupIndex = ref(0)
@@ -84,7 +86,7 @@ const fetchCategoryPlaylists = async (reset = false) => {
     const mapped = list.map((item: any) => ({
       id: item.id,
       title: item.name,
-      description: item.desc || '精选歌单',
+      description: item.desc || t('music.playlistCategory.featuredPlaylist'),
       cover: item.img,
       playCount: item.play_count || item.playCount,
       author: item.author,
@@ -104,7 +106,7 @@ const fetchCategoryPlaylists = async (reset = false) => {
     error.value = ''
   } catch (e) {
     console.error('获取分类歌单失败:', e)
-    error.value = '获取分类歌单失败，请稍后重试'
+    error.value = t('music.playlistCategory.fetchFailed')
   } finally {
     loading.value = false
     loadingMore.value = false
@@ -148,7 +150,7 @@ watch(activeGroupName, (name) => {
 
 const formatCount = (count: any) => {
   const n = typeof count === 'number' ? count : parseInt(count) || 0
-  if (n >= 10000) return (n / 10000).toFixed(1) + '万'
+  if (n >= 10000) return (n / 10000).toFixed(1) + t('common.unitTenThousand')
   return String(n)
 }
 
@@ -174,7 +176,7 @@ onMounted(() => {
       Object.keys(categoryCache).forEach(k => delete categoryCache[k])
       fetchTags().then(() => {
         activeTagId.value = ''
-        activeCategoryName.value = '热门'
+        activeCategoryName.value = t('music.playlistCategory.hot')
         fetchCategoryPlaylists(true)
       })
     },
@@ -206,9 +208,9 @@ onDeactivated(() => {
         <button
           class="tag-chip"
           :class="{ active: activeTagId === '' }"
-          @click="onSelectTag('', '热门')"
+          @click="onSelectTag('', t('music.playlistCategory.hot'))"
         >
-          热门
+          {{ t('music.playlistCategory.hot') }}
         </button>
         <button
           v-for="t in hotTag"
@@ -234,7 +236,7 @@ onDeactivated(() => {
             aria-haspopup="dialog"
             @click.stop="openMoreCategories"
           >
-            更多分类
+            {{ t('music.playlistCategory.moreCategory') }}
             <template #suffix>
               <t-icon name="chevron-down" size="14px" :class="{ rotate: showMore }" />
             </template>
@@ -288,16 +290,16 @@ onDeactivated(() => {
               <div class="sheet-handle" />
               <header class="sheet-header">
                 <div>
-                  <p class="sheet-eyebrow">选择歌单分类</p>
-                  <h3 id="categorySheetTitle">发现更多音乐口味</h3>
+                  <p class="sheet-eyebrow">{{ t('music.playlistCategory.selectCategory') }}</p>
+                  <h3 id="categorySheetTitle">{{ t('music.playlistCategory.discoverMore') }}</h3>
                 </div>
-                <button class="sheet-close" aria-label="关闭分类面板" @click="closeMoreCategories">
+                <button class="sheet-close" :aria-label="t('music.playlistCategory.closeCategoryPanel')" @click="closeMoreCategories">
                   <t-icon name="close" size="18px" />
                 </button>
               </header>
 
               <div class="sheet-body">
-                <div class="sheet-groups" role="tablist" aria-label="歌单分类分组">
+                <div class="sheet-groups" role="tablist" :aria-label="t('music.playlistCategory.categoryGroup')">
                   <button
                     v-for="group in tags"
                     :key="group.name"
@@ -330,19 +332,19 @@ onDeactivated(() => {
     </div>
 
     <div class="section">
-      <h3 class="section-title">{{ activeCategoryName }}歌单</h3>
+      <h3 class="section-title">{{ t('music.playlistCategory.hotPlaylists', { name: activeCategoryName }) }}</h3>
 
       <div v-if="loading && playlists.length === 0" class="loading-container">
         <div class="playlist-loading" role="status" aria-live="polite">
           <span class="playlist-loading-spinner" aria-hidden="true" />
-          <span>正在加载歌单...</span>
+          <span>{{ t('music.playlistCategory.loadingPlaylists') }}</span>
         </div>
       </div>
 
       <div v-else-if="error" class="error-container">
         <t-alert theme="error" :message="error" />
         <t-button theme="primary" style="margin-top: 1rem" @click="fetchCategoryPlaylists(true)">
-          重新加载
+          {{ t('music.playlistCategory.reload') }}
         </t-button>
       </div>
 
@@ -350,8 +352,8 @@ onDeactivated(() => {
         <div class="empty-orb">
           <t-icon name="music" size="28px" />
         </div>
-        <h4>暂无歌单</h4>
-        <p>换个分类看看，也许会发现新的音乐灵感</p>
+        <h4>{{ t('music.playlistCategory.noPlaylists') }}</h4>
+        <p>{{ t('music.playlistCategory.tryOtherCategory') }}</p>
       </div>
 
       <div v-else class="playlist-grid">
@@ -372,7 +374,7 @@ onDeactivated(() => {
                 <i class="iconfont icon-bofang"></i>
                 {{ formatCount(playlist.playCount) }}
               </span>
-              <span v-if="playlist.total" class="song-count">{{ playlist.total }}首</span>
+              <span v-if="playlist.total" class="song-count">{{ t('music.playlistCategory.songUnit', { count: playlist.total }) }}</span>
             </div>
           </div>
         </div>
@@ -381,11 +383,11 @@ onDeactivated(() => {
       <div v-if="loadingMore && playlists.length > 0" class="load-status">
         <div class="playlist-loading small" role="status" aria-live="polite">
           <span class="playlist-loading-spinner" aria-hidden="true" />
-          <span>加载更多...</span>
+          <span>{{ t('music.playlistCategory.loadingMore') }}</span>
         </div>
       </div>
       <div v-else-if="noMore && playlists.length > 0" class="load-status">
-        <span class="no-more">没有更多内容</span>
+        <span class="no-more">{{ t('music.playlistCategory.noMore') }}</span>
       </div>
     </div>
   </div>

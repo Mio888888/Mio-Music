@@ -861,7 +861,7 @@ onBeforeUnmount(() => {
       <!-- 左侧：封面和歌曲信息 -->
       <div class="left-section">
         <div v-if="songInfo.songmid" class="album-cover">
-          <img :src="player.cover || songCover" :style="{ opacity: coverOpacity }" alt="专辑封面" />
+          <img :src="player.cover || songCover" :style="{ opacity: coverOpacity }" :alt="songInfo.name || t('common.unknownAlbum')" />
         </div>
 
         <div class="song-info">

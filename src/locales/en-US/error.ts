@@ -13,7 +13,9 @@ export default {
     wrongFormat: 'Invalid file format. Please select a .cmpl or .cpl playlist file',
     readFailed: 'Failed to read file',
     clipboardEmpty: 'Clipboard is empty',
-    clipboardImportFailed: 'Failed to import playlist from clipboard:'
+    clipboardImportFailed: 'Failed to import playlist from clipboard:',
+    encrypt: 'Failed to encrypt playlist',
+    decrypt: 'Failed to decrypt playlist or invalid data format'
   },
   songList: {
     createFailed: 'Failed to create playlist',

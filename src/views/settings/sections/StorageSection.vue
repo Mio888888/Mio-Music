@@ -232,7 +232,7 @@ const getTagOptionsStatus = () => {
           <t-checkbox v-model="tagWriteOptions.downloadLyrics" @change="updateTagWriteOptions">
             {{ t('settings.storage.tagDownloadLyricsFile') }}
           </t-checkbox>
-          <p class="option-desc">在下载歌曲的同时，在相同目录下保存一个独立的LRC歌词文件</p>
+          <p class="option-desc">{{ t('settings.storage.tagDownloadLyricsFileDesc') }}</p>
         </div>
 
         <div class="tag-option lyric-format-options">

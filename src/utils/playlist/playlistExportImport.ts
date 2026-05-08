@@ -1,5 +1,6 @@
 import type { SongList } from '@/types/audio'
 import CryptoJS from 'crypto-js'
+import i18n from '@/locales'
 
 const SECRET_KEY = 'CeruMusic-PlaylistSecretKey'
 
@@ -10,7 +11,7 @@ export function encryptPlaylist(data: SongList[]): string {
     return encrypted
   } catch (error) {
     console.error('加密播放列表失败:', error)
-    throw new Error('加密播放列表失败')
+    throw new Error(i18n.global.t('error.playlist.encrypt'))
   }
 }
 
@@ -20,7 +21,7 @@ export function decryptPlaylist(encryptedData: string): SongList[] {
     return JSON.parse(decrypted) as SongList[]
   } catch (error) {
     console.error('解密播放列表失败:', error)
-    throw new Error('解密播放列表失败或数据格式不正确')
+    throw new Error(i18n.global.t('error.playlist.decrypt'))
   }
 }
 
@@ -53,7 +54,7 @@ export async function importPlaylistFromPath(path: string): Promise<SongList[]> 
     const text = await gunzipToString(buf)
     return decryptPlaylist(text)
   }
-  throw new Error('不支持的文件类型')
+  throw new Error(i18n.global.t('error.playlist.unsupportedType'))
 }
 
 export async function exportPlaylistToFile(
@@ -62,7 +63,7 @@ export async function exportPlaylistToFile(
 ): Promise<string> {
   try {
     if (!playlist || playlist.length === 0) {
-      throw new Error('播放列表为空')
+      throw new Error(i18n.global.t('error.playlist.empty'))
     }
 
     const encryptedData = encryptPlaylist(playlist)
@@ -94,7 +95,7 @@ export async function exportPlaylistToFile(
 export async function copyPlaylistToClipboard(playlist: SongList[]): Promise<void> {
   try {
     if (!playlist || playlist.length === 0) {
-      throw new Error('播放列表为空')
+      throw new Error(i18n.global.t('error.playlist.empty'))
     }
 
     const encryptedData = encryptPlaylist(playlist)
@@ -108,14 +109,14 @@ export async function copyPlaylistToClipboard(playlist: SongList[]): Promise<voi
 export function importPlaylistFromFile(file: File): Promise<SongList[]> {
   return new Promise((resolve, reject) => {
     if (!file) {
-      reject(new Error('未选择文件'))
+      reject(new Error(i18n.global.t('error.playlist.noFile')))
       return
     }
 
     const isCompressed = file.name.endsWith('.cmpl')
     const isLegacy = file.name.endsWith('.cpl')
     if (!isCompressed && !isLegacy) {
-      reject(new Error('文件格式不正确，请选择.cmpl或.cpl格式的播放列表文件'))
+      reject(new Error(i18n.global.t('error.playlist.wrongFormat')))
       return
     }
 
@@ -124,11 +125,11 @@ export function importPlaylistFromFile(file: File): Promise<SongList[]> {
     reader.onload = async (event) => {
       try {
         if (!event.target || event.target.result == null) {
-          throw new Error('读取文件失败')
+          throw new Error(i18n.global.t('error.playlist.readFailed'))
         }
 
         if (isLegacy) {
-          if (typeof event.target.result !== 'string') throw new Error('读取文件失败')
+          if (typeof event.target.result !== 'string') throw new Error(i18n.global.t('error.playlist.readFailed'))
           const encryptedData = event.target.result
           const playlist = decryptPlaylist(encryptedData)
           resolve(playlist)
@@ -145,7 +146,7 @@ export function importPlaylistFromFile(file: File): Promise<SongList[]> {
     }
 
     reader.onerror = () => {
-      reject(new Error('读取文件失败'))
+      reject(new Error(i18n.global.t('error.playlist.readFailed')))
     }
 
     if (isLegacy) {
@@ -161,7 +162,7 @@ export async function importPlaylistFromClipboard(): Promise<SongList[]> {
     const clipboardText = await navigator.clipboard.readText()
 
     if (!clipboardText) {
-      throw new Error('剪贴板为空')
+      throw new Error(i18n.global.t('error.playlist.clipboardEmpty'))
     }
 
     return decryptPlaylist(clipboardText)

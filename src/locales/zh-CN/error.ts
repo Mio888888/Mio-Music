@@ -13,7 +13,9 @@ export default {
     wrongFormat: '文件格式不正确，请选择.cmpl或.cpl格式的播放列表文件',
     readFailed: '读取文件失败',
     clipboardEmpty: '剪贴板为空',
-    clipboardImportFailed: '从剪贴板导入播放列表失败:'
+    clipboardImportFailed: '从剪贴板导入播放列表失败:',
+    encrypt: '加密播放列表失败',
+    decrypt: '解密播放列表失败或数据格式不正确'
   },
   songList: {
     createFailed: '创建歌单失败',

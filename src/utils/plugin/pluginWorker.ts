@@ -6,6 +6,10 @@
  * （httpProxy, plugins.getCode, plugins.getConfig）通过桥接回主线程执行。
  */
 
+import i18n from '@/locales'
+
+function getT() { return i18n.global.t }
+
 // ==================== IPC 桥接 ====================
 
 const pendingIpc = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
@@ -429,7 +433,7 @@ function createCerumusicApi() {
         headers: res?.headers || {},
         body: res?.body ?? ''
       })).catch((e: any) => {
-        throw new Error(`网络请求失败: ${e?.message || e} — ${url}`)
+        throw new Error(getT()('plugin.networkFailed', { message: e?.message || e, url }))
       })
 
       if (callback) {
@@ -477,7 +481,7 @@ function executePluginCode(code: string): PluginExports {
   const fetchProxy = isCr ? `
     var fetch = function(url, opts) {
       var httpProxy = globalThis.__pluginHttpProxy;
-      if (!httpProxy) return Promise.reject(new Error('HTTP 代理不可用'));
+      if (!httpProxy) return Promise.reject(new Error(getT()('plugin.httpProxyUnavailable')));
       var method = (opts && opts.method) || 'GET';
       var headers = (opts && opts.headers) || {};
       var body = opts && opts.body;
@@ -518,7 +522,7 @@ function executePluginCode(code: string): PluginExports {
     try {
       ${code}
     } catch(e) {
-      console.warn('[PluginRunner] 插件执行异常:', e.message);
+      console.warn('[PluginRunner] ' + getT()('plugin.pluginError'), e.message);
     }
     return module.exports;
     `
@@ -616,7 +620,7 @@ function executePluginCode(code: string): PluginExports {
       Object.assign(mockModule.exports, pluginExports)
     }
   } catch (e) {
-    console.warn('[PluginWorker] 插件初始化失败:', e)
+    console.warn('[PluginWorker] ' + getT()('plugin.pluginInitFailed'), e)
   }
 
   const result = mockModule.exports
@@ -655,7 +659,7 @@ const pluginCache = new Map<string, LoadedPlugin>()
 async function getPluginCode(pluginId: string): Promise<string> {
   const res = await ipcCall('plugins.getCode', { pluginId })
   if (res?.success && typeof res.data === 'string') return res.data
-  throw new Error(res?.error || '无法获取插件代码')
+  throw new Error(res?.error || getT()('plugin.noPluginCode'))
 }
 
 async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
@@ -698,7 +702,7 @@ function normalizeMusicUrlResult(source: string, result: any): string {
     if (obj.error) throw new Error(String(obj.error))
     if (obj.url && typeof obj.url === 'string') return obj.url
   }
-  throw new Error(`插件返回了无效的播放链接 (type=${typeof result})`)
+  throw new Error(getT()('plugin.invalidPlayUrl', { type: typeof result }))
 }
 
 function parseArgsJson(argsJson: string): any[] {
@@ -708,7 +712,7 @@ function parseArgsJson(argsJson: string): any[] {
     if (parsed === null || typeof parsed === 'undefined') return []
     return [parsed]
   } catch {
-    throw new Error('插件方法参数 JSON 无效')
+    throw new Error(getT()('plugin.invalidParams'))
   }
 }
 
@@ -720,7 +724,7 @@ async function invokePluginMethod(fn: Function, thisArg: any, args: any[]): Prom
       ? setTimeout(() => {
         if (settled) return
         settled = true
-        reject(new Error('插件回调超时'))
+        reject(new Error(getT()('plugin.callbackTimeout')))
       }, 15000)
       : null
 
@@ -759,7 +763,7 @@ async function invokePluginMethod(fn: Function, thisArg: any, args: any[]): Prom
 async function getMusicUrl(pluginId: string, source: string, songInfo: any, quality: string): Promise<string> {
   const plugin = await loadPlugin(pluginId)
   if (typeof plugin.exports.musicUrl !== 'function') {
-    throw new Error('插件未导出 musicUrl 方法')
+    throw new Error(getT()('plugin.noMusicUrl'))
   }
   try {
     const result = await plugin.exports.musicUrl(source, songInfo, quality)
@@ -772,7 +776,7 @@ async function getMusicUrl(pluginId: string, source: string, songInfo: any, qual
 async function getPic(pluginId: string, source: string, songInfo: any): Promise<string> {
   const plugin = await loadPlugin(pluginId)
   if (typeof plugin.exports.getPic !== 'function') {
-    throw new Error('插件未导出 getPic 方法')
+    throw new Error(getT()('plugin.noGetPic'))
   }
   try {
     const result = await plugin.exports.getPic(source, songInfo)
@@ -788,7 +792,7 @@ async function getPic(pluginId: string, source: string, songInfo: any): Promise<
 async function getLyric(pluginId: string, source: string, songInfo: any): Promise<string | { lyric?: string; tlyric?: string; rlyric?: string; lxlyric?: string }> {
   const plugin = await loadPlugin(pluginId)
   if (typeof plugin.exports.getLyric !== 'function') {
-    throw new Error('插件未导出 getLyric 方法')
+    throw new Error(getT()('plugin.noGetLyric'))
   }
   try {
     return await plugin.exports.getLyric(source, songInfo)
@@ -801,14 +805,14 @@ async function callMethod(pluginId: string, method: string, argsJson: string, op
   const plugin = await loadPlugin(pluginId)
   const fn = (plugin.exports as Record<string, any>)[method]
   if (typeof fn !== 'function') {
-    throw new Error(`插件未导出 ${method} 方法`)
+    throw new Error(getT()('plugin.noMethod', { method }))
   }
 
   let args = parseArgsJson(argsJson)
   if (options.injectConfig) {
     const configRes = await ipcCall('plugins.getConfig', { pluginId })
     if (!configRes?.success) {
-      throw new Error(configRes?.error || '读取插件配置失败')
+      throw new Error(configRes?.error || getT()('plugin.readConfigFailed'))
     }
     args = [configRes.data || {}, ...args]
   }
@@ -834,12 +838,12 @@ async function testConnection(pluginId: string): Promise<{ success: boolean; mes
     result = await callMethod(pluginId, 'testConnection', '[]', { injectConfig: true })
   } catch (e: any) {
     const message = e?.message || String(e)
-    if (message.includes('插件未导出 testConnection 方法')) {
+    if (message.includes(getT()('plugin.noTestConnectionMethod'))) {
       try {
         result = await callMethod(pluginId, 'ping', '[]', { injectConfig: true })
       } catch (pingErr: any) {
         const pingMessage = pingErr?.message || String(pingErr)
-        return { success: false, message: `插件未实现 testConnection/ping: ${pingMessage}` }
+        return { success: false, message: getT()('plugin.noTestConnection', { message: pingMessage }) }
       }
     } else {
       return { success: false, message }
@@ -848,7 +852,7 @@ async function testConnection(pluginId: string): Promise<{ success: boolean; mes
 
   if (result && typeof result === 'object') {
     if (typeof result.success === 'boolean') {
-      return { success: result.success, message: result.message || (result.success ? '连接成功' : '连接失败') }
+      return { success: result.success, message: result.message || (result.success ? getT()('plugin.connectionSuccess') : getT()('plugin.connectionFailed')) }
     }
     if (result.error) {
       return { success: false, message: String(result.error) }
@@ -859,7 +863,7 @@ async function testConnection(pluginId: string): Promise<{ success: boolean; mes
     return { success: true, message: result }
   }
 
-  return { success: !!result, message: result ? '连接成功' : '连接失败' }
+  return { success: !!result, message: result ? getT()('plugin.connectionSuccess') : getT()('plugin.connectionFailed') }
 }
 
 function clearCache(pluginId?: string) {
@@ -926,7 +930,7 @@ self.onmessage = async (e: MessageEvent) => {
           result = undefined
           break
         default:
-          throw new Error(`未知方法: ${msg.method}`)
+          throw new Error(getT()('plugin.unknownMethod', { method: msg.method }))
       }
       self.postMessage({ type: 'resolve', id: msg.id, result })
     } catch (e: any) {

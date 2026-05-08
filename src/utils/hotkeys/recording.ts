@@ -1,4 +1,5 @@
 import type { HotkeyAction } from '@/types/hotkeys'
+import i18n from '@/locales'
 
 const isOnlyModifier = (key: string) => {
   return key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta'
@@ -40,7 +41,7 @@ const normalizeKeyPart = (e: KeyboardEvent): string => {
 
 export function acceleratorToDisplay(acc: string): string {
   const v = (acc || '').trim()
-  if (!v) return '未设置'
+  if (!v) return i18n.global.t('common.notSet')
   return v.replace(/CommandOrControl/g, 'Ctrl')
 }
 

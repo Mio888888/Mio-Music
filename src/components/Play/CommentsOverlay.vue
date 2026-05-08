@@ -268,7 +268,7 @@ const onLeave = (el: Element) => {
                       class="expand-reply"
                       @click="toggleReply(item.id)"
                     >
-                      展开 {{ item.reply.length }} 条评论
+                      {{ t('play.comments.expandReplies', { count: item.reply.length }) }}
                     </div>
                     <Transition @enter="onEnter" @after-enter="onAfterEnter" @leave="onLeave">
                       <div v-if="expandedReplies[item.id]" class="replies-wrapper">
@@ -285,7 +285,7 @@ const onLeave = (el: Element) => {
                               <span class="reply-text">: {{ reply.text }}</span>
                             </div>
                           </div>
-                          <div class="collapse-reply" @click="toggleReply(item.id)">收起评论</div>
+                          <div class="collapse-reply" @click="toggleReply(item.id)">{{ t('play.comments.collapseReplies') }}</div>
                         </div>
                       </div>
                     </Transition>
@@ -298,8 +298,8 @@ const onLeave = (el: Element) => {
               </div>
 
               <div ref="loadTrigger" class="load-trigger">
-                <t-loading v-if="isLoading" text="加载中..." size="small" />
-                <span v-else-if="!hasMore && list.length > 0" class="no-more">没有更多了</span>
+                <t-loading v-if="isLoading" :text="t('common.loading')" size="small" />
+                <span v-else-if="!hasMore && list.length > 0" class="no-more">{{ t('play.comments.noMore') }}</span>
               </div>
             </div>
           </div>

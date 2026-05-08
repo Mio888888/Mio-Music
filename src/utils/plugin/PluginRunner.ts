@@ -6,6 +6,8 @@
  * 在主线程执行后通过 postMessage 返回 Worker。
  */
 
+import i18n from '@/locales'
+
 let worker: Worker | null = null
 const pendingCalls = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 let callSeq = 0
@@ -59,7 +61,7 @@ function getWorker(): Worker {
       }
     }
     worker.onerror = (e) => {
-      console.error('[PluginRunner] Worker 错误:', e.message)
+      console.error(`[PluginRunner] ${i18n.global.t('plugin.workerError')}:`, e.message)
     }
   }
   return worker
@@ -86,7 +88,7 @@ async function handleIpc(ipcId: number, method: string, args: any) {
         result = await api.api.plugins.getConfig(args.pluginId)
         break
       default:
-        throw new Error(`未知 IPC 方法: ${method}`)
+        throw new Error(i18n.global.t('plugin.unknownIpcMethod', { method }))
     }
     getWorker().postMessage({ type: 'ipc-resolve', id: ipcId, result })
   } catch (e: any) {

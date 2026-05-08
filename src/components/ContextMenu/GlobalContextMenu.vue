@@ -8,6 +8,7 @@ import ContextMenu from './ContextMenu.vue'
 import { type ContextMenuItem, type ContextMenuPosition } from './types'
 import { CutIcon, CopyIcon, PasteIcon, CheckDoubleIcon } from 'tdesign-icons-vue-next'
 
+const { t } = useI18n()
 const visible = ref(false)
 const position = ref<ContextMenuPosition>({ x: 0, y: 0 })
 const items = ref<ContextMenuItem[]>([])
@@ -31,9 +32,9 @@ const handleContextMenu = (e: MouseEvent) => {
     }
     const hasSelection = selection.length > 0
     items.value = [
-      { id: 'cut', label: '剪切', icon: CutIcon, disabled: isReadonly || !hasSelection, onClick: () => { restoreFocus(); document.execCommand('cut') } },
-      { id: 'copy', label: '复制', icon: CopyIcon, disabled: !hasSelection, onClick: () => { restoreFocus(); document.execCommand('copy') } },
-      { id: 'paste', label: '粘贴', icon: PasteIcon, disabled: isReadonly, onClick: async () => {
+      { id: 'cut', label: t('common.cut'), icon: CutIcon, disabled: isReadonly || !hasSelection, onClick: () => { restoreFocus(); document.execCommand('cut') } },
+      { id: 'copy', label: t('common.copy'), icon: CopyIcon, disabled: !hasSelection, onClick: () => { restoreFocus(); document.execCommand('copy') } },
+      { id: 'paste', label: t('common.paste'), icon: PasteIcon, disabled: isReadonly, onClick: async () => {
         restoreFocus()
         try {
           const text = await navigator.clipboard.readText()
@@ -45,7 +46,7 @@ const handleContextMenu = (e: MouseEvent) => {
         } catch {}
       }},
       { id: 'separator', separator: true },
-      { id: 'select-all', label: '全选', icon: CheckDoubleIcon, onClick: () => {
+      { id: 'select-all', label: t('common.selectAll'), icon: CheckDoubleIcon, onClick: () => {
         restoreFocus()
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') (target as HTMLInputElement).select()
         else document.execCommand('selectAll')

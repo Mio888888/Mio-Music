@@ -5,6 +5,7 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { musicSdk } from '@/services/musicSdk'
 import LeaderBordCard from './LeaderBordCard.vue'
 
+const { t } = useI18n()
 const boards = ref<any[]>([])
 const loading = ref(true)
 const router = useRouter()
@@ -45,7 +46,7 @@ onMounted(() => fetchBoards())
 <template>
   <div class="leaderboard-container">
     <div class="section-header">
-      <div class="title">热门榜单</div>
+      <div class="title">{{ t('music.leaderboard.title') }}</div>
     </div>
 
     <div v-if="loading" class="board-grid">
@@ -64,8 +65,8 @@ onMounted(() => fetchBoards())
     </div>
 
     <div v-else class="empty-state">
-      <div class="empty-text">暂无榜单数据</div>
-      <t-button variant="text" @click="fetchBoards">重试</t-button>
+      <div class="empty-text">{{ t('music.leaderboard.noData') }}</div>
+      <t-button variant="text" @click="fetchBoards">{{ t('music.leaderboard.retry') }}</t-button>
     </div>
   </div>
 </template>

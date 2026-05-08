@@ -3,8 +3,8 @@
     <div class="section">
       <div class="setting-item" style="margin-top: 0">
         <div class="item-info">
-          <div class="item-title">启用全局快捷键</div>
-          <div class="item-desc">关闭后将不会注册系统级快捷键</div>
+          <div class="item-title">{{ t('settings.hotkey.enableGlobal') }}</div>
+          <div class="item-desc">{{ t('settings.hotkey.enableGlobalDesc') }}</div>
         </div>
         <t-switch v-model="enabled" :loading="saving" @change="save" />
       </div>
@@ -12,7 +12,7 @@
       <div class="hotkey-list" :class="{ disabled: !enabled }">
         <div class="hotkey-toolbar">
           <t-button size="small" theme="default" variant="outline" :loading="saving" @click="resetToDefault">
-            恢复默认
+            {{ t('settings.hotkey.restoreDefault') }}
           </t-button>
         </div>
         <div v-for="it in hotkeyActions" :key="it.id" class="hotkey-row">
@@ -28,10 +28,10 @@
               {{ displayBinding(it.id) }}
             </t-tag>
             <t-button size="small" theme="primary" variant="outline" :disabled="!enabled" @click="beginRecord(it.id)">
-              设置
+              {{ t('settings.hotkey.set') }}
             </t-button>
             <t-button size="small" theme="default" variant="text" :disabled="!enabled" @click="clearHotkey(it.id)">
-              清除
+              {{ t('settings.hotkey.clear') }}
             </t-button>
           </div>
         </div>
@@ -39,8 +39,8 @@
     </div>
 
     <div class="section">
-      <div class="section-title">局内快捷键</div>
-      <div class="section-desc">仅在主窗口聚焦且不在输入框时生效。</div>
+      <div class="section-title">{{ t('settings.hotkey.inAppTitle') }}</div>
+      <div class="section-desc">{{ t('settings.hotkey.inAppDesc') }}</div>
       <div class="hotkey-list">
         <div v-for="it in inAppShortcuts" :key="it.keys + it.title" class="hotkey-row">
           <div class="hotkey-meta">
@@ -64,17 +64,17 @@
       <div class="recording">
         <div class="preview">{{ recordPreview }}</div>
         <div class="preview sub">
-          {{ recording.captured ? acceleratorToDisplay(recording.captured) : '等待输入...' }}
+          {{ recording.captured ? acceleratorToDisplay(recording.captured) : t('settings.hotkey.waitForInput') }}
         </div>
         <div class="tips">
-          <div>按 Esc 取消</div>
-          <div>按 Backspace/Delete 清空</div>
+          <div>{{ t('settings.hotkey.pressEscToCancel') }}</div>
+          <div>{{ t('settings.hotkey.pressBackspaceToClear') }}</div>
         </div>
       </div>
       <template #footer>
-        <t-button theme="default" @click="cancelRecord">取消</t-button>
+        <t-button theme="default" @click="cancelRecord">{{ t('common.cancel') }}</t-button>
         <t-button theme="primary" :loading="saving" :disabled="!recordCanSave" @click="confirmRecord">
-          保存
+          {{ t('common.save') }}
         </t-button>
       </template>
     </t-dialog>
@@ -88,28 +88,30 @@ import type { HotkeyAction, HotkeyConfig } from '@/types/hotkeys'
 import { defaultHotkeyConfig } from '@/types/hotkeys'
 import { acceleratorToDisplay, createHotkeyRecorder, isCompleteAccelerator } from '@/utils/hotkeys/recording'
 
-const hotkeyActions: Array<{ id: HotkeyAction; title: string; desc: string }> = [
-  { id: 'toggle', title: '播放/暂停', desc: '全局切换播放状态' },
-  { id: 'playPrev', title: '上一首', desc: '全局切换到上一首' },
-  { id: 'playNext', title: '下一首', desc: '全局切换到下一首' },
-  { id: 'seekBackward', title: '快退', desc: '全局快退 5 秒' },
-  { id: 'seekForward', title: '快进', desc: '全局快进 5 秒' },
-  { id: 'toggleDesktopLyric', title: '桌面歌词', desc: '全局切换桌面歌词显示/隐藏' },
-  { id: 'volumeDown', title: '音量 -', desc: '全局音量降低 5%' },
-  { id: 'volumeUp', title: '音量 +', desc: '全局音量提升 5%' },
-  { id: 'setPlayModeSequence', title: '顺序播放', desc: '切换为顺序播放' },
-  { id: 'setPlayModeRandom', title: '随机播放', desc: '切换为随机播放' },
-  { id: 'togglePlayModeSingle', title: '单曲循环切换', desc: '切换单曲循环/顺序播放' }
-]
+const { t } = useI18n()
 
-const inAppShortcuts: Array<{ keys: string; title: string; desc: string }> = [
-  { keys: 'Space', title: '播放/暂停', desc: '切换播放状态' },
-  { keys: '↑', title: '音量 +', desc: '音量提升 5%' },
-  { keys: '↓', title: '音量 -', desc: '音量降低 5%' },
-  { keys: '←', title: '快退', desc: '快退 5 秒' },
-  { keys: '→', title: '快进', desc: '快进 5 秒' },
-  { keys: 'F', title: '全屏播放', desc: '切换全屏播放面板' }
-]
+const hotkeyActions = computed<Array<{ id: HotkeyAction; title: string; desc: string }>>(() => [
+  { id: 'toggle', title: t('settings.hotkey.actionToggle'), desc: t('settings.hotkey.actionToggleDesc') },
+  { id: 'playPrev', title: t('settings.hotkey.actionPlayPrev'), desc: t('settings.hotkey.actionPlayPrevDesc') },
+  { id: 'playNext', title: t('settings.hotkey.actionPlayNext'), desc: t('settings.hotkey.actionPlayNextDesc') },
+  { id: 'seekBackward', title: t('settings.hotkey.actionSeekBackward'), desc: t('settings.hotkey.actionSeekBackwardDesc') },
+  { id: 'seekForward', title: t('settings.hotkey.actionSeekForward'), desc: t('settings.hotkey.actionSeekForwardDesc') },
+  { id: 'toggleDesktopLyric', title: t('settings.hotkey.actionToggleDesktopLyric'), desc: t('settings.hotkey.actionToggleDesktopLyricDesc') },
+  { id: 'volumeDown', title: t('settings.hotkey.actionVolumeDown'), desc: t('settings.hotkey.actionVolumeDownDesc') },
+  { id: 'volumeUp', title: t('settings.hotkey.actionVolumeUp'), desc: t('settings.hotkey.actionVolumeUpDesc') },
+  { id: 'setPlayModeSequence', title: t('settings.hotkey.actionSetPlayModeSequence'), desc: t('settings.hotkey.actionSetPlayModeSequenceDesc') },
+  { id: 'setPlayModeRandom', title: t('settings.hotkey.actionSetPlayModeRandom'), desc: t('settings.hotkey.actionSetPlayModeRandomDesc') },
+  { id: 'togglePlayModeSingle', title: t('settings.hotkey.actionTogglePlayModeSingle'), desc: t('settings.hotkey.actionTogglePlayModeSingleDesc') }
+])
+
+const inAppShortcuts = computed<Array<{ keys: string; title: string; desc: string }>>(() => [
+  { keys: 'Space', title: t('settings.hotkey.inAppToggle'), desc: t('settings.hotkey.inAppToggleDesc') },
+  { keys: '↑', title: t('settings.hotkey.inAppVolumeUp'), desc: t('settings.hotkey.inAppVolumeUpDesc') },
+  { keys: '↓', title: t('settings.hotkey.inAppVolumeDown'), desc: t('settings.hotkey.inAppVolumeDownDesc') },
+  { keys: '←', title: t('settings.hotkey.inAppSeekBackward'), desc: t('settings.hotkey.inAppSeekBackwardDesc') },
+  { keys: '→', title: t('settings.hotkey.inAppSeekForward'), desc: t('settings.hotkey.inAppSeekForwardDesc') },
+  { keys: 'F', title: t('settings.hotkey.inAppFullscreen'), desc: t('settings.hotkey.inAppFullscreenDesc') }
+])
 
 const loading = ref(false)
 const saving = ref(false)
@@ -146,7 +148,7 @@ const save = async () => {
       bindings: { ...(toRaw(bindings.value) || {}) }
     })
     if (!res?.success) {
-      MessagePlugin.warning(res?.error || '保存失败')
+      MessagePlugin.warning(res?.error || t('settings.hotkey.saveFailed'))
       return
     }
     const cfg = res?.data as HotkeyConfig | undefined
@@ -156,9 +158,9 @@ const save = async () => {
     }
     const status = res?.status as any
     failedActions.value = new Set(status?.failedActions || [])
-    MessagePlugin.success('已保存')
+    MessagePlugin.success(t('settings.hotkey.saveSuccess'))
   } catch {
-    MessagePlugin.error('保存失败')
+    MessagePlugin.error(t('settings.hotkey.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -191,7 +193,7 @@ const beginRecord = (action: HotkeyAction) => {
           ([k, v]) => k !== recording.value.action && (v || '').toLowerCase() === (acc || '').toLowerCase() && !!acc
         )
         if (conflict) {
-          MessagePlugin.warning('快捷键已被其它功能占用')
+          MessagePlugin.warning(t('settings.hotkey.hotkeyConflict'))
           return
         }
       }
@@ -219,13 +221,13 @@ const confirmRecord = async () => {
 }
 
 const recordTitle = computed(() => {
-  if (!recording.value.action) return '录入快捷键'
-  const meta = hotkeyActions.find(a => a.id === recording.value.action)
-  return meta ? `设置：${meta.title}` : '录入快捷键'
+  if (!recording.value.action) return t('settings.hotkey.recordHotkey')
+  const meta = hotkeyActions.value.find(a => a.id === recording.value.action)
+  return meta ? t('settings.hotkey.setWith', { name: meta.title }) : t('settings.hotkey.recordHotkey')
 })
 
 const recordPreview = computed(() => {
-  if (!recording.value.preview) return '请按下组合键'
+  if (!recording.value.preview) return t('settings.hotkey.pressCombo')
   return acceleratorToDisplay(recording.value.preview)
 })
 
@@ -245,31 +247,72 @@ onBeforeUnmount(() => { recorder?.unmount(); recorder = null })
 </script>
 
 <style scoped>
-.section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; color: var(--td-text-color-primary); }
 .section-title { font-weight: 700; color: var(--td-text-color-primary); }
 .section-desc { font-size: 12px; color: var(--td-text-color-secondary); }
 .setting-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.875rem 1rem; border: 1px solid var(--td-border-level-1-color);
-  background: var(--td-bg-color-container); border-radius: 0.5rem; margin-top: 0.75rem;
+  padding: 0.875rem 1rem; border: 1px solid var(--settings-feature-border, var(--td-border-level-1-color));
+  background: var(--settings-feature-bg, var(--td-bg-color-container)); border-radius: 0.5rem; margin-top: 0.75rem;
 }
 .setting-item .item-info { display: flex; flex-direction: column; gap: 0.25rem; }
-.setting-item .item-title { font-weight: 600; font-size: 0.95rem; }
+.setting-item .item-title { font-weight: 600; font-size: 0.95rem; color: var(--td-text-color-primary); }
 .setting-item .item-desc { color: var(--td-text-color-secondary); font-size: 0.8rem; }
 .hotkey-list { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .hotkey-list.disabled { opacity: 0.6; }
 .hotkey-toolbar { display: flex; justify-content: flex-end; }
 .hotkey-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px; border: 1px solid var(--td-border-level-1-color);
-  background: var(--td-bg-color-container); border-radius: 10px; gap: 12px;
+  padding: 12px; border: 1px solid var(--settings-feature-border, var(--td-border-level-1-color));
+  background: var(--settings-feature-bg, var(--td-bg-color-container)); border-radius: 10px; gap: 12px;
 }
 .hotkey-meta { display: flex; flex-direction: column; gap: 4px; }
-.hotkey-title { font-weight: 600; }
+.hotkey-title { font-weight: 600; color: var(--td-text-color-primary); }
 .hotkey-desc { font-size: 12px; color: var(--td-text-color-secondary); }
 .hotkey-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.recording { display: flex; flex-direction: column; gap: 12px; }
-.preview { padding: 12px; border: 1px dashed var(--td-border-level-1-color); border-radius: 8px; font-weight: 700; text-align: center; }
-.preview.sub { font-weight: 600; }
+.recording { display: flex; flex-direction: column; gap: 12px; color: var(--td-text-color-primary); }
+.preview { padding: 12px; border: 1px dashed var(--td-border-level-1-color); border-radius: 8px; font-weight: 700; text-align: center; color: var(--td-text-color-primary); }
+.preview.sub { font-weight: 600; color: var(--td-text-color-secondary); }
 .tips { display: flex; justify-content: space-between; color: var(--td-text-color-secondary); font-size: 12px; }
+@media (max-width: 768px) {
+  .section {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .setting-item,
+  .hotkey-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+
+  .setting-item .item-info,
+  .hotkey-meta,
+  .hotkey-actions {
+    width: 100%;
+  }
+
+  .hotkey-toolbar {
+    justify-content: flex-start;
+  }
+
+  .hotkey-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .hotkey-actions .t-tag {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tips {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+}
 </style>

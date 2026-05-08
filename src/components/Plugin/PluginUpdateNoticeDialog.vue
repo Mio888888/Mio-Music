@@ -16,15 +16,15 @@
 
           <div class="update-info">
             <div v-if="currentVersion" class="version-info">
-              <span class="version-label">当前版本:</span>
+              <span class="version-label">{{ t('common.pluginUpdate.currentVersion') }}</span>
               <span class="version-value">{{ currentVersion }}</span>
             </div>
             <div v-if="currentNotice?.newVersion" class="version-info">
-              <span class="version-label">新版本:</span>
+              <span class="version-label">{{ t('common.pluginUpdate.newVersion') }}</span>
               <span class="version-value new-version">{{ currentNotice.newVersion }}</span>
             </div>
             <div v-if="currentNotice?.pluginType" class="plugin-type">
-              <span class="type-label">插件类型:</span>
+              <span class="type-label">{{ t('common.pluginUpdate.pluginType') }}</span>
               <t-tag :theme="currentNotice.pluginType === 'cr' ? 'primary' : 'success'" size="small">
                 {{ currentNotice.pluginType === 'cr' ? 'CeruMusic' : 'LX Music' }}
               </t-tag>
@@ -36,14 +36,14 @@
 
     <template #footer>
       <div class="dialog-actions">
-        <t-button theme="default" :disabled="updating" @click="handleClose">稍后更新</t-button>
+        <t-button theme="default" :disabled="updating" @click="handleClose">{{ t('common.pluginUpdate.updateLater') }}</t-button>
         <t-button
           v-if="currentNotice?.updateUrl"
           theme="primary"
           :loading="updating"
           @click="handleUpdate"
         >
-          立即更新
+          {{ t('common.pluginUpdate.updateNow') }}
         </t-button>
       </div>
     </template>
@@ -57,6 +57,7 @@ import { usePluginUpdateNotice, type PluginUpdateNotice } from '@/composables/us
 import { usePluginStore } from '@/store/plugin'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 
+const { t } = useI18n()
 const { notices, removeNotice, clearNotices } = usePluginUpdateNotice()
 const pluginStore = usePluginStore()
 
@@ -81,13 +82,13 @@ const currentVersion = computed(() => {
 })
 
 const dialogTitle = computed(() => {
-  if (!currentNotice.value) return '插件更新'
+  if (!currentNotice.value) return t('common.pluginUpdate.updateAvailable')
   const base = currentNotice.value.pluginName
-    ? `${currentNotice.value.pluginName} 有新版本可用`
-    : '插件更新可用'
+    ? t('common.pluginUpdate.hasNewVersion', { name: currentNotice.value.pluginName })
+    : t('common.pluginUpdate.updateAvailable')
   const remaining = notices.value.length - (currentIndex.value + 1)
   if (remaining > 0) {
-    return `${base} (还有 ${remaining} 个更新)`
+    return `${base} ${t('common.pluginUpdate.remainingUpdates', { count: remaining })}`
   }
   return base
 })
@@ -141,16 +142,16 @@ async function handleUpdate() {
     await pluginStore.downloadAndAdd(notice.updateUrl, pluginType, targetPluginId)
     PluginRunner.clearCache(targetPluginId)
 
-    MessagePlugin.success(`插件 "${notice.pluginName || '未知插件'}" 更新成功！`)
+    MessagePlugin.success(t('common.pluginUpdate.updateSuccess', { name: notice.pluginName || t('common.unknown') }))
     handleClose()
   } catch (e: any) {
     console.error('[PluginUpdateNotice] 更新失败:', e)
     const notice = currentNotice.value
     DialogPlugin.confirm({
-      header: '自动更新失败',
-      body: `插件更新失败（${e.message || '未知错误'}），是否在浏览器中打开下载页面？`,
-      confirmBtn: '打开浏览器',
-      cancelBtn: '取消',
+      header: t('common.pluginUpdate.autoUpdateFailed'),
+      body: t('common.pluginUpdate.updateFailedMessage', { error: e.message || t('common.unknown') }),
+      confirmBtn: t('common.pluginUpdate.openBrowser'),
+      cancelBtn: t('common.cancel'),
       onConfirm: () => {
         if (notice?.updateUrl) {
           window.open(notice.updateUrl)

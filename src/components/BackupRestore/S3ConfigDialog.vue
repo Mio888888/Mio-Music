@@ -20,7 +20,7 @@
                 </svg>
               </div>
               <div class="glass-title-text">
-                <h2 class="glass-title">备份 & 恢复</h2>
+                <h2 class="glass-title">{{ t('backup.backupAndRestore') }}</h2>
                 <div class="glass-status">
                   <span :class="['status-indicator', { connected: store.isConnected }]" />
                   <span class="status-label">{{ store.statusText }}</span>
@@ -41,7 +41,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
-              <span>推荐</span>
+              <span>{{ t('backup.tabRecommend') }}</span>
             </button>
             <button
               :class="['glass-tab', { active: activeTab === 'config' }]"
@@ -50,7 +50,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              <span>连接配置</span>
+              <span>{{ t('backup.tabConfig') }}</span>
             </button>
             <button
               :class="['glass-tab', { active: activeTab === 'ops' }]"
@@ -60,47 +60,47 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span>备份操作</span>
+              <span>{{ t('backup.tabOps') }}</span>
             </button>
           </div>
 
           <!-- Tab: Recommend -->
           <div v-show="activeTab === 'recommend'" class="glass-content">
             <div class="recommend-intro">
-              选择一个免费 S3 兼容存储服务，注册后填入连接配置即可使用。
+              {{ t('backup.recommendIntro') }}
             </div>
 
             <div class="recommend-list">
               <div class="recommend-card" @click="openLink('https://www.hi168.com')">
                 <div class="recommend-card-header">
-                  <div class="recommend-badge free">免费</div>
+                  <div class="recommend-badge free">{{ t('backup.free') }}</div>
                   <div class="recommend-card-info">
-                    <h3>Hi168 对象存储</h3>
-                    <span class="recommend-url">hi168.com</span>
+                    <h3>{{ t('backup.hi168.title') }}</h3>
+                    <span class="recommend-url">{{ t('backup.hi168.url') }}</span>
                   </div>
                 </div>
                 <div class="recommend-features">
-                  <div class="feature-tag"><b>500 GB</b> 存储空间</div>
-                  <div class="feature-tag"><b>10 GB</b> /月流量</div>
-                  <div class="feature-tag">S3 兼容</div>
+                  <div class="feature-tag"><b>500 GB</b> {{ t('backup.hi168.storage') }}</div>
+                  <div class="feature-tag"><b>10 GB</b> {{ t('backup.hi168.traffic') }}</div>
+                  <div class="feature-tag">{{ t('backup.hi168.s3Compatible') }}</div>
                 </div>
-                <p class="recommend-desc">提供大容量免费对象存储，适合歌单备份，S3 协议完全兼容。</p>
+                <p class="recommend-desc">{{ t('backup.hi168.desc') }}</p>
               </div>
 
               <div class="recommend-card" @click="openLink('https://data.cstcloud.cn/')">
                 <div class="recommend-card-header">
-                  <div class="recommend-badge free">免费</div>
+                  <div class="recommend-badge free">{{ t('backup.free') }}</div>
                   <div class="recommend-card-info">
-                    <h3>数据胶囊 · 中科院</h3>
-                    <span class="recommend-url">data.cstcloud.cn</span>
+                    <h3>{{ t('backup.cstcloud.title') }}</h3>
+                    <span class="recommend-url">{{ t('backup.cstcloud.url') }}</span>
                   </div>
                 </div>
                 <div class="recommend-features">
-                  <div class="feature-tag"><b>20 GB</b> 存储空间</div>
-                  <div class="feature-tag">S3 兼容</div>
-                  <div class="feature-tag">科研用途</div>
+                  <div class="feature-tag"><b>20 GB</b> {{ t('backup.cstcloud.storage') }}</div>
+                  <div class="feature-tag">{{ t('backup.cstcloud.s3Compatible') }}</div>
+                  <div class="feature-tag">{{ t('backup.cstcloud.research') }}</div>
                 </div>
-                <p class="recommend-desc">中国科学院计算机网络信息中心提供的云存储服务，安全可靠。</p>
+                <p class="recommend-desc">{{ t('backup.cstcloud.desc') }}</p>
               </div>
             </div>
 
@@ -108,7 +108,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
-              <span>点击卡片可前往服务商官网注册，注册后在「连接配置」中填入密钥信息。</span>
+              <span>{{ t('backup.recommendHint') }}</span>
             </div>
           </div>
 
@@ -116,23 +116,23 @@
           <div v-show="activeTab === 'config'" class="glass-content">
             <div class="form-grid">
               <div class="form-item full">
-                <label>服务地址</label>
+                <label>{{ t('backup.endpoint') }}</label>
                 <input v-model="store.config.endpoint" type="text" placeholder="https://s3.amazonaws.com" spellcheck="false" />
               </div>
               <div class="form-item">
-                <label>区域</label>
+                <label>{{ t('backup.region') }}</label>
                 <input v-model="store.config.region" type="text" placeholder="auto" />
               </div>
               <div class="form-item">
-                <label>存储桶</label>
+                <label>{{ t('backup.bucket') }}</label>
                 <input v-model="store.config.bucket" type="text" placeholder="my-bucket" />
               </div>
               <div class="form-item">
-                <label>访问密钥 ID</label>
+                <label>{{ t('backup.accessKeyId') }}</label>
                 <input v-model="store.config.accessKeyId" type="password" placeholder="AKIA..." />
               </div>
               <div class="form-item">
-                <label>访问密钥</label>
+                <label>{{ t('backup.secretAccessKey') }}</label>
                 <input v-model="store.config.secretAccessKey" type="password" placeholder="••••••••" />
               </div>
             </div>
@@ -151,16 +151,16 @@
             >
               <template v-if="store.isConnecting">
                 <span class="glass-spinner" />
-                连接中...
+                {{ t('backup.connecting') }}
               </template>
               <template v-else-if="store.isConnected">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                已连接 — 点击重新测试
+                {{ t('backup.connectedRetest') }}
               </template>
               <template v-else>
-                测试连接
+                {{ t('backup.testConnection') }}
               </template>
             </button>
           </div>
@@ -170,12 +170,12 @@
             <!-- Password & Settings -->
             <div class="glass-field-group">
               <div class="form-item">
-                <label>备份密码</label>
+                <label>{{ t('backup.backupPassword') }}</label>
                 <div class="input-wrapper">
                   <input
                     v-model="store.backupPassword"
                     :type="showBackupPwd ? 'text' : 'password'"
-                    placeholder="加密备份所需密码"
+                    :placeholder="t('backup.encryptBackupPlaceholder')"
                     autocomplete="new-password"
                   />
                   <button class="input-toggle" @click="showBackupPwd = !showBackupPwd">
@@ -185,7 +185,7 @@
                 </div>
               </div>
               <div class="form-item">
-                <label>最大保存份数</label>
+                <label>{{ t('backup.maxBackups') }}</label>
                 <input
                   :value="store.maxBackups"
                   type="number"
@@ -206,10 +206,10 @@
                   </svg>
                 </div>
                 <div class="ops-card-text">
-                  <h3>备份到云端</h3>
-                  <p>加密备份歌单、设置和音源插件</p>
+                  <h3>{{ t('backup.backupToCloud') }}</h3>
+                  <p>{{ t('backup.backupToCloudDesc') }}</p>
                   <span v-if="store.lastBackupTime" class="last-time">
-                    上次备份：{{ formatTime(store.lastBackupTime) }}
+                    {{ t('backup.lastBackup') }}{{ formatTime(store.lastBackupTime) }}
                   </span>
                 </div>
               </div>
@@ -220,10 +220,10 @@
               >
                 <template v-if="store.isBackingUp">
                   <span class="glass-spinner" />
-                  备份中...
+                  {{ t('backup.backingUp') }}
                 </template>
                 <template v-else>
-                  加密备份
+                  {{ t('backup.encryptBackup') }}
                 </template>
               </button>
             </div>
@@ -236,8 +236,8 @@
                   </svg>
                 </div>
                 <div class="ops-card-text">
-                  <h3>从云端恢复</h3>
-                  <p>解密恢复歌单、设置和音源插件</p>
+                  <h3>{{ t('backup.restoreFromCloud') }}</h3>
+                  <p>{{ t('backup.restoreFromCloudDesc') }}</p>
                 </div>
               </div>
               <div class="restore-field">
@@ -245,7 +245,7 @@
                   <input
                     v-model="restorePassword"
                     :type="showRestorePwd ? 'text' : 'password'"
-                    placeholder="输入恢复密码"
+                    :placeholder="t('backup.restorePassword')"
                     autocomplete="current-password"
                   />
                   <button class="input-toggle" @click="showRestorePwd = !showRestorePwd">
@@ -262,10 +262,10 @@
                 >
                   <template v-if="store.isRestoring">
                     <span class="glass-spinner" />
-                    恢复中...
+                    {{ t('backup.restoring') }}
                   </template>
                   <template v-else>
-                    合并恢复
+                    {{ t('backup.mergeRestore') }}
                   </template>
                 </button>
                 <button
@@ -273,7 +273,7 @@
                   :disabled="store.isRestoring || !restorePassword"
                   @click="handleRestore('overwrite')"
                 >
-                  覆盖恢复
+                  {{ t('backup.overwriteRestore') }}
                 </button>
               </div>
             </div>
@@ -289,7 +289,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
               </svg>
-              <span>备份采用 AES-256-GCM 加密，包含歌单、设置和音源插件。<b>合并</b> 保留本地数据 &nbsp;|&nbsp; <b>覆盖</b> 替换所有本地数据</span>
+              <span>{{ t('backup.opsHint') }}</span>
             </div>
           </div>
         </div>
@@ -305,6 +305,7 @@ import { useS3BackupStore } from '@/store/S3Backup'
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'update:visible', val: boolean): void }>()
 
+const { t } = useI18n()
 const store = useS3BackupStore()
 const activeTab = ref<'recommend' | 'config' | 'ops'>('recommend')
 const restorePassword = ref('')

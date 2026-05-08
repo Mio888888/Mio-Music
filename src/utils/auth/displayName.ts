@@ -1,4 +1,7 @@
+import i18n from '@/locales'
+
 export default function displayName(user: { name?: string | null; username?: string | null; nickname?: string | null } | null): string {
-  if (!user) return '未登录'
-  return user.name || user.nickname || user.username || '未登录'
+  const t = i18n.global.t
+  if (!user) return t('common.notLoggedIn')
+  return user.name || user.nickname || user.username || t('common.notLoggedIn')
 }

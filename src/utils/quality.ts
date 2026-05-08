@@ -1,3 +1,5 @@
+import i18n from '@/locales'
+
 export const QUALITY_ORDER = [
   'master',
   'atmos_plus',
@@ -12,21 +14,24 @@ export const QUALITY_ORDER = [
 export type KnownQuality = (typeof QUALITY_ORDER)[number]
 export type QualityInput = KnownQuality | string | { type: string; size?: string }
 
-const DISPLAY_NAME_MAP: Record<string, string> = {
-  '128k': '128kbps',
-  '320k': '320kbps',
-  flac: 'FLAC 无损',
-  flac24bit: '24bit FLAC',
-  hires: 'Hi-Res 高解析度',
-  atmos: '杜比全景声',
-  atmos_plus: '杜比全景声+',
-  master: '母带音质'
+function getDisplayNameMap(): Record<string, string> {
+  const t = i18n.global.t
+  return {
+    '128k': t('quality.display128k'),
+    '320k': t('quality.display320k'),
+    flac: t('quality.displayFlac'),
+    flac24bit: t('quality.displayFlac24bit'),
+    hires: t('quality.displayHires'),
+    atmos: t('quality.displayAtmos'),
+    atmos_plus: t('quality.displayAtmosPlus'),
+    master: t('quality.displayMaster')
+  }
 }
 
 export function getQualityDisplayName(quality: QualityInput | null | undefined): string {
   if (!quality) return ''
   const type = typeof quality === 'object' ? (quality as any).type : quality
-  return DISPLAY_NAME_MAP[type] || String(type || '')
+  return getDisplayNameMap()[type] || String(type || '')
 }
 
 export function compareQuality(aType: string, bType: string): number {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
 import { check } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { platform as getPlatform } from '@tauri-apps/plugin-os'
 import { MessagePlugin } from 'tdesign-vue-next'
+
+const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
 const { settings } = storeToRefs(settingsStore)
@@ -60,7 +62,7 @@ const handleCheckUpdate = async () => {
   } catch (e: any) {
     console.error('检查更新错误:', e)
     updateStatus.value = 'error'
-    errorMsg.value = e?.message || e?.toString?.() || JSON.stringify(e) || '检查更新失败，请稍后重试'
+    errorMsg.value = e?.message || e?.toString?.() || JSON.stringify(e) || t('settings.about.checkUpdateFailed')
   } finally {
     isChecking.value = false
   }
@@ -105,7 +107,7 @@ const handleDownloadAndInstall = async () => {
     updateStatus.value = 'downloaded'
   } catch (e: any) {
     updateStatus.value = 'error'
-    errorMsg.value = e?.message || '下载更新失败'
+    errorMsg.value = e?.message || t('settings.about.downloadUpdateFailed')
   }
 }
 
@@ -113,7 +115,7 @@ const handleRelaunch = async () => {
   try {
     await relaunch()
   } catch {
-    MessagePlugin.error('重启失败，请手动重启应用')
+    MessagePlugin.error(t('settings.about.restartFailed'))
   }
 }
 
@@ -122,6 +124,21 @@ const openLink = async (url: string) => {
     const { openUrl } = await import('@tauri-apps/plugin-opener')
     await openUrl(url)
   } catch { window.open(url, '_blank') }
+}
+
+const aboutIntroHtml = computed(() => {
+  const link1 = `<a class="about-link" data-url="https://github.com/timeshiftsauce/CeruMusic">CeruMusic</a>`
+  const link2 = '<strong>时迁酱</strong>'
+  const link3 = `<a class="about-link" data-url="https://ceru.docs.shiqianjiang.cn/">CeruMusic</a>`
+  return t('settings.about.aboutIntro', [link1, link2, link3])
+})
+
+const handleAboutClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target.classList.contains('about-link')) {
+    const url = target.dataset.url
+    if (url) openLink(url)
+  }
 }
 </script>
 
@@ -135,16 +152,16 @@ const openLink = async (url: string) => {
           <span class="app-version">v{{ appVersion }}</span>
         </div>
       </div>
-      <p class="app-description">一款简洁优雅的跨平台音乐播放器，支持基于合规插件获取公开音乐信息与播放功能。</p>
+      <p class="app-description">{{ t('settings.about.description') }}</p>
     </div>
 
     <div id="about-version" class="setting-group">
-      <h3>版本信息</h3>
+      <h3>{{ t('settings.about.versionInfo') }}</h3>
       <div class="version-section">
         <div class="update-actions">
           <div class="update-option">
             <t-switch v-model:value="autoUpdate" @change="updateAutoUpdate"></t-switch>
-            <div>应用启动时检查更新</div>
+            <div>{{ t('settings.about.checkUpdateOnStart') }}</div>
           </div>
           <t-button
             class="update-check-button"
@@ -155,21 +172,21 @@ const openLink = async (url: string) => {
           >
             <span class="update-check-content">
               <span v-if="isChecking" class="update-check-spinner" aria-hidden="true" />
-              {{ isChecking ? '检查中...' : '检查更新' }}
+              {{ isChecking ? t('settings.about.checking') : t('settings.about.checkUpdate') }}
             </span>
           </t-button>
         </div>
 
         <!-- 已是最新版本 -->
         <div v-if="updateStatus === 'up-to-date'" class="update-card success">
-          <span class="update-icon">✓</span> 当前已是最新版本
+          <span class="update-icon">✓</span> {{ t('settings.about.upToDate') }}
         </div>
 
         <!-- 发现新版本 -->
         <div v-if="updateStatus === 'available'" class="update-card">
           <div class="update-header">
             <span class="update-icon new">↑</span>
-            <span>发现新版本 <strong>v{{ newVersion }}</strong></span>
+            <span>{{ t('settings.about.newVersionFound') }} <strong>v{{ newVersion }}</strong></span>
           </div>
           <div v-if="updateBody" class="update-notes">{{ updateBody }}</div>
 
@@ -180,7 +197,7 @@ const openLink = async (url: string) => {
               theme="primary"
               @click="openLink('https://github.com/Mio888888/Mio-Music/releases/latest')"
             >
-              前往 GitHub 下载
+              {{ t('settings.about.goToGithub') }}
             </t-button>
             <!-- Windows/Linux: 自动下载安装 -->
             <t-button
@@ -188,9 +205,9 @@ const openLink = async (url: string) => {
               theme="primary"
               @click="handleDownloadAndInstall"
             >
-              下载并安装
+              {{ t('settings.about.downloadAndInstall') }}
             </t-button>
-            <t-button variant="text" @click="updateStatus = 'idle'">稍后提醒</t-button>
+            <t-button variant="text" @click="updateStatus = 'idle'">{{ t('settings.about.remindLater') }}</t-button>
           </div>
         </div>
 
@@ -198,7 +215,7 @@ const openLink = async (url: string) => {
         <div v-if="updateStatus === 'downloading'" class="update-card">
           <div class="update-header">
             <span class="update-icon downloading">↓</span>
-            <span>正在下载更新 v{{ newVersion }}...</span>
+            <span>{{ t('settings.about.downloading') }} v{{ newVersion }}...</span>
           </div>
           <t-progress :percentage="downloadPercent" theme="plump" :label="`${downloadPercent}%`" />
           <div v-if="downloadDetail" class="progress-detail">{{ downloadDetail }}</div>
@@ -208,9 +225,9 @@ const openLink = async (url: string) => {
         <div v-if="updateStatus === 'downloaded'" class="update-card success">
           <div class="update-header">
             <span class="update-icon">✓</span>
-            <span>更新已下载完成，重启应用即可安装</span>
+            <span>{{ t('settings.about.updateDownloaded') }}</span>
           </div>
-          <t-button theme="primary" @click="handleRelaunch">立即重启安装</t-button>
+          <t-button theme="primary" @click="handleRelaunch">{{ t('settings.about.restartNow') }}</t-button>
         </div>
 
         <!-- 错误 -->
@@ -221,51 +238,43 @@ const openLink = async (url: string) => {
     </div>
 
     <div id="about-tech" class="setting-group">
-      <h3>技术栈</h3>
+      <h3>{{ t('settings.about.techStack') }}</h3>
       <div class="tech-stack">
-        <div class="tech-item"><span class="tech-name">Tauri 2</span><span class="tech-desc">跨平台桌面应用框架</span></div>
-        <div class="tech-item"><span class="tech-name">Rust</span><span class="tech-desc">后端核心语言</span></div>
-        <div class="tech-item"><span class="tech-name">Vue 3</span><span class="tech-desc">前端响应式框架</span></div>
-        <div class="tech-item"><span class="tech-name">TypeScript</span><span class="tech-desc">类型安全的 JavaScript</span></div>
-        <div class="tech-item"><span class="tech-name">Pinia</span><span class="tech-desc">状态管理</span></div>
-        <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">前端构建工具</span></div>
-        <div class="tech-item"><span class="tech-name">TDesign</span><span class="tech-desc">UI 组件库</span></div>
-        <div class="tech-item"><span class="tech-name">Three.js</span><span class="tech-desc">3D 粒子动画渲染</span></div>
-        <div class="tech-item"><span class="tech-name">Rodio</span><span class="tech-desc">Rust 音频播放引擎</span></div>
-        <div class="tech-item"><span class="tech-name">Symphonia</span><span class="tech-desc">音频解码 (FLAC/MP3/AAC)</span></div>
-        <div class="tech-item"><span class="tech-name">Lofty</span><span class="tech-desc">音频元数据读写</span></div>
-        <div class="tech-item"><span class="tech-name">Rusqlite</span><span class="tech-desc">本地数据库存储</span></div>
-        <div class="tech-item link" style="cursor:pointer" @click="openLink('https://github.com/Steve-xmh/applemusic-like-lyrics')"><span class="tech-name">AMLL</span><span class="tech-desc">Apple Music 风格歌词</span></div>
+        <div class="tech-item"><span class="tech-name">Tauri 2</span><span class="tech-desc">{{ t('settings.about.techTauri2') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Rust</span><span class="tech-desc">{{ t('settings.about.techRust') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Vue 3</span><span class="tech-desc">{{ t('settings.about.techVue3') }}</span></div>
+        <div class="tech-item"><span class="tech-name">TypeScript</span><span class="tech-desc">{{ t('settings.about.techTypeScript') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Pinia</span><span class="tech-desc">{{ t('settings.about.techPinia') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">{{ t('settings.about.techVite') }}</span></div>
+        <div class="tech-item"><span class="tech-name">TDesign</span><span class="tech-desc">{{ t('settings.about.techTDesign') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Three.js</span><span class="tech-desc">{{ t('settings.about.techThreejs') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Rodio</span><span class="tech-desc">{{ t('settings.about.techRodio') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Symphonia</span><span class="tech-desc">{{ t('settings.about.techSymphonia') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Lofty</span><span class="tech-desc">{{ t('settings.about.techLofty') }}</span></div>
+        <div class="tech-item"><span class="tech-name">Rusqlite</span><span class="tech-desc">{{ t('settings.about.techRusqlite') }}</span></div>
+        <div class="tech-item link" style="cursor:pointer" @click="openLink('https://github.com/Steve-xmh/applemusic-like-lyrics')"><span class="tech-name">AMLL</span><span class="tech-desc">{{ t('settings.about.techAmll') }}</span></div>
       </div>
     </div>
 
     <div id="about-legal" class="setting-group">
-      <h3>法律声明</h3>
+      <h3>{{ t('settings.about.legalNotice') }}</h3>
       <div class="legal-notice">
-        <div class="notice-item"><h4>🔒 数据与内容责任</h4><p>本项目不直接获取、存储、传输任何音乐数据或版权内容，仅提供插件运行框架。用户通过插件获取的所有数据，其合法性由插件提供者及用户自行负责。</p></div>
-        <div class="notice-item"><h4>⚖️ 版权合规要求</h4><p>用户承诺仅通过合规插件获取音乐相关信息，且获取、使用版权内容的行为符合《中华人民共和国著作权法》及相关法律法规，不侵犯任何第三方合法权益。</p></div>
-        <div class="notice-item"><h4>🚫 使用限制</h4><p>本项目仅允许用于非商业、纯技术学习目的，禁止用于任何商业运营、盈利活动，禁止修改后用于侵犯第三方权益的场景。</p></div>
+        <div class="notice-item"><h4>{{ t('settings.about.dataResponsibility') }}</h4><p>{{ t('settings.about.dataResponsibilityDesc') }}</p></div>
+        <div class="notice-item"><h4>{{ t('settings.about.copyrightCompliance') }}</h4><p>{{ t('settings.about.copyrightComplianceDesc') }}</p></div>
+        <div class="notice-item"><h4>{{ t('settings.about.usageRestriction') }}</h4><p>{{ t('settings.about.usageRestrictionDesc') }}</p></div>
       </div>
-      <h3 style="margin-top: 2rem">关于我们</h3>
+      <h3 style="margin-top: 2rem">{{ t('settings.about.aboutUs') }}</h3>
       <div class="about-us">
-        <p class="about-intro">
-          Mio Music 基于
-          <a class="about-link" @click="openLink('https://github.com/timeshiftsauce/CeruMusic')">CeruMusic</a>
-          项目复刻开发，感谢原作者
-          <strong>时迁酱</strong>
-          的开源贡献与持续维护。如果你也喜欢原项目，欢迎访问
-          <a class="about-link" @click="openLink('https://ceru.docs.shiqianjiang.cn/')">CeruMusic 官方文档</a>
-          了解更多。
-        </p>
+        <p class="about-intro" v-html="aboutIntroHtml" @click="handleAboutClick"></p>
         <div class="sponsor-card">
-          <p class="sponsor-text">以下是原项目作者的赞助二维码，如果你愿意支持 CeruMusic 的开发，可以请作者喝杯奶茶 ☕</p>
+          <p class="sponsor-text">{{ t('settings.about.sponsorText') }} ☕</p>
           <div class="sponsor-qr">
             <img
               src="https://oss.shiqianjiang.cn/storage/default/20250907/image-2025082711173bb1bba3608ef15d0e1fb485f80f29c728186.png"
-              alt="原项目作者赞赏码"
+              :alt="t('settings.about.sponsorImageAlt')"
             />
           </div>
-          <p class="sponsor-hint">所有赞助将直接支持原项目作者时迁酱</p>
+          <p class="sponsor-hint">{{ t('settings.about.sponsorHint') }}</p>
         </div>
       </div>
     </div>

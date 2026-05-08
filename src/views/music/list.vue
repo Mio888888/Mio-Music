@@ -15,6 +15,7 @@ const route = useRoute()
 const router = useRouter()
 const playStatus = useGlobalPlayStatusStore()
 const localUserStore = LocalUserDetailStore()
+const { t } = useI18n()
 
 const handleBack = () => {
   if (window.history.length > 1) {
@@ -30,7 +31,7 @@ const playlistId = computed(() => route.params.id as string)
 
 const playlistInfo = ref({
   id: '',
-  title: (route.query.title as string) || '歌单',
+  title: (route.query.title as string) || t('music.list.title'),
   author: (route.query.author as string) || '',
   cover: ((route.query.cover as string) && (route.query.cover as string) !== 'default-cover') ? (route.query.cover as string) : '/default-cover.png',
   total: 0,
@@ -180,10 +181,10 @@ const handlePlay = (song: MusicItem) => {
 const handlePlayAll = () => {
   if (songs.value.length === 0) return
   const dialog = DialogPlugin.confirm({
-    header: '播放歌单',
-    body: `确定要用歌单"${playlistInfo.value.title}"中的 ${songs.value.length} 首歌曲替换当前播放列表吗？`,
-    confirmBtn: '确定替换',
-    cancelBtn: '取消',
+    header: t('music.list.playPlaylist'),
+    body: t('music.list.replaceConfirm', { title: playlistInfo.value.title, count: songs.value.length }),
+    confirmBtn: t('music.list.confirmReplace'),
+    cancelBtn: t('common.cancel'),
     onConfirm: () => {
       dialog.destroy()
       const sourceSongs = songListRef.value?.sortedSongs ?? displaySongs.value
@@ -202,10 +203,10 @@ const handlePlayAll = () => {
 const handleShufflePlay = () => {
   if (songs.value.length === 0) return
   const dialog = DialogPlugin.confirm({
-    header: '随机播放歌单',
-    body: `确定要用歌单"${playlistInfo.value.title}"中的 ${songs.value.length} 首歌曲随机替换当前播放列表吗？`,
-    confirmBtn: '确定替换',
-    cancelBtn: '取消',
+    header: t('music.list.shufflePlaylist'),
+    body: t('music.list.shuffleConfirm', { title: playlistInfo.value.title, count: songs.value.length }),
+    confirmBtn: t('music.list.confirmReplace'),
+    cancelBtn: t('common.cancel'),
     onConfirm: () => {
       dialog.destroy()
       const sourceSongs = [...(songListRef.value?.sortedSongs ?? songs.value)]
@@ -227,7 +228,7 @@ const handleShufflePlay = () => {
 
 const handleDownloadAll = () => {
   if (songs.value.length === 0) return
-  MessagePlugin.info(`开始下载 ${songs.value.length} 首歌曲`)
+  MessagePlugin.info(t('music.list.startDownloadCount', { count: songs.value.length }))
   songs.value.forEach(song => downloadSingleSong(song as any))
 }
 
@@ -237,7 +238,7 @@ const handleDownloadSong = (song: MusicItem) => {
 
 const handleDownloadBatch = (batchSongs: MusicItem[]) => {
   if (!batchSongs.length) return
-  MessagePlugin.info(`开始下载 ${batchSongs.length} 首歌曲`)
+  MessagePlugin.info(t('music.list.startDownloadCount', { count: batchSongs.length }))
   batchSongs.forEach(s => downloadSingleSong(s as any))
 }
 
@@ -250,7 +251,7 @@ const handlePlayBatch = (batchSongs: MusicItem[]) => {
   })) as any)
   playSong(batchSongs[0] as any)
   playStatus.updatePlayerInfo(batchSongs[0] as any)
-  MessagePlugin.success(`已替换播放列表，共 ${batchSongs.length} 首`)
+  MessagePlugin.success(t('music.list.replacedPlaylist', { count: batchSongs.length }))
 }
 
 const handleRemoveBatch = async (batchSongs: MusicItem[]) => {
@@ -261,10 +262,10 @@ const handleRemoveBatch = async (batchSongs: MusicItem[]) => {
     const removeSet = new Set(mids)
     songs.value = songs.value.filter(s => !removeSet.has(String(s.songmid)))
     playlistInfo.value.total = songs.value.length
-    MessagePlugin.success(`已移除 ${mids.length} 首歌曲`)
+    MessagePlugin.success(t('music.list.removedSongs', { count: mids.length }))
     multiSelect.value = false
   } else {
-    MessagePlugin.error('批量移除失败')
+    MessagePlugin.error(t('music.list.batchRemoveFailed'))
   }
 }
 
@@ -275,12 +276,12 @@ const handleRemoveFromPlaylist = async (song: MusicItem) => {
     if (ok) {
       songs.value = songs.value.filter(s => s.songmid !== song.songmid)
       playlistInfo.value.total = songs.value.length
-      MessagePlugin.success(`已将"${song.name}"从歌单中移出`)
+      MessagePlugin.success(t('music.list.removedFromPlaylist', { name: song.name }))
     } else {
-      MessagePlugin.error('移出歌曲失败')
+      MessagePlugin.error(t('music.list.removeFailed'))
     }
   } catch {
-    MessagePlugin.error('移出歌曲失败')
+    MessagePlugin.error(t('music.list.removeFailed'))
   }
 }
 
@@ -305,11 +306,11 @@ const handleFileSelect = async (event: Event) => {
   const file = target.files?.[0]
   if (!file) return
   if (!file.type.startsWith('image/')) {
-    MessagePlugin.error('请选择图片文件')
+    MessagePlugin.error(t('music.list.selectImage'))
     return
   }
   if (file.size > 5 * 1024 * 1024) {
-    MessagePlugin.error('图片文件大小不能超过5MB')
+    MessagePlugin.error(t('music.list.imageTooLarge'))
     return
   }
   try {
@@ -319,14 +320,14 @@ const handleFileSelect = async (event: Event) => {
       const ok = await localUserStore.updatePlaylistCover(playlistInfo.value.id, base64Data)
       if (ok) {
         playlistInfo.value.cover = base64Data
-        MessagePlugin.success('封面更新成功')
+        MessagePlugin.success(t('music.list.coverUpdated'))
       } else {
-        MessagePlugin.error('封面更新失败')
+        MessagePlugin.error(t('music.list.coverUpdateFailed'))
       }
     }
     reader.readAsDataURL(file)
   } catch {
-    MessagePlugin.error('处理图片文件失败')
+    MessagePlugin.error(t('music.list.imageProcessFailed'))
   }
   target.value = ''
 }
@@ -347,8 +348,8 @@ const handleScroll = (event: Event) => {
 // 更多操作
 const moreActions = computed(() => {
   const items: any[] = [
-    { content: multiSelect.value ? '取消批量选择' : '批量选择', value: 'toggleMultiSelect' },
-    { content: '下载全部', value: 'downloadAll' }
+    { content: multiSelect.value ? t('common.cancelBatch') : t('common.batchSelect'), value: 'toggleMultiSelect' },
+    { content: t('common.downloadAll'), value: 'downloadAll' }
   ]
   return items
 })
@@ -404,7 +405,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- 手机端返回按钮 -->
-    <button class="mobile-back-btn" type="button" aria-label="返回上一页" @click="handleBack">
+    <button class="mobile-back-btn" type="button" :aria-label="t('common.back')" @click="handleBack">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="15 18 9 12 15 6" />
       </svg>
@@ -427,7 +428,7 @@ onBeforeUnmount(() => {
             <svg class="edit-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
             </svg>
-            <span>点击修改封面</span>
+            <span>{{ t('music.list.editCover') }}</span>
           </div>
         </div>
 
@@ -437,7 +438,7 @@ onBeforeUnmount(() => {
             <p class="playlist-desc">
               {{ playlistInfo.desc || 'By ' + playlistInfo.source }}
             </p>
-            <p class="playlist-stats">{{ playlistInfo.total || songs.length }} 首歌曲</p>
+            <p class="playlist-stats">{{ t('common.songCount', { count: playlistInfo.total || songs.length }) }}</p>
           </div>
         </div>
 
@@ -447,7 +448,7 @@ onBeforeUnmount(() => {
               size="medium"
               :disabled="songs.length === 0 || loading"
               class="play-btn"
-              aria-label="播放全部"
+              :aria-label="t('common.playAll')"
               @click="handlePlayAll"
             >
               <template #icon>
@@ -455,7 +456,7 @@ onBeforeUnmount(() => {
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </template>
-              播放全部
+              {{ t('common.playAll') }}
             </t-button>
 
             <t-button
@@ -463,7 +464,7 @@ onBeforeUnmount(() => {
               size="medium"
               :disabled="songs.length === 0 || loading"
               class="shuffle-btn"
-              aria-label="随机播放"
+              :aria-label="t('common.shufflePlay')"
               @click="handleShufflePlay"
             >
               <template #icon>
@@ -471,7 +472,7 @@ onBeforeUnmount(() => {
                   <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
                 </svg>
               </template>
-              随机播放
+              {{ t('common.shufflePlay') }}
             </t-button>
 
             <t-dropdown
@@ -490,7 +491,7 @@ onBeforeUnmount(() => {
             <div class="playlist-search" :class="{ focused: searchFocused || !!searchQuery }">
               <t-input
                 v-model="searchQuery"
-                aria-label="搜索歌单内歌曲"
+                :aria-label="t('common.searchPlaylist')"
                 clearable
                 @focus="searchFocused = true"
                 @blur="searchFocused = !!searchQuery"
@@ -509,7 +510,7 @@ onBeforeUnmount(() => {
       <div v-if="loading" class="loading-container">
         <div class="loading-content">
           <div class="loading-spinner"></div>
-          <p>加载中...</p>
+          <p>{{ t('common.loading') }}</p>
         </div>
       </div>
 
@@ -543,7 +544,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-if="!loading && displaySongs.length === 0" class="empty-state">
-          <p>{{ searchQuery ? '没有匹配的歌曲' : '暂无歌曲' }}</p>
+          <p>{{ searchQuery ? t('music.list.noMatchSongs') : t('music.list.noSongs') }}</p>
         </div>
 
         <!-- 定位当前播放按钮 -->
@@ -551,7 +552,7 @@ onBeforeUnmount(() => {
           <div
             v-if="hasCurrentPlaying && showLocateBtn"
             class="locate-current-btn"
-            title="定位到当前播放"
+            :title="t('music.list.locatePlaying')"
             @click="locateCurrentSong"
           >
             <MapAimingIcon size="20" />

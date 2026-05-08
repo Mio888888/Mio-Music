@@ -5,6 +5,8 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import type { SongList } from '@/types/audio'
 import defaultCover from '/default-cover.png'
 
+const { t } = useI18n()
+
 const props = defineProps<{
   visible: boolean
   songs: SongList[]
@@ -43,11 +45,11 @@ const handleAdd = async (playlist: PlaylistRow) => {
   loading.value = true
   try {
     await localUserStore.addSongsToPlaylist(playlist.id, props.songs)
-    MessagePlugin.success(`已添加 ${props.songs.length} 首歌曲到「${playlist.name}」`)
+    MessagePlugin.success(t('common.addedSongsToPlaylist', { count: props.songs.length, name: playlist.name }))
     emit('added', playlist.id)
     emit('update:visible', false)
   } catch {
-    MessagePlugin.error('添加失败')
+    MessagePlugin.error(t('common.addFailed'))
   } finally {
     loading.value = false
   }
@@ -98,9 +100,9 @@ const handleClose = () => {
                 </svg>
               </div>
               <div class="glass-title-text">
-                <h2 class="glass-title">添加到歌单</h2>
+                <h2 class="glass-title">{{ t('common.addToPlaylistTitle') }}</h2>
                 <div class="glass-status">
-                  <span class="status-label">{{ songs.length }} 首歌曲</span>
+                  <span class="status-label">{{ t('common.songCount', { count: songs.length }) }}</span>
                 </div>
               </div>
             </div>
@@ -116,7 +118,7 @@ const handleClose = () => {
             </svg>
             <input
               v-model="searchQuery"
-              placeholder="搜索歌单"
+              :placeholder="t('common.searchPlaylist')"
               spellcheck="false"
             />
             <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
@@ -138,13 +140,13 @@ const handleClose = () => {
               <path d="M3 15l3.5-3.5a2.12 2.12 0 0 1 3 0L12 14" />
               <circle cx="9" cy="8" r="1.5" />
             </svg>
-            <p>还没有歌单，快去创建一个吧</p>
-            <button class="glass-btn primary" style="width:auto;padding:7px 18px" @click="showCreate = true">新建歌单</button>
+            <p>{{ t('common.noPlaylistYet') }}</p>
+            <button class="glass-btn primary" style="width:auto;padding:7px 18px" @click="showCreate = true">{{ t('common.createPlaylist') }}</button>
           </div>
 
           <!-- No results -->
           <div v-else-if="filteredPlaylists.length === 0" class="glass-empty">
-            <p>没有找到匹配的歌单</p>
+            <p>{{ t('common.noMatchPlaylist') }}</p>
           </div>
 
           <!-- Playlist list -->
@@ -167,7 +169,7 @@ const handleClose = () => {
               <div class="item-info">
                 <span class="item-name">{{ pl.name }}</span>
                 <div class="item-meta">
-                  <span class="meta-count">{{ pl.songCount }} 首</span>
+                  <span class="meta-count">{{ t('common.songCountShort', { count: pl.songCount }) }}</span>
                   <span v-if="pl.source" class="meta-source">{{ pl.source }}</span>
                 </div>
               </div>
@@ -183,20 +185,20 @@ const handleClose = () => {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              新建歌单
+              {{ t('common.createPlaylist') }}
             </button>
             <div v-else class="create-form">
               <input
                 v-model="newName"
-                placeholder="歌单名称"
+                :placeholder="t('common.playlistName')"
                 class="create-input"
                 @keydown.enter="handleCreate"
               />
               <button class="glass-btn primary" style="width:auto;padding:8px 16px" :disabled="!newName.trim() || creating" @click="handleCreate">
                 <span v-if="creating" class="glass-spinner" />
-                <template v-else>创建并添加</template>
+                <template v-else>{{ t('common.createAndAdd') }}</template>
               </button>
-              <button class="glass-btn outline" style="width:auto;padding:8px 14px" @click="showCreate = false; newName = ''">取消</button>
+              <button class="glass-btn outline" style="width:auto;padding:8px 14px" @click="showCreate = false; newName = ''">{{ t('common.cancel') }}</button>
             </div>
           </div>
         </div>
