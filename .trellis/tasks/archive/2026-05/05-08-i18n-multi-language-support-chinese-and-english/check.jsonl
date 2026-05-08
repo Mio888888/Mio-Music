@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/05-08-i18n-multi-language-support-chinese-and-english/prd.md", "reason": "PRD acceptance criteria and technical approach to verify against"}
+{"file": ".trellis/tasks/05-08-i18n-multi-language-support-chinese-and-english/research/vue3-i18n-approach.md", "reason": "Best practices to validate i18n setup correctness"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Quality standards for code review"}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "TypeScript type-checking requirements"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "Component patterns to verify correct i18n usage in templates"}

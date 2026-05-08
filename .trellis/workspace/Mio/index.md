@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-05-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~209 | Active |
+| `journal-1.md` | ~242 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-05-08 | 性能优化与Bug修复 — GPU泄漏、竞态条件、深度监听、代码健壮性 | `8e50c61` | `main` |
 | 6 | 2026-05-08 | feat: 中英文 i18n 多语言全量迁移 | `dfea3f8`, `cd5681a`, `d5c49b5`, `1a34bc3`, `3922a4d` | `main` |
 | 5 | 2026-05-08 | Sub 音源基础分类并列展示 | `11aa7d6` | `main` |
 | 4 | 2026-05-08 | 优化 Subsonic 音源与流式播放 | `4d71534` | `main` |

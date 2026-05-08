@@ -207,3 +207,36 @@ Summarized existing Vue frontend conventions into Trellis frontend spec files, i
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: 性能优化与Bug修复 — GPU泄漏、竞态条件、深度监听、代码健壮性
+
+**Date**: 2026-05-08
+**Task**: 性能优化与Bug修复 — GPU泄漏、竞态条件、深度监听、代码健壮性
+**Branch**: `main`
+
+### Summary
+
+全量扫描项目 148 个源文件，修复 4 个关键 bug（ShaderBackground GPU 泄漏、封面加载竞态、音量过渡竞态、init 重复调用）、4 个性能问题（深度监听、模板函数调用、virtualRows 预绑定、markRaw）和 6 个代码健壮性问题（index as key、v-html 安全、slice in template）。vue-tsc 类型检查和 vite build 均通过。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e50c61` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
