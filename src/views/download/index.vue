@@ -218,26 +218,163 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 </template>
 
 <style scoped>
-.download-manager { padding: 20px; height: 100%; display: flex; flex-direction: column; color: var(--td-text-color-primary); }
-.header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-.header h2 { border-left: 8px solid var(--td-brand-color-3); padding-left: 12px; border-radius: 8px; line-height: 1.5em; font-size: 1.5rem; font-weight: 600; margin: 0; }
-.settings { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.batch-actions { display: flex; align-items: center; }
-.divider { width: 1px; height: 16px; background: var(--td-border-level-1-color); margin: 0 4px; }
-.tabs { margin-bottom: 16px; flex-shrink: 0; }
-.task-list { flex: 1; overflow-y: auto; }
-.empty-state { display: flex; align-items: center; justify-content: center; height: 300px; color: var(--td-text-color-secondary); }
-.task-item { background: var(--td-bg-color-container); border-radius: 8px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.task-info { width: 350px; flex-shrink: 0; }
-.task-name { font-weight: 500; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.task-meta { display: flex; gap: 8px; font-size: 12px; color: var(--td-text-color-secondary); align-items: center; }
-.quality-tag { background: var(--td-bg-color-secondarycontainer); padding: 1px 6px; border-radius: 4px; font-size: 11px; }
-.speed { color: var(--td-brand-color); font-weight: 500; }
-.remaining { color: var(--td-text-color-placeholder); }
-.task-progress { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-.error-msg { color: var(--td-error-color); font-size: 12px; margin-top: 4px; }
-.task-actions { display: flex; gap: 4px; }
+/* ==================== Base Layout ==================== */
+.download-manager {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--td-text-color-primary);
+}
 
+.header {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h2 {
+  border-left: 8px solid var(--td-brand-color-3);
+  padding-left: 12px;
+  border-radius: 8px;
+  line-height: 1.5em;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: var(--td-border-level-1-color);
+  margin: 0 4px;
+}
+
+/* ==================== Tabs ==================== */
+.tabs {
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+/* ==================== Task List ==================== */
+.task-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  color: var(--td-text-color-secondary);
+  font-size: 15px;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--td-bg-color-container) 60%, transparent) 0%,
+    color-mix(in srgb, var(--td-bg-color-container) 45%, transparent) 100%
+  );
+  border-radius: var(--mobile-card-radius-small, 16px);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  backdrop-filter: blur(var(--glass-blur-panel)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(180%);
+}
+
+/* ==================== Task Item — Liquid Glass Card ==================== */
+.task-item {
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--td-bg-color-container) 78%, transparent) 0%,
+    color-mix(in srgb, var(--td-bg-color-container) 62%, transparent) 35%,
+    color-mix(in srgb, var(--td-bg-color-container) 70%, transparent) 100%
+  );
+  backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--glass-shadow-control);
+  transition:
+    background var(--motion-duration-standard) var(--motion-ease-standard),
+    box-shadow var(--motion-duration-standard) var(--motion-ease-standard),
+    border-color var(--motion-duration-standard) var(--motion-ease-standard);
+}
+
+.task-info {
+  min-width: 280px;
+  flex: 0 0 auto;
+}
+
+.task-name {
+  font-weight: 500;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  align-items: center;
+}
+
+.quality-tag {
+  background: color-mix(in srgb, var(--td-bg-color-secondarycontainer) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.speed {
+  color: var(--td-brand-color);
+  font-weight: 500;
+}
+
+.remaining {
+  color: var(--td-text-color-placeholder);
+}
+
+/* ==================== Progress & Actions ==================== */
+.task-progress {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.error-msg {
+  color: var(--td-error-color);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.task-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* ==================== Mobile Layout (<=768px) ==================== */
 @media (max-width: 768px) {
   .download-manager {
     min-width: 0;
@@ -261,6 +398,7 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
     letter-spacing: -0.04em;
   }
 
+  /* Mobile settings: search full width row 1, actions row 2 */
   .settings {
     width: 100%;
     align-items: stretch;
@@ -271,6 +409,8 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
   .settings :deep(.t-input) {
     width: 100% !important;
     min-height: var(--mobile-touch-target);
+    flex-basis: 100%;
+    order: -1;
   }
 
   .settings :deep(.t-input-number) {
@@ -302,16 +442,19 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
   .task-list {
     min-height: 0;
-    padding-bottom: 12px;
+    padding-bottom: calc(var(--mobile-safe-bottom, 0px) + 12px);
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Mobile task card — lighter glass treatment */
   .task-item {
     align-items: stretch;
     flex-direction: column;
     gap: 12px;
     padding: 14px;
     border-radius: var(--mobile-card-radius-small);
+    background: color-mix(in srgb, var(--td-bg-color-container) 92%, transparent);
+    border-color: color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
     box-shadow: var(--mobile-surface-shadow);
   }
 
@@ -322,6 +465,11 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
   .task-name {
     font-size: 15px;
+    margin-bottom: 6px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.4;
   }
 
   .task-meta {
@@ -330,10 +478,17 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
     line-height: 1.4;
   }
 
+  /* More prominent progress bar on mobile */
+  .task-progress :deep(.t-progress__bar) {
+    height: 8px;
+  }
+
   .task-actions {
     justify-content: flex-end;
     flex-wrap: wrap;
     gap: 6px;
+    padding-top: 4px;
+    border-top: 1px solid color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
   }
 
   .task-actions :deep(.t-button) {
@@ -346,6 +501,7 @@ const getStatusTheme = (status: DownloadStatus): 'default' | 'primary' | 'danger
 
   .empty-state {
     height: 220px;
+    border-radius: var(--mobile-card-radius-small);
   }
 }
 </style>
