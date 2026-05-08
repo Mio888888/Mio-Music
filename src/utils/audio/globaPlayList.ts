@@ -12,8 +12,9 @@ import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
+export { isLoadingSong } from './loadingState'
+import { isLoadingSong } from './loadingState'
 export const playMode = ref<PlayMode>(PlayMode.LIST)
-export const isLoadingSong = ref(false)
 
 let _playIndex = -1
 let currentPlayRequestId = 0
@@ -394,8 +395,6 @@ export async function playSong(song: SongList) {
 
     // 设置音量（恢复上次音量）
     await invoke('player__set_volume', { volume: audio.Audio.volume })
-
-    isLoadingSong.value = false
 
     // 播放成功后调度预加载
     scheduleNextPrefetch()

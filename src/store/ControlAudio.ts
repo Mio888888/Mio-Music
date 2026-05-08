@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { LocalUserDetailStore } from './LocalUserDetail'
+import { isLoadingSong } from '@/utils/audio/loadingState'
 
 import type {
   AudioEventCallback,
@@ -69,8 +70,12 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       Audio.duration = duration
       Audio.volume = volume
       Audio.url = url || ''
-      if (state === 'Playing') publish('play')
-      else if (state === 'Paused') publish('pause')
+      if (state === 'Playing') {
+        isLoadingSong.value = false
+        publish('play')
+      } else if (state === 'Paused') {
+        publish('pause')
+      }
     })
 
     const un2 = await listen('player:time', (event: any) => {
@@ -95,6 +100,7 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     const un5 = await listen('player:error', (event: any) => {
       console.error('[Player] 异步播放错误:', event.payload?.error)
       Audio.isPlay = false
+      isLoadingSong.value = false
       publish('error')
     })
 

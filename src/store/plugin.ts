@@ -113,6 +113,22 @@ export const usePluginStore = defineStore('plugin', () => {
               userStore.userInfo.selectQuality = sourceQualities.length > 0 ? sourceQualities[sourceQualities.length - 1] : ''
             }
           }
+        } else {
+          // Plugin was uninstalled — clear stale plugin data, keep built-in sources
+          userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, {})
+          const availableSources = userStore.userInfo.supportedSources || {}
+          const currentSource = userStore.userInfo.selectSources as string
+          if (currentSource && !availableSources[currentSource]) {
+            userStore.userInfo.selectSources = Object.keys(availableSources)[0] || ''
+          }
+        }
+      } else {
+        // No plugin selected — ensure supportedSources only has built-in sources
+        userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, {})
+        const availableSources = userStore.userInfo.supportedSources || {}
+        const currentSource = userStore.userInfo.selectSources as string
+        if (currentSource && !availableSources[currentSource]) {
+          userStore.userInfo.selectSources = Object.keys(availableSources)[0] || ''
         }
       }
     } catch (e) {

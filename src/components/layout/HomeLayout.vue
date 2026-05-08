@@ -13,7 +13,8 @@ let stopWatchEffect: (() => void) | null = null
 onMounted(() => {
   const LocalUserDetail = LocalUserDetailStore()
   stopWatchEffect = watchEffect(() => {
-    source.value = sourceicon[LocalUserDetail.userSource.source || 'wy']
+    const key = LocalUserDetail.userSource.source
+    source.value = key ? (sourceicon[key] || key) : ''
   })
 })
 
@@ -34,7 +35,7 @@ const sourceicon: Record<string, string> = {
   git: 'git',
   subsonic: 'git'
 }
-const source = ref('kugouyinle')
+const source = ref('')
 
 interface MenuItem {
   name: string
@@ -92,14 +93,17 @@ const sourceList = computed(() => {
   const LocalUserDetail = LocalUserDetailStore()
   const supportedSources = LocalUserDetail.userInfo.supportedSources
   if (!supportedSources) return []
-  return Object.keys(supportedSources).map((key) => ({
-    key,
-    name: sourceNames[key] || key,
-    icon: sourceicon[key] || key
-  }))
+  return Object.keys(supportedSources)
+    .filter((key) => key !== 'subsonic')
+    .map((key) => ({
+      key,
+      name: sourceNames[key] || key,
+      icon: sourceicon[key] || key
+    }))
 })
 
 const toggleSourceList = () => {
+  if (sourceList.value.length === 0) return
   source_list_show.value = !source_list_show.value
 }
 

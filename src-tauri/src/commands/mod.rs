@@ -252,7 +252,7 @@ pub async fn set_desktop_lyric_option(
 #[tauri::command]
 pub async fn audio_proxy(url: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(60))
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
         .map_err(|e| format!("创建音频代理客户端失败: {}", e))?;

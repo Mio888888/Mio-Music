@@ -3,9 +3,9 @@ use crate::player::spectrum::{PositionSource, PositionState, SpectrumSource, Spe
 use crate::player::{AudioSlot, PlaybackState, PlayerSnapshot, SharedPlayer};
 use base64::Engine;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
-use std::io::BufReader;
+use std::io::{BufReader, Read as IoRead, Seek as IoSeek, Write as IoWrite};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
@@ -117,6 +117,165 @@ impl SlotPipeline {
         pipeline.sink.pause();
         Ok(pipeline)
     }
+
+    /// Create pipeline from a spool file being downloaded in background.
+    fn from_spool(
+        stream_handle: &OutputStreamHandle,
+        path: &std::path::Path,
+        state: SharedDownloadState,
+        url: &str,
+        volume: f64,
+    ) -> Result<Self, String> {
+        let needs_symphonia = {
+            let initial = std::fs::read(path)
+                .map(|buf| buf.len() >= 8 && &buf[4..8] == b"ftyp")
+                .unwrap_or(false);
+            initial
+        };
+
+        type StreamSource = Box<dyn Source<Item = f32> + Send>;
+
+        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) = if needs_symphonia {
+            let file = std::fs::File::open(path)
+                .map_err(|e| format!("打开音频文件失败: {e}"))?;
+            let spool = SpoolReader::new(file, state.clone());
+            decode_reader_symphonia(Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>, None)?
+        } else {
+            let file = std::fs::File::open(path)
+                .map_err(|e| format!("打开音频文件失败: {e}"))?;
+            let spool = SpoolReader::new(file, state.clone());
+            match decode_reader_rodio(spool) {
+                Ok(result) => result,
+                Err(_) => {
+                    let file = std::fs::File::open(path)
+                        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+                    let spool = SpoolReader::new(file, state);
+                    decode_reader_symphonia(Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>, None)?
+                }
+            }
+        };
+
+        let eq_state = Arc::new(EqState::new(channels, sample_rate));
+        let spectrum_state = Arc::new(SpectrumState::new());
+        let position_state = Arc::new(PositionState::new());
+        let balance = Arc::new(AtomicF64::new(0.0));
+        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
+
+        position_state.set_initial(sample_rate, channels, duration);
+
+        let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
+        let source = EqSource::new(source, eq_state.clone());
+        let source = BalanceSource::new(source, balance.clone());
+        let source = SpectrumSource::new(source, spectrum_state.clone());
+        let source = PositionSource::new(source, position_state.clone());
+
+        let sink = Sink::try_new(stream_handle)
+            .map_err(|e| format!("创建 Sink 失败: {e}"))?;
+        sink.set_volume(volume as f32);
+        sink.append(source);
+
+        Ok(Self {
+            sink,
+            url: url.to_string(),
+            eq_state,
+            spectrum_state,
+            position_state,
+            balance,
+            bass_boost_gain,
+            temp_file: Some(path.to_path_buf()),
+        })
+    }
+}
+
+// ==================== 流式下载：SpoolReader ====================
+
+struct DownloadState {
+    written: u64,
+    total: Option<u64>,
+    done: bool,
+    error: Option<String>,
+}
+
+type SharedDownloadState = Arc<(Mutex<DownloadState>, Condvar)>;
+
+struct SpoolReader {
+    file: std::fs::File,
+    state: SharedDownloadState,
+}
+
+impl SpoolReader {
+    fn new(file: std::fs::File, state: SharedDownloadState) -> Self {
+        Self { file, state }
+    }
+}
+
+impl IoRead for SpoolReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        loop {
+            let (lock, cvar) = &*self.state;
+            let mut s = lock.lock().unwrap();
+            let pos = self.file.stream_position()?;
+
+            if pos < s.written {
+                let available = (s.written - pos) as usize;
+                let to_read = buf.len().min(available);
+                drop(s);
+                return self.file.read(&mut buf[..to_read]);
+            }
+
+            if s.done {
+                if let Some(ref err) = s.error {
+                    return Err(std::io::Error::new(std::io::ErrorKind::Other, err.clone()));
+                }
+                return Ok(0);
+            }
+
+            s = cvar.wait(s).unwrap();
+        }
+    }
+}
+
+impl IoSeek for SpoolReader {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        loop {
+            let new_pos = match pos {
+                std::io::SeekFrom::Start(offset) => offset,
+                std::io::SeekFrom::Current(offset) => {
+                    let current = self.file.stream_position()?;
+                    (current as i64 + offset).max(0) as u64
+                }
+                std::io::SeekFrom::End(offset) => {
+                    let (lock, _) = &*self.state;
+                    let s = lock.lock().unwrap();
+                    let end = s.total.unwrap_or(s.written);
+                    drop(s);
+                    (end as i64 + offset).max(0) as u64
+                }
+            };
+
+            let (lock, cvar) = &*self.state;
+            let mut s = lock.lock().unwrap();
+
+            if new_pos <= s.written || s.done {
+                drop(s);
+                return self.file.seek(std::io::SeekFrom::Start(new_pos));
+            }
+
+            s = cvar.wait(s).unwrap();
+        }
+    }
+}
+
+unsafe impl Send for SpoolReader {}
+unsafe impl Sync for SpoolReader {}
+
+impl symphonia::core::io::MediaSource for SpoolReader {
+    fn is_seekable(&self) -> bool { true }
+    fn byte_len(&self) -> Option<u64> {
+        let (lock, _) = &*self.state;
+        let s = lock.lock().unwrap();
+        s.total
+    }
 }
 
 // ==================== URL 解析 ====================
@@ -165,7 +324,7 @@ fn resolve_audio_file_cached(
 
 fn download_to_temp(url: &str) -> Result<PathBuf, String> {
     let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(60))
         .redirect(reqwest::redirect::Policy::limited(10))
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
@@ -209,6 +368,135 @@ fn download_to_temp(url: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+/// Stream audio to a temp file: buffer initial data, return immediately, continue in background.
+fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {e}"))?;
+
+    let referer = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            let host = u.host_str()?;
+            let parts: Vec<&str> = host.split('.').collect();
+            if parts.len() >= 2 {
+                Some(format!("http://{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]))
+            } else {
+                Some(format!("http://{}/", host))
+            }
+        })
+        .unwrap_or_else(|| "http://localhost/".to_string());
+
+    let resp = client.get(url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
+        .header("Referer", &referer)
+        .send()
+        .map_err(|e| format!("下载音频失败: {e}"))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("下载音频失败: HTTP {}", resp.status()));
+    }
+
+    let total = resp.content_length();
+    let temp_dir = std::env::temp_dir().join("mio_player");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|e| format!("创建临时目录失败: {e}"))?;
+    let path = temp_dir.join(format!("stream_{}", uuid::Uuid::new_v4()));
+
+    let mut file = std::fs::File::create(&path)
+        .map_err(|e| format!("创建临时文件失败: {e}"))?;
+
+    let state = Arc::new((
+        Mutex::new(DownloadState {
+            written: 0,
+            total,
+            done: false,
+            error: None,
+        }),
+        Condvar::new(),
+    ));
+
+    let initial_size: u64 = 512 * 1024;
+    let mut resp = resp;
+    let mut buf = [0u8; 32768];
+    let mut downloaded: u64 = 0;
+
+    // Synchronously buffer initial data
+    while downloaded < initial_size {
+        use std::io::Read;
+        let n = resp.read(&mut buf).map_err(|e| format!("下载音频失败: {e}"))?;
+        if n == 0 { break; }
+        file.write_all(&buf[..n]).map_err(|e| format!("写入临时文件失败: {e}"))?;
+        downloaded += n as u64;
+    }
+
+    file.sync_all().map_err(|e| format!("同步文件失败: {e}"))?;
+
+    // Update state with initial data
+    {
+        let (lock, cvar) = &*state;
+        let mut s = lock.lock().unwrap();
+        s.written = downloaded;
+        cvar.notify_all();
+    }
+
+    // Check if already fully downloaded
+    let fully_downloaded = total.map_or(false, |t| downloaded >= t) || downloaded == 0;
+
+    if !fully_downloaded {
+        let bg_state = state.clone();
+        let bg_path = path.clone();
+        std::thread::spawn(move || {
+            let mut bg_file = match std::fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&bg_path)
+            {
+                Ok(f) => f,
+                Err(_) => {
+                    let (lock, cvar) = &*bg_state;
+                    let mut s = lock.lock().unwrap();
+                    s.done = true;
+                    s.error = Some("无法打开临时文件".into());
+                    cvar.notify_all();
+                    return;
+                }
+            };
+
+            let mut bg_buf = [0u8; 32768];
+            use std::io::Read;
+            loop {
+                match resp.read(&mut bg_buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if bg_file.write_all(&bg_buf[..n]).is_err() { break; }
+                        let (lock, cvar) = &*bg_state;
+                        let mut s = lock.lock().unwrap();
+                        s.written += n as u64;
+                        cvar.notify_all();
+                    }
+                    Err(_) => break,
+                }
+            }
+
+            let _ = bg_file.sync_all();
+            let (lock, cvar) = &*bg_state;
+            let mut s = lock.lock().unwrap();
+            s.done = true;
+            cvar.notify_all();
+        });
+    } else {
+        let (lock, cvar) = &*state;
+        let mut s = lock.lock().unwrap();
+        s.done = true;
+        cvar.notify_all();
+    }
+
+    Ok((path, state))
+}
+
 fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
     let parts: Vec<&str> = url.splitn(2, ',').collect();
     if parts.len() != 2 { return Err("无效的 data URI".into()) }
@@ -232,21 +520,24 @@ fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
 
 type StreamDecodeResult = (u16, u32, f64, Box<dyn Source<Item = f32> + Send>);
 
-fn decode_streaming_rodio(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
-    let file = std::fs::File::open(file_path)
-        .map_err(|e| format!("打开音频文件失败: {e}"))?;
-    let reader = BufReader::new(file);
-    let decoder = Decoder::new(reader)
+fn decode_reader_rodio<R: IoRead + IoSeek + Send + Sync + 'static>(reader: R) -> Result<StreamDecodeResult, String> {
+    let buf_reader = BufReader::new(reader);
+    let decoder = Decoder::new(buf_reader)
         .map_err(|e| format!("rodio 解码失败: {e}"))?;
 
     let channels = decoder.channels();
     let sample_rate = decoder.sample_rate();
     let duration_secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
 
-    // rodio Decoder 输出 i16，通过 convert_samples 转为 f32 流式输出
     let source: Box<dyn Source<Item = f32> + Send> = Box::new(decoder.convert_samples());
 
     Ok((channels, sample_rate, duration_secs, source))
+}
+
+fn decode_streaming_rodio(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+    decode_reader_rodio(file)
 }
 
 // ==================== 流式解码：symphonia 路径（AAC/M4A 等） ====================
@@ -365,14 +656,14 @@ impl Source for SymphoniaStreamSource {
     }
 }
 
-fn decode_streaming_symphonia(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
-    let file = std::fs::File::open(file_path)
-        .map_err(|e| format!("打开音频文件失败: {e}"))?;
-
-    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+fn decode_reader_symphonia(
+    source: Box<dyn symphonia::core::io::MediaSource>,
+    hint_ext: Option<&str>,
+) -> Result<StreamDecodeResult, String> {
+    let mss = MediaSourceStream::new(source, Default::default());
 
     let mut hint = Hint::new();
-    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = hint_ext {
         hint.with_extension(ext);
     }
 
@@ -425,6 +716,13 @@ fn decode_streaming_symphonia(file_path: &std::path::Path) -> Result<StreamDecod
     let source: Box<dyn Source<Item = f32> + Send> = Box::new(source);
 
     Ok((channels, sample_rate, duration_secs, source))
+}
+
+fn decode_streaming_symphonia(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
+    let file = std::fs::File::open(file_path)
+        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+    let ext = file_path.extension().and_then(|e| e.to_str()).map(|s| s.to_string());
+    decode_reader_symphonia(Box::new(file) as Box<dyn symphonia::core::io::MediaSource>, ext.as_deref())
 }
 
 // ==================== 交叉淡入淡出 ====================
@@ -502,7 +800,7 @@ impl PlayerEngine {
     }
 
     /// 异步播放：在后台线程下载 + 解码，完成后自动赋值 primary 并发出事件
-    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>, cache_key: Option<String>) -> Result<(), String> {
+    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>, _cache_key: Option<String>) -> Result<(), String> {
         self.primary = None;
         self.secondary = None;
         self.crossfade = None;
@@ -512,17 +810,26 @@ impl PlayerEngine {
         let url = url.to_string();
         let volume = self.volume / 100.0;
         let tx = self.play_tx.clone();
-        let cache_dir = self.cache_dir.clone();
-        let cache_max_size = self.cache_max_size;
+
+        let is_http = url.starts_with("http://") || url.starts_with("https://");
 
         std::thread::spawn(move || {
-            let file_path = resolve_audio_file_cached(&url, cache_dir.as_deref(), cache_key.as_deref(), cache_max_size);
-            let result = match file_path {
-                Ok(path) => match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
-                    Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+            let result = if is_http {
+                match stream_to_temp(&url) {
+                    Ok((path, state)) => match SlotPipeline::from_spool(&stream_handle, &path, state, &url, volume) {
+                        Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                        Err(e) => AsyncPipelineResult::Error(e),
+                    },
                     Err(e) => AsyncPipelineResult::Error(e),
-                },
-                Err(e) => AsyncPipelineResult::Error(e),
+                }
+            } else {
+                match resolve_audio_file(&url) {
+                    Ok(path) => match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
+                        Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                        Err(e) => AsyncPipelineResult::Error(e),
+                    },
+                    Err(e) => AsyncPipelineResult::Error(e),
+                }
             };
             let _ = tx.send(result);
         });

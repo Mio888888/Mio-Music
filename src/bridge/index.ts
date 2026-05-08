@@ -138,6 +138,23 @@ const api = {
   // Music SDK
   music: {
     requestSdk: async (method: string, args: any) => {
+      if (args?.source === 'subsonic' && !args.subsonicConfig) {
+        const { LocalUserDetailStore } = await import('@/store/LocalUserDetail')
+        const store = LocalUserDetailStore()
+        const config = store.userInfo.subsonicConfig
+        if (config) {
+          args = {
+            ...args,
+            subsonicConfig: {
+              baseUrl: config.baseUrl || '',
+              username: config.username || '',
+              password: config.password || '',
+              apiVersion: config.apiVersion || '1.16.1',
+              clientName: config.clientName || 'Mio',
+            }
+          }
+        }
+      }
       const result = await ipcInvoke('service-music-sdk-request', { method, args })
       return rewriteImageUrls(result)
     },

@@ -32,6 +32,11 @@ async function ensureSourceState() {
       console.warn('[FindView] 初始化音源状态失败:', e)
     })
     .finally(() => {
+      const sources = localUserStore.userInfo.supportedSources
+      const current = localUserStore.userInfo.selectSources
+      if (sources && current && !sources[current] && sources.subsonic) {
+        localUserStore.userInfo.selectSources = 'subsonic'
+      }
       sourceStateLoading.value = false
       sourceStateRefreshPromise = null
     })

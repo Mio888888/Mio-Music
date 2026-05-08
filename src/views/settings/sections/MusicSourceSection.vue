@@ -46,6 +46,8 @@ const syncSubsonicSource = () => {
   if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
   if (userStore.hasValidSubsonicConfig(userInfo.value)) {
     if (!userInfo.value.sourceQualityMap.subsonic) userInfo.value.sourceQualityMap.subsonic = 'flac'
+    userInfo.value.selectSources = 'subsonic'
+    userInfo.value.selectQuality = userInfo.value.sourceQualityMap.subsonic
   } else if (userInfo.value.selectSources === 'subsonic') {
     const nextSource = Object.keys(userInfo.value.supportedSources || {})[0]
     userInfo.value.selectSources = nextSource
