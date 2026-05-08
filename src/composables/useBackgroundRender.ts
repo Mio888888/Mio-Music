@@ -235,7 +235,13 @@ export function useBackgroundRender(options: UseBackgroundRenderOptions) {
 
   // 监听配置变化
   watch(
-    () => config.value,
+    [
+      () => config.value.renderScale,
+      () => config.value.flowSpeed,
+      () => config.value.staticMode,
+      () => config.value.fps,
+      () => config.value.audioResponse
+    ],
     () => {
       if (isInitialized.value) {
         applyConfig()
@@ -247,8 +253,7 @@ export function useBackgroundRender(options: UseBackgroundRenderOptions) {
           stopAudioResponse()
         }
       }
-    },
-    { deep: true }
+    }
   )
 
   // 监听播放状态

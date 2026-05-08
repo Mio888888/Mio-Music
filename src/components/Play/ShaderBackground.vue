@@ -11,6 +11,9 @@ const props = defineProps<{
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let gl: WebGLRenderingContext | null = null
 let program: WebGLProgram | null = null
+let vertexBuffer: WebGLBuffer | null = null
+let vertexShader: WebGLShader | null = null
+let fragmentShader: WebGLShader | null = null
 let animationFrameId: number | null = null
 const startTime = Date.now()
 const dominantColor = ref({ r: 0.3, g: 0.3, b: 0.5 })
@@ -214,12 +217,12 @@ function initWebGL() {
   gl = canvasRef.value.getContext('webgl')
   if (!gl) { console.error('无法初始化WebGL'); return }
 
-  const vs = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource)
-  const fs = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource)
-  program = createProgram(gl, vs, fs)
+  vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource)
+  fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource)
+  program = createProgram(gl, vertexShader, fragmentShader)
 
-  const buf = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+  vertexBuffer = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
   const pos = gl.getAttribLocation(program, 'a_position')
@@ -274,9 +277,20 @@ onMounted(async () => {
   initWebGL()
 })
 
+function disposeWebGL() {
+  stopRenderLoop()
+  if (gl) {
+    if (vertexBuffer) { gl.deleteBuffer(vertexBuffer); vertexBuffer = null }
+    if (program) { gl.deleteProgram(program); program = null }
+    if (vertexShader) { gl.deleteShader(vertexShader); vertexShader = null }
+    if (fragmentShader) { gl.deleteShader(fragmentShader); fragmentShader = null }
+    gl = null
+  }
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCanvas)
-  stopRenderLoop()
+  disposeWebGL()
 })
 </script>
 

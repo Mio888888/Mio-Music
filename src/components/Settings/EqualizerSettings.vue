@@ -72,7 +72,7 @@
 
         <!-- Sliders -->
         <div class="sliders-container">
-          <div v-for="(freq, index) in frequencies" :key="index" class="slider-group">
+          <div v-for="(freq, index) in frequencies" :key="freq" class="slider-group">
             <div class="slider-wrapper">
               <t-slider
                 v-model="gains[index]"
@@ -191,7 +191,7 @@ const applyGains = () => {
   })
 }
 
-watch([gains, enabled], () => { applyGains() }, { deep: true })
+watch([() => [...gains.value], enabled], () => { applyGains() })
 
 const handlePresetChange = (val: string) => {
   const preset = presets.value.find((p) => p.name === val)

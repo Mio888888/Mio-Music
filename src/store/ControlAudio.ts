@@ -60,7 +60,12 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
 
   const init = async () => {
     userInfo = LocalUserDetailStore()
-    if (Audio.eventInit) return
+    if (Audio.eventInit) {
+      // 已初始化时确保旧监听器清理干净后重新绑定
+      unlisteners.forEach((un) => { try { un() } catch {} })
+      unlisteners = []
+    }
+    Audio.eventInit = true
     Audio.eventInit = true
 
     const un1 = await listen('player:state', (event: any) => {

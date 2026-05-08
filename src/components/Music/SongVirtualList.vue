@@ -186,6 +186,18 @@ const virtualizer = useVirtualizer(virtualizerOptions)
 
 const virtualItems = computed(() => virtualizer.value.getVirtualItems())
 const totalSize = computed(() => virtualizer.value.getTotalSize())
+
+// 将虚拟行与歌曲数据绑定，避免模板中重复调用 getSong
+const virtualRows = computed(() =>
+  virtualItems.value.map(vi => ({
+    ...vi,
+    song: sortedSongs.value[vi.index],
+    songId: String(sortedSongs.value[vi.index]?.songmid ?? ''),
+    isLiked: likedSet.value.has(sortedSongs.value[vi.index]?.songmid),
+    qualityLabel: getFilteredQualityLabel(sortedSongs.value[vi.index]),
+    localQualityLabel: getLocalQualityLabel(sortedSongs.value[vi.index])
+  }))
+)
 const hasScroll = computed(() =>
   !!(scrollContainerRef.value && scrollContainerRef.value.scrollHeight > scrollContainerRef.value.clientHeight)
 )
@@ -512,25 +524,25 @@ watch(() => props.songs, (newSongs) => {
           }"
         >
           <div
-            v-for="virtualRow in virtualItems"
-            :key="String(virtualRow.key)"
-            :data-index="virtualRow.index"
+            v-for="row in virtualRows"
+            :key="String(row.key)"
+            :data-index="row.index"
             class="song-item"
             :class="{
-              'is-playing': getSongId(virtualRow.index) === String(currentSongId)
+              'is-playing': row.songId === String(currentSongId)
             }"
-            @contextmenu="handleContextMenu($event, getSong(virtualRow.index)!)"
+            @contextmenu="handleContextMenu($event, row.song!)"
           >
             <!-- 序号列 -->
             <div v-if="showIndex" class="col-index">
               <template v-if="!isMultiSelect">
                 <span class="track-number">
-                  {{ String(virtualRow.index + 1).padStart(2, '0') }}
+                  {{ String(row.index + 1).padStart(2, '0') }}
                 </span>
                 <button
                   class="play-btn-overlay"
                   :title="t('music.songList.play')"
-                  @click.stop="emit('play', getSong(virtualRow.index)!)"
+                  @click.stop="emit('play', row.song!)"
                 >
                   <i class="iconfont icon-bofang"></i>
                 </button>
@@ -539,57 +551,56 @@ watch(() => props.songs, (newSongs) => {
                 v-else
                 class="select-checkbox"
                 :class="{ 'always-show': isMultiSelect }"
-                :checked="selectedSet.has(getSongId(virtualRow.index))"
+                :checked="selectedSet.has(row.songId)"
                 @change="(checked: boolean) => {
-                  const song = getSong(virtualRow.index)!
-                  if (checked) selectedSet.add(song.songmid)
-                  else selectedSet.delete(song.songmid)
+                  if (checked) selectedSet.add(row.song!.songmid)
+                  else selectedSet.delete(row.song!.songmid)
                 }"
               />
             </div>
 
             <!-- 歌曲信息 -->
-            <div class="col-title" @click="handleSongClick(getSong(virtualRow.index)!)">
-              <div v-if="getSong(virtualRow.index)?.img" class="song-cover">
-                <img :src="getSong(virtualRow.index)!.img" alt="" loading="lazy" />
+            <div class="col-title" @click="handleSongClick(row.song!)">
+              <div v-if="row.song?.img" class="song-cover">
+                <img :src="row.song.img" alt="" loading="lazy" />
               </div>
               <div class="song-info">
-                <div class="song-title" :title="getSong(virtualRow.index)?.name">
-                  {{ getSong(virtualRow.index)?.name }}
+                <div class="song-title" :title="row.song?.name">
+                  {{ row.song?.name }}
                 </div>
-                <div class="song-artist" :title="getSong(virtualRow.index)?.singer">
+                <div class="song-artist" :title="row.song?.singer">
                   <span
-                    v-if="getSong(virtualRow.index)?.types?.length && getFilteredQualityLabel(getSong(virtualRow.index)!)"
+                    v-if="row.song?.types?.length && row.qualityLabel"
                     class="quality-tag"
                   >
-                    {{ getFilteredQualityLabel(getSong(virtualRow.index)!) }}
+                    {{ row.qualityLabel }}
                   </span>
                   <span
-                    v-else-if="getLocalQualityLabel(getSong(virtualRow.index)!)"
+                    v-else-if="row.localQualityLabel"
                     class="quality-tag"
                   >
-                    {{ getLocalQualityLabel(getSong(virtualRow.index)!) }}
+                    {{ row.localQualityLabel }}
                   </span>
                   <span
-                    v-if="getSong(virtualRow.index)?.source && getSong(virtualRow.index)?.source !== 'local'"
+                    v-if="row.song?.source && row.song?.source !== 'local'"
                     class="source-tag"
                   >
-                    {{ getSong(virtualRow.index)!.source }}
+                    {{ row.song.source }}
                   </span>
                   <span
-                    v-if="getSong(virtualRow.index)?.singerId && getSong(virtualRow.index)?.source !== 'local'"
+                    v-if="row.song?.singerId && row.song?.source !== 'local'"
                     class="singer-link"
-                    @click.stop="handleSingerClick(getSong(virtualRow.index)!)"
-                  >{{ getSong(virtualRow.index)?.singer }}</span>
-                  <template v-else>{{ getSong(virtualRow.index)?.singer }}</template>
+                    @click.stop="handleSingerClick(row.song!)"
+                  >{{ row.song?.singer }}</span>
+                  <template v-else>{{ row.song?.singer }}</template>
                 </div>
               </div>
             </div>
 
             <!-- 专辑 -->
             <div v-if="showAlbum" class="col-album">
-              <span class="album-name" :title="getSong(virtualRow.index)?.albumName">
-                {{ getSong(virtualRow.index)?.albumName || '-' }}
+              <span class="album-name" :title="row.song?.albumName">
+                {{ row.song?.albumName || '-' }}
               </span>
             </div>
 
@@ -598,12 +609,12 @@ watch(() => props.songs, (newSongs) => {
               <button
                 class="like-btn"
                 :title="t('music.songList.liked')"
-                @click.stop="onToggleLike(getSong(virtualRow.index)!)"
+                @click.stop="onToggleLike(row.song!)"
               >
                 <HeartIcon
-                  :fill-color="isLiked(getSong(virtualRow.index)!) ? 'var(--td-error-color)' : ''"
-                  :stroke-color="isLiked(getSong(virtualRow.index)!) ? [] : ['currentColor']"
-                  :stroke-width="isLiked(getSong(virtualRow.index)!) ? 0 : 2"
+                  :fill-color="row.isLiked ? 'var(--td-error-color)' : ''"
+                  :stroke-color="row.isLiked ? [] : ['currentColor']"
+                  :stroke-width="row.isLiked ? 0 : 2"
                   size="18"
                 />
               </button>
@@ -613,21 +624,21 @@ watch(() => props.songs, (newSongs) => {
             <div v-if="showDuration" class="col-duration">
               <div class="duration-wrapper">
                 <span class="duration">
-                  {{ formatDuration(getSong(virtualRow.index)?.interval) }}
+                  {{ formatDuration(row.song?.interval) }}
                 </span>
                 <div class="action-buttons">
                   <button
-                    v-if="enableDownload && getSong(virtualRow.index)?.source !== 'local'"
+                    v-if="enableDownload && row.song?.source !== 'local'"
                     class="action-btn-small"
                     :title="t('music.songList.download')"
-                    @click.stop="emit('download', getSong(virtualRow.index)!)"
+                    @click.stop="emit('download', row.song!)"
                   >
                     <DownloadIcon size="16" />
                   </button>
                   <button
                     class="action-btn-small"
                     :title="t('music.songList.addToPlaylist')"
-                    @click.stop="emit('addToPlaylist', getSong(virtualRow.index)!)"
+                    @click.stop="emit('addToPlaylist', row.song!)"
                   >
                     <i class="iconfont icon-zengjia"></i>
                   </button>

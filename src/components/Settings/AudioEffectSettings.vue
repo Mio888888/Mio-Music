@@ -131,7 +131,10 @@ const applyEffects = () => {
   invoke('player__set_balance', { value: balance.value.enabled ? balance.value.value : 0 })
 }
 
-watch([bassBoost, surround, balance], () => { applyEffects() }, { deep: true })
+watch(
+  [() => ({ ...bassBoost.value }), () => ({ ...surround.value }), () => ({ ...balance.value })],
+  () => { applyEffects() }
+)
 
 const applyBassPreset = (val: string) => {
   if (!bassBoost.value.enabled) return

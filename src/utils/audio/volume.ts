@@ -1,5 +1,5 @@
-let timer: any
-let previousResolve: ((v: undefined) => void) | null = null
+let timer: ReturnType<typeof setInterval> | null = null
+let currentVersion = 0
 
 export function transitionVolume(
   audio: HTMLAudioElement,
@@ -7,24 +7,25 @@ export function transitionVolume(
   target: boolean = true,
   lengthen: boolean = false
 ): Promise<undefined> {
-  clearInterval(timer)
-  if (previousResolve) {
-    previousResolve(undefined)
-    previousResolve = null
+  if (timer !== null) {
+    clearInterval(timer)
+    timer = null
   }
+
+  // 版本号递增使旧回调自动失效
+  const version = ++currentVersion
 
   const playVolume = lengthen ? 40 : 20
   const pauseVolume = lengthen ? 30 : 20
 
   return new Promise((resolve) => {
-    previousResolve = resolve
-
     if (target) {
       timer = setInterval(() => {
+        if (version !== currentVersion) { clearInterval(timer!); timer = null; return }
         audio.volume = Math.min(audio.volume + volume / playVolume, volume)
         if (audio.volume >= volume) {
-          clearInterval(timer)
-          previousResolve = null
+          clearInterval(timer!)
+          timer = null
           resolve(undefined)
         }
       }, 50)
@@ -32,11 +33,12 @@ export function transitionVolume(
     }
 
     timer = setInterval(() => {
+      if (version !== currentVersion) { clearInterval(timer!); timer = null; return }
       audio.volume = Math.max(audio.volume - volume / pauseVolume, 0)
       if (audio.volume <= 0) {
-        clearInterval(timer)
+        clearInterval(timer!)
+        timer = null
         audio.volume = volume
-        previousResolve = null
         resolve(undefined)
       }
     }, 50)

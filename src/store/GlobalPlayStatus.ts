@@ -440,26 +440,32 @@ export const useGlobalPlayStatusStore = defineStore(
 
     watch(
       () => player.songInfo?.img,
-      async (newImg) => {
+      async (newImg, _oldVal, onCleanup) => {
+        let active = true
+        onCleanup(() => { active = false })
+
         if (currentBlobUrl) {
           URL.revokeObjectURL(currentBlobUrl)
           currentBlobUrl = null
         }
         const info: any = player.songInfo
+        const snapshotSongmid = info?.songmid
         if (!newImg && info?.source === 'local' && info?.hasCover !== false && info?.songmid) {
           try {
             const res = await (window as any).api?.localMusic?.getCoverBase64?.(String(info.songmid))
+            if (!active) return
             const coverData = res?.success ? res.data : null
             if (
               coverData &&
               player.songInfo &&
-              String(player.songInfo.songmid) === String(info.songmid) &&
+              String(player.songInfo.songmid) === String(snapshotSongmid) &&
               !player.songInfo.img
             ) {
               player.songInfo.img = coverData
             }
           } catch {}
         }
+        if (!active) return
         // For MG source, call backend SDK directly to bypass plugin CORS issue
         if (info?.source === 'mg') {
           try {
@@ -467,6 +473,7 @@ export const useGlobalPlayStatusStore = defineStore(
               source: 'mg',
               songInfo: getCleanSongInfo(info)
             })
+            if (!active) return
             const picUrl = res?.url || res
             if (picUrl && typeof picUrl === 'string' && picUrl.length > 0) {
               player.cover = proxyImageUrl(picUrl)
@@ -482,6 +489,7 @@ export const useGlobalPlayStatusStore = defineStore(
           if (pluginId) {
             try {
               const picUrl = await PluginRunner.getPic(pluginId, info.source, getCleanSongInfo(info))
+              if (!active) return
               if (picUrl && player.songInfo && !player.songInfo.img) {
                 newImg = proxyImageUrl(picUrl)
               }
@@ -489,6 +497,7 @@ export const useGlobalPlayStatusStore = defineStore(
             }
           }
         }
+        if (!active) return
         player.cover = proxyImageUrl(newImg) || '/default-cover.png'
       },
       { immediate: true }
@@ -496,10 +505,13 @@ export const useGlobalPlayStatusStore = defineStore(
 
     watch(
       () => player.cover,
-      async (newCover) => {
+      async (newCover, _oldVal, onCleanup) => {
         if (!newCover) return
+        let active = true
+        onCleanup(() => { active = false })
         try {
           const { dominantColor, useBlackText } = await analyzeImageColors(newCover)
+          if (!active) return
           player.coverDetail.ColorObject = dominantColor
           player.coverDetail.mainColor = `rgba(${dominantColor.r},${dominantColor.g},${dominantColor.b},1)`
           const base = useBlackText ? '0,0,0' : '255,255,255'
@@ -517,7 +529,7 @@ export const useGlobalPlayStatusStore = defineStore(
           player.coverDetail.lightMainColor = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},0.9)`
           player.coverDetail.useBlackText = useBlackText
         } catch {
-          resetColors()
+          if (active) resetColors()
         }
       }
     )

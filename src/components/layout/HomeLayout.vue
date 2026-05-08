@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import BackupRestore from '@/components/BackupRestore/BackupRestore.vue'
-import { onMounted, onUnmounted, ref, watchEffect, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watchEffect, computed, watch, markRaw } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
@@ -27,7 +27,7 @@ onUnmounted(() => {
   }
 })
 
-const sourceicon: Record<string, string> = {
+const sourceicon: Record<string, string> = markRaw({
   kg: 'kugouyinle',
   wy: 'wangyiyun',
   mg: 'mg',
@@ -36,7 +36,7 @@ const sourceicon: Record<string, string> = {
   bd: 'kw',
   git: 'git',
   subsonic: 'git'
-}
+})
 const source = ref('')
 
 interface MenuItem {
@@ -45,12 +45,12 @@ interface MenuItem {
   path: string
 }
 
-const menuList: MenuItem[] = [
+const menuList: MenuItem[] = markRaw([
   { nameKey: 'common.homeNav.discover', icon: 'icon-faxian', path: '/home/find' },
   { nameKey: 'common.homeNav.playlists', icon: 'icon-yanchu', path: '/home/songlist' },
   { nameKey: 'common.homeNav.local', icon: 'icon-shouye', path: '/home/local' },
   { nameKey: 'common.homeNav.download', icon: 'icon-xiazai', path: '/home/download' }
-]
+])
 
 const menuActive = ref(0)
 const router = useRouter()
@@ -183,7 +183,7 @@ const handleKeyDown = () => {
         <nav class="nav-section">
           <t-button
             v-for="(item, index) in menuList"
-            :key="index"
+            :key="item.path"
             :variant="menuActive == index ? 'base' : 'text'"
             :class="menuActive == index ? 'nav-button active' : 'nav-button'"
             block
@@ -288,7 +288,7 @@ const handleKeyDown = () => {
     <nav v-if="!isFullPlayOpen" class="mobile-bottom-nav" aria-label="主要导航">
       <button
         v-for="(item, index) in menuList"
-        :key="index"
+        :key="item.path"
         class="mobile-nav-item"
         :class="{ active: menuActive === index }"
         :aria-label="t(item.nameKey)"

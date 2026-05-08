@@ -19,8 +19,9 @@ const ballClass = ref('hidden-right')
 const showAskWindow = ref(false)
 const inputText = ref('')
 const messages = ref<
-  Array<{ type: 'user' | 'ai' | 'loading' | 'error'; content: string; html?: string }>
+  Array<{ id: number; type: 'user' | 'ai' | 'loading' | 'error'; content: string; html?: string }>
 >([])
+let nextMsgId = 0
 const isLoading = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
 let timer: number | null = null
@@ -137,6 +138,7 @@ const checkAPIKey = async (): Promise<boolean> => {
   if (!userInfo.value.deepseekAPIkey) {
     const errorMessage = t('ai.configRequired')
     messages.value.push({
+      id: nextMsgId++,
       type: 'error',
       content: errorMessage,
       html: DOMPurify.sanitize(await marked(errorMessage))
@@ -169,6 +171,7 @@ const handleBallClick = async () => {
   if (messages.value.length === 0) {
     const welcomeContent = createWelcomeMessage()
     messages.value.push({
+      id: nextMsgId++,
       type: 'ai',
       content: welcomeContent,
       html: DOMPurify.sanitize(await marked(welcomeContent))
@@ -197,6 +200,7 @@ const sendMessage = async () => {
   isLoading.value = true
 
   messages.value.push({
+    id: nextMsgId++,
     type: 'user',
     content: userMessage,
     html: DOMPurify.sanitize(await marked(userMessage))
@@ -205,6 +209,7 @@ const sendMessage = async () => {
 
   const aiMessageIndex = messages.value.length
   messages.value.push({
+    id: nextMsgId++,
     type: 'loading',
     content: t('ai.thinking'),
     html: ''
@@ -218,12 +223,13 @@ const sendMessage = async () => {
     const handleStreamChunk = async (data: { streamId: string; chunk: string }) => {
       if (data.streamId === streamId) {
         aiContent += data.chunk
+        const existingId = messages.value[aiMessageIndex]?.id ?? nextMsgId++
         messages.value[aiMessageIndex] = {
+          id: existingId,
           type: 'ai',
           content: aiContent,
           html: DOMPurify.sanitize(await marked(aiContent))
         }
-        scrollToBottom()
       }
     }
 
@@ -239,6 +245,7 @@ const sendMessage = async () => {
         console.error('AI流式响应错误:', data.error)
         if (!aiContent) {
           messages.value[aiMessageIndex] = {
+            id: messages.value[aiMessageIndex]?.id ?? nextMsgId++,
             type: 'error',
             content: t('ai.sendFailed', { message: data.error }),
             html: DOMPurify.sanitize(await marked(t('ai.sendFailed', { message: data.error })))
@@ -259,6 +266,7 @@ const sendMessage = async () => {
     if (!aiContent) {
       const errorMessage = t('ai.sendFailed', { message: (error as Error).message || t('ai.unknownError') })
       messages.value[aiMessageIndex] = {
+        id: messages.value[aiMessageIndex]?.id ?? nextMsgId++,
         type: 'error',
         content: errorMessage,
         html: DOMPurify.sanitize(await marked(errorMessage))
@@ -287,6 +295,7 @@ watch(
       if (showAskWindow.value && messages.value.length === 0) {
         const welcomeContent = createWelcomeMessage()
         messages.value.push({
+          id: nextMsgId++,
           type: 'ai',
           content: welcomeContent,
           html: DOMPurify.sanitize(await marked(welcomeContent))
@@ -436,8 +445,8 @@ onBeforeUnmount(() => {
         <div class="ask-content">
           <div ref="messagesContainer" class="chat-messages">
             <div
-              v-for="(message, index) in messages"
-              :key="index"
+              v-for="message in messages"
+              :key="message.id"
               class="message"
               :class="message.type"
             >
@@ -445,7 +454,7 @@ onBeforeUnmount(() => {
                 <t-loading size="small" />
                 <span class="loading-text">{{ message.content }}</span>
               </div>
-              <div v-else class="message-content" v-html="message.html || message.content"></div>
+              <div v-else class="message-content" v-html="message.html || DOMPurify.sanitize(message.content)"></div>
             </div>
           </div>
         </div>

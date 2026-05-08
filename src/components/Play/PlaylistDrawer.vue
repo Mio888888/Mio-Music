@@ -30,7 +30,7 @@ const { list } = storeToRefs(localUserStore)
 // 虚拟滚动
 const sourceList = ref([...list.value])
 
-watch(list, (newVal) => { sourceList.value = [...newVal] }, { deep: true })
+watch(list, (newVal) => { sourceList.value = [...newVal] })
 
 const { list: visibleList, containerProps, wrapperProps } = useVirtualList(sourceList, {
   itemHeight: 66,

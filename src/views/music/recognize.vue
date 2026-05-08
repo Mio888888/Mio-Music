@@ -100,6 +100,8 @@ function formatHistoryTime(ts: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+const recentHistory = computed(() => recognitionHistory.value.slice(0, 6))
+
 const showHistory = computed(() => recognitionHistory.value.length > 0 && !running.value && status.value !== 'success')
 
 onMounted(() => {
@@ -684,7 +686,7 @@ onUnmounted(() => {
         </div>
         <div class="history-grid">
           <div
-            v-for="(item, idx) in recognitionHistory.slice(0, 6)"
+            v-for="(item, idx) in recentHistory"
             :key="`${item.songmid}-${idx}`"
             class="history-card"
             @click="handlePlayHistory(item)"

@@ -251,7 +251,7 @@ const onLeave = (el: Element) => {
                         <div class="image-grid">
                           <t-image
                             v-for="(img, index) in item.images"
-                            :key="index"
+                            :key="img"
                             :src="img"
                             class="comment-image"
                             fit="cover"

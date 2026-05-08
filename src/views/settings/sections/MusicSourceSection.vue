@@ -78,7 +78,7 @@ const testSubsonicConnection = async () => {
   }
 }
 
-watch(() => userInfo.value.subsonicConfig, syncSubsonicSource, { deep: true })
+watch(() => ({ ...userInfo.value.subsonicConfig }), syncSubsonicSource)
 
 const hasPluginData = computed(() => {
   return !!(userInfo.value.supportedSources && Object.keys(userInfo.value.supportedSources).length > 0)
