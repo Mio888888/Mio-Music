@@ -342,9 +342,30 @@ interface CommentsState {
   latestIsLoading: boolean
 }
 
+const COMMENT_SOURCE_WHITELIST = new Set(['wy', 'tx', 'mg', 'kw', 'bd'])
+
+function canFetchComments(source?: string) {
+  return !!source && COMMENT_SOURCE_WHITELIST.has(source)
+}
+
+function resetCommentState(player: PlayerState) {
+  player.comments.hotList = []
+  player.comments.latestList = []
+  player.comments.hotPage = 0
+  player.comments.hotTotal = 0
+  player.comments.hotMaxPage = 0
+  player.comments.latestPage = 0
+  player.comments.latestTotal = 0
+  player.comments.latestMaxPage = 0
+}
+
+
+type PlayerSongInfo = Omit<SongList, 'songmid'> & { songmid: null | number | string }
+
 interface PlayerState {
   songId?: string
-  songInfo?: Omit<SongList, 'songmid'> & { songmid: null | number | string }
+  songInfo?: PlayerSongInfo
+  playbackSongInfo?: PlayerSongInfo
   cover?: string
   songName: string
   singer: string
@@ -390,6 +411,7 @@ export const useGlobalPlayStatusStore = defineStore(
     const player = reactive<PlayerState>({
       songId: void 0,
       songInfo: DEFAULT_SONG_INFO,
+      playbackSongInfo: void 0,
       cover: void 0,
       songName: '',
       singer: '',
@@ -545,9 +567,17 @@ export const useGlobalPlayStatusStore = defineStore(
     }
 
     watch(
-      [() => player.songInfo?.songmid, () => (player.songInfo as any)?.source, () => player._lyricsTrigger],
-      async ([newSongmid, newSource], _oldVals, onCleanup) => {
-        if (!newSongmid || !player.songInfo) {
+      [
+        () => player.songInfo?.songmid,
+        () => (player.songInfo as any)?.source,
+        () => player.playbackSongInfo?.songmid,
+        () => (player.playbackSongInfo as any)?.source,
+        () => player._lyricsTrigger
+      ],
+      async ([_newSongmid, _newSource, playbackSongmid, playbackSource], _oldVals, onCleanup) => {
+        const lyricSongInfo = player.playbackSongInfo || player.songInfo
+        const lyricSongmid = playbackSongmid || lyricSongInfo?.songmid
+        if (!lyricSongmid || !lyricSongInfo) {
           player.lyrics.lines = []
           return
         }
@@ -556,8 +586,8 @@ export const useGlobalPlayStatusStore = defineStore(
         await new Promise(r => requestAnimationFrame(r))
 
         player.isLoading = true
-        const targetSongId = String(newSongmid)
-        const source = newSource || 'kg'
+        const targetSongId = String(lyricSongmid)
+        const source = playbackSource || (lyricSongInfo as any)?.source || 'kg'
 
         let active = true
         const abort = new AbortController()
@@ -570,7 +600,7 @@ export const useGlobalPlayStatusStore = defineStore(
           const parsedLyrics = await resolveLyrics(
             source,
             targetSongId,
-            toRaw(player.songInfo),
+            toRaw(lyricSongInfo),
             {
               grepLyricInfo: playSettingStore.getIsGrepLyricInfo,
               useStrictMode: playSettingStore.getStrictGrep
@@ -592,6 +622,7 @@ export const useGlobalPlayStatusStore = defineStore(
       if (changed) {
         player.songInfo = songInfo
       }
+      player.playbackSongInfo = songInfo
       player.songName = songInfo.name || ''
       player.singer = songInfo.singer || ''
       if (changed) {
@@ -599,9 +630,15 @@ export const useGlobalPlayStatusStore = defineStore(
       }
     }
 
+    function updatePlaybackSongInfo(songInfo: SongList) {
+      player.playbackSongInfo = songInfo as PlayerSongInfo
+      player._lyricsTrigger++
+    }
+
     async function fetchComments(page = 1, type: 'hot' | 'latest' = 'hot') {
       const currentSongInfo = toRaw(player.songInfo)
       if (!currentSongInfo || !currentSongInfo.songmid) return
+      if (!canFetchComments((currentSongInfo as any).source)) return
 
       if (type === 'hot') {
         player.comments.hotIsLoading = true
@@ -650,16 +687,8 @@ export const useGlobalPlayStatusStore = defineStore(
     }
 
     function updateComments(songInfo: SongList) {
-      const knownSources = ['wy', 'tx', 'mg', 'kg', 'kw', 'bd']
-      if ((songInfo as any).source === 'local' || !knownSources.includes((songInfo as any).source)) return
-      player.comments.hotList = []
-      player.comments.latestList = []
-      player.comments.hotPage = 0
-      player.comments.hotTotal = 0
-      player.comments.hotMaxPage = 0
-      player.comments.latestPage = 0
-      player.comments.latestTotal = 0
-      player.comments.latestMaxPage = 0
+      resetCommentState(player)
+      if (!canFetchComments((songInfo as any).source)) return
       setTimeout(() => { fetchComments(1, 'hot'); fetchComments(1, 'latest') }, 500)
     }
 
@@ -667,7 +696,7 @@ export const useGlobalPlayStatusStore = defineStore(
       player.isFullPlayOpen = open
     }
 
-    return { player, updatePlayerInfo, fetchComments, setFullPlayOpen }
+    return { player, updatePlayerInfo, updatePlaybackSongInfo, fetchComments, setFullPlayOpen }
   },
   { persist: false }
 )

@@ -4,6 +4,7 @@ import { ControlAudioStore } from '@/store/ControlAudio'
 import { useEqualizerStore } from '@/store/Equalizer'
 import { useAudioEffectsStore } from '@/store/AudioEffects'
 import { invoke } from '@tauri-apps/api/core'
+import { installShortDurationGuard, uninstallShortDurationGuard } from '@/utils/audio/globaPlayList'
 import createLogger from '@/utils/logger'
 
 const log = createLogger('GlobalAudio')
@@ -36,6 +37,7 @@ const applyGlobalEffects = () => {
 
 onMounted(async () => {
   await audioStore.init()
+  installShortDurationGuard()
   log.debug('Rust 原生音频引擎初始化完成')
 
   // 恢复 EQ 和音效设置到 Rust 后端
@@ -56,6 +58,7 @@ watch(
 )
 
 onUnmounted(() => {
+  uninstallShortDurationGuard()
   audioStore.destroy()
 })
 </script>

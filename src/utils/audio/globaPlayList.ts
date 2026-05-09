@@ -4,7 +4,7 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useSettingsStore } from '@/store/Settings'
 import { playSetting } from '@/store/playSetting'
-import { PlayMode, type SongList } from '@/types/audio'
+import { PlayMode, type SongList, type UnsubscribeFunction } from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality, compareQuality, normalizeTypes } from '@/utils/quality'
 import { musicSdk } from '@/services/musicSdk'
@@ -19,6 +19,14 @@ export const playMode = ref<PlayMode>(PlayMode.LIST)
 
 let _playIndex = -1
 let currentPlayRequestId = 0
+let playbackRequestSeq = 0
+let playbackAttemptId = 0
+let handledShortDurationAttemptId = 0
+let shortDurationHandling = false
+let shortDurationSongKey = ''
+let currentPlaybackUrl = ''
+let currentResolvedSong: SongList | null = null
+let shortDurationUnsubscribers: UnsubscribeFunction[] = []
 
 // ===== 无缝换曲预加载状态 =====
 let prefetchRequestId = 0
@@ -29,6 +37,8 @@ let prefetchTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 预加载提前量（秒）：剩余时长低于此值时开始预加载 */
 const PREFETCH_LEAD_TIME = 30
+const MIN_PLAYABLE_DURATION = 20
+const SHORT_DURATION_SKIP_SOURCE_KEY = '__short_duration_skip_source__'
 
 /**
  * 计算歌曲的最佳音质（用于 URL 解析和缓存键）
@@ -137,6 +147,7 @@ interface FindMusicCandidate {
 export async function autoSwitchSource(song: SongList): Promise<{ url: string; song: SongList } | null> {
   if (song.source === 'local') return null
 
+  const skippedSources = getSkippedShortDurationSources(song)
   let candidates: FindMusicCandidate[] = []
   try {
     const result: any = await invoke('service_music_find_music', {
@@ -158,12 +169,12 @@ export async function autoSwitchSource(song: SongList): Promise<{ url: string; s
   if (candidates.length === 0) return null
 
   for (const candidate of candidates) {
-    const newSource = candidate.source || i18n.global.t('common.unknown')
     try {
-      const candidateSong: SongList = {
+      const candidateSong = withShortDurationSkipSources({
         ...candidate,
         source: candidate.source,
-      }
+      } as SongList, skippedSources)
+      if (skippedSources.has(getSourceKey(candidateSong))) continue
       const url = await getSongRealUrl(candidateSong)
       if (url && typeof url === 'string') {
         return { url, song: candidateSong }
@@ -173,6 +184,184 @@ export async function autoSwitchSource(song: SongList): Promise<{ url: string; s
   }
 
   return null
+}
+
+
+function getSongKey(song: SongList | null): string {
+  if (!song) return ''
+  return `${song.source || ''}:${String(song.songmid)}`
+}
+
+function getSourceKey(song: SongList): string {
+  return `${song.source || ''}:${String(song.songmid)}`
+}
+
+function getSkippedShortDurationSources(song: SongList): Set<string> {
+  return (song as any)[SHORT_DURATION_SKIP_SOURCE_KEY] instanceof Set
+    ? (song as any)[SHORT_DURATION_SKIP_SOURCE_KEY]
+    : new Set<string>()
+}
+
+function withShortDurationSkipSources(song: SongList, skippedSources: Set<string>): SongList {
+  const nextSong = { ...toRaw(song) } as SongList
+  Object.defineProperty(nextSong, SHORT_DURATION_SKIP_SOURCE_KEY, {
+    value: skippedSources,
+    enumerable: false,
+    configurable: true,
+  })
+  return nextSong
+}
+
+function withSkippedShortDurationSource(song: SongList, sourceKey: string): SongList {
+  const skipped = new Set(getSkippedShortDurationSources(song))
+  skipped.add(sourceKey)
+  const nextSong = { ...toRaw(song) } as SongList
+  Object.defineProperty(nextSong, SHORT_DURATION_SKIP_SOURCE_KEY, {
+    value: skipped,
+    enumerable: false,
+    configurable: true,
+  })
+  return nextSong
+}
+
+function resetPlaybackAttempt(song: SongList, url: string) {
+  playbackAttemptId++
+  handledShortDurationAttemptId = 0
+  shortDurationHandling = false
+  shortDurationSongKey = getSongKey(song)
+  currentPlaybackUrl = url
+  currentResolvedSong = song
+}
+
+function resetPlaybackTracking() {
+  playbackAttemptId++
+  handledShortDurationAttemptId = 0
+  shortDurationHandling = false
+  shortDurationSongKey = ''
+  currentPlaybackUrl = ''
+  currentResolvedSong = null
+}
+
+
+function shouldHandleShortDuration(): boolean {
+  const audio = ControlAudioStore()
+  return (
+    audio.Audio.duration > 0 &&
+    audio.Audio.duration < MIN_PLAYABLE_DURATION &&
+    !!currentResolvedSong &&
+    !!currentPlaybackUrl &&
+    audio.Audio.url === currentPlaybackUrl &&
+    getSongKey(currentResolvedSong) === shortDurationSongKey &&
+    handledShortDurationAttemptId !== playbackAttemptId &&
+    !shortDurationHandling
+  )
+}
+
+function stopPlaybackForUnplayable() {
+  const audio = ControlAudioStore()
+  invoke('player__pause')
+  audio.Audio.isPlay = false
+  isLoadingSong.value = false
+  resetPlaybackTracking()
+}
+
+function playNextAfterUnplayable(): SongList | null {
+  const store = LocalUserDetailStore()
+  if (store.list.length === 0) {
+    stopPlaybackForUnplayable()
+    return null
+  }
+
+  if (store.list.length === 1 || (playMode.value === PlayMode.LIST && _playIndex >= store.list.length - 1)) {
+    stopPlaybackForUnplayable()
+    return null
+  }
+
+  if (playMode.value === PlayMode.RANDOM) {
+    let nextIndex = _playIndex
+    while (nextIndex === _playIndex) {
+      nextIndex = Math.floor(Math.random() * store.list.length)
+    }
+    _playIndex = nextIndex
+  } else {
+    _playIndex = (_playIndex + 1) % store.list.length
+  }
+
+  const song = store.list[_playIndex]
+  if (song) playSong(song)
+  return song
+}
+
+async function playResolvedSource(song: SongList, url: string) {
+  const requestId = ++playbackRequestSeq
+  currentPlayRequestId = requestId
+  const audio = ControlAudioStore()
+
+  try {
+    isLoadingSong.value = true
+    resetPlaybackAttempt(song, url)
+    useGlobalPlayStatusStore().updatePlaybackSongInfo(toRaw(song) as any)
+    const cacheKey = buildCacheKey(song)
+    const result: any = await invoke('player__play', { url, cacheKey })
+    if (currentPlayRequestId !== requestId) return
+
+    if (result && !result.success) {
+      throw new Error(result.error || i18n.global.t('play.playerStartFailed'))
+    }
+
+    await invoke('player__set_volume', { volume: audio.Audio.volume })
+    scheduleNextPrefetch()
+  } catch {
+    if (currentPlayRequestId !== requestId) return
+    isLoadingSong.value = false
+    resetPlaybackTracking()
+    playNextAfterUnplayable()
+  }
+}
+
+async function handleShortDurationPlayback() {
+  if (!shouldHandleShortDuration()) return
+
+  const attemptId = playbackAttemptId
+  handledShortDurationAttemptId = attemptId
+  shortDurationHandling = true
+  const song = currentResolvedSong
+  const sourceKey = song ? getSourceKey(song) : ''
+
+  try {
+    invalidatePrefetch()
+    await invoke('player__pause')
+    if (!song) return
+
+    const songWithSkippedSource = withSkippedShortDurationSource(song, sourceKey)
+    const switched = await autoSwitchSource(songWithSkippedSource)
+    if (attemptId !== playbackAttemptId) return
+
+    if (switched) {
+      await playResolvedSource(withSkippedShortDurationSource(switched.song, sourceKey), switched.url)
+      return
+    }
+
+    playNextAfterUnplayable()
+  } catch {
+    if (attemptId === playbackAttemptId) playNextAfterUnplayable()
+  } finally {
+    if (attemptId === playbackAttemptId) shortDurationHandling = false
+  }
+}
+
+export function installShortDurationGuard() {
+  const audio = ControlAudioStore()
+  shortDurationUnsubscribers.forEach((unsubscribe) => unsubscribe())
+  shortDurationUnsubscribers = [
+    audio.subscribe('play', handleShortDurationPlayback),
+    audio.subscribe('timeupdate', handleShortDurationPlayback),
+  ]
+}
+
+export function uninstallShortDurationGuard() {
+  shortDurationUnsubscribers.forEach((unsubscribe) => unsubscribe())
+  shortDurationUnsubscribers = []
 }
 
 export function getPlayIndex(): number {
@@ -327,7 +516,7 @@ export async function playSong(song: SongList) {
   // 手动切歌时清除预加载
   invalidatePrefetch()
 
-  const requestId = Date.now()
+  const requestId = ++playbackRequestSeq
   currentPlayRequestId = requestId
 
   const store = LocalUserDetailStore()
@@ -350,7 +539,7 @@ export async function playSong(song: SongList) {
 
     store.userInfo.lastPlaySongId = song.songmid
     globalPlayStatus.player.songInfo = toRaw(song) as any
-    globalPlayStatus.player._lyricsTrigger++
+    globalPlayStatus.updatePlaybackSongInfo(toRaw(song) as any)
 
     // 解析真实播放 URL（失败时自动换源）
     let url: string | undefined
@@ -363,6 +552,7 @@ export async function playSong(song: SongList) {
       if (switched) {
         url = switched.url
         actualSong = switched.song
+        globalPlayStatus.updatePlaybackSongInfo(toRaw(actualSong) as any)
         MessagePlugin.success(i18n.global.t('play.autoSwitchedSource', { source: switched.song.source || i18n.global.t('common.unknown') }))
       }
     }
@@ -371,10 +561,12 @@ export async function playSong(song: SongList) {
     if (!url || typeof url !== 'string') {
       MessagePlugin.warning(i18n.global.t('play.cannotGetUrl'))
       isLoadingSong.value = false
+      resetPlaybackTracking()
       return
     }
 
     // 调用 Rust 原生播放器
+    resetPlaybackAttempt(actualSong, url)
     const cacheKey = buildCacheKey(actualSong)
     const result: any = await invoke('player__play', { url, cacheKey })
     if (currentPlayRequestId !== requestId) return
@@ -402,6 +594,7 @@ export async function playSong(song: SongList) {
   } catch (error: any) {
     if (currentPlayRequestId !== requestId) return
     isLoadingSong.value = false
+    resetPlaybackTracking()
     MessagePlugin.error(error.message || i18n.global.t('play.playFailed'))
   }
 }
@@ -484,7 +677,7 @@ function updateSeamlessState() {
   }
   store.userInfo.lastPlaySongId = song.songmid
   globalPlayStatus.player.songInfo = toRaw(song) as any
-  globalPlayStatus.player._lyricsTrigger++
+  globalPlayStatus.updatePlaybackSongInfo(toRaw(song) as any)
 
   try {
     invoke('player__update_now_playing', {
@@ -522,6 +715,7 @@ export function onCrossfadeSwap() {
   }
   store.userInfo.lastPlaySongId = song.songmid
   globalPlayStatus.player.songInfo = toRaw(song) as any
+  globalPlayStatus.updatePlaybackSongInfo(toRaw(song) as any)
 
   try {
     invoke('player__update_now_playing', {
