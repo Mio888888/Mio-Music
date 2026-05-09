@@ -34,14 +34,19 @@ let unlisten: UnlistenFn | null = null
 let animationId: number | undefined
 
 const BAND_COUNT = 128
+const SILENCE_DB = -80
 const ATTACK = 0.3
 const RELEASE = 0.85
 const PEAK_FALL = 0.6 // peak 每帧下落速度 (dB)
 const PEAK_BAR_H = 2
 
-const targetBands = new Float64Array(BAND_COUNT)
-const smoothedBands = new Float64Array(BAND_COUNT)
-const peakBands = new Float64Array(BAND_COUNT)
+interface SpectrumPayload {
+  bands?: unknown
+}
+
+const targetBands = new Float64Array(BAND_COUNT).fill(SILENCE_DB)
+const smoothedBands = new Float64Array(BAND_COUNT).fill(SILENCE_DB)
+const peakBands = new Float64Array(BAND_COUNT).fill(SILENCE_DB)
 
 let drawWidth = 0
 let drawHeight = 0
@@ -51,18 +56,21 @@ let centerX = 0
 let maxBarH = 0
 
 function dbToNorm(db: number): number {
-  const clamped = Math.max(-80, Math.min(10, db))
-  const norm = (clamped + 80) / 90
+  const clamped = Math.max(SILENCE_DB, Math.min(10, db))
+  const norm = (clamped - SILENCE_DB) / 90
   return Math.pow(norm, 0.55)
 }
 
 const setupSpectrumListener = async () => {
-  unlisten = await listen('player:spectrum', (event: any) => {
+  unlisten = await listen<SpectrumPayload>('player:spectrum', (event) => {
     const { bands } = event.payload
-    if (!bands || !Array.isArray(bands)) return
+    if (!Array.isArray(bands)) return
+
+    targetBands.fill(SILENCE_DB)
     const len = Math.min(bands.length, BAND_COUNT)
     for (let i = 0; i < len; i++) {
-      targetBands[i] = bands[i]
+      const band = bands[i]
+      targetBands[i] = typeof band === 'number' && Number.isFinite(band) ? band : SILENCE_DB
     }
   })
 }

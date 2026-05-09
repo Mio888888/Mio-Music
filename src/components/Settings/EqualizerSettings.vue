@@ -123,6 +123,13 @@ const eqStore = useEqualizerStore()
 const { enabled, currentPreset, gains, presets } = storeToRefs(eqStore)
 
 const frequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+const SPECTRUM_BAND_COUNT = 128
+const SILENCE_DB = -80
+
+interface SpectrumPayload {
+  bands?: unknown
+}
+
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const savePresetDialogVisible = ref(false)
@@ -130,7 +137,7 @@ const newPresetName = ref('')
 
 let animationId: number
 let unlisten: UnlistenFn | null = null
-let spectrumData = new Array(64).fill(-80)
+let spectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
 
 const formatFreq = (freq: number) => freq >= 1000 ? `${freq / 1000}k` : `${freq}`
 
@@ -297,9 +304,17 @@ const resizeCanvas = () => {
 const setupVisualizer = async () => {
   if (!canvasRef.value) return
   resizeCanvas()
-  unlisten = await listen('player:spectrum', (event: any) => {
+  unlisten = await listen<SpectrumPayload>('player:spectrum', (event) => {
     const { bands } = event.payload
-    if (bands && Array.isArray(bands)) spectrumData = bands
+    if (!Array.isArray(bands)) return
+
+    const nextSpectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
+    const len = Math.min(bands.length, SPECTRUM_BAND_COUNT)
+    for (let i = 0; i < len; i++) {
+      const band = bands[i]
+      nextSpectrumData[i] = typeof band === 'number' && Number.isFinite(band) ? band : SILENCE_DB
+    }
+    spectrumData = nextSpectrumData
   })
   const ctx = canvasRef.value.getContext('2d')
   if (!ctx) return
@@ -317,12 +332,12 @@ const setupVisualizer = async () => {
     const barStartColor = readThemeValue('--settings-eq-visualizer-bar-start', readThemeValue('--td-brand-color-5', '#00a74d'))
     const barEndColor = readThemeValue('--settings-eq-visualizer-bar-end', readThemeValue('--td-brand-color-7', '#03de6d'))
 
-    const barCount = Math.min(spectrumData.length, 128)
+    const barCount = SPECTRUM_BAND_COUNT
     const barWidth = (width / barCount) * 2.5
     let x = 0
 
     for (let i = 0; i < barCount; i++) {
-      const normalized = Math.max(0, Math.min(1, (spectrumData[i] + 80) / 80))
+      const normalized = Math.max(0, Math.min(1, (spectrumData[i] - SILENCE_DB) / 80))
       const barHeight = Math.pow(normalized, 0.6) * (height / 2)
 
       const gradient = ctx.createLinearGradient(0, height, 0, 0)
