@@ -204,14 +204,52 @@ function stopVisualization() {
   }
 }
 
+function disconnectResizeObserver() {
+  if (resizeObserver.value) {
+    resizeObserver.value.disconnect()
+    resizeObserver.value = undefined
+  }
+}
+
+function bindResizeObserver() {
+  disconnectResizeObserver()
+  if (!canvasRef.value) return
+
+  resizeCanvas()
+  const container = canvasRef.value.parentElement
+  if (!container) return
+
+  resizeObserver.value = new ResizeObserver(() => {
+    nextTick(resizeCanvas)
+  })
+  resizeObserver.value.observe(container)
+}
+
+let visualizationRequestId = 0
+
+async function showVisualization() {
+  const requestId = ++visualizationRequestId
+  if (!props.show || !Audio.value.isPlay) return
+  await nextTick()
+  if (requestId !== visualizationRequestId || !props.show || !Audio.value.isPlay) return
+  bindResizeObserver()
+  startVisualization()
+}
+
+function hideVisualization() {
+  visualizationRequestId++
+  stopVisualization()
+  disconnectResizeObserver()
+}
+
 watch(() => Audio.value.isPlay, (playing) => {
-  if (playing && props.show) startVisualization()
-  else stopVisualization()
+  if (playing && props.show) showVisualization()
+  else hideVisualization()
 })
 
 watch(() => props.show, (show) => {
-  if (show && Audio.value.isPlay) startVisualization()
-  else stopVisualization()
+  if (show && Audio.value.isPlay) showVisualization()
+  else hideVisualization()
 })
 
 watch(() => props.color, () => { cachedGradient = null })
@@ -247,13 +285,9 @@ function resizeCanvas() {
 onMounted(async () => {
   await setupSpectrumListener()
 
-  if (canvasRef.value) {
-    resizeCanvas()
-    resizeObserver.value = new ResizeObserver(() => {
-      nextTick(resizeCanvas)
-    })
-    const container = canvasRef.value.parentElement
-    if (container) resizeObserver.value.observe(container)
+  if (props.show) {
+    await nextTick()
+    bindResizeObserver()
   }
 
   if (props.show && Audio.value.isPlay) {
@@ -262,12 +296,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  stopVisualization()
+  hideVisualization()
   if (unlisten) { unlisten(); unlisten = null }
-  if (resizeObserver.value) {
-    resizeObserver.value.disconnect()
-    resizeObserver.value = undefined
-  }
 })
 </script>
 
