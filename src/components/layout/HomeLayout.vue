@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import BackupRestore from '@/components/BackupRestore/BackupRestore.vue'
-import { onMounted, onUnmounted, ref, watchEffect, computed, watch, markRaw } from 'vue'
+import LiquidGlass from '@/components/LiquidGlass.vue'
+import { onMounted, onUnmounted, ref, watchEffect, computed, watch, markRaw, type CSSProperties } from 'vue'
 import { storeToRefs } from 'pinia'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
@@ -9,6 +10,13 @@ import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
 
 const { t } = useI18n()
+
+const mobileNavLiquidGlassContentStyle: CSSProperties = {
+  color: 'inherit',
+  font: 'inherit',
+  lineHeight: 'normal',
+  textShadow: 'none'
+}
 
 let stopWatchEffect: (() => void) | null = null
 
@@ -285,21 +293,33 @@ const handleKeyDown = () => {
     </t-layout>
 
     <!-- 移动端底部导航（悬浮胶囊 Glass Island） -->
-    <nav v-if="!isFullPlayOpen" class="mobile-bottom-nav" aria-label="主要导航">
-      <button
-        v-for="(item, index) in menuList"
-        :key="item.path"
-        class="mobile-nav-item"
-        :class="{ active: menuActive === index }"
-        :aria-label="t(item.nameKey)"
-        :aria-current="menuActive === index ? 'page' : undefined"
-        @click="handleClick(index)"
-      >
-        <span class="mobile-nav-indicator" aria-hidden="true"></span>
-        <i :class="`iconfont ${item.icon}`" aria-hidden="true"></i>
-        <span class="mobile-nav-label">{{ t(item.nameKey) }}</span>
-      </button>
-    </nav>
+    <LiquidGlass
+      v-if="!isFullPlayOpen"
+      class="mobile-bottom-nav-glass"
+      :corner-radius="999"
+      :displacement-scale="48"
+      :blur-amount="0.08"
+      :saturation="180"
+      :aberration-intensity="1.5"
+      padding="0"
+      mode="standard"
+      :content-style="mobileNavLiquidGlassContentStyle"
+    >
+      <nav class="mobile-bottom-nav" aria-label="主要导航">
+        <button
+          v-for="(item, index) in menuList"
+          :key="item.path"
+          class="mobile-nav-item"
+          :class="{ active: menuActive === index }"
+          :aria-label="t(item.nameKey)"
+          :aria-current="menuActive === index ? 'page' : undefined"
+          @click="handleClick(index)"
+        >
+          <i :class="`iconfont ${item.icon}`" aria-hidden="true"></i>
+          <span class="mobile-nav-label">{{ t(item.nameKey) }}</span>
+        </button>
+      </nav>
+    </LiquidGlass>
   </t-layout>
 </template>
 
@@ -601,6 +621,7 @@ const handleKeyDown = () => {
 }
 
 /* ============ 移动端底部导航（Apple Music 风格） ============ */
+.home-container .mobile-bottom-nav-glass,
 .mobile-bottom-nav {
   display: none;
 }
@@ -682,31 +703,27 @@ const handleKeyDown = () => {
     flex-shrink: 0;
   }
 
-  .mobile-bottom-nav {
+  .home-container .mobile-bottom-nav-glass {
     display: flex;
     position: fixed;
     right: max(14px, var(--mobile-page-gutter));
     bottom: calc(var(--mobile-safe-bottom) + var(--mobile-nav-bottom-gap));
     left: max(14px, var(--mobile-page-gutter));
     z-index: var(--mobile-bottom-layer-z);
+    max-width: 520px;
+    height: var(--mobile-nav-height);
+    margin: 0 auto;
+  }
+
+  .mobile-bottom-nav {
+    display: flex;
     align-items: center;
     justify-content: space-between;
+    width: 100%;
     height: var(--mobile-nav-height);
-    max-width: 520px;
-    margin: 0 auto;
     padding: 7px 8px;
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12)),
-      color-mix(in srgb, var(--td-bg-color-container) 18%, transparent);
-    border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: calc(var(--mobile-nav-height) / 2);
-    box-shadow:
-      0 16px 36px rgba(15, 23, 42, 0.1),
-      0 5px 14px rgba(15, 23, 42, 0.05),
-      inset 0 1px 0 rgba(255, 255, 255, 0.5),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.12);
-    backdrop-filter: saturate(220%) blur(20px);
-    -webkit-backdrop-filter: saturate(220%) blur(20px);
+    box-sizing: border-box;
   }
 
   .mobile-nav-item {
@@ -753,21 +770,6 @@ const handleKeyDown = () => {
       letter-spacing: 0.01em;
     }
 
-    .mobile-nav-indicator {
-      position: absolute;
-      top: 5px;
-      left: 50%;
-      width: 18px;
-      height: 3px;
-      border-radius: 999px;
-      background: transparent;
-      transform: translateX(-50%) scaleX(0.4);
-      transform-origin: center;
-      transition:
-        background-color var(--motion-duration-quick) var(--motion-ease-standard),
-        box-shadow var(--motion-duration-quick) var(--motion-ease-standard),
-        transform var(--motion-duration-quick) var(--motion-ease-standard);
-    }
   }
 
   .mobile-nav-item.active {
@@ -786,29 +788,11 @@ const handleKeyDown = () => {
     .mobile-nav-label {
       font-weight: 700;
     }
-
-    .mobile-nav-indicator {
-      background: var(--td-brand-color);
-      box-shadow: 0 0 12px color-mix(in srgb, var(--td-brand-color) 60%, transparent);
-      transform: translateX(-50%) scaleX(1);
-    }
   }
 
   .mobile-nav-item:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--td-brand-color) 70%, white);
     outline-offset: 2px;
-  }
-
-  :global([data-theme="dark"]) .mobile-bottom-nav {
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(10, 12, 18, 0.16)),
-      color-mix(in srgb, var(--td-bg-color-container) 14%, transparent);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow:
-      0 18px 42px rgba(0, 0, 0, 0.24),
-      0 6px 16px rgba(0, 0, 0, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.16),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.05);
   }
 
   :global([data-theme="dark"]) .mobile-nav-item.active {
@@ -822,8 +806,7 @@ const handleKeyDown = () => {
 
   @media (prefers-reduced-motion: reduce) {
     .mobile-nav-item,
-    .mobile-nav-item .iconfont,
-    .mobile-nav-indicator {
+    .mobile-nav-item .iconfont {
       transition: none;
     }
   }
