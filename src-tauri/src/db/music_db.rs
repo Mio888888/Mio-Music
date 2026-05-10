@@ -118,6 +118,18 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<TrackRow>> {
     rows.collect()
 }
 
+pub fn get_track_paths_by_ids(conn: &Connection, songmids: &[String]) -> Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare("SELECT songmid, path FROM tracks WHERE songmid = ?1")?;
+    let mut result = Vec::with_capacity(songmids.len());
+    for songmid in songmids {
+        let mut rows = stmt.query_map([songmid], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        if let Some(row) = rows.next() {
+            result.push(row?);
+        }
+    }
+    Ok(result)
+}
+
 pub fn get_track_by_id(conn: &Connection, songmid: &str) -> Result<Option<TrackRow>> {
     let mut stmt = conn.prepare(
         "SELECT songmid, path, url, singer, name, albumName, albumId, source, interval,

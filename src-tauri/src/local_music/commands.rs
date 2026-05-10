@@ -33,10 +33,7 @@ pub fn local_music__get_cover(state: State<'_, AppDb>, track_id: String) -> Resu
 #[tauri::command]
 pub fn local_music__get_covers(state: State<'_, AppDb>, track_ids: Vec<String>) -> Result<serde_json::Value, String> {
     let conn = state.music.lock().map_err(|e| e.to_string())?;
-    let all_tracks = music_db::get_all_tracks(&conn).map_err(|e| e.to_string())?;
-    let track_paths: Vec<(String, String)> = all_tracks.iter()
-        .map(|t| (t.songmid.clone(), t.path.clone()))
-        .collect();
+    let track_paths = music_db::get_track_paths_by_ids(&conn, &track_ids).map_err(|e| e.to_string())?;
     let covers = cover_cache::batch_get_covers(&track_ids, &track_paths);
     Ok(serde_json::json!({ "success": true, "data": covers }))
 }

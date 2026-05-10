@@ -8,7 +8,7 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { downloadSingleSong } from '@/utils/audio/download'
 import type { SongList } from '@/types/audio'
-import { directImageUrl } from '@/utils/imageProxy'
+import { fillMissingCoversWithResolver } from '@/utils/songCover'
 import defaultCover from '/default-cover.png'
 
 const router = useRouter()
@@ -40,23 +40,16 @@ const networkPlaylistUrl = ref('')
 const importPlatformType = ref('wy')
 const songlistFileInputRef = ref<HTMLInputElement | null>(null)
 
-const PIC_FETCH_BATCH_SIZE = 50
-
-async function fillMissingImportedSongPics(songsNeedPic: any[], platform: string) {
-  for (let index = 0; index < songsNeedPic.length; index += PIC_FETCH_BATCH_SIZE) {
-    const batch = songsNeedPic.slice(index, index + PIC_FETCH_BATCH_SIZE)
-    await Promise.all(batch.map(async (song) => {
-      try {
-        const url = await (window as any).api?.music?.requestSdk?.('getPic', {
-          source: platform,
-          songInfo: song
-        })
-        if (typeof url === 'string') song.img = directImageUrl(url)
-      } catch (e) {
-        console.warn('获取歌曲封面失败:', e)
-      }
-    }))
-  }
+async function fillMissingImportedSongPics(songsNeedPic: SongList[], platform: string) {
+  await fillMissingCoversWithResolver(songsNeedPic, {
+    resolver: async (song) => {
+      const url = await (window as any).api?.music?.requestSdk?.('getPic', {
+        source: platform,
+        songInfo: song
+      })
+      return typeof url === 'string' ? url : null
+    }
+  })
 }
 
 // 加载歌单列表

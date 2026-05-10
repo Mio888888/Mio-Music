@@ -213,7 +213,6 @@ const state = reactive({
   audioUrl: Audio.value.url,
   albumUrl: props.coverImage,
   currentTime: 0,
-  lowFreqVolume: 1.0
 })
 
 const bgRef = ref<CoreBackgroundRender<PixiRenderer> | undefined>(undefined)
@@ -554,8 +553,6 @@ watch(
   { deep: true }
 )
 
-const handleLowFreqUpdate = (volume: number) => { state.lowFreqVolume = volume }
-
 const lightMainColor = computed(() => player.value.coverDetail.lightMainColor || 'rgba(255, 255, 255, 0.9)')
 const useBlackText = computed(() => player.value.coverDetail.useBlackText)
 const lyricViewColor = computed(() => playSetting.getIsImmersiveLyricColor ? lightMainColor.value : 'rgba(255, 255, 255, 1)')
@@ -820,7 +817,6 @@ onUnmounted(() => {
         :height="70"
         :bar-count="80"
         :color="mainColor"
-        @low-freq-update="handleLowFreqUpdate"
       />
     </div>
     <!-- 播放设置浮动按钮 -->

@@ -3,6 +3,7 @@ import { ref, onMounted, computed, onActivated } from 'vue'
 import { useRoute } from 'vue-router'
 import { musicSdk, type MusicItem, type SingerInfo, type SingerAlbumListResult } from '@/services/musicSdk'
 import { playSong } from '@/utils/audio/globaPlayList'
+import { fillMissingSongCovers } from '@/utils/songCover'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { DialogPlugin } from 'tdesign-vue-next'
@@ -26,22 +27,6 @@ const currentPage = ref(1)
 const totalCount = ref(0)
 
 const songListRef = ref<InstanceType<typeof SongVirtualList> | null>(null)
-const PIC_FETCH_BATCH_SIZE = 50
-
-async function fillMissingSongPics(songsNeedPic: MusicItem[]) {
-  for (let index = 0; index < songsNeedPic.length; index += PIC_FETCH_BATCH_SIZE) {
-    const batch = songsNeedPic.slice(index, index + PIC_FETCH_BATCH_SIZE)
-    await Promise.all(batch.map(async (song) => {
-      try {
-        const url = await musicSdk.getPic(song)
-        if (url) song.img = url
-      } catch (e) {
-        console.warn('获取歌曲封面失败:', e)
-      }
-    }))
-    songs.value = [...songs.value]
-  }
-}
 
 const currentSongId = computed(() => localUserStore.userInfo?.lastPlaySongId)
 
@@ -71,10 +56,9 @@ async function fetchSongs(reset = false) {
     hasMore.value = songs.value.length < (res?.total || 0)
     currentPage.value += 1
 
-    const songsNeedPic = newSongs.filter(s => !s.img)
-    if (songsNeedPic.length > 0) {
-      void fillMissingSongPics(songsNeedPic)
-    }
+    void fillMissingSongCovers(newSongs, {
+      onBatchComplete: () => { songs.value = [...songs.value] }
+    })
   } catch (e) {
     console.error('获取歌手歌曲失败:', e)
   } finally {

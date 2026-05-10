@@ -20,10 +20,6 @@ const props = withDefaults(defineProps<Props>(), {
   backgroundColor: 'transparent'
 })
 
-const emit = defineEmits<{
-  lowFreqUpdate: [volume: number]
-}>()
-
 const canvasRef = ref<HTMLCanvasElement>()
 const resizeObserver = ref<ResizeObserver>()
 
@@ -32,13 +28,15 @@ const { Audio } = storeToRefs(controlAudio)
 
 let unlisten: UnlistenFn | null = null
 let animationId: number | undefined
+let lastDrawTime = 0
 
 const BAND_COUNT = 128
 const SILENCE_DB = -80
 const ATTACK = 0.3
 const RELEASE = 0.85
-const PEAK_FALL = 0.6 // peak 每帧下落速度 (dB)
+const PEAK_FALL = 0.6
 const PEAK_BAR_H = 2
+const DRAW_INTERVAL_MS = 1000 / 30
 
 interface SpectrumPayload {
   bands?: unknown
@@ -76,7 +74,8 @@ const setupSpectrumListener = async () => {
 }
 
 function updateSmoothed() {
-  for (let i = 0; i < BAND_COUNT; i++) {
+  const activeBands = Math.max(1, Math.min(BAND_COUNT, halfBars))
+  for (let i = 0; i < activeBands; i++) {
     const target = targetBands[i]
     const prev = smoothedBands[i]
     if (target > prev) {
@@ -119,7 +118,19 @@ function getGradient(ctx: CanvasRenderingContext2D): CanvasGradient | CanvasPatt
   return g
 }
 
-function draw() {
+function scheduleNextFrame() {
+  if (props.show && Audio.value.isPlay) {
+    animationId = requestAnimationFrame(draw)
+  }
+}
+
+function draw(timestamp = 0) {
+  if (timestamp - lastDrawTime < DRAW_INTERVAL_MS) {
+    scheduleNextFrame()
+    return
+  }
+  lastDrawTime = timestamp
+
   if (!canvasRef.value) return
   const canvas = canvasRef.value
   const ctx = canvas.getContext('2d')
@@ -135,7 +146,7 @@ function draw() {
   }
 
   if (drawWidth === 0) {
-    animationId = requestAnimationFrame(draw)
+    scheduleNextFrame()
     return
   }
 
@@ -177,19 +188,13 @@ function draw() {
     ctx.fillRect(rx, peakY, barWidth - 0.5, PEAK_BAR_H)
   }
 
-  // low freq event
-  let lowSum = 0
-  for (let i = 0; i < 3 && i < BAND_COUNT; i++) lowSum += dbToNorm(smoothedBands[i])
-  emit('lowFreqUpdate', lowSum / 3)
-
-  if (props.show && Audio.value.isPlay) {
-    animationId = requestAnimationFrame(draw)
-  }
+  scheduleNextFrame()
 }
 
 function startVisualization() {
   if (!props.show || !Audio.value.isPlay) return
   if (animationId !== undefined) cancelAnimationFrame(animationId)
+  lastDrawTime = 0
   animationId = requestAnimationFrame(draw)
 }
 
