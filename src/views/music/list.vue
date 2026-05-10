@@ -47,6 +47,22 @@ const currentPage = ref(1)
 const totalCount = ref(0)
 
 const songListRef = ref<InstanceType<typeof SongVirtualList> | null>(null)
+const PIC_FETCH_BATCH_SIZE = 50
+
+async function fillMissingSongPics(songsNeedPic: MusicItem[]) {
+  for (let index = 0; index < songsNeedPic.length; index += PIC_FETCH_BATCH_SIZE) {
+    const batch = songsNeedPic.slice(index, index + PIC_FETCH_BATCH_SIZE)
+    await Promise.all(batch.map(async (song) => {
+      try {
+        const url = await musicSdk.getPic(song)
+        if (url) song.img = url
+      } catch (e) {
+        console.warn('获取歌曲封面失败:', e)
+      }
+    }))
+    songs.value = [...songs.value]
+  }
+}
 
 const currentSongId = computed(() => localUserStore.userInfo?.lastPlaySongId)
 
@@ -148,18 +164,10 @@ const fetchSongs = async (reset = false) => {
     songs.value = reset ? newSongs : [...songs.value, ...newSongs]
     totalCount.value = res?.total || 0
 
-    // 按需获取封面（参考 songlist.vue 实现）
+    // 按需获取封面（按批次限制并发，保持 direct-first URL）
     const songsNeedPic = newSongs.filter(s => !s.img)
     if (songsNeedPic.length > 0) {
-      const batch = songsNeedPic.slice(0, 50)
-      Promise.all(batch.map(async (song) => {
-        try {
-          const url = await musicSdk.getPic(song)
-          if (url) song.img = url
-        } catch {}
-      })).then(() => {
-        songs.value = [...songs.value]
-      })
+      void fillMissingSongPics(songsNeedPic)
     }
     if (res?.info) {
       playlistInfo.value.desc = res.info.desc || ''

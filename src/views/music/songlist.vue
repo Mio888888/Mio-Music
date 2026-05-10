@@ -40,6 +40,25 @@ const networkPlaylistUrl = ref('')
 const importPlatformType = ref('wy')
 const songlistFileInputRef = ref<HTMLInputElement | null>(null)
 
+const PIC_FETCH_BATCH_SIZE = 50
+
+async function fillMissingImportedSongPics(songsNeedPic: any[], platform: string) {
+  for (let index = 0; index < songsNeedPic.length; index += PIC_FETCH_BATCH_SIZE) {
+    const batch = songsNeedPic.slice(index, index + PIC_FETCH_BATCH_SIZE)
+    await Promise.all(batch.map(async (song) => {
+      try {
+        const url = await (window as any).api?.music?.requestSdk?.('getPic', {
+          source: platform,
+          songInfo: song
+        })
+        if (typeof url === 'string') song.img = directImageUrl(url)
+      } catch (e) {
+        console.warn('获取歌曲封面失败:', e)
+      }
+    }))
+  }
+}
+
 // 加载歌单列表
 const loadPlaylists = async () => {
   loading.value = true
@@ -372,18 +391,10 @@ const handleNetworkPlaylistImport = async (input: string) => {
       return
     }
 
-    // 获取封面
+    // 获取封面（按批次限制并发，保持 direct-first URL）
     const songsNeedPic = allSongs.filter(s => !s.img)
-    if (songsNeedPic.length > 0 && songsNeedPic.length <= 50) {
-      await Promise.all(songsNeedPic.map(async (song) => {
-        try {
-          const url = await (window as any).api?.music?.requestSdk?.('getPic', {
-            source: platform,
-            songInfo: song
-          })
-          if (typeof url === 'string') song.img = directImageUrl(url)
-        } catch {}
-      }))
+    if (songsNeedPic.length > 0) {
+      await fillMissingImportedSongPics(songsNeedPic, platform)
     }
 
     // 创建本地歌单
