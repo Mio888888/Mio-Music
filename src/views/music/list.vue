@@ -7,10 +7,11 @@ import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { downloadSingleSong } from '@/utils/audio/download'
 import { fillMissingSongCovers } from '@/utils/songCover'
-import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { EllipsisIcon, SearchIcon, MapAimingIcon } from 'tdesign-icons-vue-next'
 import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
 import SongVirtualList from '@/components/Music/SongVirtualList.vue'
+import { createLiquidGlassConfirm } from '@/utils/liquidGlassConfirm'
 
 const route = useRoute()
 const router = useRouter()
@@ -169,52 +170,50 @@ const handlePlay = (song: MusicItem) => {
   playSong(song as any)
 }
 
-const handlePlayAll = () => {
+const handlePlayAll = async () => {
   if (songs.value.length === 0) return
-  const dialog = DialogPlugin.confirm({
-    header: t('music.list.playPlaylist'),
+  const confirmed = await createLiquidGlassConfirm({
+    title: t('music.list.playPlaylist'),
     body: t('music.list.replaceConfirm', { title: playlistInfo.value.title, count: songs.value.length }),
-    confirmBtn: t('music.list.confirmReplace'),
-    cancelBtn: t('common.cancel'),
-    onConfirm: () => {
-      dialog.destroy()
-      const sourceSongs = songListRef.value?.sortedSongs ?? displaySongs.value
-      localUserStore.replaceSongList(sourceSongs.map(s => ({
-        songmid: s.songmid, name: s.name, singer: s.singer,
-        albumName: s.albumName, img: s.img, source: s.source,
-        url: '', interval: s.interval
-      })) as any)
-      playSong(sourceSongs[0] as any)
-      playStatus.updatePlayerInfo(sourceSongs[0] as any)
-    },
-    onCancel: () => dialog.destroy()
+    confirmText: t('music.list.confirmReplace'),
+    cancelText: t('common.cancel'),
+    icon: 'play'
   })
+  if (!confirmed) return
+
+  const sourceSongs = songListRef.value?.sortedSongs ?? displaySongs.value
+  localUserStore.replaceSongList(sourceSongs.map(s => ({
+    songmid: s.songmid, name: s.name, singer: s.singer,
+    albumName: s.albumName, img: s.img, source: s.source,
+    url: '', interval: s.interval
+  })) as any)
+  playSong(sourceSongs[0] as any)
+  playStatus.updatePlayerInfo(sourceSongs[0] as any)
 }
 
-const handleShufflePlay = () => {
+const handleShufflePlay = async () => {
   if (songs.value.length === 0) return
-  const dialog = DialogPlugin.confirm({
-    header: t('music.list.shufflePlaylist'),
+  const confirmed = await createLiquidGlassConfirm({
+    title: t('music.list.shufflePlaylist'),
     body: t('music.list.shuffleConfirm', { title: playlistInfo.value.title, count: songs.value.length }),
-    confirmBtn: t('music.list.confirmReplace'),
-    cancelBtn: t('common.cancel'),
-    onConfirm: () => {
-      dialog.destroy()
-      const sourceSongs = [...(songListRef.value?.sortedSongs ?? songs.value)]
-      for (let i = sourceSongs.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [sourceSongs[i], sourceSongs[j]] = [sourceSongs[j], sourceSongs[i]]
-      }
-      localUserStore.replaceSongList(sourceSongs.map(s => ({
-        songmid: s.songmid, name: s.name, singer: s.singer,
-        albumName: s.albumName, img: s.img, source: s.source,
-        url: '', interval: s.interval
-      })) as any)
-      playSong(sourceSongs[0] as any)
-      playStatus.updatePlayerInfo(sourceSongs[0] as any)
-    },
-    onCancel: () => dialog.destroy()
+    confirmText: t('music.list.confirmReplace'),
+    cancelText: t('common.cancel'),
+    icon: 'shuffle'
   })
+  if (!confirmed) return
+
+  const sourceSongs = [...(songListRef.value?.sortedSongs ?? songs.value)]
+  for (let i = sourceSongs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[sourceSongs[i], sourceSongs[j]] = [sourceSongs[j], sourceSongs[i]]
+  }
+  localUserStore.replaceSongList(sourceSongs.map(s => ({
+    songmid: s.songmid, name: s.name, singer: s.singer,
+    albumName: s.albumName, img: s.img, source: s.source,
+    url: '', interval: s.interval
+  })) as any)
+  playSong(sourceSongs[0] as any)
+  playStatus.updatePlayerInfo(sourceSongs[0] as any)
 }
 
 const handleDownloadAll = () => {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from 'vue'
 import { LocalUserDetailStore, type PlaylistRow } from '@/store/LocalUserDetail'
 import { MessagePlugin } from 'tdesign-vue-next'
+import LiquidGlass from '@/components/LiquidGlass.vue'
 import type { SongList } from '@/types/audio'
 import defaultCover from '/default-cover.png'
 
@@ -23,6 +24,44 @@ const creating = ref(false)
 const showCreate = ref(false)
 const newName = ref('')
 const searchQuery = ref('')
+
+// Responsive corner-radius for mobile
+const isMobile = ref(false)
+const mobileMql = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)') : null
+
+const onMobileChange = (e: MediaQueryListEvent | MediaQueryList) => {
+  isMobile.value = e.matches
+}
+
+onMounted(() => {
+  if (mobileMql) {
+    onMobileChange(mobileMql)
+    mobileMql.addEventListener('change', onMobileChange)
+  }
+})
+
+onUnmounted(() => {
+  if (mobileMql) {
+    mobileMql.removeEventListener('change', onMobileChange)
+  }
+})
+
+const cornerRadius = computed(() => {
+  if (!isMobile.value) return 22
+  const cssVal = getComputedStyle(document.documentElement).getPropertyValue('--mobile-card-radius')?.trim()
+  if (cssVal) {
+    const num = parseFloat(cssVal)
+    if (Number.isFinite(num)) return num
+  }
+  return 18
+})
+
+const liquidGlassContentStyle: CSSProperties = {
+  color: 'var(--td-text-color-primary)',
+  font: 'inherit',
+  lineHeight: 'normal',
+  textShadow: 'none',
+}
 
 const filteredPlaylists = computed(() => {
   const list = localUserStore.playlists
@@ -80,128 +119,134 @@ const handleClose = () => {
     <Transition name="glass-fade">
       <div v-if="visible" class="liquid-glass-overlay" @click.self="handleClose">
         <div class="overlay-drag-bar" data-tauri-drag-region />
-        <div class="liquid-glass-panel" @click.stop>
-          <!-- Animated refraction border -->
-          <div class="glass-border-glow" />
-          <!-- Light sweep -->
-          <div class="glass-light-sweep" />
-          <!-- Ambient glow -->
-          <div class="glass-ambient" />
+        <LiquidGlass
+          class="liquid-glass-panel"
+          :corner-radius="cornerRadius"
+          :displacement-scale="48"
+          :blur-amount="0.08"
+          :saturation="180"
+          :aberration-intensity="1.5"
+          padding="0"
+          mode="standard"
+          :content-style="liquidGlassContentStyle"
+          @click.stop
+        >
+          <div class="liquid-glass-panel__content">
+            <!-- Header -->
+            <div class="glass-header" data-tauri-drag-region>
+              <div class="glass-title-group">
+                <div class="glass-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v9" />
+                    <path d="M3 15l3.5-3.5a2.12 2.12 0 0 1 3 0L12 14" />
+                    <path d="M12 14l2.5-2.5a2.12 2.12 0 0 1 3 0L21 15" />
+                    <circle cx="9" cy="8" r="1.5" />
+                  </svg>
+                </div>
+                <div class="glass-title-text">
+                  <h2 class="glass-title">{{ t('common.addToPlaylistTitle') }}</h2>
+                  <div class="glass-status">
+                    <span class="status-label">{{ t('common.songCount', { count: songs.length }) }}</span>
+                  </div>
+                </div>
+              </div>
+              <button class="glass-close-btn" @click="handleClose">
+                <i class="iconfont icon-a-quxiaoguanbi" />
+              </button>
+            </div>
 
-          <!-- Header -->
-          <div class="glass-header" data-tauri-drag-region>
-            <div class="glass-title-group">
-              <div class="glass-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v9" />
-                  <path d="M3 15l3.5-3.5a2.12 2.12 0 0 1 3 0L12 14" />
-                  <path d="M12 14l2.5-2.5a2.12 2.12 0 0 1 3 0L21 15" />
-                  <circle cx="9" cy="8" r="1.5" />
+            <!-- Search -->
+            <div class="glass-search">
+              <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                v-model="searchQuery"
+                :placeholder="t('common.searchPlaylist')"
+                spellcheck="false"
+              />
+              <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Loading -->
+            <div v-if="loading" class="glass-loading">
+              <span class="glass-spinner" />
+            </div>
+
+            <!-- Empty -->
+            <div v-else-if="localUserStore.playlists.length === 0" class="glass-empty">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3">
+                <path d="M21 15V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v9" />
+                <path d="M3 15l3.5-3.5a2.12 2.12 0 0 1 3 0L12 14" />
+                <circle cx="9" cy="8" r="1.5" />
+              </svg>
+              <p>{{ t('common.noPlaylistYet') }}</p>
+              <button class="glass-btn primary" style="width:auto;padding:7px 18px" @click="showCreate = true">{{ t('common.createPlaylist') }}</button>
+            </div>
+
+            <!-- No results -->
+            <div v-else-if="filteredPlaylists.length === 0" class="glass-empty">
+              <p>{{ t('common.noMatchPlaylist') }}</p>
+            </div>
+
+            <!-- Playlist list -->
+            <div v-else class="playlist-list">
+              <div
+                v-for="pl in filteredPlaylists"
+                :key="pl.id"
+                class="playlist-item"
+                @click="handleAdd(pl)"
+              >
+                <div class="item-cover">
+                  <img
+                    v-if="pl.coverImgUrl && pl.coverImgUrl !== 'default-cover'"
+                    :src="pl.coverImgUrl"
+                    alt=""
+                    loading="lazy"
+                  />
+                  <img v-else :src="defaultCover" alt="" loading="lazy" />
+                </div>
+                <div class="item-info">
+                  <span class="item-name">{{ pl.name }}</span>
+                  <div class="item-meta">
+                    <span class="meta-count">{{ t('common.songCountShort', { count: pl.songCount }) }}</span>
+                    <span v-if="pl.source" class="meta-source">{{ pl.source }}</span>
+                  </div>
+                </div>
+                <svg class="item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
                 </svg>
               </div>
-              <div class="glass-title-text">
-                <h2 class="glass-title">{{ t('common.addToPlaylistTitle') }}</h2>
-                <div class="glass-status">
-                  <span class="status-label">{{ t('common.songCount', { count: songs.length }) }}</span>
-                </div>
-              </div>
             </div>
-            <button class="glass-close-btn" @click="handleClose">
-              <i class="iconfont icon-a-quxiaoguanbi" />
-            </button>
-          </div>
 
-          <!-- Search -->
-          <div class="glass-search">
-            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              v-model="searchQuery"
-              :placeholder="t('common.searchPlaylist')"
-              spellcheck="false"
-            />
-            <button v-if="searchQuery" class="search-clear" @click="searchQuery = ''">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- Loading -->
-          <div v-if="loading" class="glass-loading">
-            <span class="glass-spinner" />
-          </div>
-
-          <!-- Empty -->
-          <div v-else-if="localUserStore.playlists.length === 0" class="glass-empty">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.3">
-              <path d="M21 15V6a3 3 0 0 0-3-3H6a3 3 0 0 0-3 3v9" />
-              <path d="M3 15l3.5-3.5a2.12 2.12 0 0 1 3 0L12 14" />
-              <circle cx="9" cy="8" r="1.5" />
-            </svg>
-            <p>{{ t('common.noPlaylistYet') }}</p>
-            <button class="glass-btn primary" style="width:auto;padding:7px 18px" @click="showCreate = true">{{ t('common.createPlaylist') }}</button>
-          </div>
-
-          <!-- No results -->
-          <div v-else-if="filteredPlaylists.length === 0" class="glass-empty">
-            <p>{{ t('common.noMatchPlaylist') }}</p>
-          </div>
-
-          <!-- Playlist list -->
-          <div v-else class="playlist-list">
-            <div
-              v-for="pl in filteredPlaylists"
-              :key="pl.id"
-              class="playlist-item"
-              @click="handleAdd(pl)"
-            >
-              <div class="item-cover">
-                <img
-                  v-if="pl.coverImgUrl && pl.coverImgUrl !== 'default-cover'"
-                  :src="pl.coverImgUrl"
-                  alt=""
-                  loading="lazy"
-                />
-                <img v-else :src="defaultCover" alt="" loading="lazy" />
-              </div>
-              <div class="item-info">
-                <span class="item-name">{{ pl.name }}</span>
-                <div class="item-meta">
-                  <span class="meta-count">{{ t('common.songCountShort', { count: pl.songCount }) }}</span>
-                  <span v-if="pl.source" class="meta-source">{{ pl.source }}</span>
-                </div>
-              </div>
-              <svg class="item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </div>
-          </div>
-
-          <!-- Create entry -->
-          <div class="create-entry">
-            <button v-if="!showCreate" class="glass-btn outline create-trigger" @click="showCreate = true">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              {{ t('common.createPlaylist') }}
-            </button>
-            <div v-else class="create-form">
-              <input
-                v-model="newName"
-                :placeholder="t('common.playlistName')"
-                class="create-input"
-                @keydown.enter="handleCreate"
-              />
-              <button class="glass-btn primary" style="width:auto;padding:8px 16px" :disabled="!newName.trim() || creating" @click="handleCreate">
-                <span v-if="creating" class="glass-spinner" />
-                <template v-else>{{ t('common.createAndAdd') }}</template>
+            <!-- Create entry -->
+            <div class="create-entry">
+              <button v-if="!showCreate" class="glass-btn outline create-trigger" @click="showCreate = true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                {{ t('common.createPlaylist') }}
               </button>
-              <button class="glass-btn outline" style="width:auto;padding:8px 14px" @click="showCreate = false; newName = ''">{{ t('common.cancel') }}</button>
+              <div v-else class="create-form">
+                <input
+                  v-model="newName"
+                  :placeholder="t('common.playlistName')"
+                  class="create-input"
+                  @keydown.enter="handleCreate"
+                />
+                <button class="glass-btn primary" style="width:auto;padding:8px 16px" :disabled="!newName.trim() || creating" @click="handleCreate">
+                  <span v-if="creating" class="glass-spinner" />
+                  <template v-else>{{ t('common.createAndAdd') }}</template>
+                </button>
+                <button class="glass-btn outline" style="width:auto;padding:8px 14px" @click="showCreate = false; newName = ''">{{ t('common.cancel') }}</button>
+              </div>
             </div>
           </div>
-        </div>
+        </LiquidGlass>
       </div>
     </Transition>
   </Teleport>
@@ -236,111 +281,17 @@ const handleClose = () => {
 
 // --- Glass Panel ---
 .liquid-glass-panel {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.liquid-glass-panel__content {
   position: relative;
-  width: 440px;
-  max-height: 520px;
+  width: 100%;
   overflow: hidden;
   border-radius: 22px;
   padding: 28px;
-  display: flex;
-  flex-direction: column;
-
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--td-bg-color-container) 72%, transparent) 0%,
-    color-mix(in srgb, var(--td-bg-color-container) 58%, transparent) 35%,
-    color-mix(in srgb, var(--td-bg-color-container) 65%, transparent) 100%
-  );
-  backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
-
-  border: 1.5px solid color-mix(in srgb, var(--td-text-color-primary) 18%, transparent);
-  box-shadow:
-    var(--glass-shadow-panel),
-    inset 0 2px 0 color-mix(in srgb, var(--td-text-color-primary) 12%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
-}
-
-// --- Animated refraction border ---
-.glass-border-glow {
-  position: absolute;
-  inset: 0;
-  border-radius: 22px;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--border-angle, 0deg),
-    transparent 0%,
-    rgba(120, 180, 255, 0.55) 7%,
-    rgba(180, 120, 255, 0.45) 14%,
-    rgba(255, 120, 180, 0.4) 22%,
-    transparent 34%,
-    transparent 66%,
-    rgba(120, 255, 200, 0.45) 74%,
-    rgba(180, 255, 120, 0.4) 82%,
-    rgba(120, 180, 255, 0.55) 94%,
-    transparent 100%
-  );
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  will-change: transform; animation: rotate-border 12s linear infinite;
-  pointer-events: none;
-  z-index: 0;
-
-  @property --border-angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
-  }
-
-  @keyframes rotate-border {
-    to { --border-angle: 360deg; }
-  }
-}
-
-// --- Light sweep ---
-.glass-light-sweep {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 55%;
-  height: 100%;
-  transform: translateX(-120%);
-  background: linear-gradient(
-    108deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.08) 44%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0.08) 56%,
-    transparent 65%
-  );
-  will-change: transform; animation: light-sweep 9s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-  border-radius: 22px;
-
-  @keyframes light-sweep {
-    0%, 100% { transform: translateX(-120%); }
-    50% { transform: translateX(320%); }
-  }
-}
-
-// --- Ambient inner glow ---
-.glass-ambient {
-  position: absolute;
-  top: -30%;
-  right: -20%;
-  width: 70%;
-  height: 70%;
-  background: radial-gradient(ellipse, rgba(120, 160, 255, 0.12) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.liquid-glass-panel > *:not(.glass-border-glow):not(.glass-light-sweep):not(.glass-ambient) {
-  position: relative;
-  z-index: 1;
 }
 
 // ==================
@@ -754,25 +705,36 @@ const handleClose = () => {
   }
 
   .liquid-glass-panel {
-    width: 100%;
-    max-width: 420px;
-    max-height: min(76dvh, 620px);
-    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
-    border-radius: var(--mobile-card-radius);
-    background: var(--mobile-glass-bg-strong);
-    border-color: var(--mobile-glass-border);
-    box-shadow: var(--mobile-surface-shadow);
+    width: min(440px, 100%);
+    max-height: min(82dvh, 680px);
+    display: flex;
   }
 
-  .liquid-glass-panel::before {
+  :deep(.glass) {
+    height: 100%;
+  }
+
+  :deep(.liquid-glass__content) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .liquid-glass-panel__content {
+    border-radius: var(--mobile-card-radius);
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .liquid-glass-panel__content::before {
     content: '';
+    display: block;
     width: 38px;
     height: 4px;
     border-radius: 999px;
     background: rgba(120, 120, 128, 0.36);
-    align-self: center;
-    margin: -8px 0 12px;
-    flex-shrink: 0;
+    margin: -8px auto 12px;
   }
 
   .glass-header {
@@ -833,15 +795,14 @@ const handleClose = () => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glass-border-glow,
-  .glass-light-sweep,
   .glass-spinner {
     animation: none !important;
   }
 
-  .glass-fade-enter-active .liquid-glass-panel,
-  .glass-fade-leave-active .liquid-glass-panel {
+  .liquid-glass-panel {
     animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
 </style>

@@ -6,8 +6,8 @@ import { playSong } from '@/utils/audio/globaPlayList'
 import { fillMissingSongCovers } from '@/utils/songCover'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
-import { DialogPlugin } from 'tdesign-vue-next'
 import SongVirtualList from '@/components/Music/SongVirtualList.vue'
+import { createLiquidGlassConfirm } from '@/utils/liquidGlassConfirm'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -84,26 +84,25 @@ function handlePlay(song: MusicItem) {
   playSong(song as any)
 }
 
-function handlePlayAll() {
+async function handlePlayAll() {
   if (songs.value.length === 0) return
-  const dialog = DialogPlugin.confirm({
-    header: t('common.playAll'),
+  const confirmed = await createLiquidGlassConfirm({
+    title: t('common.playAll'),
     body: t('music.singer.replaceConfirm', { name: singerInfo.value?.info.name || '', count: songs.value.length }),
-    confirmBtn: t('music.list.confirmReplace'),
-    cancelBtn: t('common.cancel'),
-    onConfirm: () => {
-      dialog.destroy()
-      const sourceSongs = songListRef.value?.sortedSongs ?? songs.value
-      localUserStore.replaceSongList(sourceSongs.map(s => ({
-        songmid: s.songmid, name: s.name, singer: s.singer,
-        albumName: s.albumName, img: s.img, source: s.source,
-        url: '', interval: s.interval
-      })) as any)
-      playSong(sourceSongs[0] as any)
-      playStatus.updatePlayerInfo(sourceSongs[0] as any)
-    },
-    onCancel: () => dialog.destroy()
+    confirmText: t('music.list.confirmReplace'),
+    cancelText: t('common.cancel'),
+    icon: 'play'
   })
+  if (!confirmed) return
+
+  const sourceSongs = songListRef.value?.sortedSongs ?? songs.value
+  localUserStore.replaceSongList(sourceSongs.map(s => ({
+    songmid: s.songmid, name: s.name, singer: s.singer,
+    albumName: s.albumName, img: s.img, source: s.source,
+    url: '', interval: s.interval
+  })) as any)
+  playSong(sourceSongs[0] as any)
+  playStatus.updatePlayerInfo(sourceSongs[0] as any)
 }
 
 function switchTab(tab: 'songs' | 'albums') {

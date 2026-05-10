@@ -3,15 +3,20 @@
     <Transition name="glass-fade">
       <div v-if="visible" class="liquid-glass-overlay" @click.self="handleClose">
         <div class="overlay-drag-bar" data-tauri-drag-region />
-        <div class="liquid-glass-panel" @click.stop>
-          <!-- Animated refraction border -->
-          <div class="glass-border-glow" />
-          <!-- Light sweep -->
-          <div class="glass-light-sweep" />
-          <!-- Ambient glow -->
-          <div class="glass-ambient" />
-
-          <!-- Header -->
+        <LiquidGlass
+          class="liquid-glass-panel"
+          :corner-radius="cornerRadius"
+          :displacement-scale="48"
+          :blur-amount="0.08"
+          :saturation="180"
+          :aberration-intensity="1.5"
+          padding="0"
+          mode="standard"
+          :content-style="liquidGlassContentStyle"
+          @click.stop
+        >
+          <div class="liquid-glass-panel__content">
+            <!-- Header -->
           <div class="glass-header" data-tauri-drag-region>
             <div class="glass-title-group">
               <div class="glass-icon">
@@ -292,14 +297,16 @@
               <span>{{ t('backup.opsHint') }}</span>
             </div>
           </div>
-        </div>
+          </div>
+        </LiquidGlass>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type CSSProperties } from 'vue'
+import LiquidGlass from '@/components/LiquidGlass.vue'
 import { useS3BackupStore } from '@/store/S3Backup'
 
 defineProps<{ visible: boolean }>()
@@ -311,6 +318,44 @@ const activeTab = ref<'recommend' | 'config' | 'ops'>('recommend')
 const restorePassword = ref('')
 const showBackupPwd = ref(false)
 const showRestorePwd = ref(false)
+
+// Responsive corner-radius for mobile
+const isMobile = ref(false)
+const mobileMql = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)') : null
+
+const onMobileChange = (e: MediaQueryListEvent | MediaQueryList) => {
+  isMobile.value = e.matches
+}
+
+onMounted(() => {
+  if (mobileMql) {
+    onMobileChange(mobileMql)
+    mobileMql.addEventListener('change', onMobileChange)
+  }
+})
+
+onUnmounted(() => {
+  if (mobileMql) {
+    mobileMql.removeEventListener('change', onMobileChange)
+  }
+})
+
+const cornerRadius = computed(() => {
+  if (!isMobile.value) return 22
+  const cssVal = getComputedStyle(document.documentElement).getPropertyValue('--mobile-card-radius')?.trim()
+  if (cssVal) {
+    const num = parseFloat(cssVal)
+    if (Number.isFinite(num)) return num
+  }
+  return 18
+})
+
+const liquidGlassContentStyle: CSSProperties = {
+  color: 'var(--td-text-color-primary)',
+  font: 'inherit',
+  lineHeight: 'normal',
+  textShadow: 'none',
+}
 
 const isConfigValid = computed(() =>
   store.config.endpoint &&
@@ -381,109 +426,17 @@ function formatTime(iso: string): string {
 
 // --- Glass Panel ---
 .liquid-glass-panel {
+  width: min(500px, calc(100vw - 32px));
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.liquid-glass-panel__content {
   position: relative;
-  width: 500px;
+  width: 100%;
   overflow: hidden;
   border-radius: 22px;
   padding: 28px;
-
-  background: linear-gradient(
-    165deg,
-    color-mix(in srgb, var(--td-bg-color-container) 72%, transparent) 0%,
-    color-mix(in srgb, var(--td-bg-color-container) 58%, transparent) 35%,
-    color-mix(in srgb, var(--td-bg-color-container) 65%, transparent) 100%
-  );
-  backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
-  -webkit-backdrop-filter: blur(var(--glass-blur-panel)) saturate(200%);
-
-  border: 1.5px solid color-mix(in srgb, var(--td-text-color-primary) 18%, transparent);
-  box-shadow:
-    var(--glass-shadow-panel),
-    inset 0 2px 0 color-mix(in srgb, var(--td-text-color-primary) 12%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--td-text-color-primary) 4%, transparent);
-}
-
-// --- Animated refraction border ---
-.glass-border-glow {
-  position: absolute;
-  inset: 0;
-  border-radius: 22px;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--border-angle, 0deg),
-    transparent 0%,
-    rgba(120, 180, 255, 0.55) 7%,
-    rgba(180, 120, 255, 0.45) 14%,
-    rgba(255, 120, 180, 0.4) 22%,
-    transparent 34%,
-    transparent 66%,
-    rgba(120, 255, 200, 0.45) 74%,
-    rgba(180, 255, 120, 0.4) 82%,
-    rgba(120, 180, 255, 0.55) 94%,
-    transparent 100%
-  );
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  will-change: transform; animation: rotate-border 12s linear infinite;
-  pointer-events: none;
-  z-index: 0;
-
-  @property --border-angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
-  }
-
-  @keyframes rotate-border {
-    to { --border-angle: 360deg; }
-  }
-}
-
-// --- Light sweep ---
-.glass-light-sweep {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 55%;
-  height: 100%;
-  transform: translateX(-120%);
-  background: linear-gradient(
-    108deg,
-    transparent 35%,
-    rgba(255, 255, 255, 0.08) 44%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0.08) 56%,
-    transparent 65%
-  );
-  will-change: transform; animation: light-sweep 9s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-  border-radius: 22px;
-
-  @keyframes light-sweep {
-    0%, 100% { transform: translateX(-120%); }
-    50% { transform: translateX(320%); }
-  }
-}
-
-// --- Ambient inner glow ---
-.glass-ambient {
-  position: absolute;
-  top: -30%;
-  right: -20%;
-  width: 70%;
-  height: 70%;
-  background: radial-gradient(ellipse, rgba(120, 160, 255, 0.12) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-// Content above decorative layers
-.liquid-glass-panel > *:not(.glass-border-glow):not(.glass-light-sweep):not(.glass-ambient) {
-  position: relative;
-  z-index: 1;
 }
 
 // ==================
@@ -1135,19 +1088,29 @@ function formatTime(iso: string): string {
   }
 
   .liquid-glass-panel {
-    width: 100%;
-    max-width: 440px;
+    width: min(440px, 100%);
     max-height: min(82dvh, 680px);
-    overflow-y: auto;
-    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    display: flex;
+  }
+
+  :deep(.glass) {
+    height: 100%;
+  }
+
+  :deep(.liquid-glass__content) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .liquid-glass-panel__content {
     border-radius: var(--mobile-card-radius);
-    background: var(--mobile-glass-bg-strong);
-    border-color: var(--mobile-glass-border);
-    box-shadow: var(--mobile-surface-shadow);
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    height: 100%;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
 
-  .liquid-glass-panel::before {
+  .liquid-glass-panel__content::before {
     content: '';
     display: block;
     width: 38px;
@@ -1240,15 +1203,14 @@ function formatTime(iso: string): string {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glass-border-glow,
-  .glass-light-sweep,
   .glass-spinner {
     animation: none !important;
   }
 
-  .glass-fade-enter-active .liquid-glass-panel,
-  .glass-fade-leave-active .liquid-glass-panel {
+  .liquid-glass-panel {
     animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
 </style>

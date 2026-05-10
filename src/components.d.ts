@@ -35,6 +35,7 @@ declare module 'vue' {
     ImportPlaylist: typeof import('./components/ServicePlugin/ImportPlaylist.vue')['default']
     LeaderBord: typeof import('./components/Find/LeaderBord.vue')['default']
     LeaderBordCard: typeof import('./components/Find/LeaderBordCard.vue')['default']
+    LiquidGlass: typeof import('./components/LiquidGlass.vue')['default']
     LyricFontSettings: typeof import('./components/Settings/LyricFontSettings.vue')['default']
     MusicCache: typeof import('./components/Settings/MusicCache.vue')['default']
     NBadge: typeof import('naive-ui')['NBadge']
