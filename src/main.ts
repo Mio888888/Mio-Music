@@ -15,8 +15,9 @@ import { performanceTelemetry } from '@/utils/performanceMonitor'
 // IPC adapter layer
 import './bridge'
 
-// 全局 fetch 拦截器：代理跨域图片请求到 Rust 后端，绕过 WebView CORS
+// 全局 fetch 拦截器：图片请求直连优先，失败后代理兜底，绕过 WebView CORS
 import './utils/cors-proxy'
+import { installImageProxyFallback } from '@/utils/imageProxy'
 
 // Initialize Logto client (skip in desktop lyric window)
 import config from './config'
@@ -30,6 +31,8 @@ if (!window.location.hash.includes('/desktop-lyric')) {
 if (import.meta.env.DEV) {
   performanceTelemetry.startMemorySampling()
 }
+
+installImageProxyFallback()
 
 const app = createApp(App)
 

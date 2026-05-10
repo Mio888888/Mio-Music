@@ -1,3 +1,5 @@
+import { canProxyImageUrl, proxyImageUrl } from '@/utils/imageProxy'
+
 export interface Color { r: number; g: number; b: number }
 export interface ImageAnalysisResult { dominantColor: Color; useBlackText: boolean }
 
@@ -32,8 +34,7 @@ export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysi
     return cacheAndReturn(FALLBACK)
   }
 
-  // 获取像素数据（需要 DOM）
-  const pixels = await getImagePixels(imageSrc)
+  const pixels = await getImagePixelsWithFallback(imageSrc)
   if (!pixels) return cacheAndReturn(FALLBACK)
 
   // Worker 计算颜色分析
@@ -53,6 +54,17 @@ export async function analyzeImageColors(imageSrc: string): Promise<ImageAnalysi
     w.addEventListener('message', handler as EventListener)
     w.postMessage({ requestId, pixels })
   })
+}
+
+async function getImagePixelsWithFallback(imageSrc: string): Promise<Uint8ClampedArray | null> {
+  const directPixels = await getImagePixels(imageSrc)
+  if (directPixels) return directPixels
+
+  if (!canProxyImageUrl(imageSrc)) return null
+
+  const fallbackUrl = proxyImageUrl(imageSrc)
+  if (fallbackUrl === imageSrc) return null
+  return getImagePixels(fallbackUrl)
 }
 
 function getImagePixels(imageSrc: string): Promise<Uint8ClampedArray | null> {
