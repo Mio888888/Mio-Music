@@ -58,7 +58,6 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   try {
     directResponse = await _fetch(input, init)
     if (directResponse.ok) return directResponse
-    directResponse.body?.cancel().catch(() => {})
   } catch (e) {
     console.warn('[CORS Proxy] 图片直连失败，尝试代理兜底:', url.substring(0, 80), e)
   }

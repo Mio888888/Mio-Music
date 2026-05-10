@@ -81,12 +81,12 @@ function handleImageError(event: Event): void {
   const currentSrc = target.currentSrc || target.src || declaredSrc
   const fallbackSource = declaredSrc || currentSrc
   if (!canProxyImageUrl(fallbackSource)) return
-  if (target.dataset[FALLBACK_MARK] === 'true') return
+  if (target.dataset[FALLBACK_MARK] === fallbackSource) return
 
   const fallbackUrl = proxyImageUrl(fallbackSource)
   if (fallbackUrl === currentSrc) return
 
-  target.dataset[FALLBACK_MARK] = 'true'
+  target.dataset[FALLBACK_MARK] = fallbackSource
   target.src = fallbackUrl
 }
 
