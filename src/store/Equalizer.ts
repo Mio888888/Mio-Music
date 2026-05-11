@@ -7,16 +7,35 @@ import createLogger from '@/utils/logger'
 const log = createLogger('EqualizerStore')
 
 export const EQ_STORAGE_KEY = 'equalizer'
-export const EQ_CONFIG_VERSION = 2
+export const EQ_CONFIG_VERSION = 3
 export const EQ_BAND_COUNT = 10
 export const EQ_GAIN_MIN = -24
 export const EQ_GAIN_MAX = 24
 export const EQ_FLAT_PRESET_ID = 'flat'
 export const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] as const
 
+export const EQ_FREQ_MIN = 20
+export const EQ_FREQ_MAX = 20000
+export const EQ_Q_MIN = 0.1
+export const EQ_Q_MAX = 10.0
+export const EQ_Q_DEFAULT_PEAK = 1.414
+export const EQ_Q_DEFAULT_SHELF = 0.7
+
+export type FilterType = 'peak' | 'lowshelf' | 'highshelf' | 'lowpass' | 'highpass' | 'notch'
+
+export const ALL_FILTER_TYPES: FilterType[] = ['peak', 'lowshelf', 'highshelf', 'lowpass', 'highpass', 'notch']
+
+export interface EqBand {
+  frequency: number   // 20-20000 Hz
+  gain: number        // -24 to +24 dB
+  q: number           // 0.1 to 10.0
+  type: FilterType
+  enabled: boolean
+}
+
 export interface EqualizerGains {
   global: number
-  bands: number[]
+  bands: EqBand[]
 }
 
 export interface EqualizerPreset {
@@ -54,15 +73,57 @@ interface ImportResult {
 
 const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/
 
-const DEFAULT_PRESET_DATA: Array<Omit<EqualizerPreset, 'isDefault' | 'gains'> & { bands: number[] }> = [
-  { id: EQ_FLAT_PRESET_ID, name: 'Flat', bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
-  { id: 'pop', name: 'Pop', bands: [4, 3, 2, 0, -2, -2, 0, 2, 3, 4] },
-  { id: 'rock', name: 'Rock', bands: [5, 4, 3, 1, -1, -1, 1, 3, 4, 5] },
-  { id: 'jazz', name: 'Jazz', bands: [3, 2, 1, 2, -2, -2, 0, 2, 3, 4] },
-  { id: 'classical', name: 'Classical', bands: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4] },
-  { id: 'bass_boost', name: 'Bass Boost', bands: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
-  { id: 'vocal_boost', name: 'Vocal Boost', bands: [-2, -2, -1, 1, 4, 4, 2, 1, 0, -1] },
-  { id: 'treble_boost', name: 'Treble Boost', bands: [0, 0, 0, 0, 0, 1, 3, 5, 6, 7] }
+export const clampEqGain = (gain: number): number => {
+  if (!Number.isFinite(gain)) return 0
+  return Math.min(EQ_GAIN_MAX, Math.max(EQ_GAIN_MIN, gain))
+}
+
+export const clampEqFreq = (freq: number): number => {
+  if (!Number.isFinite(freq)) return 1000
+  return Math.min(EQ_FREQ_MAX, Math.max(EQ_FREQ_MIN, freq))
+}
+
+export const clampEqQ = (q: number): number => {
+  if (!Number.isFinite(q)) return EQ_Q_DEFAULT_PEAK
+  return Math.min(EQ_Q_MAX, Math.max(EQ_Q_MIN, q))
+}
+
+export const isValidFilterType = (type: unknown): type is FilterType => {
+  return typeof type === 'string' && ALL_FILTER_TYPES.includes(type as FilterType)
+}
+
+export const getDefaultQ = (type: FilterType): number => {
+  return (type === 'lowshelf' || type === 'highshelf') ? EQ_Q_DEFAULT_SHELF : EQ_Q_DEFAULT_PEAK
+}
+
+export const createFlatBands = (): EqBand[] =>
+  EQ_FREQUENCIES.map(freq => ({
+    frequency: freq,
+    gain: 0,
+    q: EQ_Q_DEFAULT_PEAK,
+    type: 'peak' as FilterType,
+    enabled: true
+  }))
+
+export const createFlatGains = (): EqualizerGains => ({
+  global: 0,
+  bands: createFlatBands()
+})
+
+export const cloneGains = (source: EqualizerGains): EqualizerGains => ({
+  global: source.global,
+  bands: source.bands.map(band => ({ ...band }))
+})
+
+const DEFAULT_PRESET_DATA: Array<Omit<EqualizerPreset, 'isDefault' | 'gains'> & { bandGains: number[] }> = [
+  { id: EQ_FLAT_PRESET_ID, name: 'Flat', bandGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { id: 'pop', name: 'Pop', bandGains: [4, 3, 2, 0, -2, -2, 0, 2, 3, 4] },
+  { id: 'rock', name: 'Rock', bandGains: [5, 4, 3, 1, -1, -1, 1, 3, 4, 5] },
+  { id: 'jazz', name: 'Jazz', bandGains: [3, 2, 1, 2, -2, -2, 0, 2, 3, 4] },
+  { id: 'classical', name: 'Classical', bandGains: [4, 3, 2, 1, -1, -1, 0, 2, 3, 4] },
+  { id: 'bass_boost', name: 'Bass Boost', bandGains: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+  { id: 'vocal_boost', name: 'Vocal Boost', bandGains: [-2, -2, -1, 1, 4, 4, 2, 1, 0, -1] },
+  { id: 'treble_boost', name: 'Treble Boost', bandGains: [0, 0, 0, 0, 0, 1, 3, 5, 6, 7] }
 ]
 
 export const DEFAULT_EQUALIZER_PRESETS: EqualizerPreset[] = DEFAULT_PRESET_DATA.map((preset) => ({
@@ -71,7 +132,13 @@ export const DEFAULT_EQUALIZER_PRESETS: EqualizerPreset[] = DEFAULT_PRESET_DATA.
   isDefault: true,
   gains: {
     global: 0,
-    bands: [...preset.bands]
+    bands: preset.bandGains.map((gain, index) => ({
+      frequency: EQ_FREQUENCIES[index],
+      gain,
+      q: EQ_Q_DEFAULT_PEAK,
+      type: 'peak' as FilterType,
+      enabled: true
+    }))
   }
 }))
 
@@ -105,21 +172,6 @@ const isFiniteNumber = (value: unknown): value is number => (
   typeof value === 'number' && Number.isFinite(value)
 )
 
-export const clampEqGain = (gain: number): number => {
-  if (!Number.isFinite(gain)) return 0
-  return Math.min(EQ_GAIN_MAX, Math.max(EQ_GAIN_MIN, gain))
-}
-
-export const createFlatGains = (): EqualizerGains => ({
-  global: 0,
-  bands: new Array(EQ_BAND_COUNT).fill(0)
-})
-
-export const cloneGains = (source: EqualizerGains): EqualizerGains => ({
-  global: source.global,
-  bands: [...source.bands]
-})
-
 const clonePreset = (preset: EqualizerPreset): EqualizerPreset => ({
   id: preset.id,
   name: preset.name,
@@ -140,32 +192,59 @@ const normalizeGainValue = (value: unknown, strict: boolean, label: string): num
   return value
 }
 
-const normalizeBands = (value: unknown, strict: boolean, label: string): number[] => {
-  if (!Array.isArray(value)) {
-    throw new Error(`${label} 必须是数组`)
+const migrateBands = (bands: unknown): EqBand[] => {
+  // If it's an array of numbers (v2 format), migrate
+  if (Array.isArray(bands) && bands.length > 0 && typeof bands[0] === 'number') {
+    return (bands as number[]).map((gain, index) => ({
+      frequency: clampEqFreq(EQ_FREQUENCIES[index] ?? 1000),
+      gain: clampEqGain(gain),
+      q: EQ_Q_DEFAULT_PEAK,
+      type: 'peak' as FilterType,
+      enabled: true
+    }))
   }
-  if (value.length !== EQ_BAND_COUNT) {
-    throw new Error(`${label} 必须包含 ${EQ_BAND_COUNT} 个频段`)
+  // If it's already EqBand[], validate and fix
+  if (Array.isArray(bands)) {
+    return (bands as unknown[]).map((band, index) => {
+      if (typeof band === 'object' && band !== null && !Array.isArray(band)) {
+        const b = band as Record<string, unknown>
+        return {
+          frequency: clampEqFreq(typeof b.frequency === 'number' ? b.frequency : EQ_FREQUENCIES[index] ?? 1000),
+          gain: clampEqGain(typeof b.gain === 'number' ? b.gain : 0),
+          q: clampEqQ(typeof b.q === 'number' ? b.q : EQ_Q_DEFAULT_PEAK),
+          type: isValidFilterType(b.type) ? b.type : 'peak',
+          enabled: typeof b.enabled === 'boolean' ? b.enabled : true,
+        }
+      }
+      return {
+        frequency: EQ_FREQUENCIES[index] ?? 1000,
+        gain: 0,
+        q: EQ_Q_DEFAULT_PEAK,
+        type: 'peak' as FilterType,
+        enabled: true,
+      }
+    })
   }
-  return value.map((gain, index) => normalizeGainValue(gain, strict, `${label}[${index}]`))
+  return createFlatBands()
 }
 
 const normalizeGains = (value: unknown, strict: boolean, label: string): EqualizerGains => {
-  if (Array.isArray(value)) {
+  // v2 format: bare number array
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'number') {
     return {
       global: 0,
-      bands: normalizeBands(value, strict, `${label}.bands`)
+      bands: migrateBands(value)
     }
   }
 
-  if (!isRecord(value)) {
-    throw new Error(`${label} 必须包含 global 和 bands`)
+  if (isRecord(value)) {
+    const global = normalizeGainValue(value.global, strict, `${label}.global`)
+    const bands = migrateBands(value.bands)
+    return { global, bands }
   }
 
-  return {
-    global: normalizeGainValue(value.global, strict, `${label}.global`),
-    bands: normalizeBands(value.bands, strict, `${label}.bands`)
-  }
+  if (strict) throw new Error(`${label} 格式无效`)
+  return createFlatGains()
 }
 
 const getLegacyPresetIdByName = (name: string): string | undefined => {
@@ -432,12 +511,17 @@ export const useEqualizerStore = defineStore('equalizer', () => {
   }
 
   function getBackendPayload() {
-    const normalized = normalizeGains(gains.value, false, 'gains')
     return {
       enabled: enabled.value,
-      globalGain: normalized.global,
-      global_gain: normalized.global,
-      bands: normalized.bands
+      globalGain: gains.value.global,
+      global_gain: gains.value.global,
+      bands: gains.value.bands.map(band => ({
+        frequency: band.frequency,
+        gain: band.gain,
+        q: band.q,
+        type: band.type,
+        enabled: band.enabled
+      }))
     }
   }
 
@@ -476,18 +560,41 @@ export const useEqualizerStore = defineStore('equalizer', () => {
 
   function setBandGain(index: number, gain: number) {
     if (index < 0 || index >= EQ_BAND_COUNT) return
-    const nextBands = [...gains.value.bands]
-    nextBands[index] = clampEqGain(gain)
-    gains.value = {
-      ...gains.value,
-      bands: nextBands
+    const bands = [...gains.value.bands]
+    bands[index] = { ...bands[index], gain: clampEqGain(gain) }
+    gains.value = { ...gains.value, bands }
+    addLog(`Adjusted band ${bands[index].frequency}Hz to ${clampEqGain(gain).toFixed(1)}dB`)
+  }
+
+  function setBandFrequency(index: number, frequency: number) {
+    if (index < 0 || index >= EQ_BAND_COUNT) return
+    const bands = [...gains.value.bands]
+    bands[index] = { ...bands[index], frequency: clampEqFreq(frequency) }
+    gains.value = { ...gains.value, bands }
+  }
+
+  function setBandQ(index: number, q: number) {
+    if (index < 0 || index >= EQ_BAND_COUNT) return
+    const bands = [...gains.value.bands]
+    bands[index] = { ...bands[index], q: clampEqQ(q) }
+    gains.value = { ...gains.value, bands }
+  }
+
+  function setBandType(index: number, type: FilterType) {
+    if (index < 0 || index >= EQ_BAND_COUNT) return
+    const bands = [...gains.value.bands]
+    const defaultQ = getDefaultQ(type)
+    bands[index] = { ...bands[index], type, q: defaultQ }
+    // For LP/HP/Notch, gain is not applicable — set to 0
+    if (['lowpass', 'highpass', 'notch'].includes(type)) {
+      bands[index] = { ...bands[index], gain: 0 }
     }
-    addLog(`Adjusted band ${EQ_FREQUENCIES[index]}Hz to ${nextBands[index].toFixed(1)}dB`)
+    gains.value = { ...gains.value, bands }
   }
 
   function setGains(newGains: EqualizerGains | number[]) {
     gains.value = normalizeGains(newGains, false, 'gains')
-    addLog(`${i18n.global.t('play.gainUpdated')} [${gains.value.bands.map((gain) => gain.toFixed(1)).join(', ')}], global ${gains.value.global.toFixed(1)}`)
+    addLog(`${i18n.global.t('play.gainUpdated')} [${gains.value.bands.map((band) => band.gain.toFixed(1)).join(', ')}], global ${gains.value.global.toFixed(1)}`)
   }
 
   function applyPreset(presetId: string): boolean {
@@ -614,6 +721,9 @@ export const useEqualizerStore = defineStore('equalizer', () => {
     setEnabled,
     setGlobalGain,
     setBandGain,
+    setBandFrequency,
+    setBandQ,
+    setBandType,
     setGains,
     setCurrentPreset,
     applyPreset,

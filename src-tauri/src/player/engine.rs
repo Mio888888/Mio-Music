@@ -1,5 +1,5 @@
 use crate::player::effects::{
-    AtomicF64, BalanceSource, BassBoostSource, EqSettings, EqSource, EqState, NUM_EQ_BANDS,
+    AtomicF64, BalanceSource, EqSettings, EqSource, EqState, NUM_EQ_BANDS,
 };
 use crate::player::spectrum::{PositionSource, PositionState, SpectrumSource, SpectrumState};
 use crate::player::{AudioSlot, PlaybackState, PlayerSnapshot, SharedPlayer};
@@ -26,7 +26,6 @@ pub struct SlotPipeline {
     spectrum_state: Arc<SpectrumState>,
     position_state: Arc<PositionState>,
     balance: Arc<AtomicF64>,
-    bass_boost_gain: Arc<AtomicF64>,
     #[allow(dead_code)]
     temp_file: Option<PathBuf>,
 }
@@ -77,12 +76,10 @@ impl SlotPipeline {
         let spectrum_state = Arc::new(SpectrumState::new());
         let position_state = Arc::new(PositionState::new());
         let balance = Arc::new(AtomicF64::new(0.0));
-        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
 
         position_state.set_initial(sample_rate, channels, duration);
 
-        // 管线: Decoder → BassBoost → EQ → Balance → Spectrum → Position
-        let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
+        // 管线: Decoder → EQ → Balance → Spectrum → Position
         let source = EqSource::new(source, eq_state.clone());
         let source = BalanceSource::new(source, balance.clone());
         let source = SpectrumSource::new(source, spectrum_state.clone());
@@ -99,7 +96,6 @@ impl SlotPipeline {
             spectrum_state,
             position_state,
             balance,
-            bass_boost_gain,
             temp_file: None,
         })
     }
@@ -191,11 +187,9 @@ impl SlotPipeline {
         let spectrum_state = Arc::new(SpectrumState::new());
         let position_state = Arc::new(PositionState::new());
         let balance = Arc::new(AtomicF64::new(0.0));
-        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
 
         position_state.set_initial(sample_rate, channels, duration);
 
-        let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
         let source = EqSource::new(source, eq_state.clone());
         let source = BalanceSource::new(source, balance.clone());
         let source = SpectrumSource::new(source, spectrum_state.clone());
@@ -212,7 +206,6 @@ impl SlotPipeline {
             spectrum_state,
             position_state,
             balance,
-            bass_boost_gain,
             temp_file: Some(path.to_path_buf()),
         })
     }
@@ -1013,11 +1006,9 @@ impl PlayerEngine {
         let spectrum_state = Arc::new(SpectrumState::new());
         let position_state = Arc::new(PositionState::new());
         let balance = Arc::new(AtomicF64::new(0.0));
-        let bass_boost_gain = Arc::new(AtomicF64::new(0.0));
 
         position_state.set_initial(sample_rate, channels, duration);
 
-        let source = BassBoostSource::new(source, bass_boost_gain.clone(), channels, sample_rate);
         let source = EqSource::new(source, eq_state.clone());
         let source = BalanceSource::new(source, balance.clone());
         let source = SpectrumSource::new(source, spectrum_state.clone());
@@ -1034,7 +1025,6 @@ impl PlayerEngine {
             spectrum_state,
             position_state,
             balance,
-            bass_boost_gain,
             temp_file: None,
         })
     }
@@ -1087,7 +1077,7 @@ impl PlayerEngine {
         if index >= NUM_EQ_BANDS {
             return;
         }
-        self.eq_settings.bands[index] = gain;
+        self.eq_settings.bands[index].gain = gain;
         self.set_eq_settings(self.eq_settings.clone());
     }
 
@@ -1097,15 +1087,6 @@ impl PlayerEngine {
 
     pub fn get_eq_global_gain(&self) -> f64 {
         self.eq_settings.effective_global_gain()
-    }
-
-    pub fn set_bass_boost(&self, gain: f64) {
-        if let Some(ref p) = self.primary {
-            p.bass_boost_gain.store(gain)
-        }
-        if let Some(ref s) = self.secondary {
-            s.bass_boost_gain.store(gain)
-        }
     }
 
     pub fn set_balance(&self, value: f64) {

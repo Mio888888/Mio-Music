@@ -10,7 +10,6 @@ class AudioManager {
   private analysers = new Map<string, { node: AnalyserNode; element: HTMLAudioElement }>()
   private splitters = new WeakMap<HTMLAudioElement, GainNode>()
   private equalizers = new WeakMap<HTMLAudioElement, BiquadFilterNode[]>()
-  private bassBoostFilters = new WeakMap<HTMLAudioElement, BiquadFilterNode>()
   private convolverNodes = new WeakMap<HTMLAudioElement, ConvolverNode>()
   private surroundGainNodes = new WeakMap<HTMLAudioElement, GainNode>()
   private balanceNodes = new WeakMap<HTMLAudioElement, StereoPannerNode>()
@@ -64,12 +63,6 @@ class AudioManager {
         let lastNode: AudioNode = source
         filters.forEach((f) => { lastNode.connect(f); lastNode = f })
         this.equalizers.set(audioElement, filters)
-
-        // Bass Boost
-        const bassBoost = context.createBiquadFilter()
-        bassBoost.type = 'lowshelf'; bassBoost.frequency.value = 200; bassBoost.gain.value = 0
-        this.bassBoostFilters.set(audioElement, bassBoost)
-        lastNode.connect(bassBoost); lastNode = bassBoost
 
         // Surround (Convolver)
         const convolver = context.createConvolver()
@@ -156,7 +149,7 @@ class AudioManager {
         this.analysers.delete(id)
       }
     }
-    for (const map of [this.splitters, this.equalizers, this.bassBoostFilters, this.convolverNodes, this.surroundGainNodes, this.balanceNodes, this.crossfadeGains, this.crossfadeLowpasses, this.audioSources, this.audioContexts] as any[]) {
+    for (const map of [this.splitters, this.equalizers, this.convolverNodes, this.surroundGainNodes, this.balanceNodes, this.crossfadeGains, this.crossfadeLowpasses, this.audioSources, this.audioContexts] as any[]) {
       if (map.delete) map.delete(audioElement)
     }
   }
@@ -173,7 +166,6 @@ class AudioManager {
     return filters ? filters.map((f) => f.gain.value) : new Array(this.EQ_FREQUENCIES.length).fill(0)
   }
 
-  setBassBoost(audioElement: HTMLAudioElement, gain: number) { this.bassBoostFilters.get(audioElement)?.gain && (this.bassBoostFilters.get(audioElement)!.gain.value = gain) }
   setBalance(audioElement: HTMLAudioElement, value: number) { this.balanceNodes.get(audioElement)?.pan && (this.balanceNodes.get(audioElement)!.pan.value = value) }
 
   setSurroundMode(audioElement: HTMLAudioElement, mode: 'off' | 'small' | 'medium' | 'large') {

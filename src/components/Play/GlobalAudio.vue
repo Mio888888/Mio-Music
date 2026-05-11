@@ -22,8 +22,7 @@ const applyGlobalEQ = () => {
 
 // 音效变化时同步到 Rust 后端
 const applyGlobalEffects = () => {
-  const { bassBoost, balance } = effectStore
-  invoke('player__set_bass_boost', { gain: bassBoost.enabled ? bassBoost.gain : 0 })
+  const { balance } = effectStore
   invoke('player__set_balance', { value: balance.enabled ? balance.value : 0 })
 }
 
@@ -38,7 +37,7 @@ onMounted(async () => {
 })
 
 watch(
-  [() => effectStore.bassBoost, () => effectStore.surround, () => effectStore.balance],
+  [() => effectStore.surround, () => effectStore.balance],
   () => { applyGlobalEffects() },
   { deep: true }
 )

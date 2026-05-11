@@ -1,4 +1,4 @@
-use crate::player::effects::{EqSettings, NUM_EQ_BANDS};
+use crate::player::effects::{EqBand, EqSettings, NUM_EQ_BANDS};
 use crate::player::media_control::MEDIA_CONTROL;
 use crate::player::{AudioSlot, SharedPlayer};
 use serde::{Deserialize, Serialize};
@@ -24,20 +24,41 @@ type CmdResult<T> = Result<CommandResult<T>, String>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EqBandPayload {
+    pub frequency: f64,
+    pub gain: f64,
+    pub q: f64,
+    #[serde(rename = "type")]
+    pub filter_type: crate::player::effects::FilterType,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EqSettingsPayload {
     pub enabled: bool,
     pub global_gain: f64,
-    pub bands: Vec<f64>,
+    pub bands: Vec<EqBandPayload>,
 }
 
 impl TryFrom<EqSettingsPayload> for EqSettings {
     type Error = String;
 
     fn try_from(payload: EqSettingsPayload) -> Result<Self, Self::Error> {
-        let bands: [f64; NUM_EQ_BANDS] = payload
-            .bands
-            .try_into()
-            .map_err(|_| format!("EQ 设置必须包含 {NUM_EQ_BANDS} 个频段"))?;
+        if payload.bands.len() != NUM_EQ_BANDS {
+            return Err(format!("EQ 设置必须包含 {NUM_EQ_BANDS} 个频段"));
+        }
+
+        let bands: [EqBand; NUM_EQ_BANDS] = std::array::from_fn(|i| {
+            let b = &payload.bands[i];
+            EqBand {
+                frequency: b.frequency,
+                gain: b.gain,
+                q: b.q,
+                filter_type: b.filter_type,
+                enabled: b.enabled,
+            }
+        });
 
         Ok(Self {
             enabled: payload.enabled,
@@ -152,7 +173,7 @@ pub fn player__set_eq_settings(
     player: State<'_, SharedPlayer>,
     enabled: bool,
     global_gain: f64,
-    bands: Vec<f64>,
+    bands: Vec<EqBandPayload>,
 ) -> CmdResult<()> {
     let settings = EqSettings::try_from(EqSettingsPayload { enabled, global_gain, bands })?;
     player.lock().set_eq_settings(settings);
@@ -180,13 +201,6 @@ pub fn player__get_eq_bands(player: State<'_, SharedPlayer>) -> CmdResult<Vec<f6
 #[tauri::command]
 pub fn player__get_eq_global_gain(player: State<'_, SharedPlayer>) -> CmdResult<f64> {
     Ok(CommandResult::ok(player.lock().get_eq_global_gain()))
-}
-
-#[allow(non_snake_case)]
-#[tauri::command]
-pub fn player__set_bass_boost(player: State<'_, SharedPlayer>, gain: f64) -> CmdResult<()> {
-    player.lock().set_bass_boost(gain);
-    Ok(CommandResult::ok(()))
 }
 
 #[allow(non_snake_case)]

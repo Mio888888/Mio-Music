@@ -289,7 +289,17 @@ export default {
     presetClassical: 'Classical(古典)',
     presetBassBoost: 'Bass Boost(低音增强)',
     presetVocalBoost: 'Vocal Boost(人声增强)',
-    presetTrebleBoost: 'Treble Boost(高音增强)'
+    presetTrebleBoost: 'Treble Boost(高音增强)',
+    bandParams: '频段 {index} 参数',
+    frequency: 'Frequency（频率）',
+    qFactor: 'Q（品质因子）',
+    filterType: 'Type（滤波器类型）',
+    typePeak: 'Peak（峰值）',
+    typeLowShelf: 'Low Shelf（低搁架）',
+    typeHighShelf: 'High Shelf（高搁架）',
+    typeLowPass: 'Low Pass（低通）',
+    typeHighPass: 'High Pass（高通）',
+    typeNotch: 'Notch（陷波）'
   },
   audioOutput: {
     title: '音频输出设备',
@@ -319,11 +329,6 @@ export default {
   audioEffect: {
     title: '高级音效处理 (Audio Effects)',
     resetAll: '重置全部',
-    bassBoost: '低音增强 (Bass Boost)',
-    bassGain: '低频增益',
-    bassLight: '轻度',
-    bassMedium: '中度',
-    bassHeavy: '重度',
     surround: '环绕音效 (Surround)',
     surroundSimulation: '环境模拟',
     surroundOff: '关闭',

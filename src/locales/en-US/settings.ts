@@ -280,7 +280,17 @@ export default {
     presetClassical: 'Classical',
     presetBassBoost: 'Bass Boost',
     presetVocalBoost: 'Vocal Boost',
-    presetTrebleBoost: 'Treble Boost'
+    presetTrebleBoost: 'Treble Boost',
+    bandParams: 'Band {index} Parameters',
+    frequency: 'Frequency',
+    qFactor: 'Q Factor',
+    filterType: 'Filter Type',
+    typePeak: 'Peak',
+    typeLowShelf: 'Low Shelf',
+    typeHighShelf: 'High Shelf',
+    typeLowPass: 'Low Pass',
+    typeHighPass: 'High Pass',
+    typeNotch: 'Notch'
   },
   audioOutput: {
     title: 'Audio Output Device',
@@ -310,11 +320,6 @@ export default {
   audioEffect: {
     title: 'Advanced Audio Effects (Audio Effects)',
     resetAll: 'Reset All',
-    bassBoost: 'Bass Boost',
-    bassGain: 'Bass Gain',
-    bassLight: 'Light',
-    bassMedium: 'Medium',
-    bassHeavy: 'Heavy',
     surround: 'Surround Sound',
     surroundSimulation: 'Environment Simulation',
     surroundOff: 'Off',

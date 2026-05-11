@@ -425,7 +425,6 @@ pub fn run() {
             player::commands::player__set_eq_band,
             player::commands::player__get_eq_bands,
             player::commands::player__get_eq_global_gain,
-            player::commands::player__set_bass_boost,
             player::commands::player__set_balance,
             player::commands::player__update_now_playing,
             player::commands::player__shutdown,
