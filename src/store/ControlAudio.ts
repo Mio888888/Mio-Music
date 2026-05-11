@@ -93,13 +93,10 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     const un3 = await listen('player:ended', () => {
       Audio.isPlay = false
       publish('ended')
-      // 通知全局控制器自动播放下一首
-      window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'autoNext' } }))
     })
 
     const un4 = await listen('player:crossfade_swap', () => {
-      // Rust 自动 crossfade 完成交换，通知前端更新 UI 状态
-      window.dispatchEvent(new CustomEvent('global-music-control', { detail: { name: 'crossfadeSwap' } }))
+      publish('slotSwap')
     })
 
     const un5 = await listen('player:error', (event: any) => {

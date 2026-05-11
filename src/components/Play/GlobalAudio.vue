@@ -4,7 +4,7 @@ import { ControlAudioStore } from '@/store/ControlAudio'
 import { useEqualizerStore } from '@/store/Equalizer'
 import { useAudioEffectsStore } from '@/store/AudioEffects'
 import { invoke } from '@tauri-apps/api/core'
-import { installShortDurationGuard, uninstallShortDurationGuard } from '@/utils/audio/globaPlayList'
+import { installShortDurationGuard, onCrossfadeSwap, playNext, uninstallShortDurationGuard } from '@/utils/audio/globaPlayList'
 import createLogger from '@/utils/logger'
 
 const log = createLogger('GlobalAudio')
@@ -12,6 +12,8 @@ const log = createLogger('GlobalAudio')
 const audioStore = ControlAudioStore()
 const eqStore = useEqualizerStore()
 const effectStore = useAudioEffectsStore()
+let unsubscribeEnded: (() => void) | null = null
+let unsubscribeSlotSwap: (() => void) | null = null
 
 provide('audioSubscribe', audioStore.subscribe)
 
@@ -28,6 +30,12 @@ const applyGlobalEffects = () => {
 
 onMounted(async () => {
   await audioStore.init()
+  unsubscribeEnded = audioStore.subscribe('ended', () => {
+    playNext()
+  })
+  unsubscribeSlotSwap = audioStore.subscribe('slotSwap', () => {
+    onCrossfadeSwap()
+  })
   installShortDurationGuard()
   log.debug('Rust 原生音频引擎初始化完成')
 
@@ -43,6 +51,10 @@ watch(
 )
 
 onUnmounted(() => {
+  unsubscribeEnded?.()
+  unsubscribeEnded = null
+  unsubscribeSlotSwap?.()
+  unsubscribeSlotSwap = null
   uninstallShortDurationGuard()
   audioStore.destroy()
 })

@@ -611,13 +611,6 @@ export function playNext(): SongList | null {
     return null
   }
 
-  // 无缝换曲模式：尝试使用预加载的下一曲
-  const setting = playSetting()
-  if (setting.isSeamlessTransition && preloadedSong && preloadedReady) {
-    seamlessNext()
-    return preloadedSong
-  }
-
   if (playMode.value === PlayMode.SINGLE) {
     const song = store.list[_playIndex]
     if (song) { playSong(song); return song }
@@ -628,9 +621,17 @@ export function playNext(): SongList | null {
     _playIndex = (_playIndex + 1) % store.list.length
   }
   const song = store.list[_playIndex]
-  if (song) {
-    playSong(song)
+  if (!song) return null
+
+  const setting = playSetting()
+  if (setting.isSeamlessTransition && preloadedSong?.songmid === song.songmid && preloadedReady) {
+    seamlessNext().then((success) => {
+      if (!success) playSong(song)
+    })
+    return song
   }
+
+  playSong(song)
   return song
 }
 
@@ -644,10 +645,7 @@ export async function seamlessNext(): Promise<boolean> {
   const setting = playSetting()
 
   if (setting.seamlessMode === 'crossfade') {
-    // crossfade 模式：Rust 后端自动完成渐变和 slot 交换
-    // 前端只更新 UI 状态，不调用 swap_slot（否则会与 Rust 自动交换冲突导致音频错位）
-    updateSeamlessState()
-    return true
+    return false
   }
 
   // gapless 模式：前端主动触发即时切换
