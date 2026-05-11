@@ -2,7 +2,7 @@
   <div class="equalizer-settings">
     <t-card :title="t('settings.equalizer.title')" :bordered="false">
       <template #actions>
-        <t-space>
+        <t-space align="center">
           <t-switch
             v-model="enabled"
             :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]"
@@ -196,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -229,6 +229,8 @@ const CANVAS_HEIGHT = 250
 const SPECTRUM_BAND_COUNT = 128
 const SILENCE_DB = -80
 const RESPONSE_POINTS = 300
+const PLOT_INSET_X = 16
+const PLOT_INSET_Y = 16
 
 const GRID_FREQS = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
 const GRID_DB = [-24, -18, -12, -6, 0, 6, 12, 18, 24]
@@ -268,7 +270,9 @@ const selectedBandIndex = ref(-1)
 
 let animationId = 0
 let unlisten: UnlistenFn | null = null
+let resizeObserver: ResizeObserver | null = null
 let spectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
+let displaySpectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -295,11 +299,32 @@ const sliderValueToFreq = (val: number): number => {
 const freqToX = (freq: number, width: number): number => {
   const minLog = Math.log10(20)
   const maxLog = Math.log10(20000)
-  return ((Math.log10(freq) - minLog) / (maxLog - minLog)) * width
+  return PLOT_INSET_X + ((Math.log10(freq) - minLog) / (maxLog - minLog)) * Math.max(1, width - PLOT_INSET_X * 2)
 }
 
 const dbToY = (db: number, height: number): number => {
-  return ((24 - db) / 48) * height
+  return PLOT_INSET_Y + ((24 - db) / 48) * Math.max(1, height - PLOT_INSET_Y * 2)
+}
+
+const drawRoundedRect = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number
+) => {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath()
+    ctx.roundRect(x, y, width, height, radius)
+    ctx.fill()
+    return
+  }
+  ctx.fillRect(x, y, width, height)
+}
+
+const prefersReducedMotion = (): boolean => {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 // ---------------------------------------------------------------------------
@@ -440,6 +465,40 @@ const readThemeValue = (name: string, fallback: string): string => {
   return value || fallback
 }
 
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value))
+
+const withAlpha = (color: string, alpha: number, fallback = 'rgba(0, 167, 77, 1)'): string => {
+  const normalizedAlpha = clamp(alpha, 0, 1)
+  const trimmed = color.trim()
+
+  const fallbackMatch = fallback.match(/rgba?\(([^)]+)\)/i)
+  const fallbackParts = fallbackMatch?.[1]
+    .split(',')
+    .map((part) => Number.parseFloat(part.trim())) ?? [0, 167, 77]
+  const fallbackRgb = fallbackParts.slice(0, 3).map((part, index) => clamp(Number.isFinite(part) ? part : [0, 167, 77][index], 0, 255))
+
+  const hexMatch = trimmed.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i)
+  if (hexMatch) {
+    const hex = hexMatch[1]
+    const fullHex = hex.length === 3
+      ? hex.split('').map((char) => char + char).join('')
+      : hex.slice(0, 6)
+    const rgb = [0, 2, 4].map((index) => Number.parseInt(fullHex.slice(index, index + 2), 16))
+    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${normalizedAlpha})`
+  }
+
+  const rgbMatch = trimmed.match(/^rgba?\(([^)]+)\)$/i)
+  if (rgbMatch) {
+    const parts = rgbMatch[1].split(',').map((part) => Number.parseFloat(part.trim()))
+    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
+      const rgb = parts.slice(0, 3).map((part) => clamp(part, 0, 255))
+      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${normalizedAlpha})`
+    }
+  }
+
+  return `rgba(${fallbackRgb[0]}, ${fallbackRgb[1]}, ${fallbackRgb[2]}, ${normalizedAlpha})`
+}
+
 // ---------------------------------------------------------------------------
 // Preset / display
 // ---------------------------------------------------------------------------
@@ -535,11 +594,37 @@ const onFreqSliderChange = (event: Event) => {
   const input = event.target as HTMLInputElement
   const freq = sliderValueToFreq(parseFloat(input.value))
   eqStore.setBandFrequency(selectedBandIndex.value, freq)
+  updateSliderTrack(input)
 }
 
 const onQSliderChange = (event: Event) => {
   const input = event.target as HTMLInputElement
   eqStore.setBandQ(selectedBandIndex.value, parseFloat(input.value))
+  updateSliderTrack(input)
+}
+
+/**
+ * Update the native range slider background to show a filled track effect.
+ * The left portion (from start to current value) is rendered in brand color,
+ * the right portion remains in the component background color.
+ */
+const updateSliderTrack = (el: HTMLInputElement) => {
+  const min = parseFloat(el.min)
+  const max = parseFloat(el.max)
+  const val = parseFloat(el.value)
+  const pct = ((val - min) / (max - min)) * 100
+  el.style.background =
+    `linear-gradient(to right, var(--td-brand-color) ${pct}%, var(--td-bg-color-component) ${pct}%)`
+}
+
+/**
+ * Initialize filled track styles on all param-slider elements inside the panel.
+ */
+const initAllSliderTracks = () => {
+  const panel = document.querySelector('.band-params-panel')
+  if (!panel) return
+  const sliders = panel.querySelectorAll<HTMLInputElement>('.param-slider')
+  sliders.forEach(updateSliderTrack)
 }
 
 const onTypeChange = (type: FilterType) => {
@@ -629,9 +714,11 @@ const resizeCanvas = () => {
   if (!canvasRef.value || !canvasContainerRef.value) return
   const rect = canvasContainerRef.value.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
-  canvasRef.value.width = Math.floor(rect.width * dpr)
-  canvasRef.value.height = Math.floor(CANVAS_HEIGHT * dpr)
-  canvasRef.value.style.width = `${rect.width}px`
+  canvasRef.value.width = Math.max(1, Math.floor(rect.width * dpr))
+  canvasRef.value.height = Math.max(1, Math.floor(CANVAS_HEIGHT * dpr))
+  if (rect.width > 0) {
+    canvasRef.value.style.width = `${rect.width}px`
+  }
   canvasRef.value.style.height = `${CANVAS_HEIGHT}px`
 }
 
@@ -639,21 +726,35 @@ const setupVisualizer = async () => {
   if (!canvasRef.value) return
   resizeCanvas()
 
-  unlisten = await listen<SpectrumPayload>('player:spectrum', (event) => {
-    const { bands } = event.payload
-    if (!Array.isArray(bands)) return
+  // Set up spectrum listener (non-blocking, failures don't prevent visualizer)
+  try {
+    unlisten = await listen<SpectrumPayload>('player:spectrum', (event) => {
+      const { bands } = event.payload
+      if (!Array.isArray(bands)) return
 
-    const nextSpectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
-    const len = Math.min(bands.length, SPECTRUM_BAND_COUNT)
-    for (let i = 0; i < len; i++) {
-      const band = bands[i]
-      nextSpectrumData[i] = typeof band === 'number' && Number.isFinite(band) ? band : SILENCE_DB
-    }
-    spectrumData = nextSpectrumData
-  })
+      const nextSpectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
+      const len = Math.min(bands.length, SPECTRUM_BAND_COUNT)
+      for (let i = 0; i < len; i++) {
+        const band = bands[i]
+        nextSpectrumData[i] = typeof band === 'number' && Number.isFinite(band) ? band : SILENCE_DB
+      }
+      spectrumData = nextSpectrumData
+    })
+  } catch {
+    // Spectrum data won't be available, but visualizer still works
+  }
 
+  // Draw loop (independent of spectrum listener)
   const ctx = canvasRef.value.getContext('2d')
   if (!ctx) return
+
+  const drawLayer = (name: string, fn: () => void) => {
+    try {
+      fn()
+    } catch (error) {
+      console.warn(`[EqualizerSettings] Failed to draw ${name} layer`, error)
+    }
+  }
 
   const draw = () => {
     if (!ctx || !canvasRef.value) return
@@ -664,173 +765,244 @@ const setupVisualizer = async () => {
     const height = canvasRef.value.height / dpr
 
     ctx.save()
-    ctx.scale(dpr, dpr)
+    try {
+      ctx.scale(dpr, dpr)
 
-    // --- Layer 0: Background + Grid ---
-    drawBackground(ctx, width, height)
+      // --- Layer 0: Background + Grid ---
+      drawLayer('background', () => drawBackground(ctx, width, height))
 
-    // --- Layer 1: Spectrum Analyzer ---
-    drawSpectrum(ctx, width, height)
+      // --- Layer 1: Spectrum Analyzer ---
+      drawLayer('spectrum', () => drawSpectrum(ctx, width, height))
 
-    // --- Layer 2: EQ Response Curve ---
-    drawEQCurve(ctx, width, height)
+      // --- Layer 2: EQ Response Curve ---
+      drawLayer('eq-curve', () => drawEQCurve(ctx, width, height))
 
-    // --- Layer 3: Band Markers ---
-    drawBandMarkers(ctx, width, height)
-
-    ctx.restore()
+      // --- Layer 3: Band Markers ---
+      drawLayer('band-markers', () => drawBandMarkers(ctx, width, height))
+    } finally {
+      ctx.restore()
+    }
   }
   draw()
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  // Background
-  const bgColor = readThemeValue('--settings-eq-visualizer-bg', readThemeValue('--td-bg-color-page', '#1a1a1a'))
-  ctx.fillStyle = bgColor
+  const bgColor = readThemeValue('--settings-eq-visualizer-bg', readThemeValue('--td-bg-color-page', '#101418'))
+  const brandColor = readThemeValue('--td-brand-color', '#00a74d')
+  const textColor = readThemeValue('--td-text-color-primary', '#ffffff')
+  const gridColor = withAlpha(textColor, 0.055, 'rgba(255,255,255,1)')
+  const subGridColor = withAlpha(textColor, 0.035, 'rgba(255,255,255,1)')
+  const zeroLineColor = withAlpha(brandColor, 0.34)
+  const labelColor = withAlpha(textColor, 0.38, 'rgba(255,255,255,1)')
+  const reducedMotion = prefersReducedMotion()
+
+  const bgGradient = ctx.createLinearGradient(0, 0, 0, height)
+  bgGradient.addColorStop(0, withAlpha(bgColor, 1, '#101418'))
+  bgGradient.addColorStop(0.48, withAlpha(bgColor, 0.94, '#101418'))
+  bgGradient.addColorStop(1, withAlpha(brandColor, 0.045))
+  ctx.fillStyle = bgGradient
   ctx.fillRect(0, 0, width, height)
 
-  const gridColor = 'rgba(255,255,255,0.06)'
-  const zeroLineColor = 'rgba(255,255,255,0.12)'
-  const labelColor = 'rgba(255,255,255,0.35)'
+  ctx.save()
+  ctx.lineCap = 'butt'
+  ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+  ctx.textBaseline = 'middle'
 
-  // Vertical grid lines (frequency)
+  const top = PLOT_INSET_Y
+  const bottom = height - PLOT_INSET_Y
+  const left = PLOT_INSET_X
+  const right = width - PLOT_INSET_X
+
   for (const freq of GRID_FREQS) {
-    const x = freqToX(freq, width)
+    const x = Math.round(freqToX(freq, width)) + 0.5
     ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, height)
-    ctx.strokeStyle = gridColor
-    ctx.lineWidth = 1
+    ctx.moveTo(x, top)
+    ctx.lineTo(x, bottom)
+    ctx.strokeStyle = freq === 1000 || freq === 10000 ? gridColor : subGridColor
+    ctx.lineWidth = freq === 1000 || freq === 10000 ? 0.8 : 0.5
     ctx.stroke()
 
-    // Frequency label at bottom
     ctx.fillStyle = labelColor
-    ctx.font = '10px system-ui, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(formatFreq(freq), x, height - 4)
+    ctx.fillText(formatFreq(freq), x, height - 7)
   }
 
-  // Horizontal grid lines (dB)
   for (const db of GRID_DB) {
-    const y = dbToY(db, height)
+    const y = Math.round(dbToY(db, height)) + 0.5
     ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(width, y)
-    ctx.strokeStyle = db === 0 ? zeroLineColor : gridColor
-    ctx.lineWidth = db === 0 ? 1 : 0.5
-    ctx.stroke()
+    ctx.moveTo(left, y)
+    ctx.lineTo(right, y)
 
-    // dB label on left
+    if (db === 0) {
+      ctx.save()
+      if (!reducedMotion) {
+        ctx.shadowColor = withAlpha(brandColor, 0.22)
+        ctx.shadowBlur = 8
+      }
+      ctx.setLineDash([6, 7])
+      ctx.strokeStyle = zeroLineColor
+      ctx.lineWidth = 1.15
+      ctx.stroke()
+      ctx.restore()
+    } else {
+      ctx.strokeStyle = db % 12 === 0 ? gridColor : subGridColor
+      ctx.lineWidth = db % 12 === 0 ? 0.7 : 0.5
+      ctx.stroke()
+    }
+
     if (db % 6 === 0) {
       ctx.fillStyle = labelColor
-      ctx.font = '9px system-ui, sans-serif'
       ctx.textAlign = 'left'
-      ctx.fillText(`${db}`, 4, y - 2)
+      ctx.fillText(db > 0 ? `+${db}` : `${db}`, 5, y)
     }
   }
+
+  ctx.strokeStyle = withAlpha(textColor, 0.045, 'rgba(255,255,255,1)')
+  ctx.lineWidth = 1
+  ctx.strokeRect(PLOT_INSET_X + 0.5, PLOT_INSET_Y + 0.5, Math.max(1, width - PLOT_INSET_X * 2 - 1), Math.max(1, height - PLOT_INSET_Y * 2 - 1))
+  ctx.restore()
 }
 
 function drawSpectrum(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const barCount = SPECTRUM_BAND_COUNT
-  const barWidth = width / barCount
+  const plotWidth = Math.max(1, width - PLOT_INSET_X * 2)
+  const barWidth = plotWidth / barCount
+  const visibleBarWidth = Math.max(1, barWidth * 0.55)
+  const baseline = height - PLOT_INSET_Y
+  const maxBarHeight = Math.max(1, (height - PLOT_INSET_Y * 2) * 0.48)
 
-  const barStartColor = readThemeValue('--settings-eq-visualizer-bar-start', readThemeValue('--td-brand-color-5', 'rgba(0,167,77,0.15)'))
-  const barEndColor = readThemeValue('--settings-eq-visualizer-bar-end', readThemeValue('--td-brand-color-7', 'rgba(3,222,109,0.25)'))
+  const barStartColor = readThemeValue('--settings-eq-visualizer-bar-start', readThemeValue('--td-brand-color-5', '#00a74d'))
+  const barEndColor = readThemeValue('--settings-eq-visualizer-bar-end', readThemeValue('--td-brand-color-7', '#03de6d'))
+  const hasSignal = spectrumData.some((value) => value > SILENCE_DB + 3)
 
   for (let i = 0; i < barCount; i++) {
-    const normalized = Math.max(0, Math.min(1, (spectrumData[i] - SILENCE_DB) / 80))
-    const barHeight = Math.pow(normalized, 0.6) * (height / 2)
-    if (barHeight < 1) continue
+    const target = typeof spectrumData[i] === 'number' && Number.isFinite(spectrumData[i]) ? spectrumData[i] : SILENCE_DB
+    displaySpectrumData[i] += (target - displaySpectrumData[i]) * 0.18
 
-    const x = i * barWidth
-    const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight)
-    gradient.addColorStop(0, barStartColor)
-    gradient.addColorStop(1, barEndColor)
+    const normalized = clamp((displaySpectrumData[i] - SILENCE_DB) / 80, 0, 1)
+    const floorAmount = hasSignal ? 0 : 0.018 + (Math.sin(i * 1.73) + 1) * 0.007
+    const barHeight = Math.max(floorAmount * maxBarHeight, Math.pow(normalized, 0.68) * maxBarHeight)
+    if (barHeight < 0.6) continue
+
+    const x = PLOT_INSET_X + i * barWidth + (barWidth - visibleBarWidth) / 2
+    const y = baseline - barHeight
+    const gradient = ctx.createLinearGradient(0, baseline, 0, y)
+    gradient.addColorStop(0, withAlpha(barStartColor, hasSignal ? 0.02 : 0.025))
+    gradient.addColorStop(0.3, withAlpha(barStartColor, hasSignal ? 0.11 : 0.04))
+    gradient.addColorStop(1, withAlpha(barEndColor, hasSignal ? 0.28 : 0.07))
     ctx.fillStyle = gradient
-    ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight)
+    drawRoundedRect(ctx, x, y, visibleBarWidth, barHeight, Math.min(2.5, visibleBarWidth / 2))
   }
 }
 
 function drawEQCurve(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const response = calcTotalResponseDb(gains.value.bands, gains.value.global)
-
-  // Curve color
   const curveColor = readThemeValue('--td-brand-color', '#00a74d')
+  const reducedMotion = prefersReducedMotion()
+  const path = new Path2D()
+  const fillPath = new Path2D()
+  const zeroY = dbToY(0, height)
+  const firstX = freqToX(freqPoints[0], width)
+  const lastX = freqToX(freqPoints[freqPoints.length - 1], width)
 
-  // Build path
-  ctx.beginPath()
   let started = false
   for (let i = 0; i < freqPoints.length; i++) {
     const x = freqToX(freqPoints[i], width)
-    const clampedDb = Math.max(-24, Math.min(24, response[i]))
+    const clampedDb = clamp(response[i], -24, 24)
     const y = dbToY(clampedDb, height)
     if (!started) {
-      ctx.moveTo(x, y)
+      path.moveTo(x, y)
+      fillPath.moveTo(x, zeroY)
+      fillPath.lineTo(x, y)
       started = true
     } else {
-      ctx.lineTo(x, y)
+      path.lineTo(x, y)
+      fillPath.lineTo(x, y)
     }
   }
+  fillPath.lineTo(lastX, zeroY)
+  fillPath.lineTo(firstX, zeroY)
+  fillPath.closePath()
 
-  // Stroke
-  ctx.strokeStyle = curveColor
-  ctx.lineWidth = 2
-  ctx.stroke()
-
-  // Fill area (gradient from curve to bottom)
-  const lastX = freqToX(freqPoints[freqPoints.length - 1], width)
-  const firstX = freqToX(freqPoints[0], width)
-  ctx.lineTo(lastX, dbToY(0, height))
-  ctx.lineTo(firstX, dbToY(0, height))
-  ctx.closePath()
-
-  const fillGradient = ctx.createLinearGradient(0, 0, 0, height)
-  // Parse curveColor to create semi-transparent version
-  fillGradient.addColorStop(0, curveColor + '33')
-  fillGradient.addColorStop(0.5, curveColor + '18')
-  fillGradient.addColorStop(1, curveColor + '00')
+  const fillGradient = ctx.createLinearGradient(0, PLOT_INSET_Y, 0, height - PLOT_INSET_Y)
+  fillGradient.addColorStop(0, withAlpha(curveColor, 0.16))
+  fillGradient.addColorStop(0.48, withAlpha(curveColor, 0.055))
+  fillGradient.addColorStop(1, withAlpha(curveColor, 0.012))
   ctx.fillStyle = fillGradient
-  ctx.fill()
+  ctx.fill(fillPath)
+
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  if (!reducedMotion) {
+    ctx.shadowColor = withAlpha(curveColor, 0.24)
+    ctx.shadowBlur = 10
+  }
+  ctx.strokeStyle = withAlpha(curveColor, reducedMotion ? 0.18 : 0.24)
+  ctx.lineWidth = reducedMotion ? 5.5 : 8
+  ctx.stroke(path)
+  ctx.restore()
+
+  ctx.save()
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = withAlpha(curveColor, 0.92)
+  ctx.lineWidth = 2.2
+  ctx.stroke(path)
+  ctx.restore()
 }
 
 function drawBandMarkers(ctx: CanvasRenderingContext2D, width: number, height: number) {
   const curveColor = readThemeValue('--td-brand-color', '#00a74d')
+  const textColor = readThemeValue('--td-text-color-primary', '#ffffff')
   const bands = gains.value.bands
+  const reducedMotion = prefersReducedMotion()
 
   for (let i = 0; i < bands.length; i++) {
     const band = bands[i]
     const x = freqToX(band.frequency, width)
-
-    // For LP/HP/Notch, show marker at 0dB line
     const effectiveGain = GAIN_DISABLED_TYPES.has(band.type) ? 0 : band.gain
-    const clampedDb = Math.max(-24, Math.min(24, effectiveGain))
-    const y = dbToY(clampedDb, height)
-
+    const y = dbToY(clamp(effectiveGain, -24, 24), height)
     const isSelected = i === selectedBandIndex.value
 
     if (isSelected) {
-      // Outer glow
+      ctx.save()
+      if (!reducedMotion) {
+        ctx.shadowColor = withAlpha(curveColor, 0.32)
+        ctx.shadowBlur = 12
+      }
       ctx.beginPath()
-      ctx.arc(x, y, 10, 0, Math.PI * 2)
-      ctx.fillStyle = curveColor + '33'
-      ctx.fill()
+      ctx.arc(x, y, 11, 0, Math.PI * 2)
+      ctx.strokeStyle = withAlpha(curveColor, 0.34)
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.restore()
 
-      // Selected dot
+      ctx.beginPath()
+      ctx.arc(x, y, 6.2, 0, Math.PI * 2)
+      ctx.fillStyle = withAlpha(curveColor, 0.86)
+      ctx.fill()
+      ctx.strokeStyle = withAlpha(textColor, 0.86, 'rgba(255,255,255,1)')
+      ctx.lineWidth = 1.6
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.arc(x, y, 2.2, 0, Math.PI * 2)
+      ctx.fillStyle = withAlpha(textColor, 0.7, 'rgba(255,255,255,1)')
+      ctx.fill()
+    } else {
       ctx.beginPath()
       ctx.arc(x, y, 6, 0, Math.PI * 2)
-      ctx.fillStyle = curveColor
-      ctx.fill()
-      ctx.strokeStyle = '#fff'
-      ctx.lineWidth = 2
+      ctx.strokeStyle = withAlpha(curveColor, 0.28)
+      ctx.lineWidth = 1.2
       ctx.stroke()
-    } else {
-      // Normal dot
+
       ctx.beginPath()
-      ctx.arc(x, y, 4, 0, Math.PI * 2)
-      ctx.fillStyle = curveColor + 'AA'
+      ctx.arc(x, y, 3.2, 0, Math.PI * 2)
+      ctx.fillStyle = withAlpha(curveColor, 0.42)
       ctx.fill()
-      ctx.strokeStyle = curveColor
-      ctx.lineWidth = 1
+      ctx.strokeStyle = withAlpha(textColor, 0.18, 'rgba(255,255,255,1)')
+      ctx.lineWidth = 0.8
       ctx.stroke()
     }
   }
@@ -842,7 +1014,19 @@ function drawBandMarkers(ctx: CanvasRenderingContext2D, width: number, height: n
 
 onMounted(() => {
   setupVisualizer()
+  if (canvasContainerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      resizeCanvas()
+    })
+    resizeObserver.observe(canvasContainerRef.value)
+  }
   window.addEventListener('resize', resizeCanvas)
+  initAllSliderTracks()
+})
+
+// Re-initialize slider tracks when the selected band changes (panel re-renders)
+watch(selectedBandIndex, () => {
+  nextTick(initAllSliderTracks)
 })
 
 onUnmounted(() => {
@@ -850,6 +1034,10 @@ onUnmounted(() => {
   if (unlisten) {
     unlisten()
     unlisten = null
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
   window.removeEventListener('resize', resizeCanvas)
 })
@@ -870,8 +1058,13 @@ onUnmounted(() => {
 .visualizer-container {
   width: 100%;
   background: var(--settings-eq-visualizer-bg, var(--td-bg-color-page));
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--td-brand-color), var(--td-border-level-1-color) 76%);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--td-text-color-anti), transparent 94%),
+    inset 0 -18px 42px color-mix(in srgb, var(--td-brand-color), transparent 94%),
+    0 10px 28px color-mix(in srgb, var(--td-brand-color), transparent 92%);
 }
 .visualizer-container canvas {
   width: 100%;
@@ -922,16 +1115,18 @@ onUnmounted(() => {
 
 /* --- Band params panel --- */
 .band-params-panel {
-  padding: 14px 18px;
-  border-radius: 8px;
+  padding: 16px 20px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--td-bg-color-container), var(--td-brand-color) 5%);
-  border: 1px solid var(--td-border-level-1-color);
+  border: 1px solid color-mix(in srgb, var(--td-border-level-1-color), var(--td-brand-color) 12%);
 }
 .band-params-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--td-border-level-1-color);
 }
 .band-params-title {
   font-size: 13px;
@@ -941,22 +1136,29 @@ onUnmounted(() => {
 .band-params-freq {
   font-size: 12px;
   color: var(--td-text-color-secondary);
+  font-variant-numeric: tabular-nums;
 }
 .band-params-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 .param-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+}
+/* Add a subtle divider between param rows, except after the last */
+.param-row + .param-row {
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--td-component-border), transparent 40%);
 }
 .param-label {
   width: 64px;
   flex-shrink: 0;
   font-size: 12px;
   color: var(--td-text-color-secondary);
+  user-select: none;
 }
 .param-control {
   flex: 1;
@@ -970,39 +1172,75 @@ onUnmounted(() => {
   color: var(--td-text-color-primary);
   font-variant-numeric: tabular-nums;
 }
+/* --- Custom range slider (param-slider) --- */
 .param-slider {
   width: 100%;
-  height: 4px;
+  height: 6px;
   -webkit-appearance: none;
   appearance: none;
   background: var(--td-bg-color-component);
-  border-radius: 2px;
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+.param-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
 }
 .param-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--td-brand-color);
   cursor: pointer;
   border: 2px solid var(--td-bg-color-container);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  margin-top: -5px;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.param-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--td-brand-color), transparent 75%);
+  transform: scale(1.1);
+}
+.param-slider::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+}
+.param-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--td-bg-color-component);
 }
 .param-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--td-brand-color);
   cursor: pointer;
   border: 2px solid var(--td-bg-color-container);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.param-slider::-moz-range-thumb:hover {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--td-brand-color), transparent 75%);
 }
 .param-slider:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+.param-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* Filter type select — match param-row visual weight */
+.band-params-body .param-control :deep(.t-select) {
+  width: 100%;
+}
+.band-params-body .param-control :deep(.t-input--small) {
+  height: 32px;
+  border-radius: 6px;
+  font-size: 12px;
 }
 
 /* --- Controls row --- */
