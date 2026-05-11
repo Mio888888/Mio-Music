@@ -1,4 +1,6 @@
-use crate::player::effects::{AtomicF64, BalanceSource, BassBoostSource, EqSource, EqState};
+use crate::player::effects::{
+    AtomicF64, BalanceSource, BassBoostSource, EqSettings, EqSource, EqState, NUM_EQ_BANDS,
+};
 use crate::player::spectrum::{PositionSource, PositionState, SpectrumSource, SpectrumState};
 use crate::player::{AudioSlot, PlaybackState, PlayerSnapshot, SharedPlayer};
 use base64::Engine;
@@ -10,7 +12,7 @@ use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 use symphonia::core::audio::SampleBuffer;
-use symphonia::core::codecs::{DecoderOptions, Decoder as SymphoniaDecoderTrait};
+use symphonia::core::codecs::{Decoder as SymphoniaDecoderTrait, DecoderOptions};
 use symphonia::core::formats::{FormatOptions, FormatReader, SeekTo};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
@@ -30,6 +32,10 @@ pub struct SlotPipeline {
 }
 
 impl SlotPipeline {
+    pub fn apply_eq_settings(&self, settings: &EqSettings) {
+        self.eq_state.set_settings(settings);
+    }
+
     /// 从已解析的文件路径创建管线
     pub fn from_file(
         stream_handle: &OutputStreamHandle,
@@ -37,11 +43,14 @@ impl SlotPipeline {
         url: &str,
         volume: f64,
     ) -> Result<Self, String> {
-
         // AAC/M4A (ISO BMFF / ftyp) 直接走 symphonia，避免 rodio symphonia 解码器的 seek panic
         // 其他格式先尝试 rodio，失败再回退 symphonia
         let needs_symphonia_direct = {
-            let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+            let ext = file_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
             if matches!(ext.as_str(), "m4a" | "aac" | "mp4" | "m4b" | "m4p") {
                 true
             } else {
@@ -54,14 +63,15 @@ impl SlotPipeline {
 
         type StreamSource = Box<dyn Source<Item = f32> + Send>;
 
-        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) = if needs_symphonia_direct {
-            decode_streaming_symphonia(&file_path)?
-        } else {
-            match decode_streaming_rodio(&file_path) {
-                Ok(result) => result,
-                Err(_) => decode_streaming_symphonia(&file_path)?,
-            }
-        };
+        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) =
+            if needs_symphonia_direct {
+                decode_streaming_symphonia(&file_path)?
+            } else {
+                match decode_streaming_rodio(&file_path) {
+                    Ok(result) => result,
+                    Err(_) => decode_streaming_symphonia(&file_path)?,
+                }
+            };
 
         let eq_state = Arc::new(EqState::new(channels, sample_rate));
         let spectrum_state = Arc::new(SpectrumState::new());
@@ -78,8 +88,7 @@ impl SlotPipeline {
         let source = SpectrumSource::new(source, spectrum_state.clone());
         let source = PositionSource::new(source, position_state.clone());
 
-        let sink = Sink::try_new(stream_handle)
-            .map_err(|e| format!("创建 Sink 失败: {e}"))?;
+        let sink = Sink::try_new(stream_handle).map_err(|e| format!("创建 Sink 失败: {e}"))?;
         sink.set_volume(volume as f32);
         sink.append(source);
 
@@ -95,17 +104,33 @@ impl SlotPipeline {
         })
     }
 
-    pub fn pause(&self) { self.sink.pause() }
-    pub fn resume(&self) { self.sink.play() }
+    pub fn pause(&self) {
+        self.sink.pause()
+    }
+    pub fn resume(&self) {
+        self.sink.play()
+    }
     pub fn seek(&self, pos: Duration) -> bool {
         self.sink.try_seek(pos).is_ok()
     }
-    pub fn set_volume(&self, vol: f64) { self.sink.set_volume(vol as f32) }
-    pub fn position(&self) -> f64 { self.position_state.position_secs() }
-    pub fn duration(&self) -> f64 { self.position_state.duration_secs() }
-    pub fn is_playing(&self) -> bool { !self.sink.is_paused() && !self.sink.empty() }
-    pub fn url(&self) -> &str { &self.url }
-    pub fn take_spectrum(&self) -> Option<Vec<f64>> { self.spectrum_state.take_spectrum() }
+    pub fn set_volume(&self, vol: f64) {
+        self.sink.set_volume(vol as f32)
+    }
+    pub fn position(&self) -> f64 {
+        self.position_state.position_secs()
+    }
+    pub fn duration(&self) -> f64 {
+        self.position_state.duration_secs()
+    }
+    pub fn is_playing(&self) -> bool {
+        !self.sink.is_paused() && !self.sink.empty()
+    }
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    pub fn take_spectrum(&self) -> Option<Vec<f64>> {
+        self.spectrum_state.take_spectrum()
+    }
 
     /// 创建管线后立即暂停（用于预加载）
     pub fn from_file_paused(
@@ -135,25 +160,32 @@ impl SlotPipeline {
 
         type StreamSource = Box<dyn Source<Item = f32> + Send>;
 
-        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) = if needs_symphonia {
-            let file = std::fs::File::open(path)
-                .map_err(|e| format!("打开音频文件失败: {e}"))?;
-            let spool = SpoolReader::new(file, state.clone());
-            decode_reader_symphonia(Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>, None)?
-        } else {
-            let file = std::fs::File::open(path)
-                .map_err(|e| format!("打开音频文件失败: {e}"))?;
-            let spool = SpoolReader::new(file, state.clone());
-            match decode_reader_rodio(spool) {
-                Ok(result) => result,
-                Err(_) => {
-                    let file = std::fs::File::open(path)
-                        .map_err(|e| format!("打开音频文件失败: {e}"))?;
-                    let spool = SpoolReader::new(file, state);
-                    decode_reader_symphonia(Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>, None)?
+        let (channels, sample_rate, duration, source): (u16, u32, f64, StreamSource) =
+            if needs_symphonia {
+                let file =
+                    std::fs::File::open(path).map_err(|e| format!("打开音频文件失败: {e}"))?;
+                let spool = SpoolReader::new(file, state.clone());
+                decode_reader_symphonia(
+                    Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>,
+                    None,
+                )?
+            } else {
+                let file =
+                    std::fs::File::open(path).map_err(|e| format!("打开音频文件失败: {e}"))?;
+                let spool = SpoolReader::new(file, state.clone());
+                match decode_reader_rodio(spool) {
+                    Ok(result) => result,
+                    Err(_) => {
+                        let file = std::fs::File::open(path)
+                            .map_err(|e| format!("打开音频文件失败: {e}"))?;
+                        let spool = SpoolReader::new(file, state);
+                        decode_reader_symphonia(
+                            Box::new(spool) as Box<dyn symphonia::core::io::MediaSource>,
+                            None,
+                        )?
+                    }
                 }
-            }
-        };
+            };
 
         let eq_state = Arc::new(EqState::new(channels, sample_rate));
         let spectrum_state = Arc::new(SpectrumState::new());
@@ -169,8 +201,7 @@ impl SlotPipeline {
         let source = SpectrumSource::new(source, spectrum_state.clone());
         let source = PositionSource::new(source, position_state.clone());
 
-        let sink = Sink::try_new(stream_handle)
-            .map_err(|e| format!("创建 Sink 失败: {e}"))?;
+        let sink = Sink::try_new(stream_handle).map_err(|e| format!("创建 Sink 失败: {e}"))?;
         sink.set_volume(volume as f32);
         sink.append(source);
 
@@ -270,7 +301,9 @@ unsafe impl Send for SpoolReader {}
 unsafe impl Sync for SpoolReader {}
 
 impl symphonia::core::io::MediaSource for SpoolReader {
-    fn is_seekable(&self) -> bool { true }
+    fn is_seekable(&self) -> bool {
+        true
+    }
     fn byte_len(&self) -> Option<u64> {
         let (lock, _) = &*self.state;
         let s = lock.lock().unwrap();
@@ -336,15 +369,23 @@ fn download_to_temp(url: &str) -> Result<PathBuf, String> {
             let host = u.host_str()?;
             let parts: Vec<&str> = host.split('.').collect();
             if parts.len() >= 2 {
-                Some(format!("http://{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]))
+                Some(format!(
+                    "http://{}.{}",
+                    parts[parts.len() - 2],
+                    parts[parts.len() - 1]
+                ))
             } else {
                 Some(format!("http://{}/", host))
             }
         })
         .unwrap_or_else(|| "http://localhost/".to_string());
 
-    let resp = client.get(url)
-        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
+    let resp = client
+        .get(url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        )
         .header("Referer", &referer)
         .send()
         .map_err(|e| format!("下载音频失败: {e}"))?;
@@ -354,16 +395,13 @@ fn download_to_temp(url: &str) -> Result<PathBuf, String> {
         return Err(format!("下载音频失败: HTTP {}", status));
     }
 
-    let bytes = resp.bytes()
-        .map_err(|e| format!("读取音频数据失败: {e}"))?;
+    let bytes = resp.bytes().map_err(|e| format!("读取音频数据失败: {e}"))?;
 
     let temp_dir = std::env::temp_dir().join("mio_player");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("创建临时目录失败: {e}"))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
 
     let path = temp_dir.join(format!("audio_{}", uuid::Uuid::new_v4()));
-    std::fs::write(&path, &bytes)
-        .map_err(|e| format!("写入临时文件失败: {e}"))?;
+    std::fs::write(&path, &bytes).map_err(|e| format!("写入临时文件失败: {e}"))?;
 
     Ok(path)
 }
@@ -382,15 +420,23 @@ fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
             let host = u.host_str()?;
             let parts: Vec<&str> = host.split('.').collect();
             if parts.len() >= 2 {
-                Some(format!("http://{}.{}", parts[parts.len() - 2], parts[parts.len() - 1]))
+                Some(format!(
+                    "http://{}.{}",
+                    parts[parts.len() - 2],
+                    parts[parts.len() - 1]
+                ))
             } else {
                 Some(format!("http://{}/", host))
             }
         })
         .unwrap_or_else(|| "http://localhost/".to_string());
 
-    let resp = client.get(url)
-        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
+    let resp = client
+        .get(url)
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        )
         .header("Referer", &referer)
         .send()
         .map_err(|e| format!("下载音频失败: {e}"))?;
@@ -401,12 +447,10 @@ fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
 
     let total = resp.content_length();
     let temp_dir = std::env::temp_dir().join("mio_player");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("创建临时目录失败: {e}"))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     let path = temp_dir.join(format!("stream_{}", uuid::Uuid::new_v4()));
 
-    let mut file = std::fs::File::create(&path)
-        .map_err(|e| format!("创建临时文件失败: {e}"))?;
+    let mut file = std::fs::File::create(&path).map_err(|e| format!("创建临时文件失败: {e}"))?;
 
     let state = Arc::new((
         Mutex::new(DownloadState {
@@ -426,9 +470,14 @@ fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
     // Synchronously buffer initial data
     while downloaded < initial_size {
         use std::io::Read;
-        let n = resp.read(&mut buf).map_err(|e| format!("下载音频失败: {e}"))?;
-        if n == 0 { break; }
-        file.write_all(&buf[..n]).map_err(|e| format!("写入临时文件失败: {e}"))?;
+        let n = resp
+            .read(&mut buf)
+            .map_err(|e| format!("下载音频失败: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buf[..n])
+            .map_err(|e| format!("写入临时文件失败: {e}"))?;
         downloaded += n as u64;
     }
 
@@ -471,7 +520,9 @@ fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
                 match resp.read(&mut bg_buf) {
                     Ok(0) => break,
                     Ok(n) => {
-                        if bg_file.write_all(&bg_buf[..n]).is_err() { break; }
+                        if bg_file.write_all(&bg_buf[..n]).is_err() {
+                            break;
+                        }
                         let (lock, cvar) = &*bg_state;
                         let mut s = lock.lock().unwrap();
                         s.written += n as u64;
@@ -499,19 +550,19 @@ fn stream_to_temp(url: &str) -> Result<(PathBuf, SharedDownloadState), String> {
 
 fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
     let parts: Vec<&str> = url.splitn(2, ',').collect();
-    if parts.len() != 2 { return Err("无效的 data URI".into()) }
+    if parts.len() != 2 {
+        return Err("无效的 data URI".into());
+    }
 
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(parts[1].trim())
         .map_err(|e| format!("解码 base64 失败: {e}"))?;
 
     let temp_dir = std::env::temp_dir().join("mio_player");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("创建临时目录失败: {e}"))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
 
     let path = temp_dir.join(format!("data_{}", uuid::Uuid::new_v4()));
-    std::fs::write(&path, &bytes)
-        .map_err(|e| format!("写入临时文件失败: {e}"))?;
+    std::fs::write(&path, &bytes).map_err(|e| format!("写入临时文件失败: {e}"))?;
 
     Ok(path)
 }
@@ -520,14 +571,18 @@ fn data_uri_to_temp(url: &str) -> Result<PathBuf, String> {
 
 type StreamDecodeResult = (u16, u32, f64, Box<dyn Source<Item = f32> + Send>);
 
-fn decode_reader_rodio<R: IoRead + IoSeek + Send + Sync + 'static>(reader: R) -> Result<StreamDecodeResult, String> {
+fn decode_reader_rodio<R: IoRead + IoSeek + Send + Sync + 'static>(
+    reader: R,
+) -> Result<StreamDecodeResult, String> {
     let buf_reader = BufReader::new(reader);
-    let decoder = Decoder::new(buf_reader)
-        .map_err(|e| format!("rodio 解码失败: {e}"))?;
+    let decoder = Decoder::new(buf_reader).map_err(|e| format!("rodio 解码失败: {e}"))?;
 
     let channels = decoder.channels();
     let sample_rate = decoder.sample_rate();
-    let duration_secs = decoder.total_duration().map(|d| d.as_secs_f64()).unwrap_or(0.0);
+    let duration_secs = decoder
+        .total_duration()
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0);
 
     let source: Box<dyn Source<Item = f32> + Send> = Box::new(decoder.convert_samples());
 
@@ -535,8 +590,7 @@ fn decode_reader_rodio<R: IoRead + IoSeek + Send + Sync + 'static>(reader: R) ->
 }
 
 fn decode_streaming_rodio(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
-    let file = std::fs::File::open(file_path)
-        .map_err(|e| format!("打开音频文件失败: {e}"))?;
+    let file = std::fs::File::open(file_path).map_err(|e| format!("打开音频文件失败: {e}"))?;
     decode_reader_rodio(file)
 }
 
@@ -602,10 +656,11 @@ impl Iterator for SymphoniaStreamSource {
                     }
                 }
                 Err(symphonia::core::errors::Error::IoError(e))
-                    if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                        self.eof = true;
-                        return None;
-                    }
+                    if e.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    self.eof = true;
+                    return None;
+                }
                 Err(symphonia::core::errors::Error::IoError(_)) => {
                     self.eof = true;
                     return None;
@@ -632,8 +687,12 @@ impl Source for SymphoniaStreamSource {
         // 返回当前缓冲区中剩余的采样数
         Some(self.sample_buffer.len().saturating_sub(self.buffer_pos))
     }
-    fn channels(&self) -> u16 { self.channels }
-    fn sample_rate(&self) -> u32 { self.sample_rate }
+    fn channels(&self) -> u16 {
+        self.channels
+    }
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
     fn total_duration(&self) -> Option<Duration> {
         if self.duration_secs > 0.0 {
             Some(Duration::from_secs_f64(self.duration_secs))
@@ -648,7 +707,9 @@ impl Source for SymphoniaStreamSource {
         };
         self.format
             .seek(symphonia::core::formats::SeekMode::Accurate, seek_to)
-            .map_err(|_| rodio::source::SeekError::NotSupported { underlying_source: "SymphoniaStreamSource" })?;
+            .map_err(|_| rodio::source::SeekError::NotSupported {
+                underlying_source: "SymphoniaStreamSource",
+            })?;
         // seek 后清空缓冲区
         self.sample_buffer.clear();
         self.buffer_pos = 0;
@@ -677,19 +738,23 @@ fn decode_reader_symphonia(
         .map_err(|e| format!("探测音频格式失败: {e}"))?;
 
     let format = probed.format;
-    let track = format.default_track()
+    let track = format
+        .default_track()
         .ok_or_else(|| "音频文件无默认音轨".to_string())?
         .to_owned();
 
-    let channels = track.codec_params.channels
+    let channels = track
+        .codec_params
+        .channels
         .map(|c| c.count() as u16)
         .unwrap_or(2);
-    let sample_rate = track.codec_params.sample_rate
-        .unwrap_or(44100);
+    let sample_rate = track.codec_params.sample_rate.unwrap_or(44100);
 
     // 从元数据计算时长，无需全量解码
     let duration_secs = if let Some(tb) = track.codec_params.time_base {
-        track.codec_params.n_frames
+        track
+            .codec_params
+            .n_frames
             .map(|n| n as f64 * tb.numer as f64 / tb.denom as f64)
             .unwrap_or(0.0)
     } else {
@@ -719,10 +784,15 @@ fn decode_reader_symphonia(
 }
 
 fn decode_streaming_symphonia(file_path: &std::path::Path) -> Result<StreamDecodeResult, String> {
-    let file = std::fs::File::open(file_path)
-        .map_err(|e| format!("打开音频文件失败: {e}"))?;
-    let ext = file_path.extension().and_then(|e| e.to_str()).map(|s| s.to_string());
-    decode_reader_symphonia(Box::new(file) as Box<dyn symphonia::core::io::MediaSource>, ext.as_deref())
+    let file = std::fs::File::open(file_path).map_err(|e| format!("打开音频文件失败: {e}"))?;
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_string());
+    decode_reader_symphonia(
+        Box::new(file) as Box<dyn symphonia::core::io::MediaSource>,
+        ext.as_deref(),
+    )
 }
 
 // ==================== 交叉淡入淡出 ====================
@@ -767,6 +837,8 @@ pub struct PlayerEngine {
     // 音频缓存配置
     cache_dir: Option<String>,
     cache_max_size: u64,
+    // 全局 EQ 快照：新建播放管线、预加载管线、seek 重建管线后都立即应用。
+    eq_settings: EqSettings,
 }
 
 impl PlayerEngine {
@@ -796,11 +868,17 @@ impl PlayerEngine {
             ended_emitted: false,
             cache_dir: None,
             cache_max_size: 1073741824, // 1GB default
+            eq_settings: EqSettings::default(),
         }
     }
 
     /// 异步播放：在后台线程下载 + 解码，完成后自动赋值 primary 并发出事件
-    pub fn play_async(&mut self, url: &str, _slot: Option<AudioSlot>, _cache_key: Option<String>) -> Result<(), String> {
+    pub fn play_async(
+        &mut self,
+        url: &str,
+        _slot: Option<AudioSlot>,
+        _cache_key: Option<String>,
+    ) -> Result<(), String> {
         self.primary = None;
         self.secondary = None;
         self.crossfade = None;
@@ -809,6 +887,7 @@ impl PlayerEngine {
         let stream_handle = self.stream_handle.clone();
         let url = url.to_string();
         let volume = self.volume / 100.0;
+        let eq_settings = self.eq_settings.clone();
         let tx = self.play_tx.clone();
 
         let is_http = url.starts_with("http://") || url.starts_with("https://");
@@ -816,18 +895,28 @@ impl PlayerEngine {
         std::thread::spawn(move || {
             let result = if is_http {
                 match stream_to_temp(&url) {
-                    Ok((path, state)) => match SlotPipeline::from_spool(&stream_handle, &path, state, &url, volume) {
-                        Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
-                        Err(e) => AsyncPipelineResult::Error(e),
-                    },
+                    Ok((path, state)) => {
+                        match SlotPipeline::from_spool(&stream_handle, &path, state, &url, volume) {
+                            Ok(pipeline) => {
+                                pipeline.apply_eq_settings(&eq_settings);
+                                AsyncPipelineResult::Ready(pipeline)
+                            }
+                            Err(e) => AsyncPipelineResult::Error(e),
+                        }
+                    }
                     Err(e) => AsyncPipelineResult::Error(e),
                 }
             } else {
                 match resolve_audio_file(&url) {
-                    Ok(path) => match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
-                        Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
-                        Err(e) => AsyncPipelineResult::Error(e),
-                    },
+                    Ok(path) => {
+                        match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
+                            Ok(pipeline) => {
+                                pipeline.apply_eq_settings(&eq_settings);
+                                AsyncPipelineResult::Ready(pipeline)
+                            }
+                            Err(e) => AsyncPipelineResult::Error(e),
+                        }
+                    }
                     Err(e) => AsyncPipelineResult::Error(e),
                 }
             };
@@ -837,12 +926,16 @@ impl PlayerEngine {
     }
 
     pub fn pause(&mut self) {
-        if let Some(ref p) = self.primary { p.pause() }
+        if let Some(ref p) = self.primary {
+            p.pause()
+        }
         self.emit_state();
     }
 
     pub fn resume(&mut self) {
-        if let Some(ref p) = self.primary { p.resume() }
+        if let Some(ref p) = self.primary {
+            p.resume()
+        }
         self.emit_state();
     }
 
@@ -872,7 +965,11 @@ impl PlayerEngine {
             Some(p) => p.url().to_string(),
             None => return,
         };
-        let was_playing = self.primary.as_ref().map(|p| p.is_playing()).unwrap_or(false);
+        let was_playing = self
+            .primary
+            .as_ref()
+            .map(|p| p.is_playing())
+            .unwrap_or(false);
         let volume = self.volume / 100.0;
 
         // 销毁旧管线
@@ -884,15 +981,17 @@ impl PlayerEngine {
         };
 
         // 强制使用 symphonia 解码器（支持 seek）
-        let new_pipeline = match Self::build_pipeline_symphonia(&self.stream_handle, &file_path, &url, volume) {
-            Ok(p) => p,
-            Err(e) => {
-                eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
-                return;
-            }
-        };
+        let new_pipeline =
+            match Self::build_pipeline_symphonia(&self.stream_handle, &file_path, &url, volume) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
+                    return;
+                }
+            };
 
-        // 在新管线上 seek
+        // 在新管线上应用全局 EQ 快照并 seek
+        new_pipeline.apply_eq_settings(&self.eq_settings);
         let _ = new_pipeline.sink.try_seek(pos);
         if !was_playing {
             new_pipeline.sink.pause();
@@ -924,8 +1023,7 @@ impl PlayerEngine {
         let source = SpectrumSource::new(source, spectrum_state.clone());
         let source = PositionSource::new(source, position_state.clone());
 
-        let sink = Sink::try_new(stream_handle)
-            .map_err(|e| format!("创建 Sink 失败: {e}"))?;
+        let sink = Sink::try_new(stream_handle).map_err(|e| format!("创建 Sink 失败: {e}"))?;
         sink.set_volume(volume as f32);
         sink.append(source);
 
@@ -944,18 +1042,29 @@ impl PlayerEngine {
     pub fn set_volume(&mut self, vol: f64) {
         self.volume = vol.clamp(0.0, 100.0);
         let n = self.volume / 100.0;
-        if let Some(ref p) = self.primary { p.set_volume(n) }
-        if let Some(ref s) = self.secondary { s.set_volume(n) }
+        if let Some(ref p) = self.primary {
+            p.set_volume(n)
+        }
+        if let Some(ref s) = self.secondary {
+            s.set_volume(n)
+        }
     }
 
     #[allow(dead_code)]
-    pub fn volume(&self) -> f64 { self.volume }
+    pub fn volume(&self) -> f64 {
+        self.volume
+    }
 
     pub fn crossfade_to(&mut self, url: &str, duration_ms: u64) -> Result<(), String> {
         let file_path = resolve_audio_file(url)?;
         let pipeline = SlotPipeline::from_file(&self.stream_handle, &file_path, url, 0.0)?;
+        pipeline.apply_eq_settings(&self.eq_settings);
         self.secondary = Some(pipeline);
-        self.crossfade = Some(CrossfadeState { active: true, start: Instant::now(), duration_ms });
+        self.crossfade = Some(CrossfadeState {
+            active: true,
+            start: Instant::now(),
+            duration_ms,
+        });
         Ok(())
     }
 
@@ -964,25 +1073,48 @@ impl PlayerEngine {
         self.emit_state();
     }
 
-    pub fn set_eq_band(&self, index: usize, gain: f64) {
-        if let Some(ref p) = self.primary { p.eq_state.set_band(index, gain) }
-        if let Some(ref s) = self.secondary { s.eq_state.set_band(index, gain) }
+    pub fn set_eq_settings(&mut self, settings: EqSettings) {
+        self.eq_settings = settings.sanitized();
+        if let Some(ref p) = self.primary {
+            p.apply_eq_settings(&self.eq_settings)
+        }
+        if let Some(ref s) = self.secondary {
+            s.apply_eq_settings(&self.eq_settings)
+        }
+    }
+
+    pub fn set_eq_band(&mut self, index: usize, gain: f64) {
+        if index >= NUM_EQ_BANDS {
+            return;
+        }
+        self.eq_settings.bands[index] = gain;
+        self.set_eq_settings(self.eq_settings.clone());
     }
 
     pub fn get_eq_bands(&self) -> Vec<f64> {
-        self.primary.as_ref()
-            .map(|p| p.eq_state.get_gains().to_vec())
-            .unwrap_or_else(|| vec![0.0; 10])
+        self.eq_settings.effective_bands().to_vec()
+    }
+
+    pub fn get_eq_global_gain(&self) -> f64 {
+        self.eq_settings.effective_global_gain()
     }
 
     pub fn set_bass_boost(&self, gain: f64) {
-        if let Some(ref p) = self.primary { p.bass_boost_gain.store(gain) }
-        if let Some(ref s) = self.secondary { s.bass_boost_gain.store(gain) }
+        if let Some(ref p) = self.primary {
+            p.bass_boost_gain.store(gain)
+        }
+        if let Some(ref s) = self.secondary {
+            s.bass_boost_gain.store(gain)
+        }
     }
 
     pub fn set_balance(&self, value: f64) {
-        if let Some(ref p) = self.primary { p.balance.store(value) }
-        if let Some(ref s) = self.secondary { s.balance.store(value) }
+        if let Some(ref p) = self.primary {
+            p.balance.store(value)
+        }
+        if let Some(ref s) = self.secondary {
+            s.balance.store(value)
+        }
     }
 
     /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
@@ -994,12 +1126,21 @@ impl PlayerEngine {
         let tx = self.preload_tx.clone();
         let cache_dir = self.cache_dir.clone();
         let cache_max_size = self.cache_max_size;
+        let eq_settings = self.eq_settings.clone();
 
         std::thread::spawn(move || {
-            let file_path = resolve_audio_file_cached(&url, cache_dir.as_deref(), cache_key.as_deref(), cache_max_size);
+            let file_path = resolve_audio_file_cached(
+                &url,
+                cache_dir.as_deref(),
+                cache_key.as_deref(),
+                cache_max_size,
+            );
             let result = match file_path {
                 Ok(path) => match SlotPipeline::from_file_paused(&stream_handle, &path, &url) {
-                    Ok(pipeline) => AsyncPipelineResult::Ready(pipeline),
+                    Ok(pipeline) => {
+                        pipeline.apply_eq_settings(&eq_settings);
+                        AsyncPipelineResult::Ready(pipeline)
+                    }
                     Err(e) => AsyncPipelineResult::Error(e),
                 },
                 Err(e) => AsyncPipelineResult::Error(e),
@@ -1026,7 +1167,9 @@ impl PlayerEngine {
 
     /// 从已预加载的 secondary 启动 crossfade 渐变
     fn start_crossfade_from_preloaded(&mut self) {
-        if self.secondary.is_none() { return }
+        if self.secondary.is_none() {
+            return;
+        }
         if let Some(ref s) = self.secondary {
             s.set_volume(0.0);
             s.resume();
@@ -1059,10 +1202,15 @@ impl PlayerEngine {
 
     pub fn snapshot(&self) -> PlayerSnapshot {
         let p = self.primary.as_ref();
-        let state = p.map(|p| {
-            if p.is_playing() { PlaybackState::Playing }
-            else { PlaybackState::Paused }
-        }).unwrap_or(PlaybackState::Stopped);
+        let state = p
+            .map(|p| {
+                if p.is_playing() {
+                    PlaybackState::Playing
+                } else {
+                    PlaybackState::Paused
+                }
+            })
+            .unwrap_or(PlaybackState::Stopped);
 
         PlayerSnapshot {
             state,
@@ -1075,23 +1223,33 @@ impl PlayerEngine {
         }
     }
 
-    pub fn is_shutdown(&self) -> bool { self.shutdown }
-    pub fn shutdown(&mut self) { self.shutdown = true; self.stop_all() }
+    pub fn is_shutdown(&self) -> bool {
+        self.shutdown
+    }
+    pub fn shutdown(&mut self) {
+        self.shutdown = true;
+        self.stop_all()
+    }
 
     pub fn poll(&mut self) {
-        if self.shutdown { return }
+        if self.shutdown {
+            return;
+        }
         self.poll_tick = self.poll_tick.wrapping_add(1);
 
         // 检查异步播放结果（非阻塞）
         if let Ok(result) = self.play_rx.try_recv() {
             match result {
                 AsyncPipelineResult::Ready(pipeline) => {
+                    pipeline.apply_eq_settings(&self.eq_settings);
                     self.primary = Some(pipeline);
                     self.ended_emitted = false;
                     self.emit_state();
                 }
                 AsyncPipelineResult::Error(e) => {
-                    let _ = self.app_handle.emit("player:error", serde_json::json!({ "error": e }));
+                    let _ = self
+                        .app_handle
+                        .emit("player:error", serde_json::json!({ "error": e }));
                 }
             }
         }
@@ -1100,8 +1258,11 @@ impl PlayerEngine {
         if let Ok(result) = self.preload_rx.try_recv() {
             match result {
                 AsyncPipelineResult::Ready(pipeline) => {
+                    pipeline.apply_eq_settings(&self.eq_settings);
                     self.secondary = Some(pipeline);
-                    let _ = self.app_handle.emit("player:preload_ready", serde_json::json!({}));
+                    let _ = self
+                        .app_handle
+                        .emit("player:preload_ready", serde_json::json!({}));
                 }
                 AsyncPipelineResult::Error(e) => {
                     eprintln!("预加载失败: {e}");
@@ -1115,15 +1276,20 @@ impl PlayerEngine {
             // 频谱：每 3 tick 发一次（~30Hz poll / 3 ≈ 10FPS）
             if self.poll_tick % 3 == 0 {
                 if let Some(bands) = p.take_spectrum() {
-                    let _ = self.app_handle.emit("player:spectrum", serde_json::json!({ "bands": bands }));
+                    let _ = self
+                        .app_handle
+                        .emit("player:spectrum", serde_json::json!({ "bands": bands }));
                 }
             }
 
             // 时间：每 6 tick 发一次（~5Hz，200ms 足够 UI 更新）
             if self.poll_tick % 6 == 0 && p.is_playing() {
-                let _ = self.app_handle.emit("player:time", serde_json::json!({
-                    "position": p.position(), "duration": p.duration(),
-                }));
+                let _ = self.app_handle.emit(
+                    "player:time",
+                    serde_json::json!({
+                        "position": p.position(), "duration": p.duration(),
+                    }),
+                );
             }
         }
 
@@ -1131,7 +1297,10 @@ impl PlayerEngine {
         let should_crossfade = {
             let p = self.primary.as_ref();
             p.map_or(false, |p| {
-                if !self.auto_crossfade_enabled || self.crossfade.is_some() || self.secondary.is_none() {
+                if !self.auto_crossfade_enabled
+                    || self.crossfade.is_some()
+                    || self.secondary.is_none()
+                {
                     return false;
                 }
                 let pos = p.position();
@@ -1145,28 +1314,44 @@ impl PlayerEngine {
         }
 
         if let Some(ref p) = self.primary {
-            if p.sink.empty() && !p.sink.is_paused() && self.crossfade.is_none() && !self.ended_emitted {
+            if p.sink.empty()
+                && !p.sink.is_paused()
+                && self.crossfade.is_none()
+                && !self.ended_emitted
+            {
                 self.ended_emitted = true;
-                let _ = self.app_handle.emit("player:ended", serde_json::json!({ "slot": "A" }));
+                let _ = self
+                    .app_handle
+                    .emit("player:ended", serde_json::json!({ "slot": "A" }));
             }
         }
     }
 
     fn tick_crossfade(&mut self) {
-        let Some(ref mut cf) = self.crossfade else { return };
-        if !cf.active { return }
+        let Some(ref mut cf) = self.crossfade else {
+            return;
+        };
+        if !cf.active {
+            return;
+        }
 
         let mut done = false;
         let progress = (cf.start.elapsed().as_millis() as f64 / cf.duration_ms as f64).min(1.0);
         let vol = self.volume / 100.0;
 
-        if let Some(ref p) = self.primary { p.set_volume(vol * (1.0 - progress)) }
-        if let Some(ref s) = self.secondary { s.set_volume(vol * progress) }
+        if let Some(ref p) = self.primary {
+            p.set_volume(vol * (1.0 - progress))
+        }
+        if let Some(ref s) = self.secondary {
+            s.set_volume(vol * progress)
+        }
 
         if progress >= 1.0 {
             self.primary = self.secondary.take();
             self.ended_emitted = false;
-            let _ = self.app_handle.emit("player:crossfade_swap", serde_json::json!({}));
+            let _ = self
+                .app_handle
+                .emit("player:crossfade_swap", serde_json::json!({}));
             done = true;
         }
 
@@ -1177,25 +1362,28 @@ impl PlayerEngine {
 
     fn emit_state(&self) {
         let s = self.snapshot();
-        let _ = self.app_handle.emit("player:state", serde_json::json!({
-            "state": format!("{:?}", s.state), "position": s.position, "duration": s.duration,
-            "volume": s.volume, "url": s.url, "isPlaying": s.is_playing,
-        }));
+        let _ = self.app_handle.emit(
+            "player:state",
+            serde_json::json!({
+                "state": format!("{:?}", s.state), "position": s.position, "duration": s.duration,
+                "volume": s.volume, "url": s.url, "isPlaying": s.is_playing,
+            }),
+        );
     }
 }
 
 // ==================== 初始化：专用音频线程保持 OutputStream 存活 ====================
 
 pub fn start_bus_poller(shared: SharedPlayer) {
-    std::thread::spawn(move || {
-        loop {
-            {
-                let mut engine = shared.lock();
-                if engine.is_shutdown() { break }
-                engine.poll();
+    std::thread::spawn(move || loop {
+        {
+            let mut engine = shared.lock();
+            if engine.is_shutdown() {
+                break;
             }
-            std::thread::sleep(Duration::from_millis(33));
+            engine.poll();
         }
+        std::thread::sleep(Duration::from_millis(33));
     });
 }
 
@@ -1203,25 +1391,31 @@ pub fn create_output_stream() -> Result<(OutputStreamHandle, std::sync::mpsc::Se
     let (handle_tx, handle_rx) = std::sync::mpsc::channel();
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel::<()>();
 
-    std::thread::spawn(move || {
-        match OutputStream::try_default() {
-            Ok((_stream, handle)) => {
-                if handle_tx.send(Ok(handle)).is_err() { return }
-                let _ = shutdown_rx.recv();
-                drop(_stream);
+    std::thread::spawn(move || match OutputStream::try_default() {
+        Ok((_stream, handle)) => {
+            if handle_tx.send(Ok(handle)).is_err() {
+                return;
             }
-            Err(e) => { let _ = handle_tx.send(Err(format!("{e}"))); }
+            let _ = shutdown_rx.recv();
+            drop(_stream);
+        }
+        Err(e) => {
+            let _ = handle_tx.send(Err(format!("{e}")));
         }
     });
 
-    let handle = handle_rx.recv().map_err(|e| format!("音频线程通信失败: {e}"))??;
+    let handle = handle_rx
+        .recv()
+        .map_err(|e| format!("音频线程通信失败: {e}"))??;
     Ok((handle, shutdown_tx))
 }
 
 /// 清理上次运行遗留的临时音频文件
 pub fn cleanup_temp_files() {
     let temp_dir = std::env::temp_dir().join("mio_player");
-    if !temp_dir.exists() { return }
+    if !temp_dir.exists() {
+        return;
+    }
     let threshold = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
     if let Ok(entries) = std::fs::read_dir(&temp_dir) {
         for entry in entries.flatten() {

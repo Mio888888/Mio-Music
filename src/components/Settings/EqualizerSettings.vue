@@ -3,8 +3,14 @@
     <t-card :title="t('settings.equalizer.title')" :bordered="false">
       <template #actions>
         <t-space>
-          <t-switch v-model="enabled" :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]" />
-          <t-button theme="default" variant="text" @click="resetToCurrentPreset">{{ t('settings.equalizer.reset') }}</t-button>
+          <t-switch
+            v-model="enabled"
+            :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]"
+            @change="(val: unknown) => handleEnabledChange(Boolean(val))"
+          />
+          <t-button theme="default" variant="text" @click="resetToCurrentPreset">
+            {{ t('settings.equalizer.reset') }}
+          </t-button>
         </t-space>
       </template>
 
@@ -18,21 +24,21 @@
         <div class="controls-row">
           <div class="preset-controls">
             <t-select
-              v-model="currentPresetName"
+              v-model="selectedPresetId"
               :placeholder="t('settings.equalizer.selectPreset')"
               class="preset-select"
               @change="(val: unknown) => handlePresetChange(val as string)"
             >
               <t-option
                 v-for="preset in presets"
-                :key="preset.name"
-                :label="preset.name"
-                :value="preset.name"
+                :key="preset.id"
+                :label="displayPresetName(preset)"
+                :value="preset.id"
               />
             </t-select>
 
             <t-button
-              v-if="canDeleteCurrentPreset"
+              v-if="canModifyCurrentPreset"
               theme="primary"
               variant="text"
               size="small"
@@ -43,7 +49,7 @@
             </t-button>
 
             <t-button
-              v-if="canDeleteCurrentPreset"
+              v-if="canModifyCurrentPreset"
               theme="danger"
               variant="text"
               size="small"
@@ -55,11 +61,15 @@
           </div>
 
           <div class="action-buttons">
-            <t-button theme="primary" variant="outline" @click="savePresetDialogVisible = true"
-              >{{ t('settings.equalizer.saveAsPreset') }}</t-button
-            >
-            <t-button theme="default" variant="outline" @click="exportConfig">{{ t('settings.equalizer.exportConfig') }}</t-button>
-            <t-button theme="default" variant="outline" @click="triggerImport">{{ t('settings.equalizer.importConfig') }}</t-button>
+            <t-button theme="primary" variant="outline" @click="savePresetDialogVisible = true">
+              {{ t('settings.equalizer.saveAsPreset') }}
+            </t-button>
+            <t-button theme="default" variant="outline" @click="exportConfig">
+              {{ t('settings.equalizer.exportConfig') }}
+            </t-button>
+            <t-button theme="default" variant="outline" @click="triggerImport">
+              {{ t('settings.equalizer.importConfig') }}
+            </t-button>
             <input
               ref="fileInputRef"
               type="file"
@@ -70,23 +80,40 @@
           </div>
         </div>
 
+        <!-- Global Gain -->
+        <div class="global-gain-control">
+          <div class="global-gain-header">
+            <span class="global-gain-title">{{ t('settings.equalizer.globalGain') }}</span>
+            <span class="global-gain-value">{{ gains.global.toFixed(1) }}dB</span>
+          </div>
+          <t-slider
+            v-model="gains.global"
+            :min="EQ_GAIN_MIN"
+            :max="EQ_GAIN_MAX"
+            :step="0.1"
+            :show-tooltip="true"
+            :disabled="!enabled"
+            @change="(val: number | number[]) => onGlobalGainChange(val as number)"
+          />
+        </div>
+
         <!-- Sliders -->
         <div class="sliders-container">
-          <div v-for="(freq, index) in frequencies" :key="freq" class="slider-group">
+          <div v-for="(freq, index) in EQ_FREQUENCIES" :key="freq" class="slider-group">
             <div class="slider-wrapper">
               <t-slider
-                v-model="gains[index]"
-                :min="-12"
-                :max="12"
+                v-model="gains.bands[index]"
+                :min="EQ_GAIN_MIN"
+                :max="EQ_GAIN_MAX"
                 :step="0.1"
                 layout="vertical"
                 :show-tooltip="true"
                 :disabled="!enabled"
-                @change="(val: number | number[]) => onGainChange(index, val as number)"
+                @change="(val: number | number[]) => onBandGainChange(index, val as number)"
               />
             </div>
             <span class="freq-label">{{ formatFreq(freq) }}</span>
-            <span class="gain-label">{{ gains[index].toFixed(1) }}dB</span>
+            <span class="gain-label">{{ gains.bands[index].toFixed(1) }}dB</span>
           </div>
         </div>
       </div>
@@ -103,26 +130,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useEqualizerStore } from '@/store/Equalizer'
-import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
-import { DeleteIcon, SaveIcon } from 'tdesign-icons-vue-next'
-import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useI18n } from 'vue-i18n'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { DialogPlugin, MessagePlugin } from 'tdesign-vue-next'
+import { DeleteIcon, SaveIcon } from 'tdesign-icons-vue-next'
+import {
+  EQ_FLAT_PRESET_ID,
+  EQ_FREQUENCIES,
+  EQ_GAIN_MAX,
+  EQ_GAIN_MIN,
+  type EqualizerPreset,
+  useEqualizerStore
+} from '@/store/Equalizer'
 
 const { t } = useI18n()
-
-const BUILTIN_PRESETS = computed(() => [
-  t('settings.equalizer.presetFlat'), t('settings.equalizer.presetPop'), t('settings.equalizer.presetRock'), t('settings.equalizer.presetJazz'),
-  t('settings.equalizer.presetClassical'), t('settings.equalizer.presetBassBoost'), t('settings.equalizer.presetVocalBoost'), t('settings.equalizer.presetTrebleBoost')
-])
-
 const eqStore = useEqualizerStore()
-const { enabled, currentPreset, gains, presets } = storeToRefs(eqStore)
+const { enabled, currentPresetId, gains, presets, currentPresetDetail } = storeToRefs(eqStore)
 
-const frequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+const PRESET_LABEL_KEYS: Record<string, string> = {
+  flat: 'settings.equalizer.presetFlat',
+  pop: 'settings.equalizer.presetPop',
+  rock: 'settings.equalizer.presetRock',
+  jazz: 'settings.equalizer.presetJazz',
+  classical: 'settings.equalizer.presetClassical',
+  bass_boost: 'settings.equalizer.presetBassBoost',
+  vocal_boost: 'settings.equalizer.presetVocalBoost',
+  treble_boost: 'settings.equalizer.presetTrebleBoost'
+}
+
 const SPECTRUM_BAND_COUNT = 128
 const SILENCE_DB = -80
 
@@ -141,150 +178,154 @@ let spectrumData = new Array<number>(SPECTRUM_BAND_COUNT).fill(SILENCE_DB)
 
 const formatFreq = (freq: number) => freq >= 1000 ? `${freq / 1000}k` : `${freq}`
 
-const currentPresetName = computed({
-  get: () => currentPreset.value,
-  set: (val) => { currentPreset.value = val }
+const displayPresetName = (preset: EqualizerPreset) => {
+  const key = PRESET_LABEL_KEYS[preset.id]
+  return preset.isDefault && key ? t(key) : preset.name
+}
+
+const currentPresetDisplayName = computed(() => {
+  const preset = currentPresetDetail.value
+  return preset ? displayPresetName(preset) : t(PRESET_LABEL_KEYS[EQ_FLAT_PRESET_ID])
 })
 
-const canDeleteCurrentPreset = computed(() => {
-  const reversedPresets = [...presets.value].reverse()
-  const preset = reversedPresets.find((p) => p.name === currentPreset.value)
-  return preset && preset.originalGains !== undefined
+const selectedPresetId = computed({
+  get: () => currentPresetId.value,
+  set: (val: string) => {
+    currentPresetId.value = val
+  }
 })
+
+const canModifyCurrentPreset = computed(() => {
+  const preset = currentPresetDetail.value
+  return Boolean(preset && !preset.isDefault)
+})
+
+const localizedDefaultPresetNames = computed(() => new Set(
+  presets.value
+    .filter((preset) => preset.isDefault)
+    .map((preset) => displayPresetName(preset).trim().toLocaleLowerCase())
+))
+
+const handleEnabledChange = (val: boolean) => {
+  eqStore.setEnabled(val)
+}
+
+const handlePresetChange = (val: string) => {
+  if (!eqStore.applyPreset(val)) {
+    MessagePlugin.error(t('settings.equalizer.presetNotExist'))
+  }
+}
 
 const confirmDeletePreset = () => {
-  if (!canDeleteCurrentPreset.value) {
+  if (!canModifyCurrentPreset.value) {
     MessagePlugin.warning(t('settings.equalizer.builtinNoDelete'))
     return
   }
+
   const dialog = DialogPlugin.confirm({
     header: t('settings.equalizer.deletePresetTitle'),
-    body: t('settings.equalizer.deletePresetBody', { name: currentPreset.value }),
+    body: t('settings.equalizer.deletePresetBody', { name: currentPresetDisplayName.value }),
     confirmBtn: { theme: 'danger', content: t('settings.equalizer.deletePreset') },
-    onConfirm: () => { deleteCurrentPreset(); dialog.destroy() }
+    onConfirm: () => {
+      deleteCurrentPreset()
+      dialog.destroy()
+    }
   })
 }
 
 const deleteCurrentPreset = () => {
-  const presetName = currentPreset.value
-  let index = -1
-  for (let i = presets.value.length - 1; i >= 0; i--) {
-    if (presets.value[i].name === presetName) { index = i; break }
+  const presetName = currentPresetDisplayName.value
+  const result = eqStore.deleteUserPreset(currentPresetId.value)
+  if (!result.success) {
+    MessagePlugin.warning(result.error || t('settings.equalizer.builtinNoDelete'))
+    return
   }
-  if (index === -1) { MessagePlugin.error(t('settings.equalizer.presetNotExist')); return }
-  if (presets.value[index].originalGains === undefined) { MessagePlugin.warning(t('settings.equalizer.builtinNoDelete')); return }
-  presets.value.splice(index, 1)
-  currentPreset.value = 'Flat'
-  handlePresetChange('Flat')
   MessagePlugin.success(t('settings.equalizer.presetDeleted', { name: presetName }))
-  eqStore.addLog(`Deleted preset: ${presetName}`)
 }
 
 const saveCurrentToPreset = () => {
-  const presetName = currentPreset.value
-  if (BUILTIN_PRESETS.value.includes(presetName)) { MessagePlugin.warning(t('settings.equalizer.builtinNoModify')); return }
-  const preset = presets.value.find((p) => p.name === presetName)
-  if (!preset) { MessagePlugin.error(t('settings.equalizer.presetNotExist')); return }
-  preset.gains = [...gains.value]
-  MessagePlugin.success(t('settings.equalizer.savedToPreset', { name: presetName }))
-  eqStore.addLog(`Updated preset "${presetName}" with current gains: ${gains.value.map((g) => g.toFixed(1)).join(', ')}`)
-}
-
-// 同步 EQ 到 Rust 后端
-const applyGains = () => {
-  const targetGains = enabled.value ? gains.value : new Array(10).fill(0)
-  targetGains.forEach((gain, index) => {
-    invoke('player__set_eq_band', { index, gain })
-  })
-}
-
-watch([() => [...gains.value], enabled], () => { applyGains() })
-
-const handlePresetChange = (val: string) => {
-  const preset = presets.value.find((p) => p.name === val)
-  if (preset) {
-    gains.value = [...preset.gains]
-    eqStore.addLog(`Applied preset: ${val}`)
+  const presetName = currentPresetDisplayName.value
+  const result = eqStore.updateUserPreset(currentPresetId.value)
+  if (!result.success) {
+    MessagePlugin.warning(result.error || t('settings.equalizer.builtinNoModify'))
+    return
   }
+  MessagePlugin.success(t('settings.equalizer.savedToPreset', { name: presetName }))
 }
 
-const onGainChange = (index: number, val: number) => {
-  eqStore.addLog(`Adjusted band ${frequencies[index]}Hz to ${val}dB`)
+const onGlobalGainChange = (val: number) => {
+  eqStore.setGlobalGain(val)
+}
+
+const onBandGainChange = (index: number, val: number) => {
+  eqStore.setBandGain(index, val)
 }
 
 const resetToCurrentPreset = () => {
-  const presetName = currentPreset.value
-  if (BUILTIN_PRESETS.value.includes(presetName)) {
-    const preset = presets.value.find((p) => p.name === presetName)
-    if (preset) {
-      gains.value = [...preset.gains]
-      MessagePlugin.success(t('settings.equalizer.resetToPreset', { name: presetName }))
-      eqStore.addLog(`Reset to preset original values: ${presetName}`)
-    }
-  } else {
-    const preset = presets.value.find((p) => p.name === presetName)
-    if (preset && preset.originalGains) {
-      gains.value = [...preset.originalGains]
-      MessagePlugin.success(t('settings.equalizer.resetToInitial', { name: presetName }))
-      eqStore.addLog(`Reset custom preset "${presetName}" to original values`)
-    } else {
-      handlePresetChange('Flat')
-      MessagePlugin.success(t('settings.equalizer.resetToFlat'))
-      eqStore.addLog(`Reset custom preset "${presetName}" to Flat`)
-    }
+  if (eqStore.resetToCurrentPreset()) {
+    MessagePlugin.success(t('settings.equalizer.resetToPreset', { name: currentPresetDisplayName.value }))
+    return
   }
+
+  eqStore.applyPreset(EQ_FLAT_PRESET_ID)
+  MessagePlugin.success(t('settings.equalizer.resetToFlat'))
 }
 
 const saveNewPreset = () => {
-  if (!newPresetName.value) return
-  if (BUILTIN_PRESETS.value.includes(newPresetName.value)) { MessagePlugin.warning(t('settings.equalizer.builtinNameConflict', { name: newPresetName.value })); return }
-  if (presets.value.some((p) => p.name === newPresetName.value)) { MessagePlugin.warning(t('settings.equalizer.presetExists', { name: newPresetName.value })); return }
-  const currentGains = [...gains.value]
-  presets.value.push({ name: newPresetName.value, gains: currentGains, originalGains: currentGains })
-  currentPreset.value = newPresetName.value
+  const name = newPresetName.value.trim()
+  if (!name) return
+
+  if (localizedDefaultPresetNames.value.has(name.toLocaleLowerCase())) {
+    MessagePlugin.warning(t('settings.equalizer.builtinNameConflict', { name }))
+    return
+  }
+
+  const result = eqStore.createUserPreset(name)
+  if (!result.success) {
+    MessagePlugin.warning(result.error || t('settings.equalizer.presetExists', { name }))
+    return
+  }
+
   savePresetDialogVisible.value = false
   newPresetName.value = ''
   MessagePlugin.success(t('settings.equalizer.presetSaveSuccess'))
-  eqStore.addLog(`Saved new preset with gains: ${currentGains.map((g) => g.toFixed(1)).join(', ')}`)
 }
 
 const exportConfig = () => {
-  const data = JSON.stringify({ presets: presets.value, currentPreset: currentPreset.value, gains: gains.value, enabled: enabled.value }, null, 2)
+  const data = JSON.stringify(eqStore.exportConfig(), null, 2)
   const blob = new Blob([data], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url; a.download = 'ceru-music-eq-config.json'; a.click()
+  a.href = url
+  a.download = 'mio-eq-config.json'
+  a.click()
   URL.revokeObjectURL(url)
   eqStore.addLog('Exported configuration')
 }
 
-const triggerImport = () => { fileInputRef.value?.click() }
+const triggerImport = () => {
+  fileInputRef.value?.click()
+}
 
 const handleFileImport = async (event: Event) => {
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
+
   const file = input.files[0]
   try {
     const text = await file.text()
     const data = JSON.parse(text)
-    if (data.presets) {
-      presets.value = data.presets.map((preset: any) => {
-        if (preset.basePreset && !preset.originalGains) {
-          const basePreset = data.presets.find((p: any) => p.name === preset.basePreset)
-          if (basePreset) return { ...preset, originalGains: [...basePreset.gains] }
-        }
-        return preset
-      })
+    const result = eqStore.importConfig(data)
+    if (!result.success) {
+      MessagePlugin.error(result.error || t('settings.equalizer.importFailed'))
+      return
     }
-    if (data.enabled !== undefined) enabled.value = data.enabled
-    if (data.gains) gains.value = data.gains
-    if (data.currentPreset) currentPreset.value = data.currentPreset
     MessagePlugin.success(t('settings.equalizer.importSuccess'))
-    eqStore.addLog('Imported configuration')
-  } catch (e) {
+  } catch (error) {
     MessagePlugin.error(t('settings.equalizer.importFailed'))
+  } finally {
+    input.value = ''
   }
-  input.value = ''
 }
 
 const readThemeValue = (name: string, fallback: string): string => {
@@ -353,13 +394,15 @@ const setupVisualizer = async () => {
 
 onMounted(() => {
   setupVisualizer()
-  applyGains()
   window.addEventListener('resize', resizeCanvas)
 })
 
 onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId)
-  if (unlisten) { unlisten(); unlisten = null }
+  if (unlisten) {
+    unlisten()
+    unlisten = null
+  }
   window.removeEventListener('resize', resizeCanvas)
 })
 </script>
@@ -399,7 +442,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 .preset-select {
-  width: 160px;
+  width: 180px;
 }
 .action-buttons {
   display: flex;
@@ -407,10 +450,32 @@ onUnmounted(() => {
   gap: 8px;
   flex-wrap: wrap;
 }
+.global-gain-control {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--td-bg-color-container), var(--td-brand-color) 5%);
+  border: 1px solid var(--td-border-level-1-color);
+}
+.global-gain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.global-gain-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+}
+.global-gain-value {
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
 .sliders-container {
   display: flex;
   justify-content: space-between;
-  height: 250px;
+  height: 280px;
   padding: 20px 0;
 }
 .slider-group {
@@ -420,7 +485,7 @@ onUnmounted(() => {
   flex: 1;
 }
 .slider-wrapper {
-  height: 180px;
+  height: 210px;
   display: flex;
   justify-content: center;
 }

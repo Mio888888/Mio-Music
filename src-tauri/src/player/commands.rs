@@ -1,6 +1,7 @@
+use crate::player::effects::{EqSettings, NUM_EQ_BANDS};
 use crate::player::media_control::MEDIA_CONTROL;
 use crate::player::{AudioSlot, SharedPlayer};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[derive(Debug, Serialize)]
@@ -20,6 +21,31 @@ impl<T: Serialize> CommandResult<T> {
 }
 
 type CmdResult<T> = Result<CommandResult<T>, String>;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EqSettingsPayload {
+    pub enabled: bool,
+    pub global_gain: f64,
+    pub bands: Vec<f64>,
+}
+
+impl TryFrom<EqSettingsPayload> for EqSettings {
+    type Error = String;
+
+    fn try_from(payload: EqSettingsPayload) -> Result<Self, Self::Error> {
+        let bands: [f64; NUM_EQ_BANDS] = payload
+            .bands
+            .try_into()
+            .map_err(|_| format!("EQ 设置必须包含 {NUM_EQ_BANDS} 个频段"))?;
+
+        Ok(Self {
+            enabled: payload.enabled,
+            global_gain: payload.global_gain,
+            bands,
+        }.sanitized())
+    }
+}
 
 #[allow(non_snake_case)]
 #[tauri::command]
@@ -122,6 +148,19 @@ pub fn player__swap_slot(player: State<'_, SharedPlayer>) -> CmdResult<()> {
 
 #[allow(non_snake_case)]
 #[tauri::command]
+pub fn player__set_eq_settings(
+    player: State<'_, SharedPlayer>,
+    enabled: bool,
+    global_gain: f64,
+    bands: Vec<f64>,
+) -> CmdResult<()> {
+    let settings = EqSettings::try_from(EqSettingsPayload { enabled, global_gain, bands })?;
+    player.lock().set_eq_settings(settings);
+    Ok(CommandResult::ok(()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
 pub fn player__set_eq_band(
     player: State<'_, SharedPlayer>,
     index: usize,
@@ -135,6 +174,12 @@ pub fn player__set_eq_band(
 #[tauri::command]
 pub fn player__get_eq_bands(player: State<'_, SharedPlayer>) -> CmdResult<Vec<f64>> {
     Ok(CommandResult::ok(player.lock().get_eq_bands()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__get_eq_global_gain(player: State<'_, SharedPlayer>) -> CmdResult<f64> {
+    Ok(CommandResult::ok(player.lock().get_eq_global_gain()))
 }
 
 #[allow(non_snake_case)]

@@ -15,17 +15,9 @@ const effectStore = useAudioEffectsStore()
 
 provide('audioSubscribe', audioStore.subscribe)
 
-// EQ 变化时同步到 Rust 后端
+// EQ 同步集中在 Equalizer store；此处仅在全局播放器初始化后恢复一次快照。
 const applyGlobalEQ = () => {
-  if (!eqStore.enabled) {
-    for (let i = 0; i < 10; i++) {
-      invoke('player__set_eq_band', { index: i, gain: 0 })
-    }
-    return
-  }
-  eqStore.gains.forEach((gain, index) => {
-    invoke('player__set_eq_band', { index, gain })
-  })
+  void eqStore.syncToBackend()
 }
 
 // 音效变化时同步到 Rust 后端
@@ -44,12 +36,6 @@ onMounted(async () => {
   applyGlobalEQ()
   applyGlobalEffects()
 })
-
-watch(
-  [() => eqStore.enabled, () => eqStore.gains],
-  () => { applyGlobalEQ() },
-  { deep: true }
-)
 
 watch(
   [() => effectStore.bassBoost, () => effectStore.surround, () => effectStore.balance],

@@ -259,6 +259,7 @@ export default {
     saveAsPreset: '保存预设',
     exportConfig: '导出配置',
     importConfig: '导入配置',
+    globalGain: '全局增益 / Preamp',
     saveNewPresetTitle: '保存为新预设',
     presetNamePlaceholder: '输入预设名称',
     builtinNoDelete: '内置预设不能删除',

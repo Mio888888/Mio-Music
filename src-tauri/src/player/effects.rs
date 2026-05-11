@@ -88,15 +88,65 @@ impl BiquadFilter {
 // ==================== EQ 共享状态 ====================
 
 pub const NUM_EQ_BANDS: usize = 10;
+pub const EQ_GAIN_MIN: f64 = -24.0;
+pub const EQ_GAIN_MAX: f64 = 24.0;
 pub const EQ_FREQS: [f64; NUM_EQ_BANDS] = [
     32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
 ];
 const EQ_Q: f64 = 1.4;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EqSettings {
+    pub enabled: bool,
+    pub global_gain: f64,
+    pub bands: [f64; NUM_EQ_BANDS],
+}
+
+impl Default for EqSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            global_gain: 0.0,
+            bands: [0.0; NUM_EQ_BANDS],
+        }
+    }
+}
+
+impl EqSettings {
+    pub fn sanitized(&self) -> Self {
+        Self {
+            enabled: self.enabled,
+            global_gain: clamp_eq_gain(self.global_gain),
+            bands: std::array::from_fn(|index| clamp_eq_gain(self.bands[index])),
+        }
+    }
+
+    pub fn effective_global_gain(&self) -> f64 {
+        if self.enabled { clamp_eq_gain(self.global_gain) } else { 0.0 }
+    }
+
+    pub fn effective_bands(&self) -> [f64; NUM_EQ_BANDS] {
+        if self.enabled {
+            std::array::from_fn(|index| clamp_eq_gain(self.bands[index]))
+        } else {
+            [0.0; NUM_EQ_BANDS]
+        }
+    }
+}
+
+pub fn clamp_eq_gain(gain_db: f64) -> f64 {
+    if gain_db.is_finite() {
+        gain_db.clamp(EQ_GAIN_MIN, EQ_GAIN_MAX)
+    } else {
+        0.0
+    }
+}
+
 /// EQ 状态通过原子操作共享 gain 值，音频线程在本地持有滤波器实例。
-/// IPC 线程调用 set_band 写入 gain → 音频线程通过原子读取检测变化 → 本地重建系数。
+/// IPC 线程调用 set_settings/set_band 写入 gain → 音频线程通过原子读取检测变化 → 本地重建系数。
 pub struct EqState {
     gains: [AtomicU64; NUM_EQ_BANDS],
+    global_gain: AtomicU64,
     pub channels: u16,
     pub sample_rate: u32,
 }
@@ -105,6 +155,7 @@ impl EqState {
     pub fn new(channels: u16, sample_rate: u32) -> Self {
         Self {
             gains: std::array::from_fn(|_| AtomicU64::new(0.0f64.to_bits())),
+            global_gain: AtomicU64::new(0.0f64.to_bits()),
             channels,
             sample_rate,
         }
@@ -112,11 +163,18 @@ impl EqState {
 
     pub fn set_band(&self, band: usize, gain_db: f64) {
         if band >= NUM_EQ_BANDS { return }
-        self.gains[band].store(gain_db.to_bits(), Ordering::Relaxed);
+        self.gains[band].store(clamp_eq_gain(gain_db).to_bits(), Ordering::Relaxed);
     }
 
-    pub fn get_gains(&self) -> [f64; NUM_EQ_BANDS] {
-        std::array::from_fn(|i| f64::from_bits(self.gains[i].load(Ordering::Relaxed)))
+    pub fn set_global_gain(&self, gain_db: f64) {
+        self.global_gain.store(clamp_eq_gain(gain_db).to_bits(), Ordering::Relaxed);
+    }
+
+    pub fn set_settings(&self, settings: &EqSettings) {
+        self.set_global_gain(settings.effective_global_gain());
+        for (index, gain) in settings.effective_bands().iter().enumerate() {
+            self.set_band(index, *gain);
+        }
     }
 }
 
@@ -129,6 +187,8 @@ pub struct EqSource<S> {
     eq_state: Arc<EqState>,
     filters: Vec<Vec<BiquadFilter>>,
     cached_gains: [f64; NUM_EQ_BANDS],
+    cached_global_gain: f64,
+    cached_global_gain_factor: f64,
     ch: usize,
 }
 
@@ -138,7 +198,15 @@ impl<S> EqSource<S> {
         let filters = (0..NUM_EQ_BANDS)
             .map(|_| (0..channels).map(|_| BiquadFilter::new()).collect())
             .collect();
-        Self { inner, eq_state, filters, cached_gains: [0.0; NUM_EQ_BANDS], ch: 0 }
+        Self {
+            inner,
+            eq_state,
+            filters,
+            cached_gains: [0.0; NUM_EQ_BANDS],
+            cached_global_gain: 0.0,
+            cached_global_gain_factor: 1.0,
+            ch: 0,
+        }
     }
 }
 
@@ -170,6 +238,18 @@ where S: Source<Item = f32>,
         for band in 0..NUM_EQ_BANDS {
             val = self.filters[band][ch].run(val);
         }
+
+        let global_gain = f64::from_bits(self.eq_state.global_gain.load(Ordering::Relaxed));
+        if global_gain != self.cached_global_gain {
+            self.cached_global_gain = global_gain;
+            self.cached_global_gain_factor = if global_gain.abs() > 0.001 {
+                10.0_f64.powf(clamp_eq_gain(global_gain) / 20.0)
+            } else {
+                1.0
+            };
+        }
+        val *= self.cached_global_gain_factor;
+
         Some(val as f32)
     }
 }
