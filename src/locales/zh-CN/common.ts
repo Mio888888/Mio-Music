@@ -85,6 +85,7 @@ export default {
     appearance: '外观',
     ai: 'AI',
     playlist: '播放',
+    effects: '音效',
     hotkeys: '快捷键',
     plugins: '插件',
     music: '音乐源',

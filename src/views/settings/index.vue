@@ -6,6 +6,7 @@ import {
   PaletteIcon,
   ApiIcon,
   PlayCircleIcon,
+  AudioIcon,
   KeyboardIcon,
   TreeRoundDotIcon,
   MusicIcon,
@@ -16,6 +17,7 @@ import {
 import AppearanceSection from './sections/AppearanceSection.vue'
 import AISection from './sections/AISection.vue'
 import PlaybackSection from './sections/PlaybackSection.vue'
+import AudioEffectsSection from './sections/AudioEffectsSection.vue'
 import HotkeySection from './sections/HotkeySection.vue'
 import PluginSection from './sections/PluginSection.vue'
 import MusicSourceSection from './sections/MusicSourceSection.vue'
@@ -31,6 +33,26 @@ const isMobile = ref(false)
 const route = useRoute()
 const contentPanelRef = ref<HTMLElement>()
 const scrollPositions = ref<Record<string, number>>({})
+
+const sectionAliases: Record<string, string> = {
+  'playback-equalizer': 'effects-equalizer',
+  'playback-audio-effect': 'effects-audio-effect'
+}
+
+const sectionCategoryMap: Record<string, string> = {
+  'effects-equalizer': 'effects',
+  'effects-audio-effect': 'effects',
+  'playback-equalizer': 'effects',
+  'playback-audio-effect': 'effects'
+}
+
+const resolveSettingsTarget = (category: string, section: string) => {
+  const resolvedSection = sectionAliases[section] || section
+  return {
+    category: sectionCategoryMap[section] || sectionCategoryMap[resolvedSection] || category,
+    section: resolvedSection
+  }
+}
 
 const settingsCategories = computed(() => [
   {
@@ -50,6 +72,12 @@ const settingsCategories = computed(() => [
     label: t('settings.musicSource.navPlaylist'),
     icon: PlayCircleIcon,
     description: t('settings.musicSource.navPlaylistDesc')
+  },
+  {
+    key: 'effects',
+    label: t('settings.musicSource.navEffects'),
+    icon: AudioIcon,
+    description: t('settings.musicSource.navEffectsDesc')
   },
   {
     key: 'hotkeys',
@@ -93,6 +121,7 @@ const sectionComponents: Record<string, any> = {
   appearance: AppearanceSection,
   ai: AISection,
   playlist: PlaybackSection,
+  effects: AudioEffectsSection,
   hotkeys: HotkeySection,
   plugins: PluginSection,
   music: MusicSourceSection,
@@ -169,8 +198,9 @@ function scrollToSection(sectionId?: string) {
 watch(
   () => route.query,
   async (q) => {
-    const category = String(q.category || '')
-    const section = String(q.section || '')
+    const rawCategory = String(q.category || '')
+    const rawSection = String(q.section || '')
+    const { category, section } = resolveSettingsTarget(rawCategory, rawSection)
     if (category && category !== activeCategory.value && !(isMobile.value && category === 'hotkeys')) {
       await switchCategory(category)
       await nextTick()

@@ -100,7 +100,9 @@ export default {
     navAi: 'AI Features',
     navAiDesc: 'DeepSeek API configuration and AI-related features',
     navPlaylist: 'Playback',
-    navPlaylistDesc: 'Playlist, lyrics management and related settings',
+    navPlaylistDesc: 'Playlist, audio output, and playback display settings',
+    navEffects: 'Audio Effects',
+    navEffectsDesc: 'Equalizer, advanced effects, and channel processing settings',
     navHotkeys: 'Hotkeys',
     navHotkeysDesc: 'Global hotkey configuration',
     navPlugins: 'Plugins',
@@ -157,8 +159,6 @@ export default {
     title: 'Playback',
     playlistManagement: 'Playlist Management',
     audioOutput: 'Audio Output',
-    equalizer: 'Audio Equalizer',
-    audioEffect: 'Advanced Audio Effects',
     fullscreenPerformance: 'Fullscreen Performance',
     jumpLyric: 'Bouncing Lyrics',
     jumpLyricDesc: 'Use spring engine effect for bouncing lyrics, uses more performance',
@@ -168,6 +168,11 @@ export default {
     audioVisualizerDesc: 'Display real-time spectrum/waveform visualization, uses more performance',
     routePreload: 'Route Preload',
     routePreloadDesc: 'Preload page components when idle to improve page switching speed'
+  },
+  effects: {
+    title: 'Audio Effects',
+    equalizer: 'Audio Equalizer',
+    audioEffect: 'Advanced Audio Effects'
   },
   storage: {
     title: 'Storage',

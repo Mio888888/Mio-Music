@@ -103,7 +103,9 @@ export default {
     navAi: 'AI 功能',
     navAiDesc: 'DeepSeek API 配置和 AI 相关功能',
     navPlaylist: '播放设置',
-    navPlaylistDesc: '播放列表，歌词管理和相关设置',
+    navPlaylistDesc: '播放列表、音频输出和播放显示设置',
+    navEffects: '音效设置',
+    navEffectsDesc: '均衡器、高级音效和声道处理设置',
     navHotkeys: '快捷键',
     navHotkeysDesc: '全局快捷键配置',
     navPlugins: '插件管理',
@@ -164,8 +166,6 @@ export default {
     title: '播放',
     playlistManagement: '播放列表管理',
     audioOutput: '音频输出',
-    equalizer: '音频均衡器',
-    audioEffect: '高级音效处理',
     fullscreenPerformance: '全屏播放-性能优化',
     jumpLyric: '跳动歌词',
     jumpLyricDesc: '使用弹簧引擎效果跳动歌词、占用更高的性能',
@@ -175,6 +175,11 @@ export default {
     audioVisualizerDesc: '显示实时频谱/波形可视化、占用更高的性能',
     routePreload: '路由预加载',
     routePreloadDesc: '空闲时预加载页面组件，提升页面切换速度'
+  },
+  effects: {
+    title: '音效',
+    equalizer: '音频均衡器',
+    audioEffect: '高级音效处理'
   },
   storage: {
     title: '存储',

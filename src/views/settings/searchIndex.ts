@@ -25,9 +25,11 @@ export function getSearchIndex(): SearchItem[] {
     // 播放设置
     { id: 'playback-playlist', category: 'playlist', title: t('common.searchIndex.playbackPlaylist.title'), description: t('common.searchIndex.playbackPlaylist.description'), keywords: t('common.searchIndex.playbackPlaylist.keywords') as unknown as string[] },
     { id: 'playback-audio-output', category: 'playlist', title: t('common.searchIndex.playbackAudioOutput.title'), description: t('common.searchIndex.playbackAudioOutput.description'), keywords: t('common.searchIndex.playbackAudioOutput.keywords') as unknown as string[] },
-    { id: 'playback-equalizer', category: 'playlist', title: t('common.searchIndex.playbackEqualizer.title'), description: t('common.searchIndex.playbackEqualizer.description'), keywords: t('common.searchIndex.playbackEqualizer.keywords') as unknown as string[] },
-    { id: 'playback-audio-effect', category: 'playlist', title: t('common.searchIndex.playbackAudioEffect.title'), description: t('common.searchIndex.playbackAudioEffect.description'), keywords: t('common.searchIndex.playbackAudioEffect.keywords') as unknown as string[] },
     { id: 'playback-performance', category: 'playlist', title: t('common.searchIndex.playbackPerformance.title'), description: t('common.searchIndex.playbackPerformance.description'), keywords: t('common.searchIndex.playbackPerformance.keywords') as unknown as string[] },
+
+    // 音效设置
+    { id: 'effects-equalizer', category: 'effects', title: t('common.searchIndex.playbackEqualizer.title'), description: t('common.searchIndex.playbackEqualizer.description'), keywords: t('common.searchIndex.playbackEqualizer.keywords') as unknown as string[] },
+    { id: 'effects-audio-effect', category: 'effects', title: t('common.searchIndex.playbackAudioEffect.title'), description: t('common.searchIndex.playbackAudioEffect.description'), keywords: t('common.searchIndex.playbackAudioEffect.keywords') as unknown as string[] },
 
     // 音乐源
     { id: 'music-source', category: 'music', title: t('common.searchIndex.musicSource.title'), description: t('common.searchIndex.musicSource.description'), keywords: t('common.searchIndex.musicSource.keywords') as unknown as string[] },

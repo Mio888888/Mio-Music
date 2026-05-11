@@ -93,6 +93,7 @@ const getCategoryLabel = (category: string) => {
     appearance: t('common.settingsCategory.appearance'),
     ai: t('common.settingsCategory.ai'),
     playlist: t('common.settingsCategory.playlist'),
+    effects: t('common.settingsCategory.effects'),
     hotkeys: t('common.settingsCategory.hotkeys'),
     plugins: t('common.settingsCategory.plugins'),
     music: t('common.settingsCategory.music'),

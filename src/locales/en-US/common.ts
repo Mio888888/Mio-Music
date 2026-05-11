@@ -85,6 +85,7 @@ export default {
     appearance: 'Appearance',
     ai: 'AI',
     playlist: 'Playback',
+    effects: 'Audio Effects',
     hotkeys: 'Hotkeys',
     plugins: 'Plugins',
     music: 'Music Source',

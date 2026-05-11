@@ -5,8 +5,6 @@ import { useSettingsStore } from '@/store/Settings'
 import PlaylistSettings from '@/components/Settings/PlaylistSettings.vue'
 import AudioOutputSettings from '@/components/Settings/AudioOutputSettings.vue'
 import DlnaDeviceSettings from '@/components/Settings/DlnaDeviceSettings.vue'
-import EqualizerSettings from '@/components/Settings/EqualizerSettings.vue'
-import AudioEffectSettings from '@/components/Settings/AudioEffectSettings.vue'
 import BackgroundRenderSettings from '@/components/Settings/BackgroundRenderSettings.vue'
 
 const { t } = useI18n()
@@ -31,16 +29,6 @@ const { settings } = storeToRefs(settingsStore)
 
     <div id="playback-dlna" class="setting-group">
       <DlnaDeviceSettings />
-    </div>
-
-    <div id="playback-equalizer" class="setting-group">
-      <h3>{{ t('settings.playback.equalizer') }}</h3>
-      <EqualizerSettings />
-    </div>
-
-    <div id="playback-audio-effect" class="setting-group">
-      <h3>{{ t('settings.playback.audioEffect') }}</h3>
-      <AudioEffectSettings />
     </div>
 
     <!-- 背景效果 -->
