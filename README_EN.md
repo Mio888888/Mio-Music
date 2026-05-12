@@ -162,6 +162,8 @@ npm run preview    # Preview production build
 - [Tauri](https://tauri.app/) — Cross-platform desktop app framework
 - [TDesign](https://tdesign.tencent.com/) — UI component library
 - [Apple Music-like Lyrics](https://github.com/Steve-xmh/amll) — Lyrics component
+- [LINUX DO](https://linux.do) — Community support
+- [AutoEq](https://github.com/jaakkopasanen/AutoEq) — Auto equalizer preset data
 
 ## Disclaimer
 

@@ -162,6 +162,8 @@ npm run preview    # 预览生产构建
 - [Tauri](https://tauri.app/) — 跨平台桌面应用框架
 - [TDesign](https://tdesign.tencent.com/) — UI 组件库
 - [Apple Music-like Lyrics](https://github.com/Steve-xmh/amll) — 歌词组件
+- [LINUX DO](https://linux.do) — 社区支持
+- [AutoEq](https://github.com/jaakkopasanen/AutoEq) — 自动均衡器预设数据
 
 ## 声明
 
