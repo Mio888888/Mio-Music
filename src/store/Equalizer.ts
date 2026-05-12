@@ -71,6 +71,10 @@ interface ImportResult {
   error?: string
 }
 
+interface TextPresetImportResult extends ImportResult {
+  gains?: EqualizerGains
+}
+
 const PRESET_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/
 
 export const clampEqGain = (gain: number): number => {
@@ -144,6 +148,39 @@ export const DEFAULT_EQUALIZER_PRESETS: EqualizerPreset[] = DEFAULT_PRESET_DATA.
 
 const DEFAULT_PRESET_IDS = new Set(DEFAULT_EQUALIZER_PRESETS.map((preset) => preset.id))
 const DEFAULT_PRESET_BY_ID = new Map(DEFAULT_EQUALIZER_PRESETS.map((preset) => [preset.id, preset]))
+
+const TEXT_NUMBER_PATTERN = '[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)'
+const TEXT_PREAMP_PATTERN = new RegExp(`^Preamp\\s*:\\s*(${TEXT_NUMBER_PATTERN})\\s*dB\\b`, 'i')
+const TEXT_FILTER_PATTERN = new RegExp(`^Filter\\s+(\\d+)\\s*:\\s*(ON|OFF)\\s+(.+?)\\s+Fc\\s*(${TEXT_NUMBER_PATTERN})\\s*Hz\\s+Gain\\s*(${TEXT_NUMBER_PATTERN})\\s*dB\\s+Q\\s*(${TEXT_NUMBER_PATTERN})\\s*$`, 'i')
+
+const TEXT_FILTER_TYPE_MAP: Record<string, FilterType> = {
+  pk: 'peak',
+  peak: 'peak',
+  peaking: 'peak',
+  peakeq: 'peak',
+  peakingeq: 'peak',
+  bell: 'peak',
+  ls: 'lowshelf',
+  lsc: 'lowshelf',
+  lowshelf: 'lowshelf',
+  lowshelving: 'lowshelf',
+  hs: 'highshelf',
+  hsc: 'highshelf',
+  highshelf: 'highshelf',
+  highshelving: 'highshelf',
+  lp: 'lowpass',
+  lpf: 'lowpass',
+  lowpass: 'lowpass',
+  lowpassfilter: 'lowpass',
+  hp: 'highpass',
+  hpf: 'highpass',
+  highpass: 'highpass',
+  highpassfilter: 'highpass',
+  no: 'notch',
+  notch: 'notch',
+  bandreject: 'notch',
+  bandstop: 'notch'
+}
 
 const LEGACY_PRESET_NAME_TO_ID: Record<string, string> = {
   'Flat': 'flat',
@@ -245,6 +282,71 @@ const normalizeGains = (value: unknown, strict: boolean, label: string): Equaliz
 
   if (strict) throw new Error(`${label} 格式无效`)
   return createFlatGains()
+}
+
+const parseTextNumber = (value: string): number | null => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const normalizeTextFilterType = (value: string): FilterType | null => {
+  const compact = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
+  return TEXT_FILTER_TYPE_MAP[compact] ?? null
+}
+
+const parseTextPreset = (text: string): TextPresetImportResult => {
+  const bands = createFlatBands()
+  let global = 0
+  let hasParsedBand = false
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#') || line.startsWith('//')) continue
+
+    if (/^Preamp\b/i.test(line)) {
+      const match = line.match(TEXT_PREAMP_PATTERN)
+      const parsed = match ? parseTextNumber(match[1]) : null
+      if (parsed === null) return { success: false }
+      global = clampEqGain(parsed)
+      continue
+    }
+
+    if (!/^Filter\b/i.test(line)) continue
+
+    const match = line.match(TEXT_FILTER_PATTERN)
+    if (!match) return { success: false }
+
+    const index = Number.parseInt(match[1], 10) - 1
+    if (!Number.isInteger(index) || index < 0) return { success: false }
+    if (index >= EQ_BAND_COUNT) continue
+
+    const type = normalizeTextFilterType(match[3])
+    const frequency = parseTextNumber(match[4])
+    const gain = parseTextNumber(match[5])
+    const q = parseTextNumber(match[6])
+    if (!type || frequency === null || gain === null || q === null) {
+      return { success: false }
+    }
+
+    bands[index] = {
+      frequency: clampEqFreq(frequency),
+      gain: type === 'lowpass' || type === 'highpass' || type === 'notch' ? 0 : clampEqGain(gain),
+      q: clampEqQ(q),
+      type,
+      enabled: match[2].toUpperCase() === 'ON'
+    }
+    hasParsedBand = true
+  }
+
+  if (!hasParsedBand) return { success: false }
+
+  return {
+    success: true,
+    gains: {
+      global,
+      bands
+    }
+  }
 }
 
 const getLegacyPresetIdByName = (name: string): string | undefined => {
@@ -622,23 +724,31 @@ export const useEqualizerStore = defineStore('equalizer', () => {
     ))
   }
 
-  function createUserPreset(name: string): ImportResult {
+  function createUserPresetFromGains(name: string, sourceGains: EqualizerGains, applyGains = true): ImportResult {
     const trimmedName = name.trim()
-    if (!trimmedName) return { success: false, error: '预设名称不能为空' }
-    if (isPresetNameTaken(trimmedName)) return { success: false, error: `预设 "${trimmedName}" 已存在` }
+    if (!trimmedName) return { success: false, error: i18n.global.t('settings.equalizer.textImportNameRequired') }
+    if (isPresetNameTaken(trimmedName)) return { success: false, error: i18n.global.t('settings.equalizer.presetExists', { name: trimmedName }) }
 
     const usedIds = new Set(userPresets.value.map((preset) => preset.id))
     const id = createUniqueUserPresetId(trimmedName, usedIds)
+    const presetGains = normalizeGains(sourceGains, false, `预设 "${trimmedName}".gains`)
     const preset: EqualizerPreset = {
       id,
       name: trimmedName,
       isDefault: false,
-      gains: cloneGains(gains.value)
+      gains: cloneGains(presetGains)
     }
     userPresets.value.push(preset)
     currentPresetId.value = id
+    if (applyGains) {
+      gains.value = cloneGains(presetGains)
+    }
     addLog(`Saved new preset "${trimmedName}"`)
     return { success: true }
+  }
+
+  function createUserPreset(name: string): ImportResult {
+    return createUserPresetFromGains(name, gains.value, false)
   }
 
   function updateUserPreset(presetId: string): ImportResult {
@@ -730,6 +840,8 @@ export const useEqualizerStore = defineStore('equalizer', () => {
     resetToCurrentPreset,
     isPresetNameTaken,
     createUserPreset,
+    createUserPresetFromGains,
+    parseTextPreset,
     updateUserPreset,
     deleteUserPreset,
     exportConfig,

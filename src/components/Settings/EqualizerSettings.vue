@@ -159,7 +159,7 @@
             <input
               ref="fileInputRef"
               type="file"
-              accept=".json"
+              accept=".json,.txt,application/json,text/plain"
               style="display: none"
               @change="handleFileImport"
             />
@@ -192,6 +192,18 @@
     >
       <t-input v-model="newPresetName" :placeholder="t('settings.equalizer.presetNamePlaceholder')" />
     </t-dialog>
+
+    <t-dialog
+      v-model:visible="textImportDialogVisible"
+      :header="t('settings.equalizer.textImportPresetTitle')"
+      @confirm="saveTextImportPreset"
+      @close="resetTextImportDialog"
+    >
+      <t-input
+        v-model="textImportPresetName"
+        :placeholder="t('settings.equalizer.textImportPresetNamePlaceholder')"
+      />
+    </t-dialog>
   </div>
 </template>
 
@@ -211,6 +223,7 @@ import {
   EQ_GAIN_MIN,
   EQ_Q_MAX,
   EQ_Q_MIN,
+  type EqualizerGains,
   type EqualizerPreset,
   type FilterType,
   useEqualizerStore
@@ -266,6 +279,9 @@ const canvasContainerRef = ref<HTMLDivElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const savePresetDialogVisible = ref(false)
 const newPresetName = ref('')
+const textImportDialogVisible = ref(false)
+const textImportPresetName = ref('')
+const pendingTextImportGains = ref<EqualizerGains | null>(null)
 const selectedBandIndex = ref(-1)
 
 let animationId = 0
@@ -677,6 +693,57 @@ const triggerImport = () => {
   fileInputRef.value?.click()
 }
 
+const getFilePresetName = (fileName: string): string => {
+  const lastDotIndex = fileName.lastIndexOf('.')
+  const baseName = lastDotIndex > 0 ? fileName.slice(0, lastDotIndex) : fileName
+  return baseName.trim()
+}
+
+const resetTextImportDialog = () => {
+  textImportDialogVisible.value = false
+  textImportPresetName.value = ''
+  pendingTextImportGains.value = null
+}
+
+const openTextImportDialog = (sourceName: string, importedGains: EqualizerGains) => {
+  pendingTextImportGains.value = importedGains
+  textImportPresetName.value = sourceName
+  textImportDialogVisible.value = true
+}
+
+const saveTextImportPreset = () => {
+  const importedGains = pendingTextImportGains.value
+  if (!importedGains) {
+    resetTextImportDialog()
+    return
+  }
+
+  const name = textImportPresetName.value.trim()
+  if (!name) {
+    MessagePlugin.warning(t('settings.equalizer.textImportNameRequired'))
+    return
+  }
+
+  if (localizedDefaultPresetNames.value.has(name.toLocaleLowerCase())) {
+    MessagePlugin.warning(t('settings.equalizer.builtinNameConflict', { name }))
+    return
+  }
+
+  if (eqStore.isPresetNameTaken(name)) {
+    MessagePlugin.warning(t('settings.equalizer.presetExists', { name }))
+    return
+  }
+
+  const result = eqStore.createUserPresetFromGains(name, importedGains)
+  if (!result.success) {
+    MessagePlugin.warning(result.error || t('settings.equalizer.presetExists', { name }))
+    return
+  }
+
+  resetTextImportDialog()
+  MessagePlugin.success(t('settings.equalizer.textImportSuccess', { name }))
+}
+
 const handleFileImport = async (event: Event) => {
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
@@ -684,14 +751,24 @@ const handleFileImport = async (event: Event) => {
   const file = input.files[0]
   try {
     const text = await file.text()
-    const data = JSON.parse(text)
-    const result = eqStore.importConfig(data)
-    if (!result.success) {
-      MessagePlugin.error(result.error || t('settings.equalizer.importFailed'))
+    try {
+      const data = JSON.parse(text)
+      const result = eqStore.importConfig(data)
+      if (!result.success) {
+        MessagePlugin.error(result.error || t('settings.equalizer.importFailed'))
+        return
+      }
+      MessagePlugin.success(t('settings.equalizer.importSuccess'))
       return
+    } catch {
+      const result = eqStore.parseTextPreset(text)
+      if (!result.success || !result.gains) {
+        MessagePlugin.error(t('settings.equalizer.textImportParseFailed'))
+        return
+      }
+      openTextImportDialog(getFilePresetName(file.name), result.gains)
     }
-    MessagePlugin.success(t('settings.equalizer.importSuccess'))
-  } catch (error) {
+  } catch {
     MessagePlugin.error(t('settings.equalizer.importFailed'))
   } finally {
     input.value = ''
