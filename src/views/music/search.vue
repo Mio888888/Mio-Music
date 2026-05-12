@@ -5,6 +5,7 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { type MusicItem } from '@/services/musicSdk'
 import { useSearchSongs } from '@/composables/useSearchSongs'
 import { useSearchPlaylists, type PlaylistCardItem } from '@/composables/useSearchPlaylists'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 import { unescapeHtml } from '@/utils/search/normalize'
 import SkeletonLoader from '@/components/SkeletonLoader.vue'
 import { playSong } from '@/utils/audio/globaPlayList'
@@ -20,6 +21,7 @@ const { t } = useI18n()
 const searchStore = useSearchStore()
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
+const { getSourceName, getSourceOptions, isSourceEnabled } = useSourceAccess()
 
 const songs = reactive(useSearchSongs())
 const playlists = reactive(useSearchPlaylists())
@@ -36,31 +38,14 @@ const setActiveTab = (tab: SearchTab) => {
   activeTab.value = tab
 }
 
-const sourceNames: Record<string, string> = {
-  wy: '网易云音乐',
-  kg: '酷狗音乐',
-  mg: '咪咕音乐',
-  tx: 'QQ音乐',
-  kw: '酷我音乐',
-  bd: '波点音乐',
-  git: 'GitCode',
-}
-
 const sourceOptions = computed<SourceOption[]>(() => {
-  const supported = localUserStore.userInfo.supportedSources
-  if (!supported) return []
-  return Object.entries(supported)
-    .filter(([key]) => key !== 'subsonic')
-    .map(([key, source]) => ({
-      key,
-      name: source?.name || sourceNames[key] || key,
-    }))
+  return getSourceOptions({ excludeSubsonic: true })
 })
 
 const sourceOrderMap = computed(() => new Map(sourceOptions.value.map((s, i) => [s.key, i])))
 
-const getSourceName = (source: string) => {
-  return sourceOptions.value.find(item => item.key === source)?.name || sourceNames[source] || source
+const getSourceNameLocal = (source: string) => {
+  return getSourceName(source)
 }
 
 const sourceKeys = () => sourceOptions.value.map(s => s.key)
@@ -299,7 +284,7 @@ watch(activeTab, async (val) => {
                 </span>
               </div>
               <div class="song-meta">
-                <span v-if="song.source" class="source-badge">{{ getSourceName(song.source) }}</span>
+                <span v-if="song.source" class="source-badge">{{ getSourceNameLocal(song.source) }}</span>
                 <span class="song-duration">{{ song.interval || '--:--' }}</span>
               </div>
             </div>

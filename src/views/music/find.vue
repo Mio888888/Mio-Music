@@ -5,6 +5,7 @@ import LeaderBord from '@/components/Find/LeaderBord.vue'
 import PlaylistCategory from '@/components/Find/PlaylistCategory.vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { usePluginStore } from '@/store/plugin'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -17,11 +18,14 @@ let sourceStateRefreshPromise: Promise<void> | null = null
 
 const hasSubsonicConfig = computed(() => localUserStore.hasValidSubsonicConfig(localUserStore.userInfo))
 const hasInstalledMusicSourcePlugin = computed(() => pluginStore.plugins.some(plugin => plugin.plugin_type === 'music-source'))
+const hasEnabledSources = computed(() => {
+  const sources = localUserStore.userInfo.supportedSources
+  return !!sources && Object.keys(sources).length > 0
+})
 const isCheckingSourceState = computed(() => sourceStateLoading.value || pluginStore.loading)
 const shouldShowSetupGuide = computed(() => (
   !isCheckingSourceState.value &&
-  !hasSubsonicConfig.value &&
-  !hasInstalledMusicSourcePlugin.value
+  !hasEnabledSources.value
 ))
 
 async function ensureSourceState() {
@@ -33,11 +37,8 @@ async function ensureSourceState() {
       console.warn('[FindView] 初始化音源状态失败:', e)
     })
     .finally(() => {
-      const sources = localUserStore.userInfo.supportedSources
-      const current = localUserStore.userInfo.selectSources
-      if (sources && current && !sources[current] && sources.subsonic) {
-        localUserStore.userInfo.selectSources = 'subsonic'
-      }
+      const { validateCurrentSource } = useSourceAccess()
+      validateCurrentSource()
       sourceStateLoading.value = false
       sourceStateRefreshPromise = null
     })

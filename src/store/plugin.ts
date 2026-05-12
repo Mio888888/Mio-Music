@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { LocalUserDetailStore } from './LocalUserDetail'
+import { ControlAudioStore } from './ControlAudio'
+import { useGlobalPlayStatusStore } from './GlobalPlayStatus'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import i18n from '@/locales'
 
@@ -188,6 +190,61 @@ export const usePluginStore = defineStore('plugin', () => {
       PluginRunner.clearCache(pluginId)
       if (currentPluginId.value === pluginId) {
         clearSelection()
+      }
+
+      const userStore = LocalUserDetailStore()
+      // Snapshot current sources before cleanup
+      const oldKeys = new Set(Object.keys(userStore.userInfo.supportedSources || {}))
+
+      // Rebuild sources: only built-in (Subsonic) remain
+      userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, {})
+      userStore.userInfo.pluginId = ''
+      userStore.userInfo.pluginName = ''
+
+      // Diff: which source keys were actually removed?
+      const newKeys = new Set(Object.keys(userStore.userInfo.supportedSources || {}))
+      const removedSourceKeys = new Set<string>()
+      for (const key of oldKeys) {
+        if (!newKeys.has(key)) removedSourceKeys.add(key)
+      }
+
+      if (removedSourceKeys.size > 0) {
+        // Remove songs from removed sources in the play queue
+        const newList = userStore.list.filter(song => {
+          const src = (song as any).source
+          return !src || src === 'local' || !removedSourceKeys.has(src)
+        })
+        userStore.replaceSongList(newList)
+
+        // Pause playback if current song is from a removed source
+        const globalPlayStatus = useGlobalPlayStatusStore()
+        const playingSource = (globalPlayStatus.player.songInfo as any)?.source
+        if (playingSource && removedSourceKeys.has(playingSource)) {
+          try {
+            const audio = ControlAudioStore()
+            await audio.stop()
+          } catch (e) {
+            console.warn('[PluginStore] 暂停播放失败:', e)
+          }
+        }
+
+        // Update lastPlaySongId if the song was removed
+        if (newList.length > 0) {
+          const lastId = userStore.userInfo.lastPlaySongId
+          if (lastId && !newList.find(s => s.songmid === lastId)) {
+            userStore.userInfo.lastPlaySongId = newList[0].songmid
+          }
+        } else {
+          userStore.userInfo.lastPlaySongId = null
+        }
+      }
+
+      // Validate selectSources against remaining sources
+      const available = userStore.userInfo.supportedSources || {}
+      const currentSource = userStore.userInfo.selectSources as string
+      if (currentSource && !available[currentSource]) {
+        userStore.userInfo.selectSources = Object.keys(available)[0] || ''
+        userStore.userInfo.selectQuality = ''
       }
     } else {
       throw new Error(res?.error || i18n.global.t('plugin.uninstallFailed'))

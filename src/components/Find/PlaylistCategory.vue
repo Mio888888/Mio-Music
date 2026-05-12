@@ -5,11 +5,13 @@ import { useI18n } from 'vue-i18n'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { storeToRefs } from 'pinia'
 import { musicSdk } from '@/services/musicSdk'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 
 const router = useRouter()
 const { t } = useI18n()
 const localUserStore = LocalUserDetailStore()
 const { userSource } = storeToRefs(localUserStore)
+const { enabledSourceKeys } = useSourceAccess()
 
 const playlists = ref<any[]>([])
 const loading = ref(true)
@@ -171,6 +173,13 @@ onMounted(() => {
   watch(
     userSource,
     () => {
+      if (enabledSourceKeys.value.size === 0) {
+        playlists.value = []
+        tags.value = []
+        hotTag.value = []
+        loading.value = false
+        return
+      }
       loading.value = true
       error.value = ''
       Object.keys(categoryCache).forEach(k => delete categoryCache[k])

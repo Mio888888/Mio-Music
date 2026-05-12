@@ -4,6 +4,8 @@ import { storeToRefs } from 'pinia'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { musicSdk } from '@/services/musicSdk'
+import { ControlAudioStore } from '@/store/ControlAudio'
+import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { TreeRoundDotIcon } from 'tdesign-icons-vue-next'
 import fonts from '@/assets/icon_font/icons'
 
@@ -43,14 +45,33 @@ const subsonicConfig = computed({
   }
 })
 
-const syncSubsonicSource = () => {
+const syncSubsonicSource = async () => {
+  const wasSubsonicSource = userInfo.value.selectSources === 'subsonic'
   userStore.ensureBuiltInSources(userInfo.value)
   if (!userInfo.value.sourceQualityMap) userInfo.value.sourceQualityMap = {}
   if (userStore.hasValidSubsonicConfig(userInfo.value)) {
     if (!userInfo.value.sourceQualityMap.subsonic) userInfo.value.sourceQualityMap.subsonic = 'flac'
     userInfo.value.selectSources = 'subsonic'
     userInfo.value.selectQuality = userInfo.value.sourceQualityMap.subsonic
-  } else if (userInfo.value.selectSources === 'subsonic') {
+  } else if (wasSubsonicSource) {
+    // Subsonic disabled while it was the active source — pause and clean up
+    const globalPlayStatus = useGlobalPlayStatusStore()
+    const playingSource = (globalPlayStatus.player.songInfo as any)?.source
+    if (playingSource === 'subsonic') {
+      const audio = ControlAudioStore()
+      await audio.stop()
+    }
+    // Remove subsonic songs from queue
+    const newList = userStore.list.filter(song => (song as any).source !== 'subsonic')
+    userStore.replaceSongList(newList)
+    if (newList.length > 0) {
+      const lastId = userStore.userInfo.lastPlaySongId
+      if (lastId && !newList.find(s => s.songmid === lastId)) {
+        userStore.userInfo.lastPlaySongId = newList[0].songmid
+      }
+    } else {
+      userStore.userInfo.lastPlaySongId = null
+    }
     const nextSource = Object.keys(userInfo.value.supportedSources || {})[0]
     userInfo.value.selectSources = nextSource
     userInfo.value.selectQuality = nextSource

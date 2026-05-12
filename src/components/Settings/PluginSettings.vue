@@ -409,7 +409,7 @@ function doSelect(plugin: LoadedPlugin) {
 
   userStore.userInfo.pluginId = plugin_id
   userStore.userInfo.pluginName = plugin_info.name
-  userStore.userInfo.supportedSources = supportedSourcesForStore
+  userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
   userStore.userInfo.selectSources = selectSources
   userStore.userInfo.selectQuality = selectQuality
 
@@ -425,13 +425,6 @@ function confirmUninstall(plugin: LoadedPlugin) {
     onConfirm: async () => {
       try {
         await store.uninstallPlugin(plugin.plugin_id)
-        if (userStore.userInfo.pluginId === plugin.plugin_id) {
-          userStore.userInfo.pluginId = ''
-          userStore.userInfo.pluginName = ''
-          userStore.userInfo.supportedSources = {}
-          userStore.userInfo.selectSources = ''
-          userStore.userInfo.selectQuality = ''
-        }
         MessagePlugin.success(t('settings.plugin.uninstallSuccess', { name: plugin.plugin_info.name }))
         dialog.destroy()
       } catch (e: any) {

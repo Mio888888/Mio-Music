@@ -5,6 +5,7 @@ import {
   mapPlaylistItem,
   type PlaylistCardItem,
 } from '@/utils/search/deduplicate'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 
 const PLAYLIST_PAGE_SIZE = 30
 const AGGREGATE_PLAYLIST_PAGE_SIZE = 20
@@ -46,7 +47,9 @@ export function useSearchPlaylists() {
 
     try {
       if (source === 'all') {
-        if (sourceKeys.length === 0) {
+        const { enabledSourceKeys } = useSourceAccess()
+        const filteredSourceKeys = sourceKeys.filter(k => enabledSourceKeys.value.has(k))
+        if (filteredSourceKeys.length === 0) {
           if (currentRequestId === requestId) {
             results.value = []
             total.value = 0
@@ -55,7 +58,7 @@ export function useSearchPlaylists() {
           return
         }
 
-        const rawResults = await musicSdk.aggregateSearchPlaylists(query, AGGREGATE_PLAYLIST_PAGE_SIZE, sourceKeys)
+        const rawResults = await musicSdk.aggregateSearchPlaylists(query, AGGREGATE_PLAYLIST_PAGE_SIZE, filteredSourceKeys)
         if (currentRequestId !== requestId) return
 
         const list = dedupeAndSortPlaylists(rawResults, query, sourceOrderMap)

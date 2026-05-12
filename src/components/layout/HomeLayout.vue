@@ -8,6 +8,7 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 
 const { t } = useI18n()
 
@@ -87,29 +88,14 @@ const hasPluginData = computed(() => {
   )
 })
 
-const sourceNames: Record<string, string> = {
-  wy: '网易云音乐',
-  kg: '酷狗音乐',
-  mg: '咪咕音乐',
-  tx: 'QQ音乐',
-  kw: '酷我音乐',
-  bd: '波点音乐',
-  xm: '虾米音乐',
-  git: 'GitCode',
-  subsonic: 'Subsonic'
-}
+const { getSourceName, getSourceOptions } = useSourceAccess()
 
 const sourceList = computed(() => {
-  const LocalUserDetail = LocalUserDetailStore()
-  const supportedSources = LocalUserDetail.userInfo.supportedSources
-  if (!supportedSources) return []
-  return Object.keys(supportedSources)
-    .filter((key) => key !== 'subsonic')
-    .map((key) => ({
-      key,
-      name: sourceNames[key] || key,
-      icon: sourceicon[key] || key
-    }))
+  return getSourceOptions({ excludeSubsonic: true }).map(opt => ({
+    key: opt.key,
+    name: opt.name,
+    icon: sourceicon[opt.key] || opt.key
+  }))
 })
 
 const toggleSourceList = () => {

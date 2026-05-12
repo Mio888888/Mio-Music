@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { musicSdk } from '@/services/musicSdk'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 import LeaderBordCard from './LeaderBordCard.vue'
 
 const { t } = useI18n()
@@ -10,10 +11,16 @@ const boards = ref<any[]>([])
 const loading = ref(true)
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
+const { enabledSourceKeys } = useSourceAccess()
 
 const currentSource = computed(() => localUserStore.userSource.source)
 
 const fetchBoards = async () => {
+  if (enabledSourceKeys.value.size === 0) {
+    boards.value = []
+    loading.value = false
+    return
+  }
   loading.value = true
   try {
     const res = await musicSdk.getLeaderboards()

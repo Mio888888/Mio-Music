@@ -1,6 +1,7 @@
 import { ref, type Ref } from 'vue'
 import { musicSdk, type MusicItem, type SearchResult } from '@/services/musicSdk'
 import { dedupeAndSortSongs } from '@/utils/search/deduplicate'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 
 const AGGREGATE_PAGE_SIZE = 20
 const SINGLE_PAGE_SIZE = 30
@@ -96,7 +97,8 @@ export function useSearchSongs() {
         }
       }
 
-      aggregateResults.value = dedupeAndSortSongs(results, query)
+      const { filterByEnabledSources } = useSourceAccess()
+      aggregateResults.value = filterByEnabledSources(dedupeAndSortSongs(results, query))
       aggregateHasMore.value = Array.from(sourcePageInfos.values()).some(info => info.fetchedPage < info.maxPage)
     } catch (e) {
       if (isCurrentAggregate(requestId, query)) console.error('聚合搜索失败:', e)
@@ -177,7 +179,8 @@ export function useSearchSongs() {
           list,
         }))
 
-        aggregateResults.value = dedupeAndSortSongs(mergedResults, query)
+        const { filterByEnabledSources } = useSourceAccess()
+        aggregateResults.value = filterByEnabledSources(dedupeAndSortSongs(mergedResults, query))
       }
 
       aggregateHasMore.value = Array.from(sourcePageInfos.values()).some(info => info.fetchedPage < info.maxPage)

@@ -13,6 +13,7 @@ import {
 import { MessagePlugin } from 'tdesign-vue-next'
 import type { MusicItem } from '@/services/musicSdk'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 import { getQualityDisplayName, compareQuality } from '@/utils/quality'
 import { useRouter } from 'vue-router'
 
@@ -59,6 +60,7 @@ const emit = defineEmits([
 
 const router = useRouter()
 const { t } = useI18n()
+const { getSourceName } = useSourceAccess()
 
 function handleSingerClick(song: MusicItem) {
   if (!song.singerId || !song.source || song.source === 'local') return
@@ -585,7 +587,7 @@ watch(() => props.songs, (newSongs) => {
                     v-if="row.song?.source && row.song?.source !== 'local'"
                     class="source-tag"
                   >
-                    {{ row.song.source }}
+                    {{ getSourceName(row.song.source) }}
                   </span>
                   <span
                     v-if="row.song?.singerId && row.song?.source !== 'local'"

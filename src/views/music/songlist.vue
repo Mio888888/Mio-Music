@@ -9,10 +9,12 @@ import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { downloadSingleSong } from '@/utils/audio/download'
 import type { SongList } from '@/types/audio'
 import { fillMissingCoversWithResolver } from '@/utils/songCover'
+import { useSourceAccess } from '@/composables/useSourceAccess'
 import defaultCover from '/default-cover.png'
 
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
+const { getSourceName } = useSourceAccess()
 const playStatus = useGlobalPlayStatusStore()
 const { t } = useI18n()
 
@@ -538,7 +540,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
                 {{ playlist.description || t('music.songlist.noDescription') }}
               </div>
               <div class="playlist-meta">
-                <span class="source-tag">{{ playlist.source || 'local' }}</span>
+                <span class="source-tag">{{ getSourceName(playlist.source || 'local') }}</span>
                 <span v-if="playlist.createTime">{{ t('music.songlist.createdAt', { date: formatDate(playlist.createTime) }) }}</span>
               </div>
             </div>
