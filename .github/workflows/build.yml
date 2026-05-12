@@ -150,6 +150,68 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage.*
 
+  build-android:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+
+      - name: Install frontend dependencies
+        run: yarn install
+
+      - name: Initialize Android project
+        run: npx tauri android init
+
+      - name: Build Android APK
+        run: npx tauri android build
+
+      - name: Upload APK to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ needs.check-version.outputs.version }}"
+          for apk in $(find src-tauri/gen/android -name "*.apk" -type f); do
+            echo "Uploading $apk to release $TAG"
+            for i in $(seq 1 20); do
+              if gh release upload "$TAG" "$apk" --clobber; then
+                break
+              fi
+              echo "Retrying in 30s... ($i/20)"
+              sleep 30
+            done
+          done
+        continue-on-error: true
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-android
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
   publish-release:
     needs: [check-version, build-windows, build-macos, build-linux]
     if: needs.check-version.outputs.should_build == 'true'
