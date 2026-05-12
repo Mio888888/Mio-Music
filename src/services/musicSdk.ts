@@ -33,8 +33,9 @@ export interface PlaylistItem {
   img: string
   source: string
   desc?: string
-  playCount?: number
+  playCount?: number | string | null
   author?: string
+  total?: number | string | null
 }
 
 export interface PlaylistResult {
@@ -145,8 +146,24 @@ export const musicSdk = {
     }
   },
 
-  async search(keyword: string, page = 1, limit = 30): Promise<SearchResult> {
-    return this.request('search', { keyword, page, limit })
+  async search(keyword: string, page = 1, limit = 30, source?: string): Promise<SearchResult> {
+    return this.request('search', { keyword, page, limit, ...(source ? { source } : {}) })
+  },
+
+  async aggregateSearch(keyword: string, limit = 20): Promise<SearchResult[]> {
+    try {
+      const res = await invoke<SearchResult[]>('service_music_search_music', {
+        name: keyword,
+        singer: '',
+        source: '',
+        limit
+      })
+      const normalized = rewriteImageUrls(res) as SearchResult[]
+      return (Array.isArray(normalized) ? normalized : []).filter(r => Array.isArray(r?.list) && r.list.length > 0)
+    } catch (error) {
+      console.error('[musicSdk] aggregateSearch failed:', error)
+      throw error
+    }
   },
 
   async tipSearch(keyword: string): Promise<any> {
@@ -178,8 +195,8 @@ export const musicSdk = {
     return { ...res, list }
   },
 
-  async getPlaylistDetail(id: string | number, page = 1): Promise<PlaylistDetailResult> {
-    return this.request('getPlaylistDetail', { id, page })
+  async getPlaylistDetail(id: string | number, page = 1, source?: string): Promise<PlaylistDetailResult> {
+    return this.request('getPlaylistDetail', { id, page, ...(source ? { source } : {}) })
   },
 
   async getLeaderboards(): Promise<any> {
@@ -205,8 +222,26 @@ export const musicSdk = {
     return res?.lyric || res?.lrc || ''
   },
 
-  async searchPlaylist(keyword: string, page = 1, limit = 30): Promise<PlaylistResult> {
-    return this.request('searchPlaylist', { keyword, page, limit })
+  async searchPlaylist(keyword: string, page = 1, limit = 30, source?: string): Promise<PlaylistResult> {
+    return this.request('searchPlaylist', { keyword, page, limit, ...(source ? { source } : {}) })
+  },
+
+  async aggregateSearchPlaylists(keyword: string, limit = 20, sources: string[] = []): Promise<PlaylistResult[]> {
+    const settled = await Promise.allSettled(
+      sources.map(source => this.searchPlaylist(keyword, 1, limit, source))
+    )
+
+    settled.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.warn(`[musicSdk] searchPlaylist('${sources[index]}') failed:`, result.reason)
+      }
+    })
+
+    return settled.flatMap((result) => {
+      if (result.status !== 'fulfilled') return []
+      const normalized = rewriteImageUrls(result.value) as PlaylistResult
+      return Array.isArray(normalized?.list) && normalized.list.length > 0 ? [normalized] : []
+    })
   },
 
   async getComment(songInfo: MusicItem, page = 1, limit = 30): Promise<any> {

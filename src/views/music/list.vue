@@ -143,9 +143,10 @@ const fetchSongs = async (reset = false) => {
       return
     }
 
+    const source = playlistInfo.value.source || undefined
     const res = isLeaderboard.value
       ? await musicSdk.getLeaderboardDetail(playlistId.value, currentPage.value)
-      : await musicSdk.getPlaylistDetail(playlistId.value, currentPage.value)
+      : await musicSdk.getPlaylistDetail(playlistId.value, currentPage.value, source)
     const newSongs = res?.list || []
     songs.value = reset ? newSongs : [...songs.value, ...newSongs]
     totalCount.value = res?.total || 0

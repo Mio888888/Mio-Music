@@ -40,8 +40,6 @@ declare module 'vue' {
     MusicCache: typeof import('./components/Settings/MusicCache.vue')['default']
     NBadge: typeof import('naive-ui')['NBadge']
     NIcon: typeof import('naive-ui')['NIcon']
-    NTabPane: typeof import('naive-ui')['NTabPane']
-    NTabs: typeof import('naive-ui')['NTabs']
     PlaylistActions: typeof import('./components/Play/PlaylistActions.vue')['default']
     PlaylistCategory: typeof import('./components/Find/PlaylistCategory.vue')['default']
     PlaylistDrawer: typeof import('./components/Play/PlaylistDrawer.vue')['default']

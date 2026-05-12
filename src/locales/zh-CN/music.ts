@@ -106,13 +106,19 @@ export default {
     title: '搜索',
     searchKeyword: '搜索',
     foundSongs: '找到 {count} 首单曲',
+    foundAggregateSongs: '全部音源共 {count} 首单曲',
     foundPlaylists: '找到 {count} 个歌单',
+    foundAggregatePlaylists: '全部音源共 {count} 个歌单',
     tabSongs: '单曲',
     tabPlaylists: '歌单',
     featuredPlaylist: '精选歌单',
     noSongResults: '未找到相关歌曲',
     tryOther: '请尝试其他关键词',
-    noPlaylistResults: '未找到相关歌单'
+    noPlaylistResults: '未找到相关歌单',
+    allSources: '全部',
+    searchingSources: '正在搜索全部音源...',
+    searchingPlaylists: '正在搜索歌单...',
+    searchingAggregatePlaylists: '正在搜索全部音源歌单...'
   },
   singer: {
     loading: '加载中...',

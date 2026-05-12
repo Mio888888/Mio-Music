@@ -268,15 +268,15 @@
 
   /* Search 页面专用变量 - 亮色主题 */
   --search-bg: var(--theme-bg-tertiary);
-  --search-title-color: #333333;
+  --search-title-color: var(--theme-text-primary);
   --search-keyword-color: var(--td-brand-color);
-  --search-info-color: #999999;
+  --search-info-color: var(--theme-text-muted);
   --search-content-bg: var(--theme-bg-primary);
   --search-content-shadow: var(--theme-shadow-light);
-  --search-empty-title: #333333;
-  --search-empty-text: #999999;
-  --search-loading-text: #666666;
-  --search-loading-border: #f3f3f3;
+  --search-empty-title: var(--theme-text-primary);
+  --search-empty-text: var(--theme-text-muted);
+  --search-loading-text: var(--theme-text-secondary);
+  --search-loading-border: var(--theme-border-light);
   --search-loading-spinner: var(--td-brand-color);
 
   /* Recent 页面专用变量 - 亮色主题 */

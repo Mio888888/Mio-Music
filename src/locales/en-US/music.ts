@@ -106,13 +106,19 @@ export default {
     title: 'Search',
     searchKeyword: 'Search',
     foundSongs: 'Found {count} songs',
+    foundAggregateSongs: 'Found {count} songs across all sources',
     foundPlaylists: 'Found {count} playlists',
+    foundAggregatePlaylists: 'Found {count} playlists across all sources',
     tabSongs: 'Songs',
     tabPlaylists: 'Playlists',
     featuredPlaylist: 'Featured Playlists',
     noSongResults: 'No songs found',
     tryOther: 'Try different keywords',
-    noPlaylistResults: 'No playlists found'
+    noPlaylistResults: 'No playlists found',
+    allSources: 'All',
+    searchingSources: 'Searching all sources...',
+    searchingPlaylists: 'Searching playlists...',
+    searchingAggregatePlaylists: 'Searching playlists across all sources...'
   },
   singer: {
     loading: 'Loading...',
