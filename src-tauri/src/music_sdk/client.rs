@@ -7,13 +7,65 @@ use once_cell::sync::Lazy;
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
     Client::builder()
         .user_agent("Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36")
+        .gzip(true)
+        .brotli(true)
         .build()
-        .unwrap_or_default()
+        .expect("Failed to build HTTP client")
 });
 
 #[allow(dead_code)]
 pub fn get_client() -> &'static Client {
     &HTTP_CLIENT
+}
+
+/// Sanitize JSON text by fixing invalid unicode escape sequences.
+/// Handles lone surrogates (\uD800-\uDFFF) by replacing them with U+FFFD,
+/// and properly decodes valid surrogate pairs into Unicode code points.
+pub fn sanitize_json(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut result = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < len {
+        if chars[i] == '\\' && i + 5 < len && chars[i + 1] == 'u' {
+            let hex: String = chars[i + 2..i + 6].iter().collect();
+            if let Ok(cp) = u32::from_str_radix(&hex, 16) {
+                if (0xD800..=0xDFFF).contains(&cp) {
+                    if i + 11 < len && chars[i + 6] == '\\' && chars[i + 7] == 'u' {
+                        let hex2: String = chars[i + 8..i + 12].iter().collect();
+                        if let Ok(cp2) = u32::from_str_radix(&hex2, 16) {
+                            if (0xDC00..=0xDFFF).contains(&cp2) {
+                                let full = ((cp - 0xD800) << 10) + (cp2 - 0xDC00) + 0x10000;
+                                if let Some(ch) = char::from_u32(full) {
+                                    result.push(ch);
+                                    i += 12;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    result.push('\u{FFFD}');
+                    i += 6;
+                    continue;
+                }
+            }
+        }
+        result.push(chars[i]);
+        i += 1;
+    }
+    result
+}
+
+/// Extension trait for reqwest::Response that sanitizes invalid unicode before JSON parsing.
+pub trait ResponseExt {
+    async fn json_sanitized(self) -> Result<serde_json::Value, String>;
+}
+
+impl ResponseExt for reqwest::Response {
+    async fn json_sanitized(self) -> Result<serde_json::Value, String> {
+        let text = self.text().await.map_err(|e| e.to_string())?;
+        serde_json::from_str(&sanitize_json(&text)).map_err(|e| e.to_string())
+    }
 }
 
 // --- Shared types matching CeruMusic's MusicItem ---

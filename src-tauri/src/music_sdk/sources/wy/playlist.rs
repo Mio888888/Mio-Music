@@ -1,5 +1,6 @@
 use super::helpers::*;
-use super::crypto::{linuxapi_form, eapi_encrypt};
+use crate::music_sdk::client::ResponseExt;
+use super::crypto::{linuxapi_form, eapi_form};
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult};
 
 pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -18,7 +19,7 @@ pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::V
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .body(body)
                 .send().await.map_err(|e| e.to_string())?
-                .json().await.map_err(|e| e.to_string())?;
+                .json_sanitized().await?;
 
             let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
             if code != 200 { return Err(format!("WY tag API error: code={}", code)); }
@@ -58,7 +59,7 @@ pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::V
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .body(body)
                 .send().await.map_err(|e| e.to_string())?
-                .json().await.map_err(|e| e.to_string())?;
+                .json_sanitized().await?;
 
             let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
             if code != 200 { return Err(format!("WY hot tag API error: code={}", code)); }
@@ -98,7 +99,7 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 { return Err(format!("WY playlist list API error: code={}", code)); }
@@ -132,7 +133,7 @@ pub async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Va
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 { return Err(format!("WY toplist API error: code={}", code)); }
@@ -179,7 +180,7 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 { return Err(format!("WY playlist detail API error: code={}", code)); }
@@ -227,23 +228,20 @@ pub async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Valu
         return Ok(serde_json::json!({ "list": [], "allPage": 0, "limit": limit, "total": 0, "source": "wy" }));
     }
 
-    let data = serde_json::json!({
+    let body = eapi_form("/api/cloudsearch/pc", &serde_json::json!({
         "s": keyword, "type": 1000, "limit": limit,
         "total": page == 1, "offset": limit * (page - 1)
-    });
-    let data_str = serde_json::to_string(&data).unwrap_or_default();
-    let eparams = eapi_encrypt("/api/cloudsearch/pc", &data_str);
-    let body = format!("eparams={}", eparams);
+    }));
 
     let resp: serde_json::Value = get_http()
-        .post("http://interface.music.163.com/eapi/batch")
+        .post("http://interface3.music.163.com/eapi/cloudsearch/pc")
         .headers(reqwest::header::HeaderMap::from_iter(
             wy_headers().into_iter().map(|(k, v)| (k.parse().unwrap(), v.parse().unwrap())),
         ))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 { return Err(format!("WY search playlist API error: code={}", code)); }
@@ -303,20 +301,17 @@ fn parse_wy_tracks(tracks: &[serde_json::Value], privileges: &[serde_json::Value
 async fn fetch_wy_song_details(song_ids: &[i64]) -> Result<Vec<MusicItem>, String> {
     if song_ids.is_empty() { return Ok(vec![]); }
 
-    let data = serde_json::json!({ "ids": song_ids });
-    let data_str = serde_json::to_string(&data).unwrap_or_default();
-    let eparams = eapi_encrypt("/api/v3/song/detail", &data_str);
-    let body = format!("eparams={}", eparams);
+    let body = eapi_form("/api/v3/song/detail", &serde_json::json!({ "ids": song_ids }));
 
     let resp: serde_json::Value = get_http()
-        .post("http://interface.music.163.com/eapi/batch")
+        .post("http://interface3.music.163.com/eapi/v3/song/detail")
         .headers(reqwest::header::HeaderMap::from_iter(
             wy_headers().into_iter().map(|(k, v)| (k.parse().unwrap(), v.parse().unwrap())),
         ))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let songs = resp.get("songs").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let privileges = resp.get("privileges").and_then(|v| v.as_array()).cloned().unwrap_or_default();

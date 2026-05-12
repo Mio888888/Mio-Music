@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use super::crypto::{eapi_form, weapi_form};
 
 pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -21,7 +22,7 @@ pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, 
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -103,7 +104,7 @@ pub async fn tip_search(args: serde_json::Value) -> Result<serde_json::Value, St
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -131,7 +132,7 @@ pub async fn hot_search(_args: serde_json::Value) -> Result<serde_json::Value, S
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {

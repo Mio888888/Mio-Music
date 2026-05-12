@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult};
 
 // --- Playlist Tags ---
@@ -12,7 +13,7 @@ pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::V
             let resp: serde_json::Value = get_http().get(tags_url)
                 .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
                 .send().await.map_err(|e| e.to_string())?
-                .json().await.map_err(|e| e.to_string())?;
+                .json_sanitized().await?;
 
             let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
             if code != 0 {
@@ -107,7 +108,7 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
     let resp: serde_json::Value = get_http().get(&url)
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 0 {
@@ -171,7 +172,7 @@ pub async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Va
     let resp: serde_json::Value = get_http().get(url)
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 0 {
@@ -234,7 +235,7 @@ pub async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_jso
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 0 {
@@ -277,7 +278,7 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
         .header("Referer", format!("https://y.qq.com/n/yqq/playsquare/{}.html", id))
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if code != 0 {

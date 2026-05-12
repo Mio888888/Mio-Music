@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use super::crypto::signature_params;
 use super::helpers::decode_html;
 
@@ -24,7 +25,7 @@ pub async fn get_comment(args: serde_json::Value) -> Result<serde_json::Value, S
     let resp: serde_json::Value = get_http().get(&url)
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.24")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let err_code = resp.get("err_code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if err_code != 0 {
@@ -67,7 +68,7 @@ pub async fn get_hot_comment(args: serde_json::Value) -> Result<serde_json::Valu
     let resp: serde_json::Value = get_http().get(&url)
         .header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.24")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let err_code = resp.get("err_code").and_then(|v| v.as_i64()).unwrap_or(-1);
     if err_code != 0 {

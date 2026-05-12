@@ -1,4 +1,5 @@
 use crate::music_sdk::client::{self, MusicItem, PlaylistItem, PlaylistResult, SearchResult};
+use crate::music_sdk::client::ResponseExt;
 
 fn get_http() -> &'static reqwest::Client {
     client::get_client()
@@ -29,7 +30,7 @@ async fn fetch_git_db() -> Result<Vec<serde_json::Value>, String> {
 
     let resp: serde_json::Value = get_http().get(GITCODE_API)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let list = if resp.is_array() {
         resp.as_array().cloned().unwrap_or_default()

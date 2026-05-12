@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult, SearchResult};
 use super::playback::get_batch_quality_info;
 
@@ -20,10 +21,11 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
 
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
-    let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
-    if errcode != 0 {
+    let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(0);
+    let status = resp.get("status").and_then(|v| v.as_i64()).unwrap_or(1);
+    if errcode != 0 && status != 1 {
         return Err("KuGou song search API error".into());
     }
 
@@ -124,7 +126,7 @@ pub async fn tip_search(args: serde_json::Value) -> Result<serde_json::Value, St
     let resp: serde_json::Value = get_http().get(&url)
         .header("Referer", "https://www.kugou.com/")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let data = resp.as_array().cloned().unwrap_or_default();
 
@@ -177,7 +179,7 @@ pub async fn hot_search(_args: serde_json::Value) -> Result<serde_json::Value, S
         .header("User-Agent", "Android9-AndroidPhone-10020-130-0-searchrecommendprotocol-wifi")
         .header("kg-rc", "1")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
     if errcode != 0 {
@@ -219,7 +221,7 @@ pub async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Valu
 
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
     if errcode != 0 {

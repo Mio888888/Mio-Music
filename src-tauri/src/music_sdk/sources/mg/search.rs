@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult, SearchResult};
 
 pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -27,7 +28,7 @@ pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, 
         .header("channel", "0146921")
         .header("User-Agent", "Mozilla/5.0 (Linux; U; Android 11.0.0; zh-cn; MI 11 Build/OPR1.170623.032) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {
@@ -97,7 +98,7 @@ pub async fn tip_search(args: serde_json::Value) -> Result<serde_json::Value, St
     let resp: serde_json::Value = get_http().get(&url)
         .header("Referer", "https://music.migu.cn/v3")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let mut order = Vec::new();
     let songs: Vec<serde_json::Value> = resp.get("songList")
@@ -125,7 +126,7 @@ pub async fn hot_search(_args: serde_json::Value) -> Result<serde_json::Value, S
     let resp: serde_json::Value = get_http()
         .get("http://jadeite.migu.cn:7090/music_search/v3/search/hotword")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {
@@ -156,28 +157,35 @@ pub async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Valu
     let limit = get_u64(&args, "limit", 30);
 
     let url = format!(
-        "https://m.music.migu.cn/migu/remoting/scr_search_tag?rows={}&type=12&keyword={}&pgc={}&pg={}",
-        limit, urlencoding::encode(keyword), page, page
+        "https://app.u.nf.migu.cn/pc/v1.0/content/search_all.do?text={}&pageNo={}&pageSize={}&searchSwitch=%7B%22songlist%22%3A1%7D",
+        urlencoding::encode(keyword), page, limit
     );
 
     let resp: serde_json::Value = get_http().get(&url)
         .headers(mg_headers())
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
-    let total = resp.get("totalCount").and_then(|v| v.as_i64()).unwrap_or(0);
-    let raw_list = resp.get("musics").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
+    if code != "000000" {
+        return Err(format!("MG search playlist API error: code={}", code));
+    }
 
-    let list: Vec<PlaylistItem> = raw_list.iter().filter_map(|item| {
-        let id = item.get("id")?.as_str()?;
-        let name = item.get("title")?.as_str()?.to_string();
-        let img = item.get("img")?.as_str()?.to_string();
-        Some(PlaylistItem {
-            id: serde_json::json!(id), name, img,
-            source: "mg".into(), desc: String::new(),
-            play_count: serde_json::Value::Null, author: String::new(),
-            total: serde_json::Value::Null,
-        })
+    let data = resp.get("songListResultData").cloned().unwrap_or(serde_json::json!({}));
+    let total: i64 = data.get("totalCount").and_then(|v| v.as_str()).unwrap_or("0").parse().unwrap_or(0);
+    let raw_list = data.get("result").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+    let list: Vec<PlaylistItem> = raw_list.iter().map(|item| {
+        PlaylistItem {
+            id: item.get("id").cloned().unwrap_or(serde_json::Value::Null),
+            name: item.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            img: item.get("musicListPicUrl").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            source: "mg".into(),
+            desc: String::new(),
+            play_count: item.get("playNum").cloned().unwrap_or(serde_json::Value::Null),
+            author: String::new(),
+            total: item.get("musicNum").cloned().unwrap_or(serde_json::Value::Null),
+        }
     }).collect();
 
     Ok(serde_json::to_value(PlaylistResult {

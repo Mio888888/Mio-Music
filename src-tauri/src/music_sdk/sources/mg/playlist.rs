@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use crate::music_sdk::client::{PlaylistItem, PlaylistResult};
 use std::collections::HashSet;
 
@@ -51,7 +52,7 @@ pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::V
     let resp: serde_json::Value = get_http().get(url)
         .headers(mg_headers())
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let status = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if status != "000000" {
@@ -112,7 +113,7 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
         get_http().get(&url)
             .headers(mg_headers())
             .send().await.map_err(|e| e.to_string())?
-            .json().await.map_err(|e| e.to_string())?
+            .json_sanitized().await?
     } else {
         let url = format!(
             "https://app.c.nf.migu.cn/pc/v1.0/template/musiclistplaza-listbytag/release?pageNumber={}&templateVersion=2&tagId={}",
@@ -121,7 +122,7 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
         get_http().get(&url)
             .headers(mg_headers())
             .send().await.map_err(|e| e.to_string())?
-            .json().await.map_err(|e| e.to_string())?
+            .json_sanitized().await?
     };
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
@@ -208,7 +209,7 @@ pub async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_jso
     let resp: serde_json::Value = get_http().get(&url)
         .headers(mg_headers())
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {
@@ -262,7 +263,7 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
     let info_resp: serde_json::Value = get_http().get(&info_url)
         .headers(mg_headers())
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let info_data = info_resp.get("data").cloned().unwrap_or(serde_json::json!({}));
     let name = info_data.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
@@ -281,7 +282,7 @@ pub async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::
     let resp: serde_json::Value = get_http().get(&url)
         .headers(mg_headers())
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {

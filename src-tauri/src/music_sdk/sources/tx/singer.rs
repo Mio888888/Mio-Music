@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use crate::music_sdk::client::{MusicItem, SearchResult, SingerInfo, SingerDetail, SingerCount, SingerAlbumItem, AlbumBrief, SingerAlbumListResult};
 
 pub async fn get_singer_info(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -33,7 +34,7 @@ pub async fn get_singer_info(args: serde_json::Value) -> Result<serde_json::Valu
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let req1_code = resp.get("req_1").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
     if req1_code != 0 {
@@ -95,7 +96,7 @@ pub async fn get_singer_song_list(args: serde_json::Value) -> Result<serde_json:
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
     if req_code != 0 {
@@ -176,7 +177,7 @@ pub async fn get_singer_album_list(args: serde_json::Value) -> Result<serde_json
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
     if req_code != 0 {

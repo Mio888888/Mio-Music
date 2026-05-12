@@ -446,15 +446,13 @@ async fn search_songmids(keyword: &str, count: usize) -> Result<Vec<String>, Str
         urlencoding::encode(keyword),
         count
     );
-    let resp: serde_json::Value = get_http()
+    let resp = get_http()
         .get(&url)
         .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
         .map_err(|e| e.to_string())?;
+    let resp: serde_json::Value = super::helpers::parse_kuwo_response(resp).await?;
 
     let mids: Vec<String> = resp
         .get("abslist")

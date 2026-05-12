@@ -509,14 +509,12 @@ pub async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Valu
     }
 
     let url = format!("http://search.kuwo.cn/r.s?all={}&pn={}&rn={}&rformat=json&encoding=utf8&ver=mbox&vipver=MUSIC_8.7.7.0_BCS37&plat=pc&devid=28156413&ft=playlist&pay=0&needliveshow=0", urlencoding::encode(keyword), page - 1, limit);
-    let resp: serde_json::Value = get_http()
+    let resp = get_http()
         .get(&url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
         .map_err(|e| e.to_string())?;
+    let resp: serde_json::Value = super::helpers::parse_kuwo_response(resp).await?;
 
     let total: i64 = resp
         .get("TOTAL")

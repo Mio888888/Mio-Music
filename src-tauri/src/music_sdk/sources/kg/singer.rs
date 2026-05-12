@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use super::playback::get_batch_quality_info;
 use crate::music_sdk::client::{MusicItem, SearchResult, SingerInfo, SingerDetail, SingerCount, SingerAlbumItem, AlbumBrief, SingerAlbumListResult};
 
@@ -14,7 +15,7 @@ pub async fn get_singer_info(args: serde_json::Value) -> Result<serde_json::Valu
     let url = format!("http://mobiles.kugou.com/api/v5/singer/info?singerid={}", id);
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     if resp.is_null() {
         return Err("KG singer info: empty response".into());
@@ -60,7 +61,7 @@ pub async fn get_singer_song_list(args: serde_json::Value) -> Result<serde_json:
     );
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let info = resp.get("info").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let total = resp.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -124,7 +125,7 @@ pub async fn get_singer_album_list(args: serde_json::Value) -> Result<serde_json
     );
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let info = resp.get("info").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let total = resp.get("total").and_then(|v| v.as_i64()).unwrap_or(0);

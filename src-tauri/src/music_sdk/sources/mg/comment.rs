@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 
 /// Get newest comments for a song
 pub async fn get_comment(args: serde_json::Value) -> Result<serde_json::Value, String> {
@@ -23,7 +24,7 @@ pub async fn get_comment(args: serde_json::Value) -> Result<serde_json::Value, S
     let resp: serde_json::Value = get_http().get(&url)
         .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {
@@ -68,7 +69,7 @@ pub async fn get_hot_comment(args: serde_json::Value) -> Result<serde_json::Valu
     let resp: serde_json::Value = get_http().get(&url)
         .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_str()).unwrap_or("");
     if code != "000000" {

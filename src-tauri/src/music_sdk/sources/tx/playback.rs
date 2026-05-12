@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use super::crypto::{qrc_decrypt, parse_qrc_lyrics};
 use crate::music_sdk::client::QualityInfo;
 use std::collections::HashMap;
@@ -20,7 +21,7 @@ async fn get_music_info(songmid: &str) -> Result<serde_json::Value, String> {
         .header("Referer", "https://y.qq.com")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
@@ -58,7 +59,7 @@ pub async fn get_batch_quality_info(song_ids: &[i64]) -> Result<HashMap<i64, (Ve
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
     let req_code = resp.get("req").and_then(|r| r.get("code")).and_then(|v| v.as_i64()).unwrap_or(-1);
@@ -139,7 +140,7 @@ pub async fn get_music_url(args: serde_json::Value) -> Result<serde_json::Value,
         .header("User-Agent", "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64; Trident/5.0)")
         .json(&vkey_body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let req_data = resp.get("req_0").and_then(|r| r.get("data")).cloned().unwrap_or(serde_json::json!({}));
     let midurlinfo = req_data.get("midurlinfo").and_then(|v| v.as_array()).cloned().unwrap_or_default();

@@ -1,5 +1,6 @@
 use super::helpers::*;
-use super::crypto::eapi_encrypt;
+use crate::music_sdk::client::ResponseExt;
+use super::crypto::eapi_form;
 use crate::music_sdk::client::{MusicItem, SearchResult, SingerInfo, SingerDetail, SingerCount, SingerAlbumItem, AlbumBrief, SingerAlbumListResult};
 use std::collections::HashMap;
 use crate::music_sdk::client::QualityInfo;
@@ -10,20 +11,17 @@ pub async fn get_singer_info(args: serde_json::Value) -> Result<serde_json::Valu
         return Err("WY singer info: missing id".into());
     }
 
-    let data = serde_json::json!({ "id": id.parse::<i64>().unwrap_or(0) });
-    let data_str = serde_json::to_string(&data).unwrap_or_default();
-    let eparams = eapi_encrypt("/api/artist/head/info/get", &data_str);
-    let body = format!("eparams={}", eparams);
+    let body = eapi_form("/api/artist/head/info/get", &serde_json::json!({ "id": id.parse::<i64>().unwrap_or(0) }));
 
     let resp: serde_json::Value = get_http()
-        .post("http://interface.music.163.com/eapi/batch")
+        .post("http://interface3.music.163.com/eapi/artist/head/info/get")
         .headers(reqwest::header::HeaderMap::from_iter(
             wy_headers().into_iter().map(|(k, v)| (k.parse().unwrap(), v.parse().unwrap())),
         ))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -65,24 +63,21 @@ pub async fn get_singer_song_list(args: serde_json::Value) -> Result<serde_json:
     }
 
     let offset = limit * (page - 1);
-    let data = serde_json::json!({
+    let body = eapi_form("/api/v2/artist/songs", &serde_json::json!({
         "id": id.parse::<i64>().unwrap_or(0),
         "limit": limit,
         "offset": offset
-    });
-    let data_str = serde_json::to_string(&data).unwrap_or_default();
-    let eparams = eapi_encrypt("/api/v2/artist/songs", &data_str);
-    let body = format!("eparams={}", eparams);
+    }));
 
     let resp: serde_json::Value = get_http()
-        .post("http://interface.music.163.com/eapi/batch")
+        .post("http://interface3.music.163.com/eapi/v2/artist/songs")
         .headers(reqwest::header::HeaderMap::from_iter(
             wy_headers().into_iter().map(|(k, v)| (k.parse().unwrap(), v.parse().unwrap())),
         ))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -109,21 +104,18 @@ pub async fn get_singer_album_list(args: serde_json::Value) -> Result<serde_json
     }
 
     let offset = limit * (page - 1);
-    let url = format!("/api/artist/albums/{}", id);
-    let data = serde_json::json!({ "limit": limit, "offset": offset });
-    let data_str = serde_json::to_string(&data).unwrap_or_default();
-    let eparams = eapi_encrypt(&url, &data_str);
-    let body = format!("eparams={}", eparams);
+    let api_path = format!("/api/artist/albums/{}", id);
+    let body = eapi_form(&api_path, &serde_json::json!({ "limit": limit, "offset": offset }));
 
     let resp: serde_json::Value = get_http()
-        .post("http://interface.music.163.com/eapi/batch")
+        .post(&format!("http://interface3.music.163.com{}", api_path))
         .headers(reqwest::header::HeaderMap::from_iter(
             wy_headers().into_iter().map(|(k, v)| (k.parse().unwrap(), v.parse().unwrap())),
         ))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {

@@ -13,14 +13,12 @@ pub async fn search(args: serde_json::Value) -> Result<serde_json::Value, String
         "http://search.kuwo.cn/r.s?client=kt&all={}&pn={}&rn={}&uid=794762570&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newver=1&ft=music&cluster=0&strategy=2012&encoding=utf8&rformat=json&vermerge=1&mobi=1&issubtitle=1",
         urlencoding::encode(keyword), page - 1, limit
     );
-    let resp: serde_json::Value = get_http()
+    let resp = get_http()
         .get(&url)
         .send()
         .await
-        .map_err(|e| e.to_string())?
-        .json()
-        .await
         .map_err(|e| e.to_string())?;
+    let resp: serde_json::Value = super::helpers::parse_kuwo_response(resp).await?;
 
     let total: i64 = resp
         .get("TOTAL")

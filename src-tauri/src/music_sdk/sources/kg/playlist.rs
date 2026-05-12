@@ -1,4 +1,5 @@
 use super::helpers::*;
+use crate::music_sdk::client::ResponseExt;
 use super::playback::get_batch_quality_info;
 use crate::music_sdk::client::{MusicItem, PlaylistItem, PlaylistResult};
 
@@ -6,7 +7,7 @@ pub async fn get_playlist_tags(_args: serde_json::Value) -> Result<serde_json::V
     let url = "http://www2.kugou.kugou.com/yueku/v9/special/getSpecial?is_smarty=1";
     let resp: serde_json::Value = get_http().get(url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let status = resp.get("status").and_then(|v| v.as_i64()).unwrap_or(0);
     if status != 1 {
@@ -59,7 +60,7 @@ pub async fn get_category_playlists(args: serde_json::Value) -> Result<serde_jso
 
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let status = resp.get("status").and_then(|v| v.as_i64()).unwrap_or(0);
     if status != 1 {
@@ -100,7 +101,7 @@ pub async fn get_leaderboards(_args: serde_json::Value) -> Result<serde_json::Va
     let url = "http://mobilecdnbj.kugou.com/api/v5/rank/list?version=9108&plat=0&showtype=2&parentid=0&apiver=6&area_code=1&withsong=1";
     let resp: serde_json::Value = get_http().get(url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
     if errcode != 0 {
@@ -152,7 +153,7 @@ pub async fn get_leaderboard_detail(args: serde_json::Value) -> Result<serde_jso
 
     let resp: serde_json::Value = get_http().get(&url)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let errcode = resp.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
     if errcode != 0 {
@@ -241,7 +242,7 @@ async fn fetch_kg_song_details(hashes: &[String]) -> Result<Vec<MusicItem>, Stri
         .header("x-router", "kmr.service.kugou.com")
         .json(&body)
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let data = resp.get("data").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 

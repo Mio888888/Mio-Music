@@ -1,4 +1,5 @@
 use crate::music_sdk::client::{self, MusicItem, PlaylistItem, PlaylistResult, SearchResult};
+use crate::music_sdk::client::ResponseExt;
 
 fn get_http() -> &'static reqwest::Client {
     client::get_client()
@@ -52,7 +53,7 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
         .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15")
         .header("plat", "h5")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = info_resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -73,7 +74,7 @@ async fn get_playlist_detail(args: serde_json::Value) -> Result<serde_json::Valu
         .header("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15")
         .header("plat", "h5")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let code = list_resp.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
     if code != 200 {
@@ -155,7 +156,7 @@ async fn search(args: serde_json::Value) -> Result<serde_json::Value, String> {
         .header("Referer", "http://www.kuwo.cn/search/list")
         .header("Cookie", "kw_token=12345")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let total = resp.get("data").and_then(|d| d.get("total")).and_then(|v| v.as_i64()).unwrap_or(0);
     let raw_list = resp.get("data").and_then(|d| d.get("list")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
@@ -213,7 +214,7 @@ async fn search_playlist(args: serde_json::Value) -> Result<serde_json::Value, S
         .header("Referer", "http://www.kuwo.cn/search/list")
         .header("Cookie", "kw_token=12345")
         .send().await.map_err(|e| e.to_string())?
-        .json().await.map_err(|e| e.to_string())?;
+        .json_sanitized().await?;
 
     let total = resp.get("data").and_then(|d| d.get("total")).and_then(|v| v.as_i64()).unwrap_or(0);
     let raw_list = resp.get("data").and_then(|d| d.get("list")).and_then(|v| v.as_array()).cloned().unwrap_or_default();
