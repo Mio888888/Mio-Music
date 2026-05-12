@@ -155,6 +155,9 @@
             <t-button theme="default" variant="outline" @click="triggerImport">
               {{ t('settings.equalizer.importConfig') }}
             </t-button>
+            <t-button theme="default" variant="outline" @click="openPresetVault">
+              {{ t('settings.equalizer.downloadPresets') }}
+            </t-button>
             <input
               ref="fileInputRef"
               type="file"
@@ -245,6 +248,7 @@ const PLOT_INSET_Y = 16
 
 const GRID_FREQS = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
 const GRID_DB = [-24, -18, -12, -6, 0, 6, 12, 18, 24]
+const PRESET_VAULT_URL = 'https://mio888888.github.io/EQVault/'
 
 const FILTER_TYPE_I18N_KEYS: Record<FilterType, string> = {
   peak: 'settings.equalizer.typePeak',
@@ -689,6 +693,15 @@ const exportConfig = () => {
 
 const triggerImport = () => {
   fileInputRef.value?.click()
+}
+
+const openPresetVault = async () => {
+  try {
+    const { openUrl } = await import('@tauri-apps/plugin-opener')
+    await openUrl(PRESET_VAULT_URL)
+  } catch {
+    window.open(PRESET_VAULT_URL, '_blank')
+  }
 }
 
 const getFilePresetName = (fileName: string): string => {

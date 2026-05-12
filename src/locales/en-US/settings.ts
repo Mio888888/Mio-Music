@@ -255,6 +255,7 @@ export default {
     saveAsPreset: 'Save Preset',
     exportConfig: 'Export Config',
     importConfig: 'Import Config',
+    downloadPresets: 'Download Presets',
     globalGain: 'Global Gain / Preamp',
     saveNewPresetTitle: 'Save as New Preset',
     presetNamePlaceholder: 'Enter preset name',
