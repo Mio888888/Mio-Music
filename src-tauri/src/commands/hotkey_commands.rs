@@ -5,7 +5,9 @@ use crate::db::playlist_db;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::AppHandle;
+#[cfg(desktop)]
+use tauri::{Emitter, Manager};
 
 // ---------------------------------------------------------------------------
 // Types (mirror frontend types/hotkeys.ts)

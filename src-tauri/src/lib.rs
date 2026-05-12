@@ -13,7 +13,9 @@ use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+#[cfg(desktop)]
+use tauri::Emitter;
 use tauri::http::{StatusCode, header};
 #[cfg(target_os = "macos")]
 use tauri::TitleBarStyle;
@@ -449,10 +451,10 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
+        .run(|_app_handle, _event| {
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = event {
-                if let Some(window) = app_handle.get_webview_window("main") {
+            if let tauri::RunEvent::Reopen { .. } = _event {
+                if let Some(window) = _app_handle.get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();
                 }

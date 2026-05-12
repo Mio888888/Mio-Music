@@ -4,6 +4,7 @@ use crate::db::music_db;
 use crate::local_music::{scanner, cover_cache};
 use crate::AppDb;
 use tauri::State;
+#[cfg(desktop)]
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
