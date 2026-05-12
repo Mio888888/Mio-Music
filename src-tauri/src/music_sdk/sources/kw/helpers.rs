@@ -1,9 +1,12 @@
 use crate::music_sdk::client::{self, MusicItem, SearchResult};
 
-/// Parse Kuwo API response which returns single-quoted pseudo-JSON.
-/// Converts structural single quotes to double quotes for serde compatibility.
+/// Parse Kuwo API response which may return single-quoted pseudo-JSON.
+/// Tries raw parsing first; falls back to single-quote replacement.
 pub async fn parse_kuwo_response(resp: reqwest::Response) -> Result<serde_json::Value, String> {
     let text = resp.text().await.map_err(|e| e.to_string())?;
+    if let Ok(val) = serde_json::from_str(&text) {
+        return Ok(val);
+    }
     let json_str = text.replace('\'', "\"");
     serde_json::from_str(&json_str).map_err(|e| format!("Kuwo JSON解析失败: {e}\n原文: {}", &text[..text.len().min(200)]))
 }

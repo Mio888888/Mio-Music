@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onActivated } from 'vue'
+import { ref, watch, onActivated, onMounted } from 'vue'
 import { searchValue as useSearchStore } from '@/store/search'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { musicSdk, type MusicItem } from '@/services/musicSdk'
@@ -29,23 +29,44 @@ const playlistTotal = ref(0)
 
 const localUserStore = LocalUserDetailStore()
 
-onActivated(async () => {
-  if (searchStore.getValue.trim() === '') {
-    router.push({ name: 'find' })
-  }
+const initialSearchDone = ref(false)
+
+onMounted(async () => {
+  const val = searchStore.getValue.trim()
+  if (val === '') { router.push({ name: 'find' }); return }
+  initialSearchDone.value = true
+  keyword.value = val
+  resetResults()
+  if (activeTab.value === 'songs') await performSearch(true)
+  else await fetchPlaylists(true)
 })
 
-watch(
-  () => searchStore.getValue,
-  async (val) => {
-    if (searchStore.getFocus || val.trim() === keyword.value.trim()) return
-    if (val.trim() === '') { router.push({ name: 'find' }); return }
+onActivated(async () => {
+  if (!initialSearchDone.value) return
+  const val = searchStore.getValue.trim()
+  if (val === '') {
+    router.push({ name: 'find' })
+    return
+  }
+  if (val !== keyword.value.trim()) {
     keyword.value = val
     resetResults()
     if (activeTab.value === 'songs') await performSearch(true)
     else await fetchPlaylists(true)
-  },
-  { immediate: true }
+  }
+})
+
+watch(
+  [() => searchStore.getValue, () => searchStore.getFocus],
+  async ([val, focus]) => {
+    if (focus) return
+    if (val.trim() === '') { router.push({ name: 'find' }); return }
+    if (val.trim() === keyword.value.trim()) return
+    keyword.value = val
+    resetResults()
+    if (activeTab.value === 'songs') await performSearch(true)
+    else await fetchPlaylists(true)
+  }
 )
 
 watch(
