@@ -1,11 +1,10 @@
 <template>
   <div class="audio-effects-settings">
-    <t-card :title="t('settings.audioEffect.title')" :bordered="false">
-      <template #actions>
-        <t-button theme="default" variant="text" @click="resetAll">{{ t('settings.audioEffect.resetAll') }}</t-button>
-      </template>
+    <div class="settings-inline-header">
+      <t-button theme="default" variant="text" @click="resetAll">{{ t('settings.audioEffect.resetAll') }}</t-button>
+    </div>
 
-      <div class="effects-grid">
+    <div class="effects-grid">
         <!-- Surround Sound -->
         <div class="effect-card">
           <div class="card-header">
@@ -73,8 +72,7 @@
             </div>
           </div>
         </div>
-      </div>
-    </t-card>
+    </div>
   </div>
 </template>
 
@@ -112,14 +110,17 @@ onMounted(() => { applyEffects() })
 
 <style scoped>
 .audio-effects-settings {
-  padding: 20px 0;
   color: var(--td-text-color-primary);
+}
+.settings-inline-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 .effects-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-top: 20px;
+  gap: 16px;
   max-width: 900px;
 }
 .effect-card {

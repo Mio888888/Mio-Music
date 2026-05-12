@@ -1,20 +1,19 @@
 <template>
   <div class="equalizer-settings">
-    <t-card :title="t('settings.equalizer.title')" :bordered="false">
-      <template #actions>
-        <t-space align="center">
-          <t-switch
-            v-model="enabled"
-            :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]"
-            @change="(val: unknown) => handleEnabledChange(Boolean(val))"
-          />
-          <t-button theme="default" variant="text" @click="resetToCurrentPreset">
-            {{ t('settings.equalizer.reset') }}
-          </t-button>
-        </t-space>
-      </template>
+    <div class="settings-inline-header">
+      <t-space align="center">
+        <t-switch
+          v-model="enabled"
+          :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]"
+          @change="(val: unknown) => handleEnabledChange(Boolean(val))"
+        />
+        <t-button theme="default" variant="text" @click="resetToCurrentPreset">
+          {{ t('settings.equalizer.reset') }}
+        </t-button>
+      </t-space>
+    </div>
 
-      <div class="eq-content">
+    <div class="eq-content">
         <!-- Frequency Response Curve Canvas -->
         <div class="visualizer-container" ref="canvasContainerRef">
           <canvas ref="canvasRef"></canvas>
@@ -181,9 +180,8 @@
             :disabled="!enabled"
             @change="(val: number | number[]) => onGlobalGainChange(val as number)"
           />
-        </div>
       </div>
-    </t-card>
+    </div>
 
     <t-dialog
       v-model:visible="savePresetDialogVisible"
@@ -1122,13 +1120,17 @@ onUnmounted(() => {
 
 <style scoped>
 .equalizer-settings {
-  padding: 20px;
   color: var(--td-text-color-primary);
+}
+.settings-inline-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 .eq-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 /* --- Canvas visualizer --- */

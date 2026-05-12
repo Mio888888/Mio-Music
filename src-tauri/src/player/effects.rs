@@ -18,7 +18,7 @@ impl AtomicF64 {
 // ==================== 滤波器类型枚举 ====================
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum FilterType {
     Peak,
     LowShelf,
