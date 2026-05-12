@@ -27,13 +27,17 @@ pub fn run() {
     let app_db = AppDb::new(&app_data_dir).expect("Failed to initialize databases");
     let plugin_manager = PluginManager::new(&app_data_dir);
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_process::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+
+    builder
         .manage(app_db)
         .manage(plugin_manager)
         .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
@@ -138,8 +142,10 @@ pub fn run() {
         .setup(|app| {
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("音乐")
-                .inner_size(1200.0, 800.0)
-                .center();
+                .inner_size(1200.0, 800.0);
+
+            #[cfg(desktop)]
+            let win_builder = win_builder.center();
 
             #[cfg(target_os = "macos")]
             let win_builder = win_builder.title_bar_style(TitleBarStyle::Overlay);
@@ -205,6 +211,7 @@ pub fn run() {
             hotkey_commands::set_app_handle(app_handle.clone());
 
             // Register OS-level shortcuts from saved config
+            #[cfg(desktop)]
             {
                 let db_ref = app_handle.state::<AppDb>();
                 let conn = db_ref.playlist.lock().expect("DB lock poisoned");
@@ -214,6 +221,7 @@ pub fn run() {
             }
 
             // Auto-open desktop lyric if it was open on last exit
+            #[cfg(desktop)]
             {
                 let state_path = db::get_app_data_dir().join("desktop_lyric_window.json");
                 let should_open = std::fs::read_to_string(&state_path)
@@ -233,6 +241,7 @@ pub fn run() {
             }
 
             // Setup system tray for desktop lyric unlock
+            #[cfg(desktop)]
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::TrayIconBuilder;

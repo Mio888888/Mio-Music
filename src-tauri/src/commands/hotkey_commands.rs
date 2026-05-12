@@ -114,8 +114,11 @@ pub fn hotkeys__set(state: DbState<'_>, args: serde_json::Value) -> Result<serde
 // Shortcut re-registration (called from commands and setup)
 // ---------------------------------------------------------------------------
 
+#[allow(unused_variables)]
 pub fn re_register_shortcuts(app_handle: &AppHandle, config: &HotkeyConfig) {
-    use tauri_plugin_global_shortcut::{GlobalShortcut, ShortcutState};
+    #[cfg(desktop)]
+    {
+        use tauri_plugin_global_shortcut::{GlobalShortcut, ShortcutState};
 
     let shortcut_plugin = app_handle.state::<GlobalShortcut<tauri::Wry>>();
 
@@ -138,5 +141,6 @@ pub fn re_register_shortcuts(app_handle: &AppHandle, config: &HotkeyConfig) {
                 let _ = handle_clone.emit("hotkey-triggered", action_clone.clone());
             }
         });
+    }
     }
 }

@@ -182,17 +182,24 @@ pub fn local_music__clear_index(state: State<'_, AppDb>) -> Result<serde_json::V
 
 #[tauri::command]
 pub async fn local_music__select_dirs(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
-    let dirs = app.dialog()
-        .file()
-        .set_title("选择音乐文件夹")
-        .blocking_pick_folders();
-    match dirs {
-        Some(paths) => {
-            let dir_strs: Vec<String> = paths.iter()
-                .map(|p| p.to_string())
-                .collect();
-            Ok(serde_json::json!({ "success": true, "data": dir_strs }))
+    #[cfg(desktop)]
+    {
+        let dirs = app.dialog()
+            .file()
+            .set_title("选择音乐文件夹")
+            .blocking_pick_folders();
+        match dirs {
+            Some(paths) => {
+                let dir_strs: Vec<String> = paths.iter()
+                    .map(|p| p.to_string())
+                    .collect();
+                Ok(serde_json::json!({ "success": true, "data": dir_strs }))
+            }
+            None => Ok(serde_json::json!({ "success": true, "data": [] })),
         }
-        None => Ok(serde_json::json!({ "success": true, "data": [] })),
+    }
+    #[cfg(not(desktop))]
+    {
+        Ok(serde_json::json!({ "success": true, "data": [] }))
     }
 }

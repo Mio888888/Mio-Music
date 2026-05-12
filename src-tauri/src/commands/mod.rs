@@ -47,12 +47,14 @@ pub fn create_desktop_lyric_window(app: &AppHandle) -> Result<(), String> {
     )
     .title("Desktop Lyric")
     .inner_size(win_width, win_height)
-    .always_on_top(true)
     .decorations(false)
     .transparent(true)
     .skip_taskbar(true)
     .resizable(false)
     .shadow(false);
+
+    #[cfg(desktop)]
+    { builder = builder.always_on_top(true); }
 
     // Try to restore saved position
     let mut has_saved_pos = false;
@@ -156,6 +158,7 @@ pub async fn toogle_desktop_lyric_lock(
 ) -> Result<(), String> {
     let locked = args.first().copied().unwrap_or(false);
 
+    #[cfg(desktop)]
     if let Some(window) = app.get_webview_window("desktop-lyric") {
         window
             .set_ignore_cursor_events(locked)
