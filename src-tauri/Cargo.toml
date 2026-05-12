@@ -1,5 +1,5 @@
 [package]
-name = "mio"
+name = "mio-music"
 version = "0.1.9"
 description = "A Tauri App"
 authors = ["you"]
