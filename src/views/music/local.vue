@@ -37,6 +37,29 @@ const multiSelect = ref(false)
 const showAddToPlaylist = ref(false)
 const songsToAdd = ref<any[]>([])
 
+// 移动端
+const isMobile = ref(window.innerWidth <= 768)
+let longPressTimer: ReturnType<typeof setTimeout> | null = null
+
+const handleTouchStart = (track: any) => {
+  if (!isMobile.value) return
+  longPressTimer = setTimeout(() => {
+    if (!multiSelect.value) multiSelect.value = true
+    toggleSelect(track.songmid)
+    if (navigator.vibrate) navigator.vibrate(30)
+  }, 500)
+}
+
+const handleTouchCancel = () => {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null }
+}
+
+const showMobileSearch = ref(false)
+const toggleMobileSearch = () => {
+  showMobileSearch.value = !showMobileSearch.value
+  if (!showMobileSearch.value) searchQuery.value = ''
+}
+
 // 右键菜单
 const contextMenuVisible = ref(false)
 const contextMenuPos = ref({ top: 0, left: 0 })
@@ -324,10 +347,12 @@ onMounted(async () => {
   await fetchDirs()
   await fetchTracks()
   document.addEventListener('click', handleGlobalClick)
+  window.addEventListener('resize', () => { isMobile.value = window.innerWidth <= 768 })
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('resize', () => { isMobile.value = window.innerWidth <= 768 })
 })
 </script>
 
@@ -369,7 +394,15 @@ onBeforeUnmount(() => {
           <template #icon><EllipsisIcon :stroke-width="1.5" /></template>
         </t-button>
       </t-dropdown>
-      <div style="margin-left: auto; display: flex; align-items: center">
+      <t-button
+        theme="default"
+        class="local-btn search-toggle mobile-only"
+        :class="{ active: showMobileSearch }"
+        @click="toggleMobileSearch"
+      >
+        <template #icon><SearchIcon size="18px" /></template>
+      </t-button>
+      <div class="desktop-search" style="margin-left: auto; display: flex; align-items: center">
         <t-input
           v-model="searchQuery"
           clearable
@@ -380,6 +413,20 @@ onBeforeUnmount(() => {
         </t-input>
       </div>
     </div>
+
+    <!-- 移动端搜索栏 -->
+    <Transition name="search-slide">
+      <div v-if="showMobileSearch" class="mobile-search-bar">
+        <t-input
+          v-model="searchQuery"
+          clearable
+          :placeholder="t('music.local.searchPlaceholder')"
+          autofocus
+        >
+          <template #prefix-icon><SearchIcon size="16px" /></template>
+        </t-input>
+      </div>
+    </Transition>
 
     <!-- 批量操作栏 -->
     <div v-if="hasSelection" class="batch-toolbar">
@@ -403,8 +450,10 @@ onBeforeUnmount(() => {
           <t-checkbox :checked="isAllSelected" @change="toggleSelectAll" />
         </span>
         <span class="col-cover"></span>
-        <span class="col-name">{{ t('music.local.colSong') }}</span>
-        <span class="col-singer">{{ t('music.local.colArtist') }}</span>
+        <div class="col-info">
+          <span class="col-name">{{ t('music.local.colSong') }}</span>
+          <span class="col-singer">{{ t('music.local.colArtist') }}</span>
+        </div>
         <span class="col-album">{{ t('music.local.colAlbum') }}</span>
         <span class="col-duration">{{ t('music.local.colDuration') }}</span>
         <span class="col-size">{{ t('music.local.colSize') }}</span>
@@ -416,9 +465,12 @@ onBeforeUnmount(() => {
             v-for="{ data: track } in virtualTracks"
             :key="track.songmid"
             class="row"
-            :class="{ 'is-selected': selectedIds.has(track.songmid) }"
+            :class="{ 'is-selected': selectedIds.has(track.songmid), 'multi-select-active': multiSelect }"
             @click="multiSelect ? toggleSelect(track.songmid) : handlePlay(track)"
             @contextmenu="handleContextMenu($event, track)"
+            @touchstart.passive="handleTouchStart(track)"
+            @touchend="handleTouchCancel"
+            @touchmove.passive="handleTouchCancel"
           >
             <div class="col-check" @click.stop>
               <t-checkbox :checked="selectedIds.has(track.songmid)" @change="toggleSelect(track.songmid)" />
@@ -432,10 +484,13 @@ onBeforeUnmount(() => {
               />
               <img v-else src="/default-cover.png" class="track-cover" loading="lazy" />
             </div>
-            <div class="col-name">
-              <span class="name-text" :class="{ playing: track.songmid === currentSongId }">{{ track.name }}</span>
+            <div class="col-info">
+              <span class="name-text" :class="{ playing: track.songmid === currentSongId }">
+                <span v-if="track.songmid === currentSongId" class="playing-eq"><i></i><i></i><i></i></span>
+                {{ track.name }}
+              </span>
+              <span class="col-singer">{{ track.singer || t('common.unknown') }}</span>
             </div>
-            <span class="col-singer">{{ track.singer || t('common.unknown') }}</span>
             <span class="col-album">{{ track.albumName || t('common.unknownAlbum') }}</span>
             <span class="col-duration">{{ formatDuration(track.duration || track.interval) }}</span>
             <span class="col-size">{{ formatSize(track.size) }}</span>
@@ -448,7 +503,12 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else class="empty">
-      {{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.noMusicDir') }}
+      <i class="iconfont icon-shouye empty-icon"></i>
+      <p class="empty-text">{{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.noMusicDir') }}</p>
+      <t-button v-if="!searchQuery" theme="primary" class="empty-action" @click="showDirModal = true">
+        <template #icon><FolderIcon /></template>
+        {{ t('music.local.selectDir') }}
+      </t-button>
     </div>
 
     <!-- 目录管理弹窗 -->
@@ -673,6 +733,29 @@ onBeforeUnmount(() => {
   height: 40px;
   border-radius: 4px;
   object-fit: cover;
+  background: var(--td-bg-color-component-hover);
+}
+
+.col-info {
+  flex: 3.5;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.col-info .col-name {
+  flex: 2;
+  min-width: 0;
+}
+
+.col-info > .name-text {
+  flex: 2;
+  min-width: 0;
+}
+
+.col-info .col-singer {
+  flex: 1.5;
+  min-width: 0;
 }
 
 .col-name {
@@ -789,8 +872,61 @@ onBeforeUnmount(() => {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* 播放中均衡器 */
+.playing-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.playing-eq i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--td-brand-color);
+  animation: eq-bar 1.2s ease-in-out infinite;
+}
+
+.playing-eq i:nth-child(1) { height: 60%; animation-delay: 0s; }
+.playing-eq i:nth-child(2) { height: 100%; animation-delay: 0.2s; }
+.playing-eq i:nth-child(3) { height: 40%; animation-delay: 0.4s; }
+
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+/* 仅移动端显示 */
+.mobile-only { display: none; }
+
+/* 移动端搜索过渡 */
+.search-slide-enter-active,
+.search-slide-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.search-slide-enter-from,
+.search-slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+}
+
+.search-slide-enter-to,
+.search-slide-leave-from {
+  opacity: 1;
+  max-height: 60px;
+  margin-bottom: 8px;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
+  .mobile-only { display: inline-flex; }
+  .desktop-search { display: none !important; }
+
   .local-container {
     padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0;
     overflow: hidden;
@@ -798,77 +934,160 @@ onBeforeUnmount(() => {
 
   .local-header {
     align-items: flex-start;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
   }
 
   .local-header .title {
     border-left: none;
     padding-left: 0;
-    font-size: clamp(2rem, 9vw, 2.6rem);
+    font-size: clamp(1.75rem, 8vw, 2.4rem);
     line-height: 1.1;
     letter-spacing: -0.04em;
   }
 
   .local-header .title span {
     display: block;
-    padding: 0.35rem 0 0;
-    font-size: 1rem !important;
-    font-weight: 500;
+    padding: 0.3rem 0 0;
+    font-size: 0.875rem !important;
+    font-weight: 400;
     letter-spacing: 0;
+    opacity: 0.5;
   }
 
   .right-container :deep(.t-button) {
     min-height: var(--mobile-touch-target);
   }
 
+  /* 控制栏 */
   .controls {
-    flex-wrap: wrap;
-    gap: 8px;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
-  .controls > div {
-    width: 100%;
-    margin-left: 0 !important;
-  }
-
-  .controls :deep(.t-input) {
-    width: 100% !important;
-    min-height: var(--mobile-touch-target);
-  }
-
-  .local-btn {
-    min-width: var(--mobile-touch-target);
+  .controls .play-all {
+    flex: 1;
     min-height: var(--mobile-touch-target);
     height: var(--mobile-touch-target);
     border-radius: var(--mobile-control-radius);
-    touch-action: manipulation;
+    font-weight: 600;
   }
 
+  .controls .scan,
+  .controls .more,
+  .controls .search-toggle {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    height: var(--mobile-touch-target);
+    width: var(--mobile-touch-target);
+    border-radius: 50%;
+    padding: 0;
+    touch-action: manipulation;
+    flex-shrink: 0;
+  }
+
+  .controls .search-toggle.active {
+    background: var(--td-brand-color-light);
+    color: var(--td-brand-color);
+  }
+
+  /* 移动端搜索栏 */
+  .mobile-search-bar {
+    margin-bottom: 8px;
+  }
+
+  .mobile-search-bar :deep(.t-input) {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+  }
+
+  /* 隐藏表头 */
+  .list-header {
+    display: none;
+  }
+
+  /* 歌曲列表 - 卡片式 */
   .list-body {
     -webkit-overflow-scrolling: touch;
   }
 
-  .list-header {
-    padding: 8px 4px;
-  }
-
   .row {
-    padding: 8px 4px;
-    border-radius: var(--mobile-card-radius-small);
+    padding: 10px 4px;
+    border-radius: 12px;
+    min-height: 64px;
     touch-action: manipulation;
+    gap: 4px;
+    -webkit-tap-highlight-color: transparent;
   }
 
+  .row:active:not(.is-selected) {
+    background: var(--td-bg-color-component-hover);
+    transform: scale(0.985);
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+
+  .row.is-selected {
+    background: color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+  }
+
+  /* 多选模式才显示勾选框 */
   .col-check {
-    width: var(--mobile-touch-target);
+    width: 0;
+    overflow: hidden;
+    padding: 0;
+    opacity: 0;
+    transition: width 0.2s ease, opacity 0.2s ease;
+  }
+
+  .row.multi-select-active .col-check {
+    width: 40px;
+    opacity: 1;
   }
 
   .col-cover {
-    width: 48px;
+    width: 52px;
+    flex-shrink: 0;
   }
 
-  .col-singer {
+  .track-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* 歌曲信息 - 堆叠布局 */
+  .col-info {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .col-info .col-name {
+    flex: none;
+    min-width: 0;
+  }
+
+  .col-info .col-singer {
+    flex: none;
+    font-size: 13px;
+    color: var(--td-text-color-placeholder);
+  }
+
+  .name-text {
+    font-size: 15px;
+  }
+
+  .playing-eq {
+    height: 12px;
+  }
+
+  .playing-eq i {
+    width: 2.5px;
   }
 
   .col-album,
@@ -877,25 +1096,63 @@ onBeforeUnmount(() => {
   }
 
   .col-duration {
-    width: 48px;
+    width: auto;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--td-text-color-placeholder);
+    align-self: center;
+    margin-left: auto;
+    padding-right: 4px;
   }
 
   .col-actions,
   .col-actions-header {
-    width: 52px;
+    display: none;
   }
 
-  .col-actions :deep(.t-button) {
-    min-height: 36px;
+  /* 空状态 */
+  .empty {
+    flex-direction: column;
+    gap: 16px;
+    padding: 60px 24px;
   }
 
+  .empty-icon {
+    font-size: 48px;
+    opacity: 0.2;
+    line-height: 1;
+  }
+
+  .empty-text {
+    font-size: 15px;
+    text-align: center;
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .empty-action {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    padding: 0 28px;
+    margin-top: 4px;
+  }
+
+  /* 批量操作栏 */
   .batch-toolbar {
     flex-wrap: wrap;
     border-radius: var(--mobile-card-radius-small);
+    gap: 6px;
   }
 
   .batch-toolbar :deep(.t-button) {
     min-height: 36px;
+  }
+
+  /* 目录弹窗适配 */
+  .dir-modal-content {
+    max-height: 60vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 </style>
