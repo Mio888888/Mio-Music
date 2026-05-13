@@ -331,27 +331,27 @@ jobs:
 
           abi_marker = "// Mio Music ABI split override"
           if abi_marker not in text:
-              abi_block = '''
-
-// Mio Music ABI split override
-android {
-    defaultConfig {
-        ndk {
-            abiFilters.clear()
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
-    }
-
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "x86_64")
-            isUniversalApk = true
-        }
-    }
-}
-'''
+              abi_block = (
+                  "\n\n"
+                  "// Mio Music ABI split override\n"
+                  "android {\n"
+                  "    defaultConfig {\n"
+                  "        ndk {\n"
+                  "            abiFilters.clear()\n"
+                  '            abiFilters += listOf("arm64-v8a", "x86_64")\n'
+                  "        }\n"
+                  "    }\n"
+                  "\n"
+                  "    splits {\n"
+                  "        abi {\n"
+                  "            isEnable = true\n"
+                  "            reset()\n"
+                  '            include("arm64-v8a", "x86_64")\n'
+                  "            isUniversalApk = true\n"
+                  "        }\n"
+                  "    }\n"
+                  "}\n"
+              )
               text = text.rstrip() + abi_block
 
           gradle_file.write_text(text)
