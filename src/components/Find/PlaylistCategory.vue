@@ -37,6 +37,8 @@ const categoryCache: Record<string, { list: any[]; page: number; total: number }
 
 const scrollTop = ref(0)
 const scrollRef = ref<HTMLDivElement>()
+const hotTagsRef = ref<HTMLDivElement>()
+const showRightFade = ref(true)
 
 const fetchTags = async () => {
   try {
@@ -115,10 +117,28 @@ const fetchCategoryPlaylists = async (reset = false) => {
   }
 }
 
+const scrollToActiveTag = () => {
+  requestAnimationFrame(() => {
+    if (!hotTagsRef.value) return
+    const active = hotTagsRef.value.querySelector('.tag-chip.active') as HTMLElement
+    if (!active) return
+    const container = hotTagsRef.value
+    const scrollLeft = active.offsetLeft - container.offsetLeft - container.clientWidth / 2 + active.clientWidth / 2
+    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' })
+  })
+}
+
+const updateRightFade = () => {
+  if (!hotTagsRef.value) return
+  const el = hotTagsRef.value
+  showRightFade.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 8
+}
+
 const onSelectTag = async (tagId: string, name: string) => {
   activeTagId.value = tagId
   activeCategoryName.value = name
   showMore.value = false
+  scrollToActiveTag()
   await fetchCategoryPlaylists(true)
 }
 
@@ -170,6 +190,7 @@ const onDocClick = (e: MouseEvent) => {
 }
 
 onMounted(() => {
+  requestAnimationFrame(updateRightFade)
   watch(
     userSource,
     () => {
@@ -186,6 +207,7 @@ onMounted(() => {
       fetchTags().then(() => {
         activeTagId.value = ''
         activeCategoryName.value = t('music.playlistCategory.hot')
+        requestAnimationFrame(updateRightFade)
         fetchCategoryPlaylists(true)
       })
     },
@@ -212,8 +234,8 @@ onDeactivated(() => {
 
 <template>
   <div ref="scrollRef" class="playlist-category" @scroll="onScroll">
-    <div class="category-bar">
-      <div class="hot-tags">
+    <div class="category-bar" :class="{ 'has-fade': showRightFade }">
+      <div ref="hotTagsRef" class="hot-tags" @scroll.passive="updateRightFade">
         <button
           class="tag-chip"
           :class="{ active: activeTagId === '' }"
@@ -804,24 +826,26 @@ onDeactivated(() => {
   }
 
   .category-bar {
-    position: relative;
-    margin: 0 0 1rem;
-    padding: 0.75rem 0 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: 0 0 0.75rem;
+    padding: 0.5rem 0 0.375rem;
     max-width: 100%;
     min-width: 0;
     overflow: hidden;
-    background: transparent;
+    transition: box-shadow 0.2s ease;
   }
 
-  .category-bar::after {
+  .category-bar.has-fade::after {
     content: '';
     position: absolute;
-    top: 0.75rem;
+    top: 0.5rem;
     right: 0;
-    bottom: 0.5rem;
-    width: 28px;
+    bottom: 0.375rem;
+    width: 32px;
     pointer-events: none;
-    background: linear-gradient(90deg, transparent, var(--td-bg-color-page, var(--td-bg-color-container)) 78%);
+    background: linear-gradient(90deg, transparent, var(--td-bg-color-page, var(--td-bg-color-container)) 85%);
   }
 
   .hot-tags {
@@ -836,9 +860,9 @@ onDeactivated(() => {
     overflow-x: scroll;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
-    padding: 0.125rem 1.75rem 0.375rem 0;
+    padding: 0.25rem 2rem 0.5rem 0;
     scroll-padding-inline: 0;
-    scroll-snap-type: x proximity;
+    scroll-snap-type: x mandatory;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x;
@@ -871,6 +895,19 @@ onDeactivated(() => {
     font-weight: 500;
     line-height: 1;
     touch-action: manipulation;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tag-chip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    background: var(--td-brand-color);
+    transition: opacity 0.22s ease;
+    pointer-events: none;
   }
 
   .tag-chip:hover {
@@ -881,15 +918,16 @@ onDeactivated(() => {
 
   .tag-chip:active,
   .tag-chip.more:active {
-    transform: scale(0.97);
+    transform: scale(0.96);
     background: var(--td-bg-color-secondarycontainer);
   }
 
   .tag-chip.active {
     color: var(--td-brand-color);
     background: var(--td-brand-color-light);
-    border-color: var(--td-brand-color);
+    border-color: color-mix(in srgb, var(--td-brand-color) 40%, transparent);
     font-weight: 600;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
   }
 
   .tag-chip.more {
