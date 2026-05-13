@@ -329,6 +329,9 @@ impl DownloadManager {
     }
 
     pub async fn open_file_location(&self, file_path: &str) -> Result<(), String> {
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+        let _ = file_path;
+
         #[cfg(target_os = "macos")]
         { std::process::Command::new("open").args(["-R", file_path]).spawn().map_err(|e| e.to_string())?; }
         #[cfg(target_os = "windows")]

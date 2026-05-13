@@ -201,6 +201,7 @@ pub async fn local_music__select_dirs(app: tauri::AppHandle) -> Result<serde_jso
     }
     #[cfg(not(desktop))]
     {
+        let _ = app;
         Ok(serde_json::json!({ "success": true, "data": [] }))
     }
 }
