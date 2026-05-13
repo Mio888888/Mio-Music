@@ -176,8 +176,14 @@ jobs:
 
       - name: Install NDK
         run: |
-          sdkmanager "ndk;27.0.12077973"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> $GITHUB_ENV
+          LATEST_NDK=$(ls -d "$ANDROID_HOME/ndk/"* 2>/dev/null | sort -V | tail -1)
+          if [ -z "$LATEST_NDK" ]; then
+            sdkmanager "ndk;27.0.12077973"
+            LATEST_NDK="$ANDROID_HOME/ndk/27.0.12077973"
+          fi
+          echo "NDK_HOME=$LATEST_NDK" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$LATEST_NDK" >> $GITHUB_ENV
+          echo "Using NDK: $LATEST_NDK"
 
       - name: Install frontend dependencies
         run: yarn install
@@ -204,7 +210,7 @@ jobs:
           )
           for perm in "${PERMISSIONS[@]}"; do
             if ! grep -q "$perm" "$MANIFEST"; then
-              sed -i "s|</manifest>|    <uses-permission android:name=\"${perm}\" />\n</manifest>|" "$MANIFEST"
+              sed -i "/<\/manifest>/i\    <uses-permission android:name=\"${perm}\" />" "$MANIFEST"
             fi
           done
           echo "Patched AndroidManifest.xml with permissions:"
