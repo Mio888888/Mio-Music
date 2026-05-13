@@ -347,7 +347,7 @@ jobs:
                   "            isEnable = true\n"
                   "            reset()\n"
                   '            include("arm64-v8a", "x86_64")\n'
-                  "            isUniversalApk = true\n"
+                  "            isUniversalApk = false\n"
                   "        }\n"
                   "    }\n"
                   "}\n"
