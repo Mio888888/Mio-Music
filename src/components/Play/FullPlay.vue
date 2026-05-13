@@ -1534,8 +1534,12 @@ onUnmounted(() => {
     }
   }
 
+  .fullscreen-btn {
+    display: none;
+  }
+
   .putawayscreen-btn {
-    left: calc(var(--mobile-page-gutter) + var(--mobile-touch-target) + 8px);
+    left: var(--mobile-page-gutter);
   }
 
   .top {
