@@ -185,6 +185,31 @@ jobs:
       - name: Initialize Android project
         run: npx tauri android init
 
+      - name: Add Android permissions
+        run: |
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST" ]; then
+            echo "::error::AndroidManifest.xml not found"
+            exit 1
+          fi
+          PERMISSIONS=(
+            "android.permission.INTERNET"
+            "android.permission.READ_EXTERNAL_STORAGE"
+            "android.permission.WRITE_EXTERNAL_STORAGE"
+            "android.permission.READ_MEDIA_AUDIO"
+            "android.permission.FOREGROUND_SERVICE"
+            "android.permission.WAKE_LOCK"
+            "android.permission.MODIFY_AUDIO_SETTINGS"
+            "android.permission.RECORD_AUDIO"
+          )
+          for perm in "${PERMISSIONS[@]}"; do
+            if ! grep -q "$perm" "$MANIFEST"; then
+              sed -i "s|</manifest>|    <uses-permission android:name=\"${perm}\" />\n</manifest>|" "$MANIFEST"
+            fi
+          done
+          echo "Patched AndroidManifest.xml with permissions:"
+          grep "uses-permission" "$MANIFEST"
+
       - name: Configure Android release signing
         shell: bash
         env:

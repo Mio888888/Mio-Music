@@ -806,14 +806,14 @@ enum AsyncPipelineResult {
 // ==================== 播放引擎 ====================
 
 pub struct PlayerEngine {
-    stream_handle: OutputStreamHandle,
+    stream_handle: Option<OutputStreamHandle>,
     primary: Option<SlotPipeline>,
     secondary: Option<SlotPipeline>,
     volume: f64,
     shutdown: bool,
     crossfade: Option<CrossfadeState>,
     #[allow(dead_code)]
-    shutdown_tx: std::sync::mpsc::Sender<()>,
+    shutdown_tx: Option<std::sync::mpsc::Sender<()>>,
     app_handle: tauri::AppHandle,
     poll_tick: u32,
     // 异步播放通道
@@ -837,8 +837,8 @@ pub struct PlayerEngine {
 impl PlayerEngine {
     pub fn new(
         app_handle: tauri::AppHandle,
-        stream_handle: OutputStreamHandle,
-        shutdown_tx: std::sync::mpsc::Sender<()>,
+        stream_handle: Option<OutputStreamHandle>,
+        shutdown_tx: Option<std::sync::mpsc::Sender<()>>,
     ) -> Self {
         let (play_tx, play_rx) = std::sync::mpsc::channel();
         let (preload_tx, preload_rx) = std::sync::mpsc::channel();
@@ -877,7 +877,10 @@ impl PlayerEngine {
         self.crossfade = None;
         self.ended_emitted = false;
 
-        let stream_handle = self.stream_handle.clone();
+        let stream_handle = match self.stream_handle.clone() {
+            Some(h) => h,
+            None => return Err("音频输出不可用".into()),
+        };
         let url = url.to_string();
         let volume = self.volume / 100.0;
         let eq_settings = self.eq_settings.clone();
@@ -974,8 +977,12 @@ impl PlayerEngine {
         };
 
         // 强制使用 symphonia 解码器（支持 seek）
+        let handle = match self.stream_handle.as_ref() {
+            Some(h) => h,
+            None => return,
+        };
         let new_pipeline =
-            match Self::build_pipeline_symphonia(&self.stream_handle, &file_path, &url, volume) {
+            match Self::build_pipeline_symphonia(handle, &file_path, &url, volume) {
                 Ok(p) => p,
                 Err(e) => {
                     eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
@@ -1047,7 +1054,8 @@ impl PlayerEngine {
 
     pub fn crossfade_to(&mut self, url: &str, duration_ms: u64) -> Result<(), String> {
         let file_path = resolve_audio_file(url)?;
-        let pipeline = SlotPipeline::from_file(&self.stream_handle, &file_path, url, 0.0)?;
+        let handle = self.stream_handle.as_ref().ok_or("音频输出不可用")?;
+        let pipeline = SlotPipeline::from_file(handle, &file_path, url, 0.0)?;
         pipeline.apply_eq_settings(&self.eq_settings);
         self.secondary = Some(pipeline);
         self.crossfade = Some(CrossfadeState {
@@ -1103,7 +1111,10 @@ impl PlayerEngine {
         // 清除旧的预加载
         self.secondary = None;
 
-        let stream_handle = self.stream_handle.clone();
+        let stream_handle = match self.stream_handle.clone() {
+            Some(h) => h,
+            None => return,
+        };
         let tx = self.preload_tx.clone();
         let cache_dir = self.cache_dir.clone();
         let cache_max_size = self.cache_max_size;

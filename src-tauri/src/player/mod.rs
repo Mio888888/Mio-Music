@@ -31,8 +31,13 @@ pub struct PlayerSnapshot {
 pub fn init_player(app_handle: tauri::AppHandle) -> SharedPlayer {
     engine::cleanup_temp_files();
 
-    let (stream_handle, shutdown_tx) = engine::create_output_stream()
-        .expect("音频输出初始化失败");
+    let (stream_handle, shutdown_tx) = match engine::create_output_stream() {
+        Ok(pair) => (Some(pair.0), Some(pair.1)),
+        Err(e) => {
+            eprintln!("音频输出初始化失败: {e}");
+            (None, None)
+        }
+    };
 
     let engine = PlayerEngine::new(app_handle, stream_handle, shutdown_tx);
     let shared = Arc::new(Mutex::new(engine));
