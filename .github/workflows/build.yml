@@ -185,32 +185,174 @@ jobs:
       - name: Initialize Android project
         run: npx tauri android init
 
-      - name: Build Android APK
-        run: npx tauri android build
+      - name: Configure Android release signing
+        shell: bash
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          for name in ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_KEY_BASE64; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::${name} secret is required for signed Android releases"
+              exit 1
+            fi
+          done
+
+          ANDROID_PROJECT_DIR="src-tauri/gen/android"
+          KEYSTORE_PATH="$RUNNER_TEMP/keystore.jks"
+
+          printf '%s' "$ANDROID_KEY_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+
+          {
+            printf '%s\n' "keyAlias=${ANDROID_KEY_ALIAS}"
+            printf '%s\n' "password=${ANDROID_KEY_PASSWORD}"
+            printf '%s\n' "storeFile=${KEYSTORE_PATH}"
+          } > "$ANDROID_PROJECT_DIR/keystore.properties"
+          chmod 600 "$ANDROID_PROJECT_DIR/keystore.properties"
+
+          python3 <<'PY'
+          from pathlib import Path
+
+          gradle_file = Path("src-tauri/gen/android/app/build.gradle.kts")
+          text = gradle_file.read_text()
+
+          if "import java.io.FileInputStream" not in text:
+              if "import java.util.Properties" in text:
+                  text = text.replace(
+                      "import java.util.Properties\n",
+                      "import java.io.FileInputStream\nimport java.util.Properties\n",
+                      1,
+                  )
+              else:
+                  text = "import java.io.FileInputStream\nimport java.util.Properties\n" + text
+
+          keystore_marker = 'val keystorePropertiesFile = rootProject.file("keystore.properties")'
+          if keystore_marker not in text:
+              android_marker = "\nandroid {"
+              if android_marker not in text:
+                  raise SystemExit("Unable to find android block in generated build.gradle.kts")
+              keystore_block = (
+                  'val keystorePropertiesFile = rootProject.file("keystore.properties")\n'
+                  "val keystoreProperties = Properties().apply {\n"
+                  "    FileInputStream(keystorePropertiesFile).use { load(it) }\n"
+                  "}\n\n"
+              )
+              text = text.replace(android_marker, "\n" + keystore_block + "android {", 1)
+
+          signing_marker = 'keyAlias = keystoreProperties["keyAlias"] as String'
+          if signing_marker not in text:
+              lines = text.splitlines(keepends=True)
+              for index, line in enumerate(lines):
+                  if line.strip() == "buildTypes {":
+                      indent = line[: len(line) - len(line.lstrip())]
+                      signing_block = [
+                          f"{indent}signingConfigs {{\n",
+                          f'{indent}    create("release") {{\n',
+                          f'{indent}        keyAlias = keystoreProperties["keyAlias"] as String\n',
+                          f'{indent}        keyPassword = keystoreProperties["password"] as String\n',
+                          f'{indent}        storeFile = file(keystoreProperties["storeFile"] as String)\n',
+                          f'{indent}        storePassword = keystoreProperties["password"] as String\n',
+                          f"{indent}    }}\n",
+                          f"{indent}}}\n",
+                          "\n",
+                      ]
+                      lines[index:index] = signing_block
+                      text = "".join(lines)
+                      break
+              else:
+                  raise SystemExit("Unable to find buildTypes block in generated build.gradle.kts")
+
+          release_signing_marker = 'signingConfig = signingConfigs.getByName("release")'
+          if release_signing_marker not in text:
+              lines = text.splitlines(keepends=True)
+              for index, line in enumerate(lines):
+                  if 'getByName("release")' in line and line.strip().endswith("{"):
+                      indent = line[: len(line) - len(line.lstrip())] + "    "
+                      lines.insert(index + 1, f"{indent}{release_signing_marker}\n")
+                      text = "".join(lines)
+                      break
+              else:
+                  raise SystemExit("Unable to find release build type in generated build.gradle.kts")
+
+          gradle_file.write_text(text)
+          print(f"Patched {gradle_file} for release signing")
+          PY
+
+      - name: Build signed Android APK
+        run: npx tauri android build --apk --ci
+
+      - name: Verify signed Android APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found in Android SDK build-tools"
+            exit 1
+          fi
+
+          rm -rf android-signed-apks
+          mkdir -p android-signed-apks
+
+          verified_count=0
+          while IFS= read -r -d '' apk; do
+            relative_path="${apk#src-tauri/gen/android/app/build/outputs/apk/}"
+            case "$relative_path" in
+              *release*.apk|*/release/*.apk) ;;
+              *)
+                echo "Skipping non-release APK: $apk"
+                continue
+                ;;
+            esac
+
+            echo "Verifying signed release APK: $apk"
+            "$APKSIGNER" verify -v --print-certs "$apk"
+
+            destination="android-signed-apks/$relative_path"
+            mkdir -p "$(dirname "$destination")"
+            cp "$apk" "$destination"
+            verified_count=$((verified_count + 1))
+          done < <(find src-tauri/gen/android/app/build/outputs/apk -type f -name "*.apk" ! -name "*unsigned*" ! -name "*debug*" ! -path "*/debug/*" -print0 | sort -z)
+
+          if [ "$verified_count" -eq 0 ]; then
+            echo "::error::No verified signed release APKs were found"
+            exit 1
+          fi
 
       - name: Upload APK to release
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           TAG="v${{ needs.check-version.outputs.version }}"
-          for apk in $(find src-tauri/gen/android -name "*.apk" -type f); do
+          while IFS= read -r -d '' apk; do
             echo "Uploading $apk to release $TAG"
             for i in $(seq 1 20); do
               if gh release upload "$TAG" "$apk" --clobber; then
                 break
               fi
+              if [ "$i" -eq 20 ]; then
+                echo "::error::Failed to upload $apk to release $TAG"
+                exit 1
+              fi
               echo "Retrying in 30s... ($i/20)"
               sleep 30
             done
-          done
-        continue-on-error: true
+          done < <(find android-signed-apks -type f -name "*.apk" -print0 | sort -z)
 
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v5
         with:
           name: mio-android
           path: |
-            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            android-signed-apks/**/*.apk
 
   publish-release:
     needs: [check-version, build-windows, build-macos, build-linux]
