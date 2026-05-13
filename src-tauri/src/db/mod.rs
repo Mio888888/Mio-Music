@@ -2,7 +2,13 @@ pub mod music_db;
 pub mod playlist_db;
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+
+static APP_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn set_app_data_dir(path: PathBuf) {
+    let _ = APP_DATA_DIR.set(path);
+}
 
 pub struct AppDb {
     pub music: Mutex<rusqlite::Connection>,
@@ -32,6 +38,9 @@ impl AppDb {
 }
 
 pub fn get_app_data_dir() -> PathBuf {
+    if let Some(dir) = APP_DATA_DIR.get() {
+        return dir.clone();
+    }
     dirs::data_local_dir()
         .or_else(dirs::data_dir)
         .unwrap_or_else(|| PathBuf::from("."))

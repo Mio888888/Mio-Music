@@ -25,10 +25,6 @@ use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let app_data_dir = db::get_app_data_dir();
-    let app_db = AppDb::new(&app_data_dir).expect("Failed to initialize databases");
-    let plugin_manager = PluginManager::new(&app_data_dir);
-
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -40,8 +36,6 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
 
     builder
-        .manage(app_db)
-        .manage(plugin_manager)
         .manage(Mutex::new(commands::power_save::power_save_blocker_state()))
         .manage(commands::DesktopLyricState {
             is_open: Mutex::new(false),
@@ -142,6 +136,16 @@ pub fn run() {
             });
         })
         .setup(|app| {
+            let app_data_dir = app.path().app_data_dir()
+                .expect("Failed to resolve app data directory");
+            db::set_app_data_dir(app_data_dir.clone());
+
+            let app_db = AppDb::new(&app_data_dir).expect("Failed to initialize databases");
+            app.manage(app_db);
+
+            let plugin_manager = PluginManager::new(&app_data_dir);
+            app.manage(plugin_manager);
+
             let win_builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("音乐")
                 .inner_size(1200.0, 800.0);
@@ -198,7 +202,6 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
-            let app_data_dir = db::get_app_data_dir();
             let download_manager = DownloadManager::new(&app_data_dir, app_handle.clone());
             app.manage(download_manager);
 
