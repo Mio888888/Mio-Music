@@ -1,7 +1,11 @@
 <template>
   <div class="equalizer-settings">
     <div class="settings-inline-header">
-      <t-space align="center">
+      <div class="eq-mobile-summary">
+        <div class="eq-mobile-title">{{ currentPresetDisplayName }}</div>
+        <div class="eq-mobile-status">{{ enabled ? t('settings.equalizer.on') : t('settings.equalizer.off') }}</div>
+      </div>
+      <t-space class="eq-header-actions" align="center">
         <t-switch
           v-model="enabled"
           :label="[t('settings.equalizer.on'), t('settings.equalizer.off')]"
@@ -166,6 +170,41 @@
               @change="handleFileImport"
             />
           </div>
+        </div>
+
+        <div class="mobile-action-grid">
+          <t-button
+            v-if="canModifyCurrentPreset"
+            theme="primary"
+            variant="outline"
+            size="small"
+            @click="saveCurrentToPreset"
+          >
+            <template #icon><SaveIcon /></template>
+            {{ t('settings.equalizer.savePreset') }}
+          </t-button>
+          <t-button
+            v-if="canModifyCurrentPreset"
+            theme="danger"
+            variant="outline"
+            size="small"
+            @click="confirmDeletePreset"
+          >
+            <template #icon><DeleteIcon /></template>
+            {{ t('settings.equalizer.deletePreset') }}
+          </t-button>
+          <t-button theme="primary" variant="outline" size="small" @click="savePresetDialogVisible = true">
+            {{ t('settings.equalizer.saveAsPreset') }}
+          </t-button>
+          <t-button theme="default" variant="outline" size="small" @click="exportConfig">
+            {{ t('settings.equalizer.exportConfig') }}
+          </t-button>
+          <t-button theme="default" variant="outline" size="small" @click="triggerImport">
+            {{ t('settings.equalizer.importConfig') }}
+          </t-button>
+          <t-button theme="default" variant="outline" size="small" @click="openPresetVault">
+            {{ t('settings.equalizer.downloadPresets') }}
+          </t-button>
         </div>
 
         <!-- Global Gain -->
@@ -802,12 +841,13 @@ const resizeCanvas = () => {
   if (!canvasRef.value || !canvasContainerRef.value) return
   const rect = canvasContainerRef.value.getBoundingClientRect()
   const dpr = window.devicePixelRatio || 1
+  const cssHeight = window.matchMedia('(max-width: 768px)').matches ? 180 : CANVAS_HEIGHT
   canvasRef.value.width = Math.max(1, Math.floor(rect.width * dpr))
-  canvasRef.value.height = Math.max(1, Math.floor(CANVAS_HEIGHT * dpr))
+  canvasRef.value.height = Math.max(1, Math.floor(cssHeight * dpr))
   if (rect.width > 0) {
     canvasRef.value.style.width = `${rect.width}px`
   }
-  canvasRef.value.style.height = `${CANVAS_HEIGHT}px`
+  canvasRef.value.style.height = `${cssHeight}px`
 }
 
 const setupVisualizer = async () => {
@@ -1140,6 +1180,12 @@ onUnmounted(() => {
   justify-content: flex-end;
   margin-bottom: 14px;
 }
+.eq-mobile-summary {
+  display: none;
+}
+.mobile-action-grid {
+  display: none;
+}
 .eq-content {
   display: flex;
   flex-direction: column;
@@ -1381,5 +1427,205 @@ onUnmounted(() => {
 .global-gain-value {
   font-size: 12px;
   color: var(--td-text-color-secondary);
+}
+
+@media (max-width: 768px) {
+  .equalizer-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .settings-inline-header {
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 0;
+    padding: 14px;
+    border: 1px solid var(--mobile-glass-border);
+    border-radius: var(--mobile-card-radius-small);
+    background: color-mix(in srgb, var(--td-bg-color-container) 80%, transparent);
+  }
+
+  .eq-mobile-summary {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .eq-mobile-title {
+    overflow: hidden;
+    color: var(--td-text-color-primary);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .eq-mobile-status {
+    color: var(--td-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  .eq-header-actions {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .eq-header-actions :deep(.t-button) {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+  }
+
+  .eq-content {
+    gap: 12px;
+  }
+
+  .visualizer-container,
+  .sliders-container,
+  .band-params-panel,
+  .controls-row,
+  .global-gain-control {
+    border: 1px solid var(--mobile-glass-border);
+    border-radius: var(--mobile-card-radius-small);
+    background: color-mix(in srgb, var(--td-bg-color-container) 82%, transparent);
+  }
+
+  .visualizer-container {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--td-text-color-anti), transparent 95%),
+      0 8px 18px color-mix(in srgb, var(--td-brand-color), transparent 94%);
+  }
+
+  .visualizer-container canvas {
+    height: 180px;
+  }
+
+  .controls-row {
+    display: block;
+    padding: 12px;
+  }
+
+  .preset-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .preset-select {
+    width: 100%;
+  }
+
+  .controls-row .preset-controls > .t-button,
+  .action-buttons {
+    display: none;
+  }
+
+  .mobile-action-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .mobile-action-grid :deep(.t-button) {
+    min-width: 0;
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    white-space: normal;
+    touch-action: manipulation;
+  }
+
+  .sliders-container {
+    height: 232px;
+    gap: 2px;
+    padding: 14px 6px 12px;
+    overflow: hidden;
+  }
+
+  .slider-group {
+    min-width: 0;
+    min-height: var(--mobile-touch-target);
+    padding: 8px 1px 6px;
+    border-radius: 12px;
+    touch-action: manipulation;
+  }
+
+  .slider-wrapper {
+    height: 168px;
+  }
+
+  .freq-label {
+    margin-top: 8px;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .gain-label {
+    margin-top: 3px;
+    font-size: 9px;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .band-params-panel,
+  .global-gain-control {
+    padding: 14px;
+  }
+
+  .band-params-header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .param-row {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) 1fr minmax(48px, auto);
+    gap: 10px;
+  }
+
+  .param-label,
+  .param-value {
+    width: auto;
+  }
+
+  .param-slider {
+    height: 8px;
+  }
+
+  .param-slider::-webkit-slider-runnable-track {
+    height: 8px;
+  }
+
+  .param-slider::-webkit-slider-thumb {
+    width: 22px;
+    height: 22px;
+    margin-top: -7px;
+  }
+
+  .param-slider::-moz-range-track {
+    height: 8px;
+  }
+
+  .param-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+  }
+
+  .band-params-body .param-control :deep(.t-input--small) {
+    min-height: var(--mobile-touch-target);
+    border-radius: 12px;
+  }
+
+  .global-gain-header {
+    margin-bottom: 12px;
+  }
 }
 </style>

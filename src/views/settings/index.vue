@@ -776,24 +776,6 @@ const handleSearchSelect = async (item: SearchItem) => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .content-panel :deep(.visual-balance) {
-    font-size: 18px;
-  }
-
-  .content-panel :deep(.effect-card) {
-    padding: 12px;
-  }
-
-  .content-panel :deep(.card-header) {
-    gap: 10px;
-  }
-
-  .content-panel :deep(.card-header .title) {
-    font-size: 14px;
-    line-height: 1.35;
-  }
-
-
   .content-panel :deep(.t-divider) {
     margin: 12px 0;
   }
@@ -806,35 +788,6 @@ const handleSearchSelect = async (item: SearchItem) => {
     margin-bottom: 16px;
   }
 
-  .content-panel :deep(.effects-grid) {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
-  .content-panel :deep(.sliders-container) {
-    height: 200px;
-    padding: 10px 0;
-  }
-
-  .content-panel :deep(.eq-content .controls-row) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .content-panel :deep(.eq-content .preset-controls) {
-    width: 100%;
-  }
-
-  .content-panel :deep(.eq-content .preset-select) {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .content-panel :deep(.eq-content .action-buttons) {
-    width: 100%;
-    justify-content: flex-start;
-  }
 }
 
 .fade-slide-enter-active,
