@@ -353,7 +353,19 @@ jobs:
 
       - name: Build signed Android APK
         id: tauri_build
+        continue-on-error: true
         run: npx tauri android build --apk --ci
+
+      - name: Debug Gradle error
+        if: steps.tauri_build.outcome == 'failure'
+        run: |
+          cd src-tauri/gen/android
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace 2>&1 || true
+
+      - name: Fail if build failed
+        if: steps.tauri_build.outcome == 'failure'
+        run: exit 1
 
       - name: Verify signed Android APKs
         shell: bash
