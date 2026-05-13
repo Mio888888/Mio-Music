@@ -5,6 +5,13 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = "s"
+
 [lints.rust]
 unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
 

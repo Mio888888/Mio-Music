@@ -278,8 +278,26 @@ jobs:
               else:
                   raise SystemExit("Unable to find release build type in generated build.gradle.kts")
 
+          splits_marker = "splits {"
+          if splits_marker not in text:
+              android_block = "android {"
+              if android_block not in text:
+                  raise SystemExit("Unable to find android block in generated build.gradle.kts")
+              splits_block = (
+                  "\n"
+                  "    splits {\n"
+                  "        abi {\n"
+                  "            isEnable = true\n"
+                  "            reset()\n"
+                  '            include("arm64-v8a", "x86_64")\n'
+                  "            isUniversalApk = false\n"
+                  "        }\n"
+                  "    }\n"
+              )
+              text = text.replace(android_block, android_block + splits_block, 1)
+
           gradle_file.write_text(text)
-          print(f"Patched {gradle_file} for release signing")
+          print(f"Patched {gradle_file} for release signing + ABI splits")
           PY
 
       - name: Build signed Android APK
