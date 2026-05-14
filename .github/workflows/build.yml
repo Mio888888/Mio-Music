@@ -201,6 +201,11 @@ jobs:
               raise SystemExit("Generated MainActivity.kt not found")
 
           main_text = main.read_text()
+          if "companion object {" not in main_text:
+              main_text = main_text.replace(
+                  "class MainActivity : TauriActivity() {",
+                  "class MainActivity : TauriActivity() {\n  companion object {\n    init { System.loadLibrary(\"mio_lib\") }\n  }",
+              )
           if "external fun initAndroidContext" not in main_text:
               main_text = main_text.replace(
                   "class MainActivity : TauriActivity() {",

@@ -8,6 +8,12 @@ if (!existsSync(mainPath)) {
 }
 
 let main = readFileSync(mainPath, 'utf8')
+if (!main.includes('companion object {')) {
+  main = main.replace(
+    'class MainActivity : TauriActivity() {',
+    'class MainActivity : TauriActivity() {\n  companion object {\n    init { System.loadLibrary("mio_lib") }\n  }',
+  )
+}
 if (!main.includes('external fun initAndroidContext')) {
   main = main.replace(
     'class MainActivity : TauriActivity() {',
