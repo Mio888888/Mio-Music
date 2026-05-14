@@ -505,31 +505,48 @@ pub fn run() {
 #[cfg(target_os = "android")]
 fn init_ndk_context() {
     use std::os::raw::c_void;
+    use std::ptr;
 
-    // Get JavaVM via JNI_GetCreatedJavaVMs (available on any JNI thread)
-    let mut vm_ptr: *mut c_void = std::ptr::null_mut();
-    let mut count: i32 = 0;
+    // On Android, the jni crate embeds a JNI_OnLoad which stores the JavaVM.
+    // We access it through the JNI invocation interface linked from libart.
+    // Use jni::JavaVM::from_raw via the JNIEnv pointer available on the current thread.
+    // The safe way: get JNIEnv from JNI_GetCreatedJavaVMs through libjvm linkage.
+    // Alternative: directly use the Android JNI invocation function table.
 
-    // SAFETY: called on the JNI thread where Tauri's Activity started us
-    unsafe {
-        let mut raw_vm: *mut jni::sys::JavaVM = std::ptr::null_mut();
-        let rc = jni::sys::JNI_GetCreatedJavaVMs(
-            &mut raw_vm as *mut _ as *mut _,
-            1,
-            &mut count as *mut _ as *mut _,
-        );
-        if rc == 0 && count > 0 && !raw_vm.is_null() {
-            vm_ptr = raw_vm as *mut c_void;
+    // Use JNIEnv::from_raw with the current JNI env pointer
+    // On Android, the current thread is a JNI thread when Tauri calls run()
+    let vm_ptr: *mut c_void = unsafe {
+        // JNIEnv** is available through the JNI invocation interface.
+        // We use a small trick: JavaVM's GetEnv can return the current JNIEnv.
+        // First, get the JavaVM pointer from the JNI bridge.
+        // On Android, JNI_GetCreatedJavaVMs is exported by the ART runtime.
+        let mut vm: *mut jni::sys::JavaVM = ptr::null_mut();
+        let mut n_vms: jni::sys::jsize = 0;
+
+        // Try to find the symbol at runtime via dlsym
+        let handle = libc::dlopen(ptr::null(), libc::RTLD_NOW);
+        if handle.is_null() {
+            eprintln!("[Android] dlopen failed");
+            return;
         }
-    }
+        let sym = libc::dlsym(handle, b"JNI_GetCreatedJavaVMs\0".as_ptr() as *const _);
+        libc::dlclose(handle);
+        if sym.is_null() {
+            eprintln!("[Android] JNI_GetCreatedJavaVMs symbol not found");
+            return;
+        }
+        let get_vms: extern "C" fn(*mut *mut jni::sys::JavaVM, jni::sys::jsize, *mut jni::sys::jsize) -> jni::sys::jint
+            = std::mem::transmute(sym);
+        let rc = get_vms(&mut vm, 1, &mut n_vms);
+        if rc != 0 || n_vms == 0 || vm.is_null() {
+            eprintln!("[Android] JNI_GetCreatedJavaVMs returned no VMs (rc={rc}, n={n_vms})");
+            return;
+        }
+        vm as *mut c_void
+    };
 
-    if vm_ptr.is_null() {
-        eprintln!("[Android] JNI_GetCreatedJavaVMs failed, ndk-context not set");
-        return;
-    }
-
-    // Attach current thread to get JNIEnv, then grab the Activity from the JNI layer
-    let activity_ptr = unsafe {
+    // Get the Activity via JNI
+    let activity_ptr: *mut c_void = unsafe {
         let vm = match jni::JavaVM::from_raw(vm_ptr as *mut _) {
             Ok(v) => v,
             Err(e) => {
@@ -545,29 +562,19 @@ fn init_ndk_context() {
             }
         };
 
-        // Find the current Activity via android.app.ActivityThread.currentActivity()
-        let activity = (|| -> Result<jni::objects::JObject<'_>, String> {
-            let thread_class = env.find_class("android/app/ActivityThread")
-                .map_err(|e| format!("find ActivityThread: {e:?}"))?;
-            let activity = env.call_static_method(
-                &thread_class,
-                "currentActivity",
-                "()Landroid/app/Activity;",
-                &[],
-            ).map_err(|e| format!("currentActivity: {e:?}"))?
-             .l().map_err(|_| "not an object")?;
-            Ok(activity)
+        let activity = (|| -> Option<jni::objects::JObject<'_>> {
+            let cls = env.find_class("android/app/ActivityThread").ok()?;
+            let result = env.call_static_method(
+                &cls, "currentActivity", "()Landroid/app/Activity;", &[],
+            ).ok()?;
+            result.l().ok()
         })();
 
         match activity {
-            Ok(act) => {
-                let global = env.new_global_ref(&act)
-                    .expect("new_global_ref failed");
-                global.as_raw() as *mut c_void
-            }
-            Err(e) => {
-                eprintln!("[Android] could not get Activity: {e}");
-                std::ptr::null_mut()
+            Some(act) => env.new_global_ref(&act).ok()?.as_raw() as *mut c_void,
+            None => {
+                eprintln!("[Android] currentActivity() returned null");
+                ptr::null_mut()
             }
         }
     };

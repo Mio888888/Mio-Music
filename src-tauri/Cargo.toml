@@ -76,6 +76,7 @@ pbkdf2 = "0.12"
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
 ndk-context = "0.1"
 jni = "0.21"
+libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 coreaudio-sys = "0.2"
