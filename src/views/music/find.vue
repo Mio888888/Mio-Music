@@ -349,11 +349,15 @@ onActivated(() => {
   }
 
   .source-state {
-    min-height: auto;
+    min-height: 0;
     margin: 0 var(--mobile-page-gutter) 1rem;
+    overflow-x: hidden;
     overflow-y: auto;
     align-items: flex-start;
-    padding-top: 8px;
+    justify-content: center;
+    padding-top: 10px;
+    padding-bottom: calc(var(--mobile-content-bottom-inset) + 18px);
+    -webkit-overflow-scrolling: touch;
   }
 
   .source-loading {
@@ -363,13 +367,15 @@ onActivated(() => {
   }
 
   .setup-guide {
-    width: auto;
-    padding: 28px 16px 24px;
+    width: 100%;
+    padding: 24px 16px;
     gap: 16px;
     border-radius: var(--mobile-card-radius, 18px);
     max-height: none;
     flex-shrink: 0;
     overflow: visible;
+    box-sizing: border-box;
+    align-items: center;
   }
 
   .setup-orb {
@@ -393,6 +399,7 @@ onActivated(() => {
 
   .setup-actions {
     grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .setup-action-card {
