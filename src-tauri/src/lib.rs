@@ -572,6 +572,6 @@ fn init_ndk_context() {
         }
     };
 
-    ndk_context::initialize_android_context(activity_ptr, vm_ptr);
+    unsafe { ndk_context::initialize_android_context(activity_ptr, vm_ptr); }
     eprintln!("[Android] ndk-context initialized (vm={:?}, activity={:?})", vm_ptr, activity_ptr);
 }
