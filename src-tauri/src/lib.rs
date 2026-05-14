@@ -529,6 +529,6 @@ pub extern "system" fn Java_com_vant_Mio_Music_MainActivity_initAndroidContext(
     let activity_ptr = global_activity.as_obj().as_raw() as *mut c_void;
     std::mem::forget(global_activity);
 
-    unsafe { ndk_context::initialize_android_context(activity_ptr, vm_ptr); }
+    unsafe { ndk_context::initialize_android_context(vm_ptr, activity_ptr); }
     eprintln!("[Android] ndk-context initialized from MainActivity");
 }
