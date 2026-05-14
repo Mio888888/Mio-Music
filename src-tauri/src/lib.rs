@@ -33,6 +33,7 @@ pub fn run() {
     #[cfg(target_os = "android")]
     {
         let _ = rustls::crypto::ring::default_provider().install_default();
+        init_ndk_context();
     }
 
     let builder = tauri::Builder::default()
@@ -499,4 +500,78 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(target_os = "android")]
+fn init_ndk_context() {
+    use std::os::raw::c_void;
+
+    // Get JavaVM via JNI_GetCreatedJavaVMs (available on any JNI thread)
+    let mut vm_ptr: *mut c_void = std::ptr::null_mut();
+    let mut count: i32 = 0;
+
+    // SAFETY: called on the JNI thread where Tauri's Activity started us
+    unsafe {
+        let mut raw_vm: *mut jni::sys::JavaVM = std::ptr::null_mut();
+        let rc = jni::sys::JNI_GetCreatedJavaVMs(
+            &mut raw_vm as *mut _ as *mut _,
+            1,
+            &mut count as *mut _ as *mut _,
+        );
+        if rc == 0 && count > 0 && !raw_vm.is_null() {
+            vm_ptr = raw_vm as *mut c_void;
+        }
+    }
+
+    if vm_ptr.is_null() {
+        eprintln!("[Android] JNI_GetCreatedJavaVMs failed, ndk-context not set");
+        return;
+    }
+
+    // Attach current thread to get JNIEnv, then grab the Activity from the JNI layer
+    let activity_ptr = unsafe {
+        let vm = match jni::JavaVM::from_raw(vm_ptr as *mut _) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[Android] JavaVM::from_raw failed: {e}");
+                return;
+            }
+        };
+        let mut env = match vm.attach_current_thread() {
+            Ok(e) => e,
+            Err(e) => {
+                eprintln!("[Android] attach_current_thread failed: {e}");
+                return;
+            }
+        };
+
+        // Find the current Activity via android.app.ActivityThread.currentActivity()
+        let activity = (|| -> Result<jni::objects::JObject<'_>, String> {
+            let thread_class = env.find_class("android/app/ActivityThread")
+                .map_err(|e| format!("find ActivityThread: {e:?}"))?;
+            let activity = env.call_static_method(
+                &thread_class,
+                "currentActivity",
+                "()Landroid/app/Activity;",
+                &[],
+            ).map_err(|e| format!("currentActivity: {e:?}"))?
+             .l().map_err(|_| "not an object")?;
+            Ok(activity)
+        })();
+
+        match activity {
+            Ok(act) => {
+                let global = env.new_global_ref(&act)
+                    .expect("new_global_ref failed");
+                global.as_raw() as *mut c_void
+            }
+            Err(e) => {
+                eprintln!("[Android] could not get Activity: {e}");
+                std::ptr::null_mut()
+            }
+        }
+    };
+
+    ndk_context::initialize_android_context(activity_ptr, vm_ptr);
+    eprintln!("[Android] ndk-context initialized (vm={:?}, activity={:?})", vm_ptr, activity_ptr);
 }

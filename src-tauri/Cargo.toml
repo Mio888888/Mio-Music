@@ -74,6 +74,8 @@ pbkdf2 = "0.12"
 # Android: install rustls crypto provider before WebView requests arrive
 [target.'cfg(target_os = "android")'.dependencies]
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+ndk-context = "0.1"
+jni = "0.21"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 coreaudio-sys = "0.2"
