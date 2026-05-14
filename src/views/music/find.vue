@@ -352,6 +352,8 @@ onActivated(() => {
     min-height: auto;
     margin: 0 var(--mobile-page-gutter) 1rem;
     overflow-y: auto;
+    align-items: flex-start;
+    padding-top: 8px;
   }
 
   .source-loading {
@@ -362,17 +364,19 @@ onActivated(() => {
 
   .setup-guide {
     width: auto;
-    padding: 24px 16px;
+    padding: 28px 16px 24px;
     gap: 16px;
     border-radius: var(--mobile-card-radius, 18px);
     max-height: none;
-    flex-shrink: 1;
+    flex-shrink: 0;
+    overflow: visible;
   }
 
   .setup-orb {
     width: 60px;
     height: 60px;
     border-radius: 18px;
+    flex: 0 0 auto;
   }
 
   .setup-logo {
