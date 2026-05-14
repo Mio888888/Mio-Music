@@ -1383,22 +1383,37 @@ pub fn create_output_stream() -> Result<(OutputStreamHandle, std::sync::mpsc::Se
     let (handle_tx, handle_rx) = std::sync::mpsc::channel();
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel::<()>();
 
-    std::thread::spawn(move || match OutputStream::try_default() {
-        Ok((_stream, handle)) => {
-            if handle_tx.send(Ok(handle)).is_err() {
-                return;
+    std::thread::spawn(move || {
+        let result = std::panic::catch_unwind(|| OutputStream::try_default());
+        match result {
+            Ok(Ok((_stream, handle))) => {
+                if handle_tx.send(Ok(handle)).is_err() {
+                    return;
+                }
+                let _ = shutdown_rx.recv();
+                drop(_stream);
             }
-            let _ = shutdown_rx.recv();
-            drop(_stream);
-        }
-        Err(e) => {
-            let _ = handle_tx.send(Err(format!("{e}")));
+            Ok(Err(e)) => {
+                let _ = handle_tx.send(Err(format!("{e}")));
+            }
+            Err(panic_val) => {
+                let msg = if let Some(s) = panic_val.downcast_ref::<String>() {
+                    s.clone()
+                } else if let Some(s) = panic_val.downcast_ref::<&str>() {
+                    s.to_string()
+                } else {
+                    "音频输出初始化 panic".to_string()
+                };
+                let _ = handle_tx.send(Err(msg));
+            }
         }
     });
 
+    let timeout = Duration::from_secs(5);
     let handle = handle_rx
-        .recv()
-        .map_err(|e| format!("音频线程通信失败: {e}"))??;
+        .recv_timeout(timeout)
+        .map_err(|e| format!("音频输出初始化超时({}s): {e}", timeout.as_secs()))?
+        .map_err(|e| format!("{e}"))?;
     Ok((handle, shutdown_tx))
 }
 

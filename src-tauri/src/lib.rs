@@ -136,11 +136,28 @@ pub fn run() {
             });
         })
         .setup(|app| {
-            let app_data_dir = app.path().app_data_dir()
-                .expect("Failed to resolve app data directory");
+            let app_data_dir = match app.path().app_data_dir() {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!("获取应用数据目录失败: {e}");
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("获取应用数据目录失败: {e}"),
+                    )) as Box<dyn std::error::Error>);
+                }
+            };
             db::set_app_data_dir(app_data_dir.clone());
 
-            let app_db = AppDb::new(&app_data_dir).expect("Failed to initialize databases");
+            let app_db = match AppDb::new(&app_data_dir) {
+                Ok(db) => db,
+                Err(e) => {
+                    eprintln!("数据库初始化失败: {e}");
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("数据库初始化失败: {e}"),
+                    )) as Box<dyn std::error::Error>);
+                }
+            };
             app.manage(app_db);
 
             let plugin_manager = PluginManager::new(&app_data_dir);
@@ -162,7 +179,16 @@ pub fn run() {
             #[cfg(target_os = "linux")]
             let win_builder = win_builder.decorations(false);
 
-            let _window = win_builder.build().expect("Failed to create main window");
+            let _window = match win_builder.build() {
+                Ok(w) => w,
+                Err(e) => {
+                    eprintln!("创建窗口失败: {e}");
+                    return Err(Box::new(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("创建窗口失败: {e}"),
+                    )) as Box<dyn std::error::Error>);
+                }
+            };
 
             #[cfg(target_os = "macos")]
             {
