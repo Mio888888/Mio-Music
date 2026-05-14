@@ -349,8 +349,9 @@ onActivated(() => {
   }
 
   .source-state {
-    min-height: 280px;
+    min-height: auto;
     margin: 0 var(--mobile-page-gutter) 1rem;
+    overflow-y: auto;
   }
 
   .source-loading {
@@ -361,9 +362,11 @@ onActivated(() => {
 
   .setup-guide {
     width: auto;
-    padding: 28px 18px;
-    gap: 20px;
+    padding: 24px 16px;
+    gap: 16px;
     border-radius: var(--mobile-card-radius, 18px);
+    max-height: none;
+    flex-shrink: 1;
   }
 
   .setup-orb {
@@ -390,8 +393,21 @@ onActivated(() => {
 
   .setup-action-card {
     min-height: auto;
-    padding: 18px;
+    padding: 14px;
+    gap: 12px;
     text-align: center;
+  }
+
+  .setup-action-card h4 {
+    font-size: 0.95rem;
+  }
+
+  .setup-action-card p {
+    font-size: 0.8rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .setup-action-card :deep(.t-button) {
