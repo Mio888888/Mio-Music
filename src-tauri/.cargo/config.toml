@@ -1,0 +1,12 @@
+# Link C++ standard library statically for Android (oboe-sys, libsqlite3-sys)
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-args=-lc++_static"]
+
+[target.x86_64-linux-android]
+rustflags = ["-C", "link-args=-lc++_static"]
+
+[target.armv7-linux-androideabi]
+rustflags = ["-C", "link-args=-lc++_static"]
+
+[target.i686-linux-android]
+rustflags = ["-C", "link-args=-lc++_static"]
