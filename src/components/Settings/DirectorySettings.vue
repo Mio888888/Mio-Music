@@ -1,9 +1,9 @@
 <template>
   <div class="directory-settings">
-    <t-card :title="t('settings.storage.directoryConfig')" hover-shadow>
-      <template #actions>
+      <div class="section-header">
+        <span class="section-title">{{ t('settings.storage.directoryConfig') }}</span>
         <t-button theme="default" size="small" @click="resetDirectories"> {{ t('settings.storage.resetToDefault') }} </t-button>
-      </template>
+      </div>
 
       <div class="directory-section">
         <h4>{{ t('settings.storage.cacheDirectory') }}</h4>
@@ -70,7 +70,6 @@
           {{ t('settings.storage.saveSettings') }}
         </t-button>
       </div>
-    </t-card>
   </div>
 </template>
 
@@ -263,6 +262,23 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--td-border-level-1-color);
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  white-space: nowrap;
 }
 
 .directory-section {

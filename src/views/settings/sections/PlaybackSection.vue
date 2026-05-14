@@ -24,7 +24,7 @@ const { settings } = storeToRefs(settingsStore)
 
     <div id="playback-audio-output" class="setting-group">
       <h3>{{ t('settings.playback.audioOutput') }}</h3>
-      <AudioOutputSettings />
+      <AudioOutputSettings embedded />
     </div>
 
     <div id="playback-dlna" class="setting-group">

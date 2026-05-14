@@ -69,7 +69,7 @@ function getSceneProfile(width: number, height: number): SceneProfile {
 
   return {
     isMobile,
-    textScale: 0.055 * narrowScale,
+    textScale: 0.04 * narrowScale,
     textParticleStep: shortSide <= 360 ? 3 : 2,
     bgParticleCount: shortSide <= 360 ? 360 : 480,
     bgSpread: 58,

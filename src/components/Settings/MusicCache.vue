@@ -1,15 +1,18 @@
 <template>
   <div class="music-cache">
-    <t-card hover-shadow :loading="cacheInfo.clearing" :title="t('settings.storage.localCacheConfig')">
-      <template #actions>
-        {{ t('settings.storage.existingCacheSize') }}{{ cacheInfo.sizeFormatted || '0 B' }}
-        <span v-if="cacheInfo.count > 0">（{{ t('settings.storage.fileCount', { count: cacheInfo.count }) }}）</span>
-      </template>
+      <div class="card-header">
+        <span class="card-title">{{ t('settings.storage.localCacheConfig') }}</span>
+        <span class="cache-stats">
+          {{ t('settings.storage.existingCacheSize') }}{{ cacheInfo.sizeFormatted || '0 B' }}
+          <span v-if="cacheInfo.count > 0">（{{ t('settings.storage.fileCount', { count: cacheInfo.count }) }}）</span>
+        </span>
+      </div>
       <div class="card-body">
         <t-button
           size="large"
           :loading="cacheInfo.clearing"
           :disabled="!cacheInfo.count || cacheInfo.count === 0"
+          block
           @click="clearCache"
         >
           {{ cacheInfo.clearing ? t('settings.storage.clearingCache') : t('settings.storage.clearLocalCache') }}
@@ -18,7 +21,6 @@
           {{ t('settings.storage.noCache') }}
         </div>
       </div>
-    </t-card>
   </div>
 </template>
 
@@ -151,14 +153,66 @@ defineExpose({
 .music-cache {
   width: 100%;
 
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--td-border-level-1-color);
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--td-text-color-primary);
+    white-space: nowrap;
+  }
+
+  .cache-stats {
+    font-size: 13px;
+    color: var(--td-text-color-secondary);
+    white-space: nowrap;
+    text-align: right;
+  }
+
   .card-body {
-    padding: 20px;
+    padding: 4px 0 0;
     text-align: center;
 
     .no-cache-tip {
       margin-top: 10px;
       color: var(--td-text-color-placeholder);
       font-size: 14px;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .music-cache {
+    .card-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 15px;
+    }
+
+    .cache-stats {
+      font-size: 12px;
+      white-space: normal;
+      text-align: left;
+    }
+
+    .card-body {
+      :deep(.t-button) {
+        width: 100%;
+      }
     }
   }
 }

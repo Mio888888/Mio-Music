@@ -243,7 +243,7 @@ watch(
 <template>
   <div class="playlist-settings">
     <div class="playlist-stats-card">
-      <t-card :title="t('settings.playlist.stats')" hover-shadow>
+      <div class="section-title">{{ t('settings.playlist.stats') }}</div>
         <div class="stats-content">
           <div class="stat-item">
             <t-icon name="play" />
@@ -269,11 +269,10 @@ watch(
             </div>
           </div>
         </div>
-      </t-card>
     </div>
 
     <div class="playlist-actions-card">
-      <t-card :title="t('settings.playlist.management')" hover-shadow>
+      <div class="section-title">{{ t('settings.playlist.management') }}</div>
         <div class="action-buttons">
           <t-button theme="primary" @click="exportDialogVisible = true">
             <template #icon>
@@ -305,7 +304,6 @@ watch(
             <li>{{ t('settings.playlist.clearDesc') }}</li>
           </ul>
         </div>
-      </t-card>
     </div>
 
     <!-- 导出对话框 -->
@@ -416,6 +414,13 @@ watch(
 <style lang="scss" scoped>
 .playlist-settings {
   margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  margin-bottom: 12px;
 }
 
 .playlist-stats-card,

@@ -8,7 +8,7 @@
       :class="{ embedded: embedded }"
     >
       <div v-if="embedded" class="embedded-header">
-        <span class="embedded-title"></span>
+        <span class="embedded-title">{{ t('settings.audioOutput.title') }}</span>
         <t-button variant="text" shape="circle" :loading="store.isLoading" @click="handleRefresh">
           <template #icon><RefreshIcon /></template>
         </t-button>
