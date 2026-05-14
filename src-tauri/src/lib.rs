@@ -504,7 +504,7 @@ pub fn run() {
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_com_vant_Mio_Music_Rust_initAndroidContext(
-    mut env: jni::JNIEnv,
+    env: jni::JNIEnv,
     _class: jni::objects::JClass,
     activity: jni::objects::JObject,
 ) {
