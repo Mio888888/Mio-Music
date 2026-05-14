@@ -507,23 +507,9 @@ fn init_ndk_context() {
     use std::os::raw::c_void;
     use std::ptr;
 
-    // On Android, the jni crate embeds a JNI_OnLoad which stores the JavaVM.
-    // We access it through the JNI invocation interface linked from libart.
-    // Use jni::JavaVM::from_raw via the JNIEnv pointer available on the current thread.
-    // The safe way: get JNIEnv from JNI_GetCreatedJavaVMs through libjvm linkage.
-    // Alternative: directly use the Android JNI invocation function table.
-
-    // Use JNIEnv::from_raw with the current JNI env pointer
-    // On Android, the current thread is a JNI thread when Tauri calls run()
     let vm_ptr: *mut c_void = unsafe {
-        // JNIEnv** is available through the JNI invocation interface.
-        // We use a small trick: JavaVM's GetEnv can return the current JNIEnv.
-        // First, get the JavaVM pointer from the JNI bridge.
-        // On Android, JNI_GetCreatedJavaVMs is exported by the ART runtime.
         let mut vm: *mut jni::sys::JavaVM = ptr::null_mut();
         let mut n_vms: jni::sys::jsize = 0;
-
-        // Try to find the symbol at runtime via dlsym
         let handle = libc::dlopen(ptr::null(), libc::RTLD_NOW);
         if handle.is_null() {
             eprintln!("[Android] dlopen failed");
@@ -545,46 +531,7 @@ fn init_ndk_context() {
         vm as *mut c_void
     };
 
-    // Get the Activity via JNI
-    let activity_ptr: *mut c_void = unsafe {
-        let vm = match jni::JavaVM::from_raw(vm_ptr as *mut _) {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("[Android] JavaVM::from_raw failed: {e}");
-                return;
-            }
-        };
-        let mut env = match vm.attach_current_thread() {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("[Android] attach_current_thread failed: {e}");
-                return;
-            }
-        };
-
-        let activity = (|| -> Option<jni::objects::JObject<'_>> {
-            let cls = env.find_class("android/app/ActivityThread").ok()?;
-            let result = env.call_static_method(
-                &cls, "currentActivity", "()Landroid/app/Activity;", &[],
-            ).ok()?;
-            result.l().ok()
-        })();
-
-        match activity {
-            Some(act) => match env.new_global_ref(&act) {
-                Ok(global) => global.as_raw() as *mut c_void,
-                Err(e) => {
-                    eprintln!("[Android] new_global_ref failed: {e}");
-                    ptr::null_mut()
-                }
-            },
-            None => {
-                eprintln!("[Android] currentActivity() returned null");
-                ptr::null_mut()
-            }
-        }
-    };
-
-    unsafe { ndk_context::initialize_android_context(activity_ptr, vm_ptr); }
-    eprintln!("[Android] ndk-context initialized (vm={:?}, activity={:?})", vm_ptr, activity_ptr);
+    // oboe only needs the JavaVM; activity pointer can be null
+    unsafe { ndk_context::initialize_android_context(ptr::null_mut(), vm_ptr); }
+    eprintln!("[Android] ndk-context initialized vm={:?}", vm_ptr);
 }
