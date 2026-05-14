@@ -71,7 +71,12 @@ const clearTimer = () => {
   }
 }
 
-const handleMouseDown = (e: MouseEvent) => {
+const getTouchXY = (e: TouchEvent) => {
+  const t = e.touches[0] || e.changedTouches[0]
+  return { clientX: t.clientX, clientY: t.clientY }
+}
+
+const startDrag = (clientX: number, clientY: number) => {
   if (showAskWindow.value) return
 
   isDragging.value = true
@@ -81,22 +86,18 @@ const handleMouseDown = (e: MouseEvent) => {
   const rect = ball.value?.getBoundingClientRect()
   if (rect) {
     dragOffset.value = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: clientX - rect.left,
+      y: clientY - rect.top
     }
   }
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-  e.preventDefault()
 }
 
-const handleMouseMove = (e: MouseEvent) => {
+const moveDrag = (clientX: number, clientY: number) => {
   if (!isDragging.value) return
   hasDragged.value = true
 
-  const x = e.clientX - dragOffset.value.x
-  const y = e.clientY - dragOffset.value.y
+  const x = clientX - dragOffset.value.x
+  const y = clientY - dragOffset.value.y
 
   const maxX = windowSize.value.width - 120
   const maxY = windowSize.value.height - 176
@@ -108,12 +109,10 @@ const handleMouseMove = (e: MouseEvent) => {
   }
 }
 
-const handleMouseUp = () => {
+const endDrag = () => {
   if (!isDragging.value) return
 
   isDragging.value = false
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', handleMouseUp)
 
   if (hasDragged.value) {
     const centerX = ballPosition.value.x + 60
@@ -132,6 +131,44 @@ const handleMouseUp = () => {
     clearTimer()
     startAutoHide()
   }
+}
+
+const handleMouseDown = (e: MouseEvent) => {
+  startDrag(e.clientX, e.clientY)
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+  e.preventDefault()
+}
+
+const handleMouseMove = (e: MouseEvent) => {
+  moveDrag(e.clientX, e.clientY)
+}
+
+const handleMouseUp = () => {
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', handleMouseUp)
+  endDrag()
+}
+
+const handleTouchStart = (e: TouchEvent) => {
+  const { clientX, clientY } = getTouchXY(e)
+  startDrag(clientX, clientY)
+  document.addEventListener('touchmove', handleTouchMove, { passive: false })
+  document.addEventListener('touchend', handleTouchEnd)
+  document.addEventListener('touchcancel', handleTouchEnd)
+}
+
+const handleTouchMove = (e: TouchEvent) => {
+  e.preventDefault()
+  const { clientX, clientY } = getTouchXY(e)
+  moveDrag(clientX, clientY)
+}
+
+const handleTouchEnd = () => {
+  document.removeEventListener('touchmove', handleTouchMove)
+  document.removeEventListener('touchend', handleTouchEnd)
+  document.removeEventListener('touchcancel', handleTouchEnd)
+  endDrag()
 }
 
 const checkAPIKey = async (): Promise<boolean> => {
@@ -155,9 +192,10 @@ const clearErrorMessages = () => {
   messages.value = messages.value.filter((msg) => msg.type !== 'error')
 }
 
-const handleBallClick = async () => {
+const handleBallClick = async (e?: MouseEvent | TouchEvent) => {
   if (hasDragged.value) {
     hasDragged.value = false
+    e?.preventDefault()
     return
   }
 
@@ -389,6 +427,9 @@ onBeforeUnmount(() => {
   clearTimer()
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', handleMouseUp)
+  document.removeEventListener('touchmove', handleTouchMove)
+  document.removeEventListener('touchend', handleTouchEnd)
+  document.removeEventListener('touchcancel', handleTouchEnd)
   window.removeEventListener('resize', handleResize)
   saveBallPosition()
 })
@@ -411,6 +452,7 @@ onBeforeUnmount(() => {
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
         @mousedown="handleMouseDown"
+        @touchstart="handleTouchStart"
       >
         <div
           class="float-ball"
@@ -500,6 +542,7 @@ onBeforeUnmount(() => {
   transition: opacity var(--motion-duration-quick) var(--motion-ease-standard),
               transform var(--motion-duration-quick) var(--motion-ease-standard);
   user-select: none;
+  touch-action: none;
 }
 
 .float-ball {
