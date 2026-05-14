@@ -516,13 +516,15 @@ const handleSearchSelect = async (item: SearchItem) => {
 
   .sidebar {
     width: 100%;
+    max-width: 100%;
     max-height: none;
     flex: 0 0 auto;
     padding: 6px var(--mobile-page-gutter) 8px;
     background: transparent;
     border-bottom: none;
-    overflow: visible;
+    overflow: hidden;
     position: relative;
+    box-sizing: border-box;
   }
 
   .sidebar::before,
@@ -553,19 +555,30 @@ const handleSearchSelect = async (item: SearchItem) => {
   .sidebar .sidebar-nav {
     display: flex;
     gap: 6px;
+    width: 100%;
+    max-width: 100%;
     overflow-x: auto;
-    padding: 2px 0;
+    overflow-y: hidden;
+    padding: 2px 0 6px;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x proximity;
     scrollbar-width: none;
+    scrollbar-gutter: stable;
+    box-sizing: border-box;
+  }
+
+  .sidebar .sidebar-nav::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 
   .sidebar .nav-item {
-    min-width: auto;
+    min-width: 0;
     flex: 0 0 auto;
     min-height: var(--mobile-touch-target);
     margin: 0;
-    padding: 0 14px;
+    padding: 0 12px;
     border: 1px solid var(--mobile-glass-border);
     border-radius: 20px;
     background: var(--mobile-glass-bg);
@@ -612,6 +625,7 @@ const handleSearchSelect = async (item: SearchItem) => {
     margin: 0;
     font-size: 13px;
     white-space: nowrap;
+    line-height: 1;
   }
 
   .content-panel {
