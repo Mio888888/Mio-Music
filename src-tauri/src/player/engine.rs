@@ -865,6 +865,21 @@ impl PlayerEngine {
         }
     }
 
+    /// Try to (re-)initialize audio output if not already available.
+    fn ensure_stream_handle(&mut self) -> Result<(), String> {
+        if self.stream_handle.is_some() {
+            return Ok(());
+        }
+        match create_output_stream() {
+            Ok((handle, shutdown_tx)) => {
+                self.stream_handle = Some(handle);
+                self.shutdown_tx = Some(shutdown_tx);
+                Ok(())
+            }
+            Err(e) => Err(format!("音频输出不可用: {e}")),
+        }
+    }
+
     /// 异步播放：在后台线程下载 + 解码，完成后自动赋值 primary 并发出事件
     pub fn play_async(
         &mut self,
@@ -877,10 +892,8 @@ impl PlayerEngine {
         self.crossfade = None;
         self.ended_emitted = false;
 
-        let stream_handle = match self.stream_handle.clone() {
-            Some(h) => h,
-            None => return Err("音频输出不可用".into()),
-        };
+        self.ensure_stream_handle()?;
+        let stream_handle = self.stream_handle.clone().unwrap();
         let url = url.to_string();
         let volume = self.volume / 100.0;
         let eq_settings = self.eq_settings.clone();
@@ -977,10 +990,10 @@ impl PlayerEngine {
         };
 
         // 强制使用 symphonia 解码器（支持 seek）
-        let handle = match self.stream_handle.as_ref() {
-            Some(h) => h,
-            None => return,
-        };
+        if self.ensure_stream_handle().is_err() {
+            return;
+        }
+        let handle = self.stream_handle.as_ref().unwrap();
         let new_pipeline =
             match Self::build_pipeline_symphonia(handle, &file_path, &url, volume) {
                 Ok(p) => p,
@@ -1054,8 +1067,9 @@ impl PlayerEngine {
 
     pub fn crossfade_to(&mut self, url: &str, duration_ms: u64) -> Result<(), String> {
         let file_path = resolve_audio_file(url)?;
-        let handle = self.stream_handle.as_ref().ok_or("音频输出不可用")?;
-        let pipeline = SlotPipeline::from_file(handle, &file_path, url, 0.0)?;
+        self.ensure_stream_handle()?;
+        let handle = self.stream_handle.as_ref().unwrap();
+        let pipeline = SlotPipeline::from_file(&handle, &file_path, url, 0.0)?;
         pipeline.apply_eq_settings(&self.eq_settings);
         self.secondary = Some(pipeline);
         self.crossfade = Some(CrossfadeState {
@@ -1111,9 +1125,9 @@ impl PlayerEngine {
         // 清除旧的预加载
         self.secondary = None;
 
-        let stream_handle = match self.stream_handle.clone() {
-            Some(h) => h,
-            None => return,
+        let stream_handle = match self.ensure_stream_handle() {
+            Ok(()) => self.stream_handle.clone().unwrap(),
+            Err(_) => return,
         };
         let tx = self.preload_tx.clone();
         let cache_dir = self.cache_dir.clone();
