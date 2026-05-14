@@ -1,12 +1,15 @@
 /**
  * 图片 URL 代理工具。
  *
- * 默认保留远程 HTTP(S) 原始链接，只有在图片加载 / 像素读取失败时，
- * 才转换为 imgproxy:// 自定义协议交给 Tauri Rust 后端兜底。
+ * 桌面端：保留原始 HTTP(S) 链接，加载失败时通过 imgproxy:// 兜底。
+ * 移动端（Android）：主动将所有外部图片转为 imgproxy:// 协议，
+ *   因为 Android WebView origin 为 https://tauri.localhost，
+ *   音乐 CDN 会拒绝非本站 Referer 的图片请求。
  */
 
 const PROXY_PREFIX = 'imgproxy://localhost/'
 const FALLBACK_MARK = 'imageProxyFallbackApplied'
+const isMobile = /android|iphone|ipad/i.test(navigator.userAgent)
 
 export function isProxiedImageUrl(url: string): boolean {
   return url.startsWith(PROXY_PREFIX) || url.startsWith('imgproxy://')
@@ -33,7 +36,6 @@ export function getOriginalImageUrl(url: string): string {
 
 /**
  * 将外部图片 URL 转为 imgproxy:// 自定义协议 URL。
- * 仅用于失败兜底，不应在数据进入前端时提前重写。
  */
 export function proxyImageUrl(url: string): string {
   if (!canProxyImageUrl(url)) return url
@@ -45,6 +47,18 @@ export function proxyImageUrl(url: string): string {
  */
 export function directImageUrl(url: string): string {
   return getOriginalImageUrl(url)
+}
+
+/**
+ * 根据平台解析图片 URL：
+ * - 移动端：外部图片主动转为 imgproxy:// 协议
+ * - 桌面端：返回原始直链
+ */
+export function resolveImageUrl(url: string): string {
+  if (!isMobile) return directImageUrl(url)
+  if (isProxiedImageUrl(url)) return url
+  if (canProxyImageUrl(url)) return proxyImageUrl(url)
+  return url
 }
 
 const IMAGE_FIELDS = ['img', 'avatar', 'cover', 'pic', 'imgUrl', 'coverUrl', 'picUrl', 'albumImg'] as const
@@ -60,7 +74,7 @@ export function rewriteImageUrls(obj: unknown): unknown {
   const record = obj as Record<string, unknown>
   for (const field of IMAGE_FIELDS) {
     if (typeof record[field] === 'string') {
-      record[field] = directImageUrl(record[field] as string)
+      record[field] = resolveImageUrl(record[field] as string)
     }
   }
   for (const key of Object.keys(record)) {

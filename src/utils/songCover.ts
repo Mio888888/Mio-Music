@@ -1,6 +1,6 @@
 import { musicSdk, type MusicItem } from '@/services/musicSdk'
 import type { SongList } from '@/types/audio'
-import { directImageUrl } from '@/utils/imageProxy'
+import { resolveImageUrl } from '@/utils/imageProxy'
 
 type CoverSong = Pick<SongList, 'songmid' | 'source'> & { img?: string; name?: string; singer?: string }
 
@@ -23,7 +23,7 @@ async function resolveCoverUrl<T extends CoverSong>(song: T, loadCover: (song: T
   const request = (async () => {
     try {
       const url = await loadCover(song)
-      const normalized = typeof url === 'string' && url ? directImageUrl(url) : null
+      const normalized = typeof url === 'string' && url ? resolveImageUrl(url) : null
       if (normalized) coverUrlCache.set(key, normalized)
       return normalized
     } catch (error) {
