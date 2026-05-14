@@ -71,6 +71,10 @@ hmac = "0.12"
 aes-gcm = "0.10"
 pbkdf2 = "0.12"
 
+# Android: install rustls crypto provider before WebView requests arrive
+[target.'cfg(target_os = "android")'.dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 coreaudio-sys = "0.2"
 core-foundation-sys = "0.8"

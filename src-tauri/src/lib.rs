@@ -29,6 +29,12 @@ pub fn run() {
         eprintln!("[PANIC] {}", info);
     }));
 
+    // Android: install rustls crypto provider before WebView sends any request
+    #[cfg(target_os = "android")]
+    {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
