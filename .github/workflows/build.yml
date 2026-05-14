@@ -191,6 +191,33 @@ jobs:
       - name: Initialize Android project
         run: npx tauri android init
 
+      - name: Patch Android native audio context bridge
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          main = Path("src-tauri/gen/android/app/src/main/java/com/vant/Mio/Music/MainActivity.kt")
+          rust = Path("src-tauri/gen/android/app/src/main/java/com/vant/Mio/Music/generated/Rust.kt")
+          if not main.exists() or not rust.exists():
+              raise SystemExit("Generated Android Kotlin files not found")
+
+          main_text = main.read_text()
+          if "Rust.initAndroidContext(this)" not in main_text:
+              main_text = main_text.replace(
+                  "  override fun onCreate(savedInstanceState: Bundle?) {\n    enableEdgeToEdge()",
+                  "  override fun onCreate(savedInstanceState: Bundle?) {\n    Rust.initAndroidContext(this)\n    enableEdgeToEdge()",
+              )
+              main.write_text(main_text)
+
+          rust_text = rust.read_text()
+          if "initAndroidContext" not in rust_text:
+              rust_text = rust_text.replace(
+                  "    @JvmStatic external fun onActivityCreate(activity: WryActivity)\n",
+                  "    @JvmStatic external fun initAndroidContext(activity: android.app.Activity)\n    @JvmStatic external fun onActivityCreate(activity: WryActivity)\n",
+              )
+              rust.write_text(rust_text)
+          PY
+
       - name: Add Android permissions
         run: |
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"

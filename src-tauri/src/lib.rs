@@ -33,7 +33,6 @@ pub fn run() {
     #[cfg(target_os = "android")]
     {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        init_ndk_context();
     }
 
     let builder = tauri::Builder::default()
@@ -503,35 +502,33 @@ pub fn run() {
 }
 
 #[cfg(target_os = "android")]
-fn init_ndk_context() {
+#[no_mangle]
+pub extern "system" fn Java_com_vant_Mio_Music_Rust_initAndroidContext(
+    mut env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+    activity: jni::objects::JObject,
+) {
     use std::os::raw::c_void;
-    use std::ptr;
 
-    let vm_ptr: *mut c_void = unsafe {
-        let mut vm: *mut jni::sys::JavaVM = ptr::null_mut();
-        let mut n_vms: jni::sys::jsize = 0;
-        let handle = libc::dlopen(ptr::null(), libc::RTLD_NOW);
-        if handle.is_null() {
-            eprintln!("[Android] dlopen failed");
+    let vm = match env.get_java_vm() {
+        Ok(vm) => vm,
+        Err(e) => {
+            eprintln!("[Android] get_java_vm failed: {e}");
             return;
         }
-        let sym = libc::dlsym(handle, b"JNI_GetCreatedJavaVMs\0".as_ptr() as *const _);
-        libc::dlclose(handle);
-        if sym.is_null() {
-            eprintln!("[Android] JNI_GetCreatedJavaVMs symbol not found");
+    };
+    let global_activity = match env.new_global_ref(&activity) {
+        Ok(activity) => activity,
+        Err(e) => {
+            eprintln!("[Android] new_global_ref(activity) failed: {e}");
             return;
         }
-        let get_vms: extern "C" fn(*mut *mut jni::sys::JavaVM, jni::sys::jsize, *mut jni::sys::jsize) -> jni::sys::jint
-            = std::mem::transmute(sym);
-        let rc = get_vms(&mut vm, 1, &mut n_vms);
-        if rc != 0 || n_vms == 0 || vm.is_null() {
-            eprintln!("[Android] JNI_GetCreatedJavaVMs returned no VMs (rc={rc}, n={n_vms})");
-            return;
-        }
-        vm as *mut c_void
     };
 
-    // oboe only needs the JavaVM; activity pointer can be null
-    unsafe { ndk_context::initialize_android_context(ptr::null_mut(), vm_ptr); }
-    eprintln!("[Android] ndk-context initialized vm={:?}", vm_ptr);
+    let vm_ptr = vm.get_java_vm_pointer() as *mut c_void;
+    let activity_ptr = global_activity.as_obj().as_raw() as *mut c_void;
+    std::mem::forget(global_activity);
+
+    unsafe { ndk_context::initialize_android_context(activity_ptr, vm_ptr); }
+    eprintln!("[Android] ndk-context initialized from MainActivity");
 }
