@@ -109,6 +109,7 @@
       :header="t('settings.plugin.addPlugin')"
       :confirm-btn="{ content: t('common.confirm') }"
       :cancel-btn="{ content: t('common.cancel') }"
+      attach="body"
       @confirm="doImport"
     >
       <div class="add-plugin-form">
@@ -208,6 +209,7 @@
       :header="t('settings.plugin.configTitle', { name: configPluginName })"
       :confirm-btn="{ content: t('common.save') }"
       :cancel-btn="{ content: t('common.cancel') }"
+      attach="body"
       @confirm="doSaveConfig"
     >
       <div class="config-form">

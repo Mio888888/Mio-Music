@@ -65,7 +65,7 @@ onActivated(() => {
 
 <template>
   <div class="find-container" :aria-busy="isCheckingSourceState">
-    <div class="page-header">
+    <div v-show="!shouldShowSetupGuide" class="page-header">
       <h2>{{ t('music.find.title') }}</h2>
       <p>{{ t('music.find.subtitle') }}</p>
     </div>
@@ -74,30 +74,32 @@ onActivated(() => {
       <t-loading size="large" :text="t('music.find.checkingSource')" />
     </div>
 
-    <div v-else-if="shouldShowSetupGuide" class="source-state setup-guide" aria-labelledby="source-setup-title">
-      <div class="setup-orb" aria-hidden="true">
-        <img class="setup-logo" src="/icon.png" alt="" />
-      </div>
-      <div class="setup-copy">
-        <h3 id="source-setup-title">{{ t('music.find.configGuide') }}</h3>
-        <p>{{ t('music.find.guideDescription') }}</p>
-      </div>
-      <div class="setup-actions">
-        <div class="setup-action-card primary-card">
-          <div>
-            <h4>{{ t('music.find.configSubsonic') }}</h4>
-            <p>{{ t('music.find.subsonicDesc') }}</p>
-          </div>
-          <t-button theme="primary" @click="goMusicSettings">{{ t('music.find.goToSourceSettings') }}</t-button>
+    <div v-else-if="shouldShowSetupGuide" class="source-state setup-state" aria-labelledby="source-setup-title">
+      <section class="setup-guide">
+        <div class="setup-orb" aria-hidden="true">
+          <img class="setup-logo" src="/icon.png" alt="" />
         </div>
-        <div class="setup-action-card">
-          <div>
-            <h4>{{ t('music.find.installPlugin') }}</h4>
-            <p>{{ t('music.find.installPluginDesc') }}</p>
-          </div>
-          <t-button variant="outline" @click="goPluginSettings">{{ t('music.find.goToPluginManage') }}</t-button>
+        <div class="setup-copy">
+          <h3 id="source-setup-title">{{ t('music.find.configGuide') }}</h3>
+          <p>{{ t('music.find.guideDescription') }}</p>
         </div>
-      </div>
+        <div class="setup-actions">
+          <div class="setup-action-card primary-card">
+            <div>
+              <h4>{{ t('music.find.configSubsonic') }}</h4>
+              <p>{{ t('music.find.subsonicDesc') }}</p>
+            </div>
+            <t-button theme="primary" @click="goMusicSettings">{{ t('music.find.goToSourceSettings') }}</t-button>
+          </div>
+          <div class="setup-action-card">
+            <div>
+              <h4>{{ t('music.find.installPlugin') }}</h4>
+              <p>{{ t('music.find.installPluginDesc') }}</p>
+            </div>
+            <t-button variant="outline" @click="goPluginSettings">{{ t('music.find.goToPluginManage') }}</t-button>
+          </div>
+        </div>
+      </section>
     </div>
 
     <template v-else>
@@ -204,7 +206,7 @@ onActivated(() => {
 
 .source-state {
   flex: 1;
-  min-height: 320px;
+  min-height: 0;
   margin: 0 2rem 1rem;
   display: flex;
   align-items: center;
@@ -212,18 +214,27 @@ onActivated(() => {
 }
 
 .source-loading {
+  min-height: 320px;
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 16px;
   background: var(--td-bg-color-container);
 }
 
+.setup-state {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 24px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
 .setup-guide {
-  max-width: 880px;
-  align-self: center;
-  width: calc(100% - 4rem);
-  padding: 40px;
+  width: min(880px, 100%);
+  max-width: 100%;
+  margin: auto;
+  padding: clamp(24px, 4vw, 40px);
+  display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: clamp(16px, 3vw, 24px);
   text-align: center;
   border: 1px dashed var(--td-border-level-1-color);
   border-radius: 20px;
@@ -351,29 +362,28 @@ onActivated(() => {
   .source-state {
     min-height: 0;
     margin: 0 var(--mobile-page-gutter) 1rem;
-    overflow-x: hidden;
-    overflow-y: auto;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 10px;
-    padding-bottom: calc(var(--mobile-content-bottom-inset) + 18px);
-    -webkit-overflow-scrolling: touch;
   }
 
   .source-loading {
+    min-height: 220px;
     border-radius: var(--mobile-card-radius, 16px);
     background: var(--mobile-glass-bg-strong);
     border: 0.5px solid var(--mobile-glass-border);
   }
 
+  .setup-state {
+    align-items: stretch;
+    justify-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   .setup-guide {
     width: 100%;
-    padding: 24px 16px;
-    gap: 16px;
+    padding: clamp(16px, 5vw, 24px);
+    gap: clamp(12px, 3.5vw, 16px);
     border-radius: var(--mobile-card-radius, 18px);
-    max-height: none;
-    flex-shrink: 0;
-    overflow: visible;
     box-sizing: border-box;
     align-items: center;
   }
@@ -414,16 +424,56 @@ onActivated(() => {
   }
 
   .setup-action-card p {
-    font-size: 0.8rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    font-size: 0.82rem;
   }
 
   .setup-action-card :deep(.t-button) {
     width: 100%;
     min-height: var(--mobile-touch-target);
+  }
+}
+
+@media (max-width: 768px) and (max-height: 640px) {
+  .setup-state {
+    padding-top: 6px;
+  }
+
+  .setup-guide {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .setup-orb {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .setup-logo {
+    border-radius: 14px;
+  }
+
+  .setup-copy h3 {
+    margin-bottom: 6px;
+    font-size: 1.08rem;
+  }
+
+  .setup-copy p {
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .setup-action-card {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .setup-action-card h4 {
+    margin-bottom: 4px;
+  }
+
+  .setup-action-card p {
+    line-height: 1.45;
   }
 }
 </style>

@@ -203,7 +203,7 @@ const handleKeyDown = () => {
 
             <div class="search-container">
               <div class="search-input">
-                <div class="source-selector" @click="toggleSourceList">
+                <div v-if="sourceList.length" class="source-selector" @click="toggleSourceList">
                   <svg class="icon" aria-hidden="true">
                     <use :xlink:href="`#icon-${source}`"></use>
                   </svg>

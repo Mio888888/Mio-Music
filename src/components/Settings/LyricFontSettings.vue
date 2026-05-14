@@ -68,7 +68,8 @@ onMounted(() => {
           multiple
           filterable
           creatable
-          style="width: 280px;"
+          style="min-width: 0;"
+          :popup-props="{ attach: 'body' }"
           :placeholder="t('settings.lyricFont.selectFont')"
         >
           <t-option v-for="font in fontList" :key="font" :value="font" :label="font" />
@@ -168,6 +169,12 @@ onMounted(() => {
     flex-direction: column;
     gap: 10px;
     padding: 10px 12px;
+    overflow: visible;
+  }
+
+  .setting-item .t-select {
+    width: 100% !important;
+    flex: 1 1 auto !important;
   }
 
   .setting-info {

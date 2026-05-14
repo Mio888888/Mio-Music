@@ -502,4 +502,48 @@ onUnmounted(() => {
   color: var(--td-warning-color);
   flex-shrink: 0;
 }
+
+@media (max-width: 768px) {
+  .device-list {
+    max-height: 240px;
+  }
+
+  .device-item {
+    padding: 8px;
+    min-height: 44px;
+  }
+
+  .device-volume {
+    padding: 4px 6px;
+    gap: 6px;
+  }
+
+  .device-meta {
+    min-width: auto;
+  }
+
+  .ab-controls {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .channel-config {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .channel-config label {
+    width: auto;
+    font-size: 12px;
+  }
+
+  .ab-action {
+    margin-top: 4px;
+  }
+
+  .ab-action .t-button .t-button__suffix {
+    display: none;
+  }
+}
 </style>
