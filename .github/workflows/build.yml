@@ -191,7 +191,7 @@ jobs:
       - name: Initialize Android project
         run: npx tauri android init
 
-      - name: Patch Android native audio context bridge
+      - name: Patch Android native audio context bridge and icons
         run: |
           python3 <<'PY'
           from pathlib import Path
@@ -217,6 +217,19 @@ jobs:
                   "  override fun onCreate(savedInstanceState: Bundle?) {\n    initAndroidContext(this)\n    enableEdgeToEdge()",
               )
           main.write_text(main_text)
+
+          icon_source = Path("src-tauri/icons/android")
+          res_dir = Path("src-tauri/gen/android/app/src/main/res")
+          if not icon_source.exists():
+              raise SystemExit("Android icon source directory not found")
+          if not res_dir.exists():
+              raise SystemExit("Generated Android res directory not found")
+
+          for item in icon_source.rglob("*"):
+              if item.is_file():
+                  target = res_dir / item.relative_to(icon_source)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(item.read_bytes())
           PY
 
       - name: Add Android permissions
