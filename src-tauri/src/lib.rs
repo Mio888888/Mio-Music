@@ -503,9 +503,9 @@ pub fn run() {
 
 #[cfg(target_os = "android")]
 #[no_mangle]
-pub extern "system" fn Java_com_vant_Mio_Music_Rust_initAndroidContext(
+pub extern "system" fn Java_com_vant_Mio_Music_MainActivity_initAndroidContext(
     env: jni::JNIEnv,
-    _class: jni::objects::JClass,
+    _this: jni::objects::JObject,
     activity: jni::objects::JObject,
 ) {
     use std::os::raw::c_void;

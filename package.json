@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
+    "android:patch-native-audio": "node scripts/patch-android-native-audio.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
