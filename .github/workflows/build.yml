@@ -329,39 +329,14 @@ jobs:
               else:
                   raise SystemExit("Unable to find release build type in generated build.gradle.kts")
 
-          abi_marker = "// Mio Music ABI split override"
-          if abi_marker not in text:
-              abi_block = (
-                  "\n\n"
-                  "// Mio Music ABI split override\n"
-                  "android {\n"
-                  "    defaultConfig {\n"
-                  "        ndk {\n"
-                  "            abiFilters.clear()\n"
-                  '            abiFilters += listOf("arm64-v8a", "x86_64")\n'
-                  "        }\n"
-                  "    }\n"
-                  "\n"
-                  "    splits {\n"
-                  "        abi {\n"
-                  "            isEnable = true\n"
-                  "            reset()\n"
-                  '            include("arm64-v8a", "x86_64")\n'
-                  "            isUniversalApk = false\n"
-                  "        }\n"
-                  "    }\n"
-                  "}\n"
-              )
-              text = text.rstrip() + abi_block
-
           gradle_file.write_text(text)
-          print(f"Patched {gradle_file} for release signing + ABI splits")
+          print(f"Patched {gradle_file} for release signing")
           PY
 
       - name: Build signed Android APK
         id: tauri_build
         continue-on-error: true
-        run: npx tauri android build --apk --ci
+        run: npx tauri android build --apk --split-per-abi --target aarch64 x86_64 --ci
 
       - name: Debug Gradle error
         if: steps.tauri_build.outcome == 'failure'
