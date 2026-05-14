@@ -571,7 +571,13 @@ fn init_ndk_context() {
         })();
 
         match activity {
-            Some(act) => env.new_global_ref(&act).ok()?.as_raw() as *mut c_void,
+            Some(act) => match env.new_global_ref(&act) {
+                Ok(global) => global.as_raw() as *mut c_void,
+                Err(e) => {
+                    eprintln!("[Android] new_global_ref failed: {e}");
+                    ptr::null_mut()
+                }
+            },
             None => {
                 eprintln!("[Android] currentActivity() returned null");
                 ptr::null_mut()
