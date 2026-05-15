@@ -84,6 +84,14 @@ router.beforeEach((to, from) => {
   const fromDepth = routeDepths[from.name as string] ?? 0
   routeDirection.value = toDepth >= fromDepth ? 'forward' : 'backward'
 
+  // Sub-route changes within /home use Vue <Transition> instead of
+  // View Transition API to avoid ::view-transition pseudo-elements
+  // breaking backdrop-filter on the fixed player bar.
+  const isHomeSubRoute = (p: string) => p.startsWith('/home/') && p !== '/home'
+  if (isHomeSubRoute(to.path) && isHomeSubRoute(from.path)) {
+    return
+  }
+
   if (
     !from.name ||
     !('startViewTransition' in document) ||

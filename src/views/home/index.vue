@@ -3,9 +3,11 @@
     <HomeLayout>
       <template #body>
         <router-view v-slot="{ Component }">
-          <KeepAlive exclude="list">
-            <component :is="Component" :key="$route.fullPath" class="vt-route" />
-          </KeepAlive>
+          <Transition :name="routeDirection === 'forward' ? 'route-slide-forward' : 'route-slide-backward'" mode="out-in">
+            <KeepAlive exclude="list">
+              <component :is="Component" :key="$route.fullPath" />
+            </KeepAlive>
+          </Transition>
         </router-view>
       </template>
     </HomeLayout>
@@ -21,6 +23,7 @@ import PluginUpdateNoticeDialog from '@/components/Plugin/PluginUpdateNoticeDial
 import { onMounted } from 'vue'
 import { usePluginStore } from '@/store/plugin'
 import PluginRunner from '@/utils/plugin/PluginRunner'
+import { routeDirection } from '@/router/index'
 
 defineOptions({ name: 'HomeView' })
 
@@ -56,4 +59,29 @@ onMounted(async () => {
   overflow: hidden;
 }
 
+.route-slide-forward-enter-active,
+.route-slide-forward-leave-active,
+.route-slide-backward-enter-active,
+.route-slide-backward-leave-active {
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard),
+              transform var(--motion-duration-quick) var(--motion-ease-standard);
+}
+
+.route-slide-forward-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.route-slide-forward-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.route-slide-backward-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+.route-slide-backward-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
 </style>
