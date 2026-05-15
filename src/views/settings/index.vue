@@ -562,9 +562,7 @@ const handleSearchSelect = async (item: SearchItem) => {
     overflow-y: hidden;
     padding: 2px 0 6px;
     -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
     scrollbar-width: none;
-    scrollbar-gutter: stable;
     box-sizing: border-box;
   }
 
@@ -583,7 +581,6 @@ const handleSearchSelect = async (item: SearchItem) => {
     border: 1px solid var(--mobile-glass-border);
     border-radius: 20px;
     background: var(--mobile-glass-bg);
-    scroll-snap-align: start;
     touch-action: manipulation;
     transition:
       background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
