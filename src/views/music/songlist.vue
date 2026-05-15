@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onActivated, onDeactivated, type CSSProperties } from 'vue'
 import { useRouter } from 'vue-router'
 import { MessagePlugin, DialogPlugin } from 'tdesign-vue-next'
 import { Edit2Icon, PlayCircleIcon, DeleteIcon, ViewListIcon, DownloadIcon } from 'tdesign-icons-vue-next'
@@ -10,6 +10,7 @@ import { downloadSingleSong } from '@/utils/audio/download'
 import type { SongList } from '@/types/audio'
 import { fillMissingCoversWithResolver } from '@/utils/songCover'
 import { useSourceAccess } from '@/composables/useSourceAccess'
+import LiquidGlass from '@/components/LiquidGlass.vue'
 import defaultCover from '/default-cover.png'
 
 const router = useRouter()
@@ -28,7 +29,8 @@ const scrollTop = ref(0)
 const showCreatePlaylistDialog = ref(false)
 const showEditPlaylistDialog = ref(false)
 const showImportDialog = ref(false)
-const showNetworkImportDialog = ref(false)
+const importView = ref<'menu' | 'network'>('menu')
+const createPlaylistLoading = ref(false)
 
 // 创建表单
 const newPlaylistForm = ref({ name: '', description: '' })
@@ -41,6 +43,27 @@ const currentEditingPlaylist = ref<PlaylistRow | null>(null)
 const networkPlaylistUrl = ref('')
 const importPlatformType = ref('wy')
 const songlistFileInputRef = ref<HTMLInputElement | null>(null)
+const networkImportLoading = ref(false)
+const networkImportResult = ref<{ type: 'success' | 'error' | 'warning', message: string } | null>(null)
+
+// LiquidGlass 响应式
+const isMobile = ref(false)
+const mobileMql = typeof window !== 'undefined' ? window.matchMedia('(max-width: 768px)') : null
+const onMobileChange = (e: MediaQueryListEvent | MediaQueryList) => { isMobile.value = e.matches }
+
+const networkImportCornerRadius = computed(() => {
+  if (!isMobile.value) return 22
+  const cssVal = getComputedStyle(document.documentElement).getPropertyValue('--mobile-card-radius')?.trim()
+  if (cssVal) { const num = parseFloat(cssVal); if (Number.isFinite(num)) return num }
+  return 18
+})
+
+const networkImportContentStyle: CSSProperties = {
+  color: 'var(--td-text-color-primary)',
+  font: 'inherit',
+  lineHeight: 'normal',
+  textShadow: 'none',
+}
 
 async function fillMissingImportedSongPics(songsNeedPic: SongList[], platform: string) {
   await fillMissingCoversWithResolver(songsNeedPic, {
@@ -81,11 +104,25 @@ const loadPlaylists = async () => {
 }
 
 // 创建歌单
+const openCreatePlaylistDialog = () => {
+  showCreatePlaylistDialog.value = true
+  newPlaylistForm.value = { name: '', description: '' }
+  createPlaylistLoading.value = false
+  document.body.style.overflow = 'hidden'
+}
+
+const closeCreatePlaylistDialog = () => {
+  if (createPlaylistLoading.value) return
+  showCreatePlaylistDialog.value = false
+  document.body.style.overflow = ''
+}
+
 const createPlaylist = async () => {
   if (!newPlaylistForm.value.name.trim()) {
     MessagePlugin.warning(t('music.songlist.nameEmpty'))
     return
   }
+  createPlaylistLoading.value = true
   try {
     const created = await localUserStore.createPlaylist(
       newPlaylistForm.value.name.trim(),
@@ -93,14 +130,17 @@ const createPlaylist = async () => {
       'local'
     )
     if (created) {
-      MessagePlugin.success(t('music.songlist.createSuccess'))
       showCreatePlaylistDialog.value = false
       newPlaylistForm.value = { name: '', description: '' }
+      document.body.style.overflow = ''
+      MessagePlugin.success(t('music.songlist.createSuccess'))
     } else {
       MessagePlugin.error(t('music.songlist.createFailed'))
     }
   } catch {
     MessagePlugin.error(t('music.songlist.createFailed'))
+  } finally {
+    createPlaylistLoading.value = false
   }
 }
 
@@ -232,6 +272,7 @@ const downloadPlaylist = async (playlist: PlaylistRow) => {
 // 从播放列表导入
 const importFromPlaylist = async () => {
   showImportDialog.value = false
+  document.body.style.overflow = ''
   const currentList = JSON.parse(JSON.stringify(localUserStore.list))
   if (!currentList || currentList.length === 0) {
     MessagePlugin.warning(t('music.songlist.playingListEmpty'))
@@ -256,6 +297,7 @@ const importFromPlaylist = async () => {
 // 从本地文件导入
 const triggerSonglistFileInput = () => {
   showImportDialog.value = false
+  document.body.style.overflow = ''
   songlistFileInputRef.value?.click()
 }
 
@@ -292,24 +334,34 @@ const handleSonglistFileChange = async (e: Event) => {
 
 // 从网络歌单导入
 const importFromNetwork = () => {
-  showImportDialog.value = false
-  showNetworkImportDialog.value = true
+  importView.value = 'network'
   networkPlaylistUrl.value = ''
   importPlatformType.value = 'wy'
+  networkImportLoading.value = false
+  networkImportResult.value = null
 }
 
 const confirmNetworkImport = async () => {
   if (!networkPlaylistUrl.value.trim()) {
-    MessagePlugin.warning(t('music.songlist.invalidLink'))
+    networkImportResult.value = { type: 'warning', message: t('music.songlist.invalidLink') }
     return
   }
-  showNetworkImportDialog.value = false
   await handleNetworkPlaylistImport(networkPlaylistUrl.value.trim())
 }
 
 const cancelNetworkImport = () => {
-  showNetworkImportDialog.value = false
+  if (networkImportLoading.value) return
+  showImportDialog.value = false
+  importView.value = 'menu'
   networkPlaylistUrl.value = ''
+  networkImportResult.value = null
+  document.body.style.overflow = ''
+}
+
+const openImportDialog = () => {
+  importView.value = 'menu'
+  showImportDialog.value = true
+  document.body.style.overflow = 'hidden'
 }
 
 // 解析歌单 ID
@@ -352,11 +404,12 @@ const handleNetworkPlaylistImport = async (input: string) => {
   const playlistId = resolvePlaylistId(input, platform)
 
   if (!playlistId) {
-    MessagePlugin.error(t('music.songlist.unrecognizedLink', { platform: pName }))
+    networkImportResult.value = { type: 'error', message: t('music.songlist.unrecognizedLink', { platform: pName }) }
     return
   }
 
-  const loadMsg = MessagePlugin.loading(t('music.songlist.fetchingInfo'), 0)
+  networkImportLoading.value = true
+  networkImportResult.value = null
   try {
     let allSongs: any[] = []
     let detailInfo: any = {}
@@ -370,7 +423,7 @@ const handleNetworkPlaylistImport = async (input: string) => {
         page
       })
       if (!detailResult || detailResult.error) {
-        MessagePlugin.error(t('music.songlist.fetchDetailFailed', { platform: pName }) + (detailResult?.error ? `：${detailResult.error}` : ''))
+        networkImportResult.value = { type: 'error', message: t('music.songlist.fetchDetailFailed', { platform: pName }) + (detailResult?.error ? `：${detailResult.error}` : '') }
         return
       }
       const list = detailResult.list || []
@@ -382,30 +435,33 @@ const handleNetworkPlaylistImport = async (input: string) => {
     }
 
     if (allSongs.length === 0) {
-      MessagePlugin.warning(t('music.songlist.emptyPlaylist'))
+      networkImportResult.value = { type: 'warning', message: t('music.songlist.emptyPlaylist') }
       return
     }
 
-    // 获取封面（按批次限制并发，保持 direct-first URL）
     const songsNeedPic = allSongs.filter(s => !s.img)
     if (songsNeedPic.length > 0) {
       await fillMissingImportedSongPics(songsNeedPic, platform)
     }
 
-    // 创建本地歌单
     const coverImg = detailInfo.cover || detailInfo.img || ''
     const name = t('music.songlist.importedFrom', { platform: pName })
     const created = await localUserStore.createPlaylist(name, t('music.songlist.fromNetworkImport', { platform: pName, count: allSongs.length }), platform)
     if (created) {
       const added = await localUserStore.addSongsToPlaylist(created.id, allSongs)
       if (coverImg) await localUserStore.updatePlaylistCover(created.id, coverImg)
-      MessagePlugin.success(t('music.songlist.networkImportSuccess', { count: added, name }))
+      networkImportResult.value = { type: 'success', message: t('music.songlist.networkImportSuccess', { count: added, name }) }
       await loadPlaylists()
+      setTimeout(() => {
+        showImportDialog.value = false
+        importView.value = 'menu'
+        document.body.style.overflow = ''
+      }, 1500)
     }
   } catch (err) {
-    MessagePlugin.error(t('music.songlist.importFailed', { error: (err as Error).message }))
+    networkImportResult.value = { type: 'error', message: t('music.songlist.importFailed', { error: (err as Error).message }) }
   } finally {
-    loadMsg.then((inst: any) => inst.close())
+    networkImportLoading.value = false
   }
 }
 
@@ -454,9 +510,11 @@ const handleGlobalClick = () => { if (contextMenuVisible.value) closeContextMenu
 onMounted(() => {
   loadPlaylists()
   document.addEventListener('click', handleGlobalClick)
+  if (mobileMql) { onMobileChange(mobileMql); mobileMql.addEventListener('change', onMobileChange) }
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleGlobalClick)
+  if (mobileMql) mobileMql.removeEventListener('change', onMobileChange)
 })
 onActivated(() => { if (scrollRef.value) scrollRef.value.scrollTop = scrollTop.value })
 onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scrollTop })
@@ -478,11 +536,11 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
           <h2>{{ t('music.songlist.title') }}</h2>
         </div>
         <div class="header-actions">
-          <t-button theme="primary" variant="outline" @click="showCreatePlaylistDialog = true">
+          <t-button theme="primary" variant="outline" @click="openCreatePlaylistDialog">
             <i class="iconfont icon-zengjia"></i>
             {{ t('music.songlist.newPlaylist') }}
           </t-button>
-          <t-button theme="primary" @click="showImportDialog = true">
+          <t-button theme="primary" @click="openImportDialog">
             <i class="iconfont icon-daoru"></i>
             {{ t('common.import') }}
           </t-button>
@@ -576,7 +634,7 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
           </div>
           <h4>{{ t('music.songlist.emptyTitle') }}</h4>
           <p>{{ t('music.songlist.emptyDesc') }}</p>
-          <t-button theme="primary" @click="showCreatePlaylistDialog = true">
+          <t-button theme="primary" @click="openCreatePlaylistDialog">
             <i class="iconfont icon-zengjia"></i>
             {{ t('music.songlist.createPlaylist') }}
           </t-button>
@@ -585,36 +643,83 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
     </div>
 
     <!-- 创建歌单对话框 -->
-    <t-dialog
-      v-model:visible="showCreatePlaylistDialog"
-      :cancel-btn="{ content: t('common.cancel') }"
-      :confirm-btn="{ content: t('common.create'), theme: 'primary' }"
-      :header="t('music.songlist.createNewPlaylist')"
-      placement="center"
-      width="500px"
-      @confirm="createPlaylist"
-    >
-      <div class="create-form">
-        <t-form :data="newPlaylistForm" layout="vertical">
-          <t-form-item :label="t('music.songlist.playlistName')" name="name" required>
-            <t-input
-              v-model="newPlaylistForm.name"
-              clearable
-              :placeholder="t('music.songlist.playlistNamePlaceholder')"
-              @keyup.enter="createPlaylist"
-            />
-          </t-form-item>
-          <t-form-item :label="t('music.songlist.playlistDesc')" name="description">
-            <t-textarea
-              v-model="newPlaylistForm.description"
-              :autosize="{ minRows: 3, maxRows: 5 }"
-              :maxlength="200"
-              :placeholder="t('music.songlist.playlistDescPlaceholder')"
-            />
-          </t-form-item>
-        </t-form>
-      </div>
-    </t-dialog>
+    <Teleport to="body">
+      <Transition name="create-pl-fade">
+        <div v-if="showCreatePlaylistDialog" class="create-pl-overlay" @click.self="closeCreatePlaylistDialog">
+          <div class="overlay-drag-bar" data-tauri-drag-region />
+          <LiquidGlass
+            class="create-pl-panel"
+            :corner-radius="networkImportCornerRadius"
+            :displacement-scale="48"
+            :blur-amount="0.08"
+            :saturation="180"
+            :aberration-intensity="1.5"
+            padding="0"
+            mode="standard"
+            :content-style="networkImportContentStyle"
+            @click.stop
+          >
+            <div class="create-pl-panel__content">
+              <!-- Header -->
+              <div class="create-pl-header" data-tauri-drag-region>
+                <div class="create-pl-title-group">
+                  <div class="create-pl-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  </div>
+                  <div class="create-pl-title-text">
+                    <h2 class="create-pl-title">{{ t('music.songlist.createNewPlaylist') }}</h2>
+                  </div>
+                </div>
+                <button class="create-pl-close-btn" @click="closeCreatePlaylistDialog">
+                  <i class="iconfont icon-a-quxiaoguanbi" />
+                </button>
+              </div>
+
+              <!-- Form -->
+              <div class="create-pl-form">
+                <div class="form-field">
+                  <label class="field-label">{{ t('music.songlist.playlistName') }} <span class="required">*</span></label>
+                  <input
+                    v-model="newPlaylistForm.name"
+                    class="field-input"
+                    :placeholder="t('music.songlist.playlistNamePlaceholder')"
+                    maxlength="50"
+                    autofocus
+                    @keydown.enter="createPlaylist"
+                  />
+                </div>
+                <div class="form-field">
+                  <label class="field-label">{{ t('music.songlist.playlistDesc') }}</label>
+                  <textarea
+                    v-model="newPlaylistForm.description"
+                    class="field-textarea"
+                    :placeholder="t('music.songlist.playlistDescPlaceholder')"
+                    maxlength="200"
+                    rows="3"
+                  />
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="create-pl-actions">
+                <button class="create-pl-btn outline" @click="closeCreatePlaylistDialog">
+                  {{ t('common.cancel') }}
+                </button>
+                <button
+                  :class="['create-pl-btn', 'primary', { disabled: createPlaylistLoading || !newPlaylistForm.name.trim() }]"
+                  @click="createPlaylist"
+                >
+                  <span v-if="createPlaylistLoading" class="create-pl-spinner" />
+                  {{ t('common.create') }}
+                </button>
+              </div>
+            </div>
+          </LiquidGlass>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- 编辑歌单对话框 -->
     <t-dialog
@@ -651,118 +756,164 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
       </div>
     </t-dialog>
 
-    <!-- 导入选择对话框 -->
-    <t-dialog
-      v-model:visible="showImportDialog"
-      :footer="false"
-      :header="t('music.songlist.selectImportMethod')"
-      placement="center"
-      width="400px"
-    >
-      <div class="import-options">
-        <div class="import-option" @click="importFromPlaylist">
-          <div class="option-icon">
-            <i class="iconfont icon-liebiao"></i>
-          </div>
-          <div class="option-content">
-            <h4>{{ t('music.songlist.fromPlayingList') }}</h4>
-            <p>{{ t('music.songlist.fromPlayingListDesc') }}</p>
-          </div>
-          <div class="option-arrow">
-            <i class="iconfont icon-youjiantou"></i>
-          </div>
-        </div>
-        <div class="import-option" @click="triggerSonglistFileInput">
-          <div class="option-icon">
-            <i class="iconfont icon-daoru"></i>
-          </div>
-          <div class="option-content">
-            <h4>{{ t('music.songlist.fromLocalFile') }}</h4>
-            <p>{{ t('music.songlist.fromLocalFileDesc') }}</p>
-          </div>
-          <div class="option-arrow">
-            <i class="iconfont icon-youjiantou"></i>
-          </div>
-        </div>
-        <div class="import-option" @click="importFromNetwork">
-          <div class="option-icon">
-            <i class="iconfont icon-wangluo"></i>
-          </div>
-          <div class="option-content">
-            <h4>{{ t('music.songlist.fromNetwork') }}</h4>
-            <p>{{ t('music.songlist.fromNetworkDesc') }}</p>
-            <span class="coming-soon">{{ t('common.experimental') }}</span>
-          </div>
-          <div class="option-arrow">
-            <i class="iconfont icon-youjiantou"></i>
-          </div>
-        </div>
-      </div>
-    </t-dialog>
+    <!-- 导入对话框 (统一 LiquidGlass) -->
+    <Teleport to="body">
+      <Transition name="netimport-fade">
+        <div v-if="showImportDialog" class="netimport-overlay" @click.self="cancelNetworkImport">
+          <div class="overlay-drag-bar" data-tauri-drag-region />
+          <LiquidGlass
+            class="netimport-panel"
+            :corner-radius="networkImportCornerRadius"
+            :displacement-scale="48"
+            :blur-amount="0.08"
+            :saturation="180"
+            :aberration-intensity="1.5"
+            padding="0"
+            mode="standard"
+            :content-style="networkImportContentStyle"
+            @click.stop
+          >
+            <div class="netimport-panel__content">
+              <!-- Header -->
+              <div class="netimport-header" data-tauri-drag-region>
+                <div class="netimport-title-group">
+                  <button v-if="importView === 'network'" class="netimport-back-btn" @click="importView = 'menu'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div class="netimport-icon">
+                    <svg v-if="importView === 'menu'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" />
+                      <line x1="2" y1="12" x2="22" y2="12" />
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z" />
+                    </svg>
+                  </div>
+                  <div class="netimport-title-text">
+                    <h2 class="netimport-title">{{ importView === 'menu' ? t('music.songlist.selectImportMethod') : t('music.songlist.importNetworkPlaylist') }}</h2>
+                  </div>
+                </div>
+                <button class="netimport-close-btn" @click="cancelNetworkImport">
+                  <i class="iconfont icon-a-quxiaoguanbi" />
+                </button>
+              </div>
 
-    <!-- 网络歌单导入对话框 -->
-    <t-dialog
-      v-model:visible="showNetworkImportDialog"
-      :cancel-btn="{ content: t('common.cancel'), variant: 'outline' }"
-      :confirm-btn="{ content: t('music.songlist.startImport'), theme: 'primary' }"
-      :style="{ maxHeight: '80vh' }"
-      :header="t('music.songlist.importNetworkPlaylist')"
-      placement="center"
-      width="600px"
-      @cancel="cancelNetworkImport"
-      @confirm="confirmNetworkImport"
-    >
-      <div class="network-import-content">
-        <div class="platform-selector">
-          <label class="form-label">{{ t('music.songlist.selectPlatform') }}</label>
-          <t-radio-group v-model="importPlatformType" variant="primary-filled">
-            <t-radio-button value="wy">{{ t('music.songlist.netease') }}</t-radio-button>
-            <t-radio-button value="tx">{{ t('music.songlist.qq') }}</t-radio-button>
-            <t-radio-button value="kw">{{ t('music.songlist.kuwo') }}</t-radio-button>
-            <t-radio-button value="bd">{{ t('music.songlist.bodo') }}</t-radio-button>
-            <t-radio-button value="kg">{{ t('music.songlist.kugou') }}</t-radio-button>
-            <t-radio-button value="mg">{{ t('music.songlist.migu') }}</t-radio-button>
-          </t-radio-group>
-        </div>
+              <!-- Menu View -->
+              <div v-if="importView === 'menu'" class="import-options">
+                <div class="import-option" @click="importFromPlaylist">
+                  <div class="option-icon">
+                    <i class="iconfont icon-liebiao"></i>
+                  </div>
+                  <div class="option-content">
+                    <h4>{{ t('music.songlist.fromPlayingList') }}</h4>
+                    <p>{{ t('music.songlist.fromPlayingListDesc') }}</p>
+                  </div>
+                  <div class="option-arrow">
+                    <i class="iconfont icon-youjiantou"></i>
+                  </div>
+                </div>
+                <div class="import-option" @click="triggerSonglistFileInput">
+                  <div class="option-icon">
+                    <i class="iconfont icon-daoru"></i>
+                  </div>
+                  <div class="option-content">
+                    <h4>{{ t('music.songlist.fromLocalFile') }}</h4>
+                    <p>{{ t('music.songlist.fromLocalFileDesc') }}</p>
+                  </div>
+                  <div class="option-arrow">
+                    <i class="iconfont icon-youjiantou"></i>
+                  </div>
+                </div>
+                <div class="import-option" @click="importFromNetwork">
+                  <div class="option-icon">
+                    <i class="iconfont icon-wangluo"></i>
+                  </div>
+                  <div class="option-content">
+                    <h4>{{ t('music.songlist.fromNetwork') }}</h4>
+                    <p>{{ t('music.songlist.fromNetworkDesc') }}</p>
+                    <span class="coming-soon">{{ t('common.experimental') }}</span>
+                  </div>
+                  <div class="option-arrow">
+                    <i class="iconfont icon-youjiantou"></i>
+                  </div>
+                </div>
+              </div>
 
-        <div class="import-content-wrapper">
-          <div :key="importPlatformType" class="import-content">
-            <div style="margin-bottom: 1em">
-              {{ t('music.songlist.networkImportGuide', { platform: platformNames[importPlatformType] || t('music.songlist.selectPlatform') }) }}
+              <!-- Network Import View -->
+              <template v-else>
+                <div class="platform-grid">
+                  <button
+                    v-for="p in [
+                      { key: 'wy', color: '#e60026' },
+                      { key: 'tx', color: '#31c27a' },
+                      { key: 'kw', color: '#f5a623' },
+                      { key: 'bd', color: '#5b9df5' },
+                      { key: 'kg', color: '#2ca2f9' },
+                      { key: 'mg', color: '#ff6c37' },
+                    ]"
+                    :key="p.key"
+                    :class="['platform-card', { active: importPlatformType === p.key }]"
+                    @click="importPlatformType = p.key"
+                  >
+                    <span class="platform-dot" :style="{ background: p.color }" />
+                    <span class="platform-name">{{ platformNames[p.key] }}</span>
+                  </button>
+                </div>
+
+                <div class="netimport-input-group">
+                  <p class="input-guide">{{ t('music.songlist.networkImportGuide', { platform: platformNames[importPlatformType] || t('music.songlist.selectPlatform') }) }}</p>
+                  <div class="input-row">
+                    <input
+                      v-model="networkPlaylistUrl"
+                      :placeholder="t('music.songlist.networkImportPlaceholder')"
+                      class="netimport-input"
+                      :disabled="networkImportLoading"
+                      autofocus
+                      @keydown.enter="confirmNetworkImport"
+                    />
+                    <button
+                      :class="['netimport-btn', 'primary', { disabled: networkImportLoading }]"
+                      @click="confirmNetworkImport"
+                    >
+                      <span v-if="networkImportLoading" class="netimport-spinner" />
+                      <template v-else>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                      </template>
+                      {{ networkImportLoading ? t('music.songlist.fetchingInfo') : t('music.songlist.startImport') }}
+                    </button>
+                  </div>
+
+                  <!-- Result -->
+                  <Transition name="result-fade">
+                    <div v-if="networkImportResult" :class="['netimport-result', networkImportResult.type]">
+                      <svg v-if="networkImportResult.type === 'success'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <svg v-else-if="networkImportResult.type === 'error'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                      </svg>
+                      <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <span>{{ networkImportResult.message }}</span>
+                    </div>
+                  </Transition>
+                </div>
+              </template>
             </div>
-            <t-input
-              v-model="networkPlaylistUrl"
-              :placeholder="t('music.songlist.networkImportPlaceholder')"
-              autofocus
-              clearable
-              @enter="confirmNetworkImport"
-            />
-            <div class="import-tips">
-              <p class="tip-title">{{ t('music.songlist.networkImportFormats', { platform: platformNames[importPlatformType] || t('music.songlist.selectPlatform') }) }}</p>
-              <ul class="tip-list">
-                <li v-if="importPlatformType === 'wy'">完整链接：https://music.163.com/playlist?id=123456789</li>
-                <li v-if="importPlatformType === 'wy'">手机链接：https://music.163.com/m/playlist?id=123456789</li>
-                <li v-if="importPlatformType === 'wy'">纯数字ID：123456789</li>
-                <li v-if="importPlatformType === 'tx'">完整链接：https://y.qq.com/n/ryqq/playlist/123456789</li>
-                <li v-if="importPlatformType === 'tx'">手机链接：https://i.y.qq.com/v8/playsquare/playlist.html?id=123456789</li>
-                <li v-if="importPlatformType === 'tx'">纯数字ID：123456789</li>
-                <li v-if="importPlatformType === 'kw'">完整链接：http://www.kuwo.cn/playlist_detail/123456789</li>
-                <li v-if="importPlatformType === 'kw'">参数链接：http://www.kuwo.cn/playlist?pid=123456789</li>
-                <li v-if="importPlatformType === 'kw'">纯数字ID：123456789</li>
-                <li v-if="importPlatformType === 'bd'">手机链接：https://h5app.kuwo.cn/m/bodian/collection.html?playlistId=123456789</li>
-                <li v-if="importPlatformType === 'bd'">纯数字ID：123456789</li>
-                <li v-if="importPlatformType === 'kg'">完整链接：https://www.kugou.com/yy/special/single/123456789</li>
-                <li v-if="importPlatformType === 'kg'">手机版链接：https://m.kugou.com/songlist/gcid_3z9vj0yqz4bz00b</li>
-                <li v-if="importPlatformType === 'kg'">酷狗码：123456789</li>
-                <li v-if="importPlatformType === 'mg'">完整链接：https://music.migu.cn/v3/music/playlist/123456789</li>
-                <li v-if="importPlatformType === 'mg'">纯数字ID：123456789</li>
-              </ul>
-              <p class="tip-note">{{ t('music.songlist.smartParse') }}</p>
-            </div>
-          </div>
+          </LiquidGlass>
         </div>
-      </div>
-    </t-dialog>
+      </Transition>
+    </Teleport>
 
     <!-- 右键菜单 -->
     <Teleport to="body">
@@ -1025,10 +1176,6 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
   margin-bottom: 2rem;
 }
 
-/* 创建/编辑表单 */
-.create-form {
-  padding: 1rem 0;
-}
 
 .edit-playlist-content .form-item {
   margin-bottom: 1.5rem;
@@ -1046,138 +1193,6 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
   font-size: 14px;
 }
 
-/* 导入选择对话框 */
-.import-options {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.import-option {
-  display: flex;
-  align-items: center;
-  padding: 1rem;
-  border: 1px solid var(--td-border-level-1-color);
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-  background: var(--td-bg-color-container);
-}
-
-.import-option:hover {
-  border-color: var(--td-brand-color-4);
-  background: var(--td-bg-color-component-hover);
-}
-
-.import-option .option-icon {
-  margin-right: 1rem;
-}
-
-.import-option .option-icon .iconfont {
-  font-size: 1.5rem;
-  color: var(--td-brand-color-4);
-}
-
-.import-option .option-content {
-  flex: 1;
-}
-
-.import-option .option-content h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  margin-bottom: 0.25rem;
-}
-
-.import-option .option-content p {
-  font-size: 0.875rem;
-  color: var(--td-text-color-secondary);
-  margin: 0;
-}
-
-.import-option .option-content .coming-soon {
-  display: inline-block;
-  background: var(--td-warning-color-light);
-  color: var(--td-warning-color);
-  padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin-top: 0.5rem;
-}
-
-.import-option .option-arrow .iconfont {
-  font-size: 1rem;
-  color: var(--td-text-color-placeholder);
-}
-
-/* 网络歌单导入 */
-.network-import-content {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 0 10px;
-}
-
-.platform-selector {
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--td-border-level-1-color);
-  padding-bottom: 1rem;
-}
-
-.platform-selector .form-label {
-  display: block;
-  margin-bottom: 1rem;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  font-size: 15px;
-}
-
-.network-import-content :deep(.t-radio-group) {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.import-content {
-  margin-top: 1rem;
-}
-
-.import-tips {
-  background: var(--td-bg-color-component-hover);
-  border-radius: 12px;
-  padding: 1.25rem;
-  border: 1px solid var(--td-border-level-1-color);
-  margin-top: 1.5rem;
-  border-left: 4px solid var(--td-brand-color-4);
-}
-
-.tip-title {
-  margin: 0 0 0.75rem;
-  font-weight: 600;
-  color: var(--td-text-color-primary);
-  font-size: 15px;
-}
-
-.tip-list {
-  margin: 0 0 0.75rem;
-  padding-left: 1.5rem;
-}
-
-.tip-list li {
-  color: var(--td-text-color-secondary);
-  font-size: 13px;
-  margin-bottom: 0.5rem;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  padding: 0.25rem 0.5rem;
-  background: var(--td-bg-color-container);
-  border-radius: 4px;
-}
-
-.tip-note {
-  margin: 0;
-  color: var(--td-text-color-placeholder);
-  font-size: 12px;
-  font-style: italic;
-}
 
 @media (max-width: 768px) {
   .page {
@@ -1353,5 +1368,817 @@ onDeactivated(() => { if (scrollRef.value) scrollTop.value = scrollRef.value.scr
 @keyframes menuIn {
   from { opacity: 0; transform: translateY(-4px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ============================
+   网络歌单导入 — LiquidGlass (unscoped for Teleport)
+   ============================ */
+
+.netimport-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
+}
+
+.netimport-panel {
+  width: min(500px, calc(100vw - 32px));
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.netimport-panel__content {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 28px;
+}
+
+.netimport-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.netimport-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.netimport-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.18), rgba(140, 80, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+}
+
+.netimport-icon svg {
+  color: var(--td-brand-color, #0052d9);
+  filter: drop-shadow(0 0 3px rgba(100, 140, 255, 0.25));
+}
+
+.netimport-title-text {
+  min-width: 0;
+}
+
+.netimport-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--td-text-color-primary);
+  line-height: 1.2;
+}
+
+.netimport-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+  color: var(--td-text-color-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color var(--motion-duration-quick) var(--motion-ease-standard), border-color var(--motion-duration-quick) var(--motion-ease-standard), color var(--motion-duration-quick) var(--motion-ease-standard);
+}
+
+.netimport-close-btn:hover {
+  background: rgba(255, 80, 80, 0.15);
+  border-color: rgba(255, 80, 80, 0.25);
+  color: var(--td-error-color, #d54941);
+}
+
+.netimport-close-btn .iconfont {
+  font-size: 13px;
+}
+
+.netimport-back-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+  color: var(--td-text-color-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.netimport-back-btn:hover {
+  background: color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  color: var(--td-text-color-primary);
+}
+
+.netimport-overlay .import-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.netimport-overlay .import-option {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 5%, transparent);
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+
+.netimport-overlay .import-option:hover {
+  background: color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
+}
+
+.netimport-overlay .import-option .option-icon {
+  margin-right: 14px;
+  flex-shrink: 0;
+}
+
+.netimport-overlay .import-option .option-icon .iconfont {
+  font-size: 1.3rem;
+  color: var(--td-brand-color, #0052d9);
+}
+
+.netimport-overlay .import-option .option-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.netimport-overlay .import-option .option-content h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  line-height: 1.3;
+}
+
+.netimport-overlay .import-option .option-content p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+  line-height: 1.4;
+}
+
+.netimport-overlay .import-option .option-content .coming-soon {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(237, 181, 0, 0.12);
+  color: var(--td-warning-color, #edb500);
+  border: 1px solid rgba(237, 181, 0, 0.2);
+}
+
+.netimport-overlay .import-option .option-arrow {
+  margin-left: 12px;
+  color: var(--td-text-color-placeholder);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.netimport-overlay .platform-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.netimport-overlay .platform-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 5%, transparent);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+}
+
+.netimport-overlay .platform-card:hover {
+  background: color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
+}
+
+.netimport-overlay .platform-card.active {
+  background: color-mix(in srgb, var(--td-brand-color) 14%, transparent);
+  border-color: color-mix(in srgb, var(--td-brand-color) 35%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--td-brand-color) 20%, transparent);
+}
+
+.netimport-overlay .platform-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.netimport-overlay .platform-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--td-text-color-primary);
+  white-space: nowrap;
+}
+
+.netimport-input-group .input-guide {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--td-text-color-secondary);
+  line-height: 1.5;
+}
+
+.netimport-overlay .input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.netimport-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.netimport-input::placeholder { color: var(--td-text-color-placeholder); }
+
+.netimport-input:focus {
+  border-color: var(--td-brand-color, #0052d9);
+  background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+}
+
+.netimport-btn {
+  padding: 10px 18px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
+  color: var(--td-text-color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.netimport-btn.primary {
+  background: var(--td-brand-color, #0052d9);
+  border-color: var(--td-brand-color, #0052d9);
+  color: #fff;
+}
+
+.netimport-btn.primary:hover {
+  background: var(--td-brand-color-hover, #4787f0);
+  border-color: var(--td-brand-color-hover, #4787f0);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--td-brand-color) 30%, transparent);
+}
+
+.netimport-fade-enter-active .netimport-panel {
+  animation: netimport-in var(--motion-duration-standard) var(--motion-ease-out);
+}
+.netimport-fade-leave-active .netimport-panel {
+  animation: netimport-in var(--motion-duration-quick) var(--motion-ease-out) reverse;
+}
+.netimport-fade-enter-active,
+.netimport-fade-leave-active {
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard);
+}
+.netimport-fade-enter-from,
+.netimport-fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes netimport-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.netimport-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: netimport-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes netimport-spin {
+  to { transform: rotate(360deg); }
+}
+
+.netimport-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.netimport-result.success {
+  background: rgba(43, 164, 113, 0.12);
+  border: 1px solid rgba(43, 164, 113, 0.2);
+  color: var(--td-success-color, #2ba471);
+}
+
+.netimport-result.error {
+  background: rgba(213, 73, 65, 0.1);
+  border: 1px solid rgba(213, 73, 65, 0.18);
+  color: var(--td-error-color, #d54941);
+}
+
+.netimport-result.warning {
+  background: rgba(237, 181, 0, 0.1);
+  border: 1px solid rgba(237, 181, 0, 0.18);
+  color: var(--td-warning-color, #edb500);
+}
+
+.netimport-result svg {
+  flex-shrink: 0;
+}
+
+.netimport-btn.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.result-fade-enter-active { transition: all 0.3s ease; }
+.result-fade-leave-active { transition: all 0.2s ease; }
+.result-fade-enter-from, .result-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* ============================
+   创建歌单 — LiquidGlass
+   ============================ */
+
+.create-pl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-overlay)) saturate(140%);
+}
+
+.create-pl-panel {
+  width: min(440px, calc(100vw - 32px));
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.create-pl-panel__content {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 22px;
+  padding: 28px;
+}
+
+.create-pl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.create-pl-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.create-pl-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(var(--td-brand-color-rgb, 0, 82, 204), 0.18), rgba(140, 80, 255, 0.12));
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+}
+
+.create-pl-icon svg {
+  color: var(--td-brand-color, #0052d9);
+  filter: drop-shadow(0 0 3px rgba(100, 140, 255, 0.25));
+}
+
+.create-pl-title-text { min-width: 0; }
+
+.create-pl-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--td-text-color-primary);
+  line-height: 1.2;
+}
+
+.create-pl-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+  color: var(--td-text-color-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.create-pl-close-btn:hover {
+  background: rgba(255, 80, 80, 0.15);
+  border-color: rgba(255, 80, 80, 0.25);
+  color: var(--td-error-color, #d54941);
+}
+
+.create-pl-close-btn .iconfont { font-size: 13px; }
+
+.create-pl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.create-pl-form .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.create-pl-form .field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--td-text-color-primary);
+  opacity: 0.75;
+  letter-spacing: 0.01em;
+  padding-left: 2px;
+}
+
+.create-pl-form .field-label .required {
+  color: var(--td-error-color, #d54941);
+}
+
+.create-pl-form .field-input,
+.create-pl-form .field-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 10%, transparent);
+  background: color-mix(in srgb, var(--td-bg-color-component) 50%, transparent);
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.create-pl-form .field-input::placeholder,
+.create-pl-form .field-textarea::placeholder {
+  color: var(--td-text-color-placeholder);
+}
+
+.create-pl-form .field-input:focus,
+.create-pl-form .field-textarea:focus {
+  border-color: var(--td-brand-color, #0052d9);
+  background: color-mix(in srgb, var(--td-bg-color-component) 65%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+}
+
+.create-pl-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.create-pl-btn {
+  min-width: 92px;
+  min-height: 38px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
+  color: var(--td-text-color-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.create-pl-btn:hover:not(.disabled) {
+  background: color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow-control);
+}
+
+.create-pl-btn:active:not(.disabled) {
+  transform: translateY(0);
+}
+
+.create-pl-btn.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.create-pl-btn.primary {
+  background: var(--td-brand-color, #0052d9);
+  border-color: var(--td-brand-color, #0052d9);
+  color: #fff;
+}
+
+.create-pl-btn.primary:hover:not(.disabled) {
+  background: var(--td-brand-color-hover, #4787f0);
+  border-color: var(--td-brand-color-hover, #4787f0);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--td-brand-color) 30%, transparent);
+}
+
+.create-pl-btn.outline {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+  color: var(--td-text-color-primary);
+}
+
+.create-pl-btn.outline:hover:not(.disabled) {
+  background: color-mix(in srgb, var(--td-text-color-primary) 3%, transparent);
+  border-color: color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
+}
+
+.create-pl-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: create-pl-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes create-pl-spin {
+  to { transform: rotate(360deg); }
+}
+
+.create-pl-fade-enter-active .create-pl-panel {
+  animation: create-pl-in var(--motion-duration-standard) var(--motion-ease-out);
+}
+.create-pl-fade-leave-active .create-pl-panel {
+  animation: create-pl-in var(--motion-duration-quick) var(--motion-ease-out) reverse;
+}
+.create-pl-fade-enter-active,
+.create-pl-fade-leave-active {
+  transition: opacity var(--motion-duration-quick) var(--motion-ease-standard);
+}
+.create-pl-fade-enter-from,
+.create-pl-fade-leave-to {
+  opacity: 0;
+}
+
+@keyframes create-pl-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* 网络导入移动端 */
+@media (max-width: 768px) {
+  .netimport-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: calc(var(--mobile-safe-top) + 12px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 12px);
+    background: var(--mobile-scrim);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .netimport-overlay .overlay-drag-bar {
+    display: none;
+  }
+
+  .netimport-panel {
+    width: min(440px, 100%);
+    max-height: min(82dvh, 680px);
+    display: flex;
+  }
+
+  .netimport-panel .glass {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .netimport-panel .liquid-glass__content {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .netimport-panel__content {
+    border-radius: var(--mobile-card-radius);
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .netimport-panel__content::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.36);
+    margin: -8px auto 12px;
+  }
+
+  .netimport-header {
+    margin-bottom: 16px;
+  }
+
+  .netimport-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .netimport-close-btn,
+  .netimport-back-btn {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .netimport-overlay .import-option {
+    min-height: 60px;
+    padding: 12px 14px;
+    border-radius: var(--mobile-card-radius-small);
+    touch-action: manipulation;
+  }
+
+  .platform-grid {
+    gap: 5px;
+    margin-bottom: 18px;
+  }
+
+  .platform-card {
+    padding: 8px 10px;
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .platform-name {
+    font-size: 11px;
+  }
+
+  .input-row {
+    flex-direction: column;
+  }
+
+  .netimport-input {
+    min-height: var(--mobile-touch-target);
+    font-size: 16px;
+  }
+
+  .netimport-btn {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+    width: 100%;
+  }
+
+  /* 创建歌单移动端 */
+  .create-pl-overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: calc(var(--mobile-safe-top) + 12px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 12px);
+    background: var(--mobile-scrim);
+    backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+    -webkit-backdrop-filter: saturate(var(--mobile-glass-saturate)) blur(var(--mobile-glass-blur));
+  }
+
+  .create-pl-overlay .overlay-drag-bar {
+    display: none;
+  }
+
+  .create-pl-panel {
+    width: min(440px, 100%);
+    max-height: min(82dvh, 680px);
+    display: flex;
+  }
+
+  .create-pl-panel .glass {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .create-pl-panel .liquid-glass__content {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .create-pl-panel__content {
+    border-radius: var(--mobile-card-radius);
+    padding: 20px 16px calc(var(--mobile-safe-bottom) + 16px);
+    height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .create-pl-panel__content::before {
+    content: '';
+    display: block;
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(120, 120, 128, 0.36);
+    margin: -8px auto 12px;
+  }
+
+  .create-pl-header {
+    margin-bottom: 16px;
+  }
+
+  .create-pl-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .create-pl-close-btn {
+    min-width: var(--mobile-touch-target);
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+  }
+
+  .create-pl-form .field-input,
+  .create-pl-form .field-textarea {
+    min-height: var(--mobile-touch-target);
+    font-size: 16px;
+  }
+
+  .create-pl-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .create-pl-btn {
+    min-height: var(--mobile-touch-target);
+    border-radius: var(--mobile-control-radius);
+    touch-action: manipulation;
+    width: 100%;
+  }
 }
 </style>

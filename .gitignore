@@ -29,3 +29,6 @@ lx-music-desktop-master
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri generated
+src-tauri/gen/
