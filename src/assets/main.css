@@ -1002,18 +1002,6 @@ html[data-theme='dark'] #app {
   animation-name: vt-fade-in;
 }
 
-/* Settings category switch */
-::view-transition-old(settings-panel) {
-  animation-name: vt-fade-slide-out;
-  animation-duration: var(--motion-duration-quick);
-  animation-timing-function: var(--motion-ease-standard);
-}
-::view-transition-new(settings-panel) {
-  animation-name: vt-fade-slide-in;
-  animation-duration: var(--motion-duration-quick);
-  animation-timing-function: var(--motion-ease-standard);
-}
-
 /* Cover morph between mini player and full player */
 ::view-transition-old(player-cover),
 ::view-transition-new(player-cover) {
