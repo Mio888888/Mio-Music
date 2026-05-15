@@ -4,7 +4,7 @@
       <template #body>
         <router-view v-slot="{ Component }">
           <KeepAlive exclude="list">
-            <component :is="Component" :key="$route.fullPath" style="view-transition-name: route-content" />
+            <component :is="Component" :key="$route.fullPath" class="vt-route" />
           </KeepAlive>
         </router-view>
       </template>

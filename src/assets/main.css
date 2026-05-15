@@ -948,6 +948,16 @@ html[data-theme='dark'] #app {
 
 /* ============ View Transition API ============ */
 
+/* Only activate view-transition-name during active transitions to avoid
+   permanent stacking context that breaks backdrop-filter on fixed elements
+   (e.g. the player bar). */
+[data-route-transition] .vt-page {
+  view-transition-name: page-content;
+}
+[data-route-transition] .vt-route {
+  view-transition-name: route-content;
+}
+
 /* Route-level transitions */
 ::view-transition-old(route-content),
 ::view-transition-new(route-content) {

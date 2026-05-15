@@ -62,6 +62,12 @@ const router = createRouter({
 
 // View Transition API integration for route changes
 let pendingTransitionResolve: (() => void) | null = null
+let activeTransition: ViewTransition | null = null
+
+function cleanupRouteTransition() {
+  delete document.documentElement.dataset.routeTransition
+  activeTransition = null
+}
 
 router.beforeEach((to, from) => {
   if (pendingTransitionResolve) {
@@ -85,11 +91,13 @@ router.beforeEach((to, from) => {
 
   document.documentElement.dataset.routeTransition = routeDirection.value
 
-  document.startViewTransition(() =>
+  activeTransition = document.startViewTransition(() =>
     new Promise<void>((resolve) => {
       pendingTransitionResolve = resolve
     })
   )
+
+  activeTransition.finished.finally(cleanupRouteTransition)
 })
 
 router.afterEach(() => {
@@ -106,6 +114,7 @@ router.onError(() => {
     pendingTransitionResolve()
     pendingTransitionResolve = null
   }
+  cleanupRouteTransition()
 })
 
 const getRoutePreloadEnabled = (): boolean => {

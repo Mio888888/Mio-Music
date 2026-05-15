@@ -2,7 +2,7 @@
   <Provider v-if="!$route.path.includes('desktop-lyric')">
     <div class="app-route-stage">
       <router-view v-slot="{ Component }">
-        <component :is="Component" style="view-transition-name: page-content" />
+        <component :is="Component" class="vt-page" />
       </router-view>
     </div>
   </Provider>
