@@ -188,94 +188,15 @@ jobs:
       - name: Install frontend dependencies
         run: yarn install
 
-      - name: Initialize Android project
-        run: npx tauri android init
-
-      - name: Patch Android native audio context bridge and icons
+      - name: Verify committed Android project
         run: |
-          python3 <<'PY'
-          from pathlib import Path
+          test -f src-tauri/gen/android/app/src/main/AndroidManifest.xml
+          test -f src-tauri/gen/android/app/build.gradle.kts
+          test -f src-tauri/gen/android/gradlew
+          grep -q 'initAndroidContext(this)' src-tauri/gen/android/app/src/main/java/com/vant/Mio/Music/MainActivity.kt
+          grep -q 'android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK' src-tauri/gen/android/app/src/main/AndroidManifest.xml
+          grep -q 'android:name=".MusicService"' src-tauri/gen/android/app/src/main/AndroidManifest.xml
 
-          main = Path("src-tauri/gen/android/app/src/main/java/com/vant/Mio/Music/MainActivity.kt")
-          if not main.exists():
-              raise SystemExit("Generated MainActivity.kt not found")
-
-          main_text = main.read_text()
-          if "companion object {" not in main_text:
-              main_text = main_text.replace(
-                  "class MainActivity : TauriActivity() {",
-                  "class MainActivity : TauriActivity() {\n  companion object {\n    init { System.loadLibrary(\"mio_lib\") }\n  }",
-              )
-          if "external fun initAndroidContext" not in main_text:
-              main_text = main_text.replace(
-                  "class MainActivity : TauriActivity() {",
-                  "class MainActivity : TauriActivity() {\n  private external fun initAndroidContext(activity: android.app.Activity)",
-              )
-          if "initAndroidContext(this)" not in main_text:
-              main_text = main_text.replace(
-                  "  override fun onCreate(savedInstanceState: Bundle?) {\n    enableEdgeToEdge()",
-                  "  override fun onCreate(savedInstanceState: Bundle?) {\n    initAndroidContext(this)\n    enableEdgeToEdge()",
-              )
-          main.write_text(main_text)
-
-          icon_source = Path("src-tauri/icons/android")
-          res_dir = Path("src-tauri/gen/android/app/src/main/res")
-          if not icon_source.exists():
-              raise SystemExit("Android icon source directory not found")
-          if not res_dir.exists():
-              raise SystemExit("Generated Android res directory not found")
-
-          for item in icon_source.rglob("*"):
-              if item.is_file():
-                  target = res_dir / item.relative_to(icon_source)
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  target.write_bytes(item.read_bytes())
-          PY
-
-      - name: Add Android permissions
-        run: |
-          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
-          if [ ! -f "$MANIFEST" ]; then
-            echo "::error::AndroidManifest.xml not found"
-            exit 1
-          fi
-          python3 <<'PY'
-          from pathlib import Path
-          manifest = Path("src-tauri/gen/android/app/src/main/AndroidManifest.xml")
-          text = manifest.read_text()
-          permissions = [
-              "android.permission.INTERNET",
-              "android.permission.READ_EXTERNAL_STORAGE",
-              "android.permission.WRITE_EXTERNAL_STORAGE",
-              "android.permission.READ_MEDIA_AUDIO",
-              "android.permission.FOREGROUND_SERVICE",
-              "android.permission.WAKE_LOCK",
-              "android.permission.MODIFY_AUDIO_SETTINGS",
-              "android.permission.RECORD_AUDIO",
-          ]
-          for perm in permissions:
-              if perm not in text:
-                  text = text.replace(
-                      "</manifest>",
-                      f'    <uses-permission android:name="{perm}" />\n</manifest>',
-                  )
-          manifest.write_text(text)
-          print(f"Patched {manifest} with permissions")
-          for line in text.splitlines():
-              if "uses-permission" in line:
-                  print(line.strip())
-          PY
-
-      - name: Debug Android config
-        run: |
-          echo "=== AndroidManifest.xml ==="
-          cat src-tauri/gen/android/app/src/main/AndroidManifest.xml
-          echo ""
-          echo "=== build.gradle.kts (first 80 lines) ==="
-          head -80 src-tauri/gen/android/app/build.gradle.kts
-          echo ""
-          echo "=== gradle.properties ==="
-          cat -A src-tauri/gen/android/gradle.properties
 
       - name: Configure Android release signing
         shell: bash
@@ -293,8 +214,8 @@ jobs:
             fi
           done
 
-          ANDROID_PROJECT_DIR="src-tauri/gen/android"
           KEYSTORE_PATH="$RUNNER_TEMP/keystore.jks"
+          KEYSTORE_PROPERTIES="$RUNNER_TEMP/keystore.properties"
 
           printf '%s' "$ANDROID_KEY_BASE64" | base64 --decode > "$KEYSTORE_PATH"
           chmod 600 "$KEYSTORE_PATH"
@@ -303,76 +224,11 @@ jobs:
             printf '%s\n' "keyAlias=${ANDROID_KEY_ALIAS}"
             printf '%s\n' "password=${ANDROID_KEY_PASSWORD}"
             printf '%s\n' "storeFile=${KEYSTORE_PATH}"
-          } > "$ANDROID_PROJECT_DIR/keystore.properties"
-          chmod 600 "$ANDROID_PROJECT_DIR/keystore.properties"
+          } > "$KEYSTORE_PROPERTIES"
+          chmod 600 "$KEYSTORE_PROPERTIES"
+          echo "ANDROID_KEYSTORE_PROPERTIES=$KEYSTORE_PROPERTIES" >> "$GITHUB_ENV"
 
-          python3 <<'PY'
-          from pathlib import Path
-
-          gradle_file = Path("src-tauri/gen/android/app/build.gradle.kts")
-          text = gradle_file.read_text()
-
-          if "import java.io.FileInputStream" not in text:
-              if "import java.util.Properties" in text:
-                  text = text.replace(
-                      "import java.util.Properties\n",
-                      "import java.io.FileInputStream\nimport java.util.Properties\n",
-                      1,
-                  )
-              else:
-                  text = "import java.io.FileInputStream\nimport java.util.Properties\n" + text
-
-          keystore_marker = 'val keystorePropertiesFile = rootProject.file("keystore.properties")'
-          if keystore_marker not in text:
-              android_marker = "\nandroid {"
-              if android_marker not in text:
-                  raise SystemExit("Unable to find android block in generated build.gradle.kts")
-              keystore_block = (
-                  'val keystorePropertiesFile = rootProject.file("keystore.properties")\n'
-                  "val keystoreProperties = Properties().apply {\n"
-                  "    FileInputStream(keystorePropertiesFile).use { load(it) }\n"
-                  "}\n\n"
-              )
-              text = text.replace(android_marker, "\n" + keystore_block + "android {", 1)
-
-          signing_marker = 'keyAlias = keystoreProperties["keyAlias"] as String'
-          if signing_marker not in text:
-              lines = text.splitlines(keepends=True)
-              for index, line in enumerate(lines):
-                  if line.strip() == "buildTypes {":
-                      indent = line[: len(line) - len(line.lstrip())]
-                      signing_block = [
-                          f"{indent}signingConfigs {{\n",
-                          f'{indent}    create("release") {{\n',
-                          f'{indent}        keyAlias = keystoreProperties["keyAlias"] as String\n',
-                          f'{indent}        keyPassword = keystoreProperties["password"] as String\n',
-                          f'{indent}        storeFile = file(keystoreProperties["storeFile"] as String)\n',
-                          f'{indent}        storePassword = keystoreProperties["password"] as String\n',
-                          f"{indent}    }}\n",
-                          f"{indent}}}\n",
-                          "\n",
-                      ]
-                      lines[index:index] = signing_block
-                      text = "".join(lines)
-                      break
-              else:
-                  raise SystemExit("Unable to find buildTypes block in generated build.gradle.kts")
-
-          release_signing_marker = 'signingConfig = signingConfigs.getByName("release")'
-          if release_signing_marker not in text:
-              lines = text.splitlines(keepends=True)
-              for index, line in enumerate(lines):
-                  if 'getByName("release")' in line and line.strip().endswith("{"):
-                      indent = line[: len(line) - len(line.lstrip())] + "    "
-                      lines.insert(index + 1, f"{indent}{release_signing_marker}\n")
-                      text = "".join(lines)
-                      break
-              else:
-                  raise SystemExit("Unable to find release build type in generated build.gradle.kts")
-
-          gradle_file.write_text(text)
-          print(f"Patched {gradle_file} for release signing")
-          PY
+          grep -q 'signingConfig = signingConfigs.getByName("release")' src-tauri/gen/android/app/build.gradle.kts
 
       - name: Build signed Android APK
         id: tauri_build
@@ -389,6 +245,9 @@ jobs:
       - name: Fail if build failed
         if: steps.tauri_build.outcome == 'failure'
         run: exit 1
+
+      - name: Verify Android project unchanged
+        run: git diff --exit-code -- src-tauri/gen
 
       - name: Verify signed Android APKs
         shell: bash
