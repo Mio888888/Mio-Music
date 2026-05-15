@@ -12,24 +12,40 @@ impl MediaControl {
 
     pub fn update_now_playing(
         &mut self,
-        _title: &str,
-        _artist: &str,
-        _album: &str,
-        _duration_secs: f64,
-        _cover_url: Option<&str>,
+        title: &str,
+        artist: &str,
+        album: &str,
+        duration_secs: f64,
+        cover_url: Option<&str>,
     ) {
         #[cfg(target_os = "macos")]
         {
-            self.update_now_playing_macos(_title, _artist, _album, _duration_secs, _cover_url);
+            self.update_now_playing_macos(title, artist, album, duration_secs, cover_url);
+        }
+        #[cfg(target_os = "android")]
+        {
+            self.update_now_playing_android(title, artist, album, duration_secs, cover_url);
         }
         self.initialized = true;
     }
 
-    pub fn set_playback_state(&self, _playing: bool) {
+    pub fn set_playback_state(&self, playing: bool) {
         #[cfg(target_os = "macos")]
         {
-            self.set_playback_state_macos(_playing);
+            self.set_playback_state_macos(playing);
         }
+        #[cfg(target_os = "android")]
+        {
+            self.set_playback_state_android(playing);
+        }
+    }
+
+    pub fn update_playback_position(&self, position_secs: f64, duration_secs: f64) {
+        #[cfg(target_os = "android")]
+        {
+            self.update_playback_position_android(position_secs, duration_secs);
+        }
+        let _ = (position_secs, duration_secs);
     }
 
     #[allow(dead_code)]
@@ -40,6 +56,108 @@ impl MediaControl {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Android — JNI calls to MusicService static methods
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "android")]
+impl MediaControl {
+    fn with_env<F, R>(f: F) -> Option<R>
+    where
+        F: FnOnce(&mut jni::JNIEnv, &jni::objects::JClass) -> R,
+    {
+        let cached = match crate::MUSIC_SERVICE_CLASS.get() {
+            Some(g) => g,
+            None => { eprintln!("[MediaControl] MUSIC_SERVICE_CLASS not cached"); return None; }
+        };
+        let vm_ptr = ndk_context::android_context().vm() as *mut _;
+        let vm = match unsafe { jni::JavaVM::from_raw(vm_ptr) } {
+            Ok(vm) => vm,
+            Err(e) => { eprintln!("[MediaControl] get_java_vm: {e}"); return None; }
+        };
+        let mut env = match vm.attach_current_thread() {
+            Ok(env) => env,
+            Err(e) => { eprintln!("[MediaControl] attach_thread: {e}"); return None; }
+        };
+        let obj = cached.as_obj();
+        let class: &jni::objects::JClass = obj.into();
+        let result = f(&mut env, class);
+        Some(result)
+    }
+
+    fn update_now_playing_android(
+        &self,
+        title: &str,
+        artist: &str,
+        album: &str,
+        duration_secs: f64,
+        cover_url: Option<&str>,
+    ) {
+        Self::with_env(|env, class| {
+            let _ = Self::call_start_with_class(env, class);
+            let j_title = env.new_string(title).unwrap_or_default();
+            let j_artist = env.new_string(artist).unwrap_or_default();
+            let j_album = env.new_string(album).unwrap_or_default();
+            let j_cover = env.new_string(cover_url.unwrap_or("")).unwrap_or_default();
+
+            let _ = env.call_static_method(
+                class,
+                "updateNowPlaying",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;)V",
+                &[
+                    jni::objects::JValue::Object(&j_title),
+                    jni::objects::JValue::Object(&j_artist),
+                    jni::objects::JValue::Object(&j_album),
+                    jni::objects::JValue::Long((duration_secs * 1000.0) as i64),
+                    jni::objects::JValue::Object(&j_cover),
+                ],
+            );
+        });
+    }
+
+    fn set_playback_state_android(&self, playing: bool) {
+        Self::with_env(|env, class| {
+            let _ = env.call_static_method(
+                class,
+                "setPlaying",
+                "(Z)V",
+                &[jni::objects::JValue::Bool(if playing { 1 } else { 0 })],
+            );
+        });
+    }
+
+    fn call_start_with_class(env: &mut jni::JNIEnv, class: &jni::objects::JClass) -> Result<(), jni::errors::Error> {
+        let activity = unsafe {
+            jni::objects::JObject::from_raw(
+                ndk_context::android_context().context() as jni::sys::jobject,
+            )
+        };
+        env.call_static_method(
+            class, "start", "(Landroid/content/Context;)V",
+            &[jni::objects::JValue::Object(&activity)],
+        )?;
+        Ok(())
+    }
+
+    fn update_playback_position_android(&self, position_secs: f64, duration_secs: f64) {
+        Self::with_env(|env, class| {
+            let _ = env.call_static_method(
+                class,
+                "updatePlaybackPosition",
+                "(JJ)V",
+                &[
+                    jni::objects::JValue::Long((position_secs * 1000.0) as i64),
+                    jni::objects::JValue::Long((duration_secs * 1000.0) as i64),
+                ],
+            );
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// macOS — MPNowPlayingInfoCenter
+// ---------------------------------------------------------------------------
 
 #[cfg(target_os = "macos")]
 use objc::runtime::Object;
@@ -86,7 +204,6 @@ impl MediaControl {
             set_str(dict, "artist", artist);
             set_str(dict, "album", album);
 
-            // 持续时间
             let num_cls = match Class::get("NSNumber") {
                 Some(c) => c,
                 None => return,
@@ -97,7 +214,6 @@ impl MediaControl {
             let dur_key = Self::ns_string("elapsedPlaybackTime");
             let _: () = msg_send![dict, setObject: dur_val forKey: dur_key];
 
-            // 播放速率
             let rate_val: *mut Object = msg_send![num_cls, numberWithDouble: 1.0];
             let rate_key = Self::ns_string("playbackRate");
             let _: () = msg_send![dict, setObject: rate_val forKey: rate_key];
@@ -120,7 +236,6 @@ impl MediaControl {
                 return;
             }
 
-            // MPNowPlayingPlaybackStatePlaying = 1, Paused = 2
             let state: u64 = if playing { 1 } else { 2 };
             let num_cls = match Class::get("NSNumber") {
                 Some(c) => c,
@@ -146,9 +261,6 @@ impl MediaControl {
                 return;
             }
 
-            // 启用 play/pause 命令按钮
-            // 注意：完整的 handler 注册需要 Objective-C block FFI (block crate)
-            // 这里仅启用命令按钮
             for _cmd_sel in ["playCommand", "pauseCommand", "nextTrackCommand", "previousTrackCommand"] {
                 let _sel = sel!(playCommand);
                 let cmd: *mut Object = msg_send![center, playCommand];
@@ -157,7 +269,7 @@ impl MediaControl {
                 }
             }
 
-            let _ = player; // 抑制未使用警告，后续接入 block FFI 时使用
+            let _ = player;
         }
     }
 

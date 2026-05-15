@@ -19,6 +19,7 @@ import Provider from '@/components/layout/Provider.vue'
 import GlobalContextMenu from '@/components/ContextMenu/GlobalContextMenu.vue'
 import { useAuthStore } from '@/store/Auth'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { setupMediaButtonListener } from '@/utils/audio/globaPlayList'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -26,6 +27,7 @@ const authStore = useAuthStore()
 onMounted(async () => {
   if (window.location.hash.includes('/desktop-lyric')) return
 
+  setupMediaButtonListener()
   LocalUserDetailStore().init()
   const url = new URL(window.location.href)
   const code = url.searchParams.get('code')

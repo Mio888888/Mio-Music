@@ -1290,12 +1290,17 @@ impl PlayerEngine {
 
             // 时间：每 6 tick 发一次（~5Hz，200ms 足够 UI 更新）
             if self.poll_tick % 6 == 0 && p.is_playing() {
+                let pos = p.position();
+                let dur = p.duration();
                 let _ = self.app_handle.emit(
                     "player:time",
                     serde_json::json!({
-                        "position": p.position(), "duration": p.duration(),
+                        "position": pos, "duration": dur,
                     }),
                 );
+                crate::player::media_control::MEDIA_CONTROL
+                    .lock()
+                    .update_playback_position(pos, dur);
             }
         }
 

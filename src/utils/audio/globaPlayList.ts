@@ -35,6 +35,34 @@ let preloadedReady = false
 let unlistenPreload: UnlistenFn | null = null
 let prefetchTimer: ReturnType<typeof setTimeout> | null = null
 
+// ===== Android 通知栏/锁屏媒体按钮 =====
+// Rust 端 nativePlayerCommand 已直接控制播放器，前端只负责 UI 状态同步
+let _mediaButtonUnlisten: UnlistenFn | null = null
+
+export async function setupMediaButtonListener() {
+  if (_mediaButtonUnlisten) return
+  _mediaButtonUnlisten = await listen<string>('media-button-command', (event) => {
+    const cmd = event.payload
+    const audio = ControlAudioStore()
+    switch (cmd) {
+      case 'play':
+      case 'resume':
+        audio.Audio.isPlay = true
+        break
+      case 'pause':
+      case 'stop':
+        audio.Audio.isPlay = false
+        break
+      case 'next':
+        playNext()
+        break
+      case 'prev':
+        playPrevious()
+        break
+    }
+  })
+}
+
 /** 预加载提前量（秒）：剩余时长低于此值时开始预加载 */
 const PREFETCH_LEAD_TIME = 30
 const MIN_PLAYABLE_DURATION = 20

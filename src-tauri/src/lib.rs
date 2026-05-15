@@ -8,6 +8,12 @@ mod download;
 mod plugin;
 mod player;
 
+#[cfg(target_os = "android")]
+static ANDROID_APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
+
+#[cfg(target_os = "android")]
+static MUSIC_SERVICE_CLASS: std::sync::OnceLock<jni::objects::GlobalRef> = std::sync::OnceLock::new();
+
 use db::AppDb;
 use download::manager::DownloadManager;
 use plugin::manager::PluginManager;
@@ -238,6 +244,8 @@ pub fn run() {
             }
 
             let app_handle = app.handle().clone();
+            #[cfg(target_os = "android")]
+            let _ = ANDROID_APP_HANDLE.set(app_handle.clone());
             let download_manager = DownloadManager::new(&app_data_dir, app_handle.clone());
             app.manage(download_manager);
 
@@ -504,7 +512,7 @@ pub fn run() {
 #[cfg(target_os = "android")]
 #[no_mangle]
 pub extern "system" fn Java_com_vant_Mio_Music_MainActivity_initAndroidContext(
-    env: jni::JNIEnv,
+    mut env: jni::JNIEnv,
     _this: jni::objects::JObject,
     activity: jni::objects::JObject,
 ) {
@@ -529,6 +537,67 @@ pub extern "system" fn Java_com_vant_Mio_Music_MainActivity_initAndroidContext(
     let activity_ptr = global_activity.as_obj().as_raw() as *mut c_void;
     std::mem::forget(global_activity);
 
+    // Cache MusicService class from main thread (JNI FindClass uses app ClassLoader here)
+    if let Ok(class) = env.find_class("com/vant/Mio/Music/MusicService") {
+        if let Ok(global_ref) = env.new_global_ref(&class) {
+            let _ = MUSIC_SERVICE_CLASS.set(global_ref);
+        }
+    }
+
     unsafe { ndk_context::initialize_android_context(vm_ptr, activity_ptr); }
     eprintln!("[Android] ndk-context initialized from MainActivity");
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_vant_Mio_Music_MusicService_nativePlayerCommand(
+    mut _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    cmd: jni::objects::JString,
+) {
+    let cmd_str: String = match _env.get_string(&cmd) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            eprintln!("[Android] nativePlayerCommand get_string failed: {e}");
+            return;
+        }
+    };
+
+    // Directly control the player (more reliable than event→JS→invoke chain)
+    if let Some(app_handle) = ANDROID_APP_HANDLE.get() {
+        if let Some(player) = app_handle.try_state::<SharedPlayer>() {
+            match cmd_str.as_str() {
+                "play" | "resume" => {
+                    player.lock().resume();
+                }
+                "pause" => {
+                    player.lock().pause();
+                }
+                "stop" => {
+                    player.lock().pause();
+                }
+                _ => {}
+            }
+        }
+        // Emit to frontend for state sync (no invoke calls)
+        use tauri::Emitter;
+        let _ = app_handle.emit("media-button-command", &cmd_str);
+    }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_vant_Mio_Music_MusicService_nativePlayerSeek(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    position_ms: jni::sys::jlong,
+) {
+    let position_secs = (position_ms as f64) / 1000.0;
+    if let Some(app_handle) = ANDROID_APP_HANDLE.get() {
+        if let Some(player) = app_handle.try_state::<SharedPlayer>() {
+            player.lock().seek(position_secs);
+        }
+        use tauri::Emitter;
+        let _ = app_handle.emit("media-button-seek", position_secs);
+    }
 }
