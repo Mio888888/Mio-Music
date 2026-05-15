@@ -958,6 +958,14 @@ html[data-theme='dark'] #app {
   view-transition-name: route-content;
 }
 
+/* Suppress the root transition — only route-content / page-content should
+   animate.  The root group covers the entire viewport and its default
+   cross-fade breaks backdrop-filter on fixed elements (player bar). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none !important;
+}
+
 /* Route-level transitions */
 ::view-transition-old(route-content),
 ::view-transition-new(route-content) {
