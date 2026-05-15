@@ -2,17 +2,18 @@
  * 图片 URL 代理工具。
  *
  * 桌面端：保留原始 HTTP(S) 链接，加载失败时通过 imgproxy:// 兜底。
- * 移动端（Android）：主动将所有外部图片转为 imgproxy:// 协议，
- *   因为 Android WebView origin 为 https://tauri.localhost，
- *   音乐 CDN 会拒绝非本站 Referer 的图片请求。
+ * 移动端（Android）：主动将所有外部图片转为 http://imgproxy.localhost/ 代理 URL，
+ *   因为 Android WebView 不支持自定义 scheme（ERR_UNKNOWN_URL_SCHEME），
+ *   需使用 WRY 的 workaround 格式让 shouldInterceptRequest 拦截后路由到 Rust 处理器。
  */
 
 const PROXY_PREFIX = 'imgproxy://localhost/'
+const PROXY_PREFIX_ANDROID = 'http://imgproxy.localhost/'
 const FALLBACK_MARK = 'imageProxyFallbackApplied'
 const isMobile = /android|iphone|ipad/i.test(navigator.userAgent)
 
 export function isProxiedImageUrl(url: string): boolean {
-  return url.startsWith(PROXY_PREFIX) || url.startsWith('imgproxy://')
+  return url.startsWith(PROXY_PREFIX) || url.startsWith('imgproxy://') || url.startsWith(PROXY_PREFIX_ANDROID)
 }
 
 export function isRemoteHttpImageUrl(url: string): boolean {
@@ -20,26 +21,34 @@ export function isRemoteHttpImageUrl(url: string): boolean {
 }
 
 export function canProxyImageUrl(url: string): boolean {
-  return !!url && isRemoteHttpImageUrl(url) && !isProxiedImageUrl(url)
+  if (!url) return false
+  if (isProxiedImageUrl(url)) return false
+  // On Android, the workaround prefix is http://imgproxy.localhost/ which startsWith http://,
+  // so we must exclude it before checking isRemoteHttpImageUrl
+  return isRemoteHttpImageUrl(url)
 }
 
 export function getOriginalImageUrl(url: string): string {
-  if (!url.startsWith(PROXY_PREFIX)) return url
-
-  const encoded = url.slice(PROXY_PREFIX.length)
-  try {
-    return decodeURIComponent(encoded)
-  } catch {
-    return url
+  if (url.startsWith(PROXY_PREFIX)) {
+    const encoded = url.slice(PROXY_PREFIX.length)
+    try { return decodeURIComponent(encoded) } catch { return url }
   }
+  if (url.startsWith(PROXY_PREFIX_ANDROID)) {
+    const encoded = url.slice(PROXY_PREFIX_ANDROID.length)
+    try { return decodeURIComponent(encoded) } catch { return url }
+  }
+  return url
 }
 
 /**
- * 将外部图片 URL 转为 imgproxy:// 自定义协议 URL。
+ * 将外部图片 URL 转为代理 URL。
+ * 桌面端：imgproxy://localhost/{encoded}
+ * Android：http://imgproxy.localhost/{encoded}（WRY workaround，Android WebView 不支持自定义 scheme）
  */
 export function proxyImageUrl(url: string): string {
   if (!canProxyImageUrl(url)) return url
-  return `${PROXY_PREFIX}${encodeURIComponent(url)}`
+  const prefix = isMobile ? PROXY_PREFIX_ANDROID : PROXY_PREFIX
+  return `${prefix}${encodeURIComponent(url)}`
 }
 
 /**
