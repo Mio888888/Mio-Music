@@ -63,10 +63,15 @@ const router = createRouter({
 // View Transition API integration for route changes
 let pendingTransitionResolve: (() => void) | null = null
 let activeTransition: ViewTransition | null = null
+let transitionTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 function cleanupRouteTransition() {
   delete document.documentElement.dataset.routeTransition
   activeTransition = null
+  if (transitionTimeoutId) {
+    clearTimeout(transitionTimeoutId)
+    transitionTimeoutId = null
+  }
 }
 
 router.beforeEach((to, from) => {
@@ -84,7 +89,9 @@ router.beforeEach((to, from) => {
     !('startViewTransition' in document) ||
     to.path === from.path ||
     to.path.includes('desktop-lyric') ||
-    to.path.includes('recognition-worker')
+    to.path.includes('recognition-worker') ||
+    to.path.includes('settings') ||
+    from.path.includes('settings')
   ) {
     return
   }
@@ -96,6 +103,13 @@ router.beforeEach((to, from) => {
       pendingTransitionResolve = resolve
     })
   )
+
+  transitionTimeoutId = setTimeout(() => {
+    if (activeTransition) {
+      try { activeTransition.skipTransition() } catch {}
+      cleanupRouteTransition()
+    }
+  }, 800)
 
   activeTransition.finished.finally(cleanupRouteTransition)
 })

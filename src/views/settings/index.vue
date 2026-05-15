@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import {
@@ -15,14 +15,14 @@ import {
 } from 'tdesign-icons-vue-next'
 
 import AppearanceSection from './sections/AppearanceSection.vue'
-import AISection from './sections/AISection.vue'
-import PlaybackSection from './sections/PlaybackSection.vue'
-import AudioEffectsSection from './sections/AudioEffectsSection.vue'
-import HotkeySection from './sections/HotkeySection.vue'
-import PluginSection from './sections/PluginSection.vue'
-import MusicSourceSection from './sections/MusicSourceSection.vue'
-import StorageSection from './sections/StorageSection.vue'
-import AboutSection from './sections/AboutSection.vue'
+const AISection = defineAsyncComponent(() => import('./sections/AISection.vue'))
+const PlaybackSection = defineAsyncComponent(() => import('./sections/PlaybackSection.vue'))
+const AudioEffectsSection = defineAsyncComponent(() => import('./sections/AudioEffectsSection.vue'))
+const HotkeySection = defineAsyncComponent(() => import('./sections/HotkeySection.vue'))
+const PluginSection = defineAsyncComponent(() => import('./sections/PluginSection.vue'))
+const MusicSourceSection = defineAsyncComponent(() => import('./sections/MusicSourceSection.vue'))
+const StorageSection = defineAsyncComponent(() => import('./sections/StorageSection.vue'))
+const AboutSection = defineAsyncComponent(() => import('./sections/AboutSection.vue'))
 import SettingsSearch from '@/components/SettingsSearch.vue'
 import type { SearchItem } from './searchIndex'
 
