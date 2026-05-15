@@ -11,6 +11,7 @@ import { musicSdk } from '@/services/musicSdk'
 import PluginRunner from '@/utils/plugin/PluginRunner'
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { platform } from '@tauri-apps/plugin-os'
 import i18n from '@/locales'
 
 export { isLoadingSong } from './loadingState'
@@ -34,6 +35,7 @@ let preloadedSong: SongList | null = null
 let preloadedReady = false
 let unlistenPreload: UnlistenFn | null = null
 let prefetchTimer: ReturnType<typeof setTimeout> | null = null
+let isAndroidPlatform: boolean | null = null
 
 // ===== Android 通知栏/锁屏媒体按钮 =====
 // Rust 端 nativePlayerCommand 已直接控制播放器，前端只负责 UI 状态同步
@@ -435,6 +437,23 @@ function syncSeamlessConfig() {
   })
 }
 
+async function isAndroid(): Promise<boolean> {
+  if (isAndroidPlatform === null) {
+    try {
+      isAndroidPlatform = platform() === 'android'
+    } catch {
+      isAndroidPlatform = false
+    }
+  }
+  return isAndroidPlatform
+}
+
+async function shouldNativePrefetch(): Promise<boolean> {
+  const setting = playSetting()
+  if (setting.isSeamlessTransition) return true
+  return isAndroid()
+}
+
 let cacheConfigSynced = false
 
 async function syncCacheConfig() {
@@ -461,6 +480,35 @@ async function ensurePreloadListener() {
 }
 
 /** 实际执行预加载（URL 解析 + 下载到 secondary slot） */
+async function syncAndroidNativeQueue(startIndex = _playIndex) {
+  if (!(await isAndroid())) return
+  const store = LocalUserDetailStore()
+  if (store.list.length <= 1) return
+
+  const items: Array<{ url: string; cacheKey?: string }> = []
+  const maxItems = Math.min(store.list.length - 1, 10)
+  const seen = new Set<string>()
+
+  for (let offset = 1; offset <= maxItems; offset++) {
+    const idx = (startIndex + offset) % store.list.length
+    if (playMode.value === PlayMode.LIST && idx <= startIndex) break
+    const song = store.list[idx]
+    if (!song || song.source === 'local') continue
+    const key = getSongKey(song)
+    if (seen.has(key)) continue
+    seen.add(key)
+    try {
+      const url = await getSongRealUrl(toRaw(song) as any)
+      items.push({ url, cacheKey: buildCacheKey(toRaw(song) as any) })
+    } catch {
+    }
+  }
+
+  if (items.length) {
+    await invoke('player__set_native_queue', { items })
+  }
+}
+
 async function doPrefetchNext() {
   const nextSong = computeNextSong()
   if (!nextSong || nextSong.source === 'local') return
@@ -482,9 +530,8 @@ async function doPrefetchNext() {
  * 调度下一曲预加载：当剩余时长 > 30s 时延迟触发，否则立即执行。
  * 手动切歌会通过 invalidatePrefetch() 取消待执行的 timer。
  */
-export function scheduleNextPrefetch() {
-  const setting = playSetting()
-  if (!setting.isSeamlessTransition) return
+export async function scheduleNextPrefetch() {
+  if (!(await shouldNativePrefetch())) return
 
   syncSeamlessConfig()
   ensurePreloadListener()
@@ -619,6 +666,7 @@ export async function playSong(song: SongList) {
 
     // 播放成功后调度预加载
     scheduleNextPrefetch()
+    syncAndroidNativeQueue(_playIndex)
   } catch (error: any) {
     if (currentPlayRequestId !== requestId) return
     isLoadingSong.value = false
@@ -721,6 +769,7 @@ function updateSeamlessState() {
   preloadedSong = null
   preloadedReady = false
   scheduleNextPrefetch()
+  syncAndroidNativeQueue(_playIndex)
 }
 
 /**
@@ -756,6 +805,7 @@ export function onCrossfadeSwap() {
   preloadedSong = null
   preloadedReady = false
   scheduleNextPrefetch()
+  syncAndroidNativeQueue(_playIndex)
 }
 
 export function playPrevious(): SongList | null {

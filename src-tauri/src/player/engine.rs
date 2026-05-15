@@ -5,6 +5,7 @@ use crate::player::spectrum::{PositionSource, PositionState, SpectrumSource, Spe
 use crate::player::{AudioSlot, PlaybackState, PlayerSnapshot, SharedPlayer};
 use base64::Engine;
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink, Source};
+use std::collections::VecDeque;
 use std::io::{BufReader, Read as IoRead, Seek as IoSeek, Write as IoWrite};
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
@@ -832,6 +833,7 @@ pub struct PlayerEngine {
     cache_max_size: u64,
     // 全局 EQ 快照：新建播放管线、预加载管线、seek 重建管线后都立即应用。
     eq_settings: EqSettings,
+    native_queue: VecDeque<(String, Option<String>)>,
 }
 
 impl PlayerEngine {
@@ -862,6 +864,7 @@ impl PlayerEngine {
             cache_dir: None,
             cache_max_size: 1073741824, // 1GB default
             eq_settings: EqSettings::default(),
+            native_queue: VecDeque::new(),
         }
     }
 
@@ -1122,9 +1125,11 @@ impl PlayerEngine {
 
     /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
     pub fn preload(&mut self, url: String, cache_key: Option<String>) {
-        // 清除旧的预加载
         self.secondary = None;
+        self.start_preload_job(url, cache_key);
+    }
 
+    fn start_preload_job(&mut self, url: String, cache_key: Option<String>) {
         let stream_handle = match self.ensure_stream_handle() {
             Ok(()) => self.stream_handle.clone().unwrap(),
             Err(_) => return,
@@ -1153,6 +1158,22 @@ impl PlayerEngine {
             };
             let _ = tx.send(result);
         });
+    }
+
+    pub fn set_native_queue(&mut self, items: Vec<(String, Option<String>)>) {
+        self.native_queue = VecDeque::from(items);
+        if self.secondary.is_none() {
+            self.preload_next_from_queue();
+        }
+    }
+
+    fn preload_next_from_queue(&mut self) {
+        if self.secondary.is_some() {
+            return;
+        }
+        if let Some((url, cache_key)) = self.native_queue.pop_front() {
+            self.start_preload_job(url, cache_key);
+        }
     }
 
     /// Gapless 即时切换：将预加载的 secondary 提升为 primary 并开始播放
@@ -1324,12 +1345,26 @@ impl PlayerEngine {
             self.start_crossfade_from_preloaded();
         }
 
-        if let Some(ref p) = self.primary {
-            if p.sink.empty()
-                && !p.sink.is_paused()
-                && self.crossfade.is_none()
-                && !self.ended_emitted
-            {
+        let ended = self.primary.as_ref().map_or(false, |p| {
+            p.sink.empty() && !p.sink.is_paused() && self.crossfade.is_none() && !self.ended_emitted
+        });
+
+        if ended {
+            if self.secondary.is_some() {
+                // Auto-advance to preloaded secondary (does not need WebView JS)
+                let vol = self.volume / 100.0;
+                self.primary = self.secondary.take();
+                if let Some(ref new_p) = self.primary {
+                    new_p.set_volume(vol);
+                    new_p.resume();
+                }
+                self.ended_emitted = false;
+                self.emit_state();
+                self.preload_next_from_queue();
+                let _ = self
+                    .app_handle
+                    .emit("player:auto_advanced", serde_json::json!({}));
+            } else {
                 self.ended_emitted = true;
                 let _ = self
                     .app_handle

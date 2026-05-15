@@ -106,7 +106,11 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       publish('error')
     })
 
-    unlisteners = [un1, un2, un3, un4, un5]
+    const un6 = await listen('player:auto_advanced', () => {
+      publish('slotSwap')
+    })
+
+    unlisteners = [un1, un2, un3, un4, un5, un6]
   }
 
   const swapPrimarySlot = () => {

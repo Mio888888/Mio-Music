@@ -24,6 +24,13 @@ type CmdResult<T> = Result<CommandResult<T>, String>;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NativeQueueItem {
+    pub url: String,
+    pub cache_key: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EqBandPayload {
     pub frequency: f64,
     pub gain: f64,
@@ -278,5 +285,17 @@ pub fn player__set_cache_config(
     max_size: Option<u64>,
 ) -> CmdResult<()> {
     player.lock().set_cache_config(cache_dir, max_size.unwrap_or(1073741824));
+    Ok(CommandResult::ok(()))
+}
+
+#[allow(non_snake_case)]
+#[tauri::command]
+pub fn player__set_native_queue(
+    player: State<'_, SharedPlayer>,
+    items: Vec<NativeQueueItem>,
+) -> CmdResult<()> {
+    player
+        .lock()
+        .set_native_queue(items.into_iter().map(|item| (item.url, item.cache_key)).collect());
     Ok(CommandResult::ok(()))
 }
