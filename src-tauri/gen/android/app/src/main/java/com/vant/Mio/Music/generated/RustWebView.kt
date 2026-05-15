@@ -37,6 +37,7 @@ class RustWebView(context: Context, val initScripts: Array<String>, val id: Stri
         }
 
 
+        
     }
 
     fun loadUrlMainThread(url: String) {
@@ -94,5 +95,5 @@ class RustWebView(context: Context, val initScripts: Array<String>, val id: Stri
         return cookieManager.getCookie(url)
     }
 
-
+    
 }

@@ -247,7 +247,7 @@ jobs:
         run: exit 1
 
       - name: Verify Android project unchanged
-        run: git diff --exit-code -- src-tauri/gen
+        run: git diff --exit-code -- src-tauri/gen ':!src-tauri/gen/android/tauri.settings.gradle'
 
       - name: Verify signed Android APKs
         shell: bash

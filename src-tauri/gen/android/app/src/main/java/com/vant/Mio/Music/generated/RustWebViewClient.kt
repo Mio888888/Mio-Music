@@ -96,5 +96,5 @@ class RustWebViewClient(webView: RustWebView, context: Context): WebViewClient()
         }
     }
 
-
+    
 }

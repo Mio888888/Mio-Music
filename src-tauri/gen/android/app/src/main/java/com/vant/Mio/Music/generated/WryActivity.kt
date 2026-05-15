@@ -171,5 +171,5 @@ abstract class WryActivity : AppCompatActivity() {
         return id
     }
 
-
+    
 }
