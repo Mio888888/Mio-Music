@@ -36,7 +36,6 @@ class RustWebView(context: Context, val initScripts: Array<String>, val id: Stri
           isDocumentStartScriptEnabled = false
         }
 
-
         
     }
 
