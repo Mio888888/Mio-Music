@@ -1,5 +1,5 @@
 import { createWebHashHistory, createRouter, type RouteRecordRaw, type RouterOptions } from 'vue-router'
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 
 export const routeDirection = ref<'forward' | 'backward'>('forward')
 
@@ -60,10 +60,52 @@ const router = createRouter({
   routes
 } as RouterOptions)
 
+// View Transition API integration for route changes
+let pendingTransitionResolve: (() => void) | null = null
+
 router.beforeEach((to, from) => {
+  if (pendingTransitionResolve) {
+    pendingTransitionResolve()
+    pendingTransitionResolve = null
+  }
+
   const toDepth = routeDepths[to.name as string] ?? 0
   const fromDepth = routeDepths[from.name as string] ?? 0
   routeDirection.value = toDepth >= fromDepth ? 'forward' : 'backward'
+
+  if (
+    !from.name ||
+    !('startViewTransition' in document) ||
+    to.path === from.path ||
+    to.path.includes('desktop-lyric') ||
+    to.path.includes('recognition-worker')
+  ) {
+    return
+  }
+
+  document.documentElement.dataset.routeTransition = routeDirection.value
+
+  document.startViewTransition(() =>
+    new Promise<void>((resolve) => {
+      pendingTransitionResolve = resolve
+    })
+  )
+})
+
+router.afterEach(() => {
+  nextTick(() => {
+    if (pendingTransitionResolve) {
+      pendingTransitionResolve()
+      pendingTransitionResolve = null
+    }
+  })
+})
+
+router.onError(() => {
+  if (pendingTransitionResolve) {
+    pendingTransitionResolve()
+    pendingTransitionResolve = null
+  }
 })
 
 const getRoutePreloadEnabled = (): boolean => {

@@ -946,6 +946,135 @@ html[data-theme='dark'] #app {
   background-color: rgba(30, 30, 30, 0.75);
 }
 
+/* ============ View Transition API ============ */
+
+/* Route-level transitions */
+::view-transition-old(route-content),
+::view-transition-new(route-content) {
+  animation-duration: var(--motion-duration-standard);
+  animation-timing-function: var(--motion-ease-emphasized);
+}
+
+::view-transition-old(route-content) {
+  animation-name: vt-fade-slide-out;
+}
+::view-transition-new(route-content) {
+  animation-name: vt-fade-slide-in;
+}
+
+/* Forward direction: old slides left, new slides from right */
+[data-route-transition="forward"]::view-transition-old(route-content) {
+  animation-name: vt-slide-left-out;
+}
+[data-route-transition="forward"]::view-transition-new(route-content) {
+  animation-name: vt-slide-right-in;
+}
+
+/* Backward direction: old slides right, new slides from left */
+[data-route-transition="backward"]::view-transition-old(route-content) {
+  animation-name: vt-slide-right-out;
+}
+[data-route-transition="backward"]::view-transition-new(route-content) {
+  animation-name: vt-slide-left-in;
+}
+
+/* Top-level page transitions (welcome → home → settings) */
+::view-transition-old(page-content),
+::view-transition-new(page-content) {
+  animation-duration: var(--motion-duration-standard);
+  animation-timing-function: var(--motion-ease-emphasized);
+}
+
+::view-transition-old(page-content) {
+  animation-name: vt-fade-out;
+}
+::view-transition-new(page-content) {
+  animation-name: vt-fade-in;
+}
+
+/* Settings category switch */
+::view-transition-old(settings-panel) {
+  animation-name: vt-fade-slide-out;
+  animation-duration: var(--motion-duration-quick);
+  animation-timing-function: var(--motion-ease-standard);
+}
+::view-transition-new(settings-panel) {
+  animation-name: vt-fade-slide-in;
+  animation-duration: var(--motion-duration-quick);
+  animation-timing-function: var(--motion-ease-standard);
+}
+
+/* Cover morph between mini player and full player */
+::view-transition-old(player-cover),
+::view-transition-new(player-cover) {
+  animation-duration: var(--motion-duration-expressive);
+  animation-timing-function: var(--motion-ease-spring);
+}
+::view-transition-old(player-cover) {
+  animation-name: vt-cover-out;
+  object-fit: cover;
+  border-radius: inherit;
+}
+::view-transition-new(player-cover) {
+  animation-name: vt-cover-in;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Shared element morphing for overlays/dialogs */
+::view-transition-group(vt-overlay) {
+  animation-duration: var(--motion-duration-standard);
+  animation-timing-function: var(--motion-ease-emphasized);
+}
+::view-transition-old(vt-overlay) {
+  animation-name: vt-fade-out;
+}
+::view-transition-new(vt-overlay) {
+  animation-name: vt-fade-in;
+}
+
+/* Keyframes */
+@keyframes vt-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vt-fade-slide-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes vt-fade-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes vt-slide-left-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(-20px); }
+}
+@keyframes vt-slide-right-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes vt-slide-right-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
+}
+@keyframes vt-slide-left-in {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes vt-cover-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.85); }
+}
+@keyframes vt-cover-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -954,5 +1083,11 @@ html[data-theme='dark'] #app {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0.01ms !important;
   }
 }

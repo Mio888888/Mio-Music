@@ -11,6 +11,7 @@ import {
   toRaw
 } from 'vue'
 import { useLifecycle } from '@/composables/useEventListener'
+import { withViewTransition } from '@/composables/useViewTransition'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import {
   installDesktopLyricBridge,
@@ -303,10 +304,12 @@ const playlistDrawerRef = ref<InstanceType<typeof PlaylistDrawer> | null>(null)
 
 const togglePlaylist = (e: MouseEvent) => {
   e.stopPropagation()
-  showPlaylist.value = !showPlaylist.value
+  withViewTransition(() => {
+    showPlaylist.value = !showPlaylist.value
+  })
 
   // 如果打开播放列表，滚动到当前播放歌曲
-  if (showPlaylist.value) {
+  if (!showPlaylist.value) {
     nextTick(() => {
       playlistDrawerRef.value?.scrollToCurrentSong()
     })
@@ -455,7 +458,9 @@ watch(
 // 全屏展示相关
 const toggleFullPlay = () => {
   if (!songInfo.value.songmid) return
-  showFullPlay.value = !showFullPlay.value
+  withViewTransition(() => {
+    showFullPlay.value = !showFullPlay.value
+  })
 }
 
 // 全屏闲置状态
@@ -856,7 +861,7 @@ onBeforeUnmount(() => {
       <!-- 左侧：封面和歌曲信息 -->
       <div class="left-section">
         <div v-if="songInfo.songmid" class="album-cover">
-          <img :src="player.cover || songCover" :style="{ opacity: coverOpacity }" :alt="songInfo.name || t('common.unknownAlbum')" />
+          <img :src="player.cover || songCover" :style="{ opacity: coverOpacity, viewTransitionName: songInfo.songmid ? 'player-cover' : 'none' }" :alt="songInfo.name || t('common.unknownAlbum')" />
         </div>
 
         <div class="song-info">

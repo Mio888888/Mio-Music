@@ -3,11 +3,9 @@
     <HomeLayout>
       <template #body>
         <router-view v-slot="{ Component }">
-          <Transition :name="routeDirection === 'forward' ? 'slide-forward' : 'slide-backward'" mode="out-in">
-            <KeepAlive exclude="list">
-              <component :is="Component" :key="$route.fullPath" />
-            </KeepAlive>
-          </Transition>
+          <KeepAlive exclude="list">
+            <component :is="Component" :key="$route.fullPath" style="view-transition-name: route-content" />
+          </KeepAlive>
         </router-view>
       </template>
     </HomeLayout>
@@ -20,7 +18,6 @@
 import HomeLayout from '@/components/layout/HomeLayout.vue'
 import PlayMusic from '@/components/Play/PlayMusic.vue'
 import PluginUpdateNoticeDialog from '@/components/Plugin/PluginUpdateNoticeDialog.vue'
-import { routeDirection } from '@/router/index'
 import { onMounted } from 'vue'
 import { usePluginStore } from '@/store/plugin'
 import PluginRunner from '@/utils/plugin/PluginRunner'
@@ -59,28 +56,4 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.slide-forward-enter-active,
-.slide-forward-leave-active,
-.slide-backward-enter-active,
-.slide-backward-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-.slide-forward-enter-from {
-  opacity: 0;
-  transform: translateX(20px);
-}
-.slide-forward-leave-to {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-
-.slide-backward-enter-from {
-  opacity: 0;
-  transform: translateX(-20px);
-}
-.slide-backward-leave-to {
-  opacity: 0;
-  transform: translateX(20px);
-}
 </style>

@@ -715,7 +715,7 @@ onUnmounted(() => {
             >
               <div class="vinyl-record"></div>
               <div class="vinyl-label">
-                <img :src="coverImage" alt="cover" class="cover" />
+                <img :src="coverImage" alt="cover" class="cover" style="view-transition-name: player-cover" />
                 <div class="label-shine"></div>
               </div>
               <div class="center-hole"></div>
@@ -727,7 +727,7 @@ onUnmounted(() => {
         <template v-else-if="playSetting.getLayoutMode === 'cover'">
           <div class="cover-layout-container">
             <div class="cover-wrapper-square" :class="{ playing: controlAudio.Audio.isPlay }">
-              <img :src="actualCoverImage" class="cover-img-square" alt="cover" />
+              <img :src="actualCoverImage" class="cover-img-square" alt="cover" style="view-transition-name: player-cover" />
             </div>
             <div class="song-info-area">
               <div ref="titleRef" class="song-title-large text-scroll-container">

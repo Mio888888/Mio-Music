@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { CloseIcon, HeartIcon } from 'tdesign-icons-vue-next'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { withViewTransition } from '@/composables/useViewTransition'
 import { storeToRefs } from 'pinia'
 
 const props = withDefaults(
@@ -57,7 +58,9 @@ const switchType = (type: 'hot' | 'latest') => {
     scrollPositions.value[currentType.value] = contentRef.value.scrollTop
   }
 
-  currentType.value = type
+  withViewTransition(() => {
+    currentType.value = type
+  })
 
   nextTick(() => {
     if (contentRef.value) {

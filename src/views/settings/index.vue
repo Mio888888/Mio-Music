@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
+import { withViewTransition } from '@/composables/useViewTransition'
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import {
   PaletteIcon,
@@ -167,7 +168,10 @@ const switchCategory = async (categoryKey: string) => {
   if (contentPanelRef.value) {
     scrollPositions.value[activeCategory.value] = contentPanelRef.value.scrollTop
   }
-  activeCategory.value = categoryKey
+  withViewTransition(() => {
+    activeCategory.value = categoryKey
+  })
+
   await nextTick()
   if (contentPanelRef.value) {
     contentPanelRef.value.scrollTop = scrollPositions.value[categoryKey] || 0
@@ -297,6 +301,7 @@ const handleSearchSelect = async (item: SearchItem) => {
             <component
               :is="currentComponent"
               :key="activeCategory"
+              style="view-transition-name: settings-panel"
               @switch-category="switchCategory"
             />
           </KeepAlive>
