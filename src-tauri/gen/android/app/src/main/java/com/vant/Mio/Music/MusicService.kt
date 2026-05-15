@@ -90,6 +90,8 @@ class MusicService : Service() {
         }
     }
 
+    fun isPlaying(): Boolean = nowPlaying
+
     private var mediaSession: MediaSession? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var audioFocusRequest: AudioFocusRequest? = null
