@@ -96,7 +96,7 @@ function startCountdown() {
     countdown.value--
     if (countdown.value <= 0) {
       clearCountdown()
-      router.push('/home')
+      router.replace('/home')
     }
   }, 1000)
 }
@@ -110,7 +110,7 @@ function clearCountdown() {
 
 function skipToHome() {
   clearCountdown()
-  router.push('/home')
+  router.replace('/home')
 }
 
 function createCircleTexture(): THREE.CanvasTexture {
