@@ -14,17 +14,25 @@ const localUserStore = LocalUserDetailStore()
 const { enabledSourceKeys } = useSourceAccess()
 
 const currentSource = computed(() => localUserStore.userSource.source)
+let boardsCache: { source: string; data: any[] } | null = null
 
-const fetchBoards = async () => {
+const fetchBoards = async (force = false) => {
   if (enabledSourceKeys.value.size === 0) {
     boards.value = []
+    loading.value = false
+    return
+  }
+  if (!force && boardsCache && boardsCache.source === currentSource.value) {
+    boards.value = boardsCache.data
     loading.value = false
     return
   }
   loading.value = true
   try {
     const res = await musicSdk.getLeaderboards()
-    boards.value = Array.isArray(res?.list) ? res.list : Array.isArray(res) ? res : []
+    const list = Array.isArray(res?.list) ? res.list : Array.isArray(res) ? res : []
+    boards.value = list
+    boardsCache = { source: currentSource.value || '', data: list }
   } catch (e) {
     console.error('获取排行榜失败:', e)
     boards.value = []
@@ -46,7 +54,7 @@ const handleCardClick = (board: any) => {
   })
 }
 
-watch(() => localUserStore.userSource.source, () => fetchBoards())
+watch(() => localUserStore.userSource.source, () => fetchBoards(true))
 onMounted(() => fetchBoards())
 </script>
 
@@ -73,7 +81,7 @@ onMounted(() => fetchBoards())
 
     <div v-else class="empty-state">
       <div class="empty-text">{{ t('music.leaderboard.noData') }}</div>
-      <t-button variant="text" @click="fetchBoards">{{ t('music.leaderboard.retry') }}</t-button>
+      <t-button variant="text" @click="fetchBoards(true)">{{ t('music.leaderboard.retry') }}</t-button>
     </div>
   </div>
 </template>

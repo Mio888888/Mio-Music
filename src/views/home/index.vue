@@ -5,7 +5,7 @@
         <router-view v-slot="{ Component }">
           <Transition :name="routeDirection === 'forward' ? 'route-slide-forward' : 'route-slide-backward'" mode="out-in">
             <KeepAlive exclude="list">
-              <component :is="Component" :key="$route.fullPath" />
+              <component :is="Component" :key="$route.name" />
             </KeepAlive>
           </Transition>
         </router-view>

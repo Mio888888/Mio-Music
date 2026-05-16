@@ -36,6 +36,8 @@ let preloadedReady = false
 let unlistenPreload: UnlistenFn | null = null
 let prefetchTimer: ReturnType<typeof setTimeout> | null = null
 let isAndroidPlatform: boolean | null = null
+let androidNativeQueueSongByUrl = new Map<string, SongList>()
+let androidSyncingPlaybackState = false
 
 // ===== Android 通知栏/锁屏媒体按钮 =====
 // Rust 端 nativePlayerCommand 已直接控制播放器，前端只负责 UI 状态同步
@@ -486,6 +488,7 @@ async function syncAndroidNativeQueue(startIndex = _playIndex) {
   if (store.list.length <= 1) return
 
   const items: Array<{ url: string; cacheKey?: string }> = []
+  const songByUrl = new Map<string, SongList>()
   const maxItems = Math.min(store.list.length - 1, 10)
   const seen = new Set<string>()
 
@@ -500,12 +503,70 @@ async function syncAndroidNativeQueue(startIndex = _playIndex) {
     try {
       const url = await getSongRealUrl(toRaw(song) as any)
       items.push({ url, cacheKey: buildCacheKey(toRaw(song) as any) })
+      songByUrl.set(url, toRaw(song) as SongList)
     } catch {
     }
   }
 
+  androidNativeQueueSongByUrl = songByUrl
   if (items.length) {
     await invoke('player__set_native_queue', { items })
+  }
+}
+
+interface PlayerSnapshotResult {
+  success?: boolean
+  data?: {
+    position?: number
+    duration?: number
+    volume?: number
+    url?: string
+    isPlaying?: boolean
+  }
+}
+
+export async function syncAndroidCurrentPlaybackState() {
+  if (androidSyncingPlaybackState || !(await isAndroid())) return
+  androidSyncingPlaybackState = true
+  try {
+    const result = await invoke<PlayerSnapshotResult>('player__get_state')
+    const snapshot = result?.data
+    if (!snapshot?.url) return
+    const url = snapshot.url
+
+    const song = androidNativeQueueSongByUrl.get(url)
+    if (!song) return
+
+    const store = LocalUserDetailStore()
+    const audio = ControlAudioStore()
+    const globalPlayStatus = useGlobalPlayStatusStore()
+    const index = store.list.findIndex((s) => getSongKey(s) === getSongKey(song))
+    if (index >= 0) _playIndex = index
+
+    store.userInfo.lastPlaySongId = song.songmid
+    globalPlayStatus.player.songInfo = toRaw(song) as any
+    globalPlayStatus.updatePlaybackSongInfo(toRaw(song) as any)
+    audio.Audio.url = url
+    audio.Audio.currentTime = snapshot.position || 0
+    audio.Audio.duration = snapshot.duration || 0
+    audio.Audio.volume = snapshot.volume ?? audio.Audio.volume
+    audio.Audio.isPlay = !!snapshot.isPlaying
+    resetPlaybackAttempt(song, url)
+
+    try {
+      await invoke('player__update_now_playing', {
+        title: song.name || i18n.global.t('common.unknownSong'),
+        artist: song.singer || i18n.global.t('common.unknownArtist'),
+        album: song.albumName || '',
+        duration: snapshot.duration || 0,
+        coverUrl: song.img || null
+      })
+    } catch {}
+
+    scheduleNextPrefetch()
+    syncAndroidNativeQueue(_playIndex)
+  } finally {
+    androidSyncingPlaybackState = false
   }
 }
 

@@ -15,6 +15,7 @@ const localUserStore = LocalUserDetailStore()
 const activeTab = ref<'songlist' | 'leaderboard'>('songlist')
 const sourceStateLoading = ref(true)
 let sourceStateRefreshPromise: Promise<void> | null = null
+let sourceStateInitialized = false
 
 const hasSubsonicConfig = computed(() => localUserStore.hasValidSubsonicConfig(localUserStore.userInfo))
 const hasInstalledMusicSourcePlugin = computed(() => pluginStore.plugins.some(plugin => plugin.plugin_type === 'music-source'))
@@ -30,6 +31,7 @@ const shouldShowSetupGuide = computed(() => (
 
 async function ensureSourceState() {
   if (sourceStateRefreshPromise) return sourceStateRefreshPromise
+  if (sourceStateInitialized) return
 
   sourceStateLoading.value = true
   sourceStateRefreshPromise = pluginStore.initialize()
@@ -41,6 +43,7 @@ async function ensureSourceState() {
       validateCurrentSource()
       sourceStateLoading.value = false
       sourceStateRefreshPromise = null
+      sourceStateInitialized = true
     })
 
   return sourceStateRefreshPromise
@@ -59,7 +62,7 @@ onMounted(() => {
 })
 
 onActivated(() => {
-  ensureSourceState()
+  if (sourceStateLoading.value) ensureSourceState()
 })
 </script>
 

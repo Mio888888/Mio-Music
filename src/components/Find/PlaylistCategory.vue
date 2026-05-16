@@ -189,30 +189,40 @@ const onDocClick = (e: MouseEvent) => {
   if (!target.closest('.category-bar') && showMore.value) showMore.value = false
 }
 
+let initialized = false
+let tagsCacheSource = ''
+
+const onSourceChange = (isInit: boolean) => {
+  if (enabledSourceKeys.value.size === 0) {
+    playlists.value = []
+    tags.value = []
+    hotTag.value = []
+    loading.value = false
+    return
+  }
+  const source = userSource.value.source || 'kw'
+  if (!isInit && source === tagsCacheSource && tags.value.length + hotTag.value.length > 0) return
+  loading.value = true
+  error.value = ''
+  if (!isInit) Object.keys(categoryCache).forEach(k => delete categoryCache[k])
+  fetchTags().then(() => {
+    tagsCacheSource = source
+    if (!isInit) {
+      activeTagId.value = ''
+      activeCategoryName.value = t('music.playlistCategory.hot')
+    }
+    requestAnimationFrame(updateRightFade)
+    fetchCategoryPlaylists(true)
+  })
+}
+
 onMounted(() => {
   requestAnimationFrame(updateRightFade)
-  watch(
-    userSource,
-    () => {
-      if (enabledSourceKeys.value.size === 0) {
-        playlists.value = []
-        tags.value = []
-        hotTag.value = []
-        loading.value = false
-        return
-      }
-      loading.value = true
-      error.value = ''
-      Object.keys(categoryCache).forEach(k => delete categoryCache[k])
-      fetchTags().then(() => {
-        activeTagId.value = ''
-        activeCategoryName.value = t('music.playlistCategory.hot')
-        requestAnimationFrame(updateRightFade)
-        fetchCategoryPlaylists(true)
-      })
-    },
-    { deep: true, immediate: true }
-  )
+  if (!initialized) {
+    initialized = true
+    onSourceChange(true)
+    watch(userSource, () => onSourceChange(false), { deep: true })
+  }
 
   document.addEventListener('click', onDocClick)
   document.addEventListener('keydown', handleMoreKeydown)

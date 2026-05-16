@@ -720,6 +720,48 @@ const handleProgressDragStart = (event: MouseEvent) => {
   window.addEventListener('mouseup', handleProgressDragEnd)
 }
 
+const getTouchPercentage = (touch: Touch): number => {
+  if (!progressRef.value) return 0
+  const rect = progressRef.value.getBoundingClientRect()
+  const offsetX = Math.max(0, Math.min(touch.clientX - rect.left, rect.width))
+  return (offsetX / rect.width) * 100
+}
+
+const handleProgressTouchStart = (event: TouchEvent) => {
+  if (dlnaStore.currentDevice) {
+    MessagePlugin.warning(t('play.screenCastingNoSeek'))
+    return
+  }
+  event.stopPropagation()
+  document.querySelector('.progress-handle')?.classList.add('dragging')
+  hasDragged.value = false
+  isDraggingProgress.value = true
+  tempProgressPercentage.value = getTouchPercentage(event.touches[0])
+}
+
+const handleProgressTouchMove = (event: TouchEvent) => {
+  if (!isDraggingProgress.value) return
+  event.preventDefault()
+  hasDragged.value = true
+  tempProgressPercentage.value = getTouchPercentage(event.touches[0])
+}
+
+const handleProgressTouchEnd = () => {
+  document.querySelector('.progress-handle')?.classList.remove('dragging')
+  if (!isDraggingProgress.value) return
+  const percentage = tempProgressPercentage.value
+  const newTime = (percentage / 100) * Audio.value.duration
+  if (dlnaStore.currentDevice) {
+    invoke('player__pause')
+    dlnaStore.seek(newTime).then(() => {
+      seekTo(newTime)
+    })
+  } else {
+    seekTo(newTime)
+  }
+  isDraggingProgress.value = false
+}
+
 // 歌曲信息由全局播放管理器提供
 const maincolor = computed(() => player.value.coverDetail.mainColor || 'var(--td-brand-color-5)')
 const startmaincolor = computed(() => {
@@ -831,6 +873,9 @@ onBeforeUnmount(() => {
         ref="progressRef"
         class="progress-bar"
         @mousedown="handleProgressDragStart($event)"
+        @touchstart.prevent="handleProgressTouchStart"
+        @touchmove.prevent="handleProgressTouchMove"
+        @touchend="handleProgressTouchEnd"
         @click.stop="handleProgressClick"
       >
         <div class="progress-background"></div>
@@ -852,7 +897,7 @@ onBeforeUnmount(() => {
           class="crossfade-fadein-mark"
           :style="{ left: '0%', width: crossfadeFadeInMarkWidth + '%' }"
         ></div>
-        <div class="progress-filled" :style="{ transform: `scaleX(${progressPercentage / 100})` }"></div>
+        <div class="progress-filled" :style="{ transform: `translateY(-50%) scaleX(${progressPercentage / 100})` }"></div>
         <div class="progress-handle" :style="{ left: `${progressPercentage}%` }"></div>
       </div>
     </div>
@@ -1710,6 +1755,36 @@ onBeforeUnmount(() => {
   .player-content {
     padding: 0 max(10px, calc(var(--mobile-page-gutter) - 6px));
     gap: 0;
+  }
+
+  /* 手机端进度条：加大触摸区域和视觉尺寸 */
+  .progress-bar-container {
+    --touch-range-height: 28px;
+    --play-line-height: 4px;
+    top: calc(var(--touch-range-height) / 2 * -1);
+
+    .progress-bar {
+      .progress-handle {
+        width: 12px;
+        height: 12px;
+        opacity: 1;
+      }
+
+      &:active {
+        .progress-background,
+        .progress-filled,
+        .crossfade-mark,
+        .crossfade-active-mark,
+        .crossfade-fadein-mark {
+          height: 8px;
+        }
+        .progress-handle {
+          width: 16px;
+          height: 16px;
+          opacity: 1;
+        }
+      }
+    }
   }
 
   /* 左侧：封面 + 歌曲信息，撑满剩余空间 */
