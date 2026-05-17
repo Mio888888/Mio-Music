@@ -8,9 +8,9 @@ use tauri::State;
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
-pub fn local_music__scan(state: State<'_, AppDb>, dirs: Vec<String>) -> Result<serde_json::Value, String> {
+pub fn local_music__scan(state: State<'_, AppDb>, dirs: Vec<String>, skip_hidden: Option<bool>) -> Result<serde_json::Value, String> {
     let conn = state.music.lock().map_err(|e| e.to_string())?;
-    let result = scanner::scan_directories(&conn, &dirs);
+    let result = scanner::scan_directories(&conn, &dirs, skip_hidden.unwrap_or(false));
     Ok(serde_json::to_value(serde_json::json!({
         "success": true,
         "data": { "scanned": result.scanned, "added": result.added, "updated": result.updated, "errors": result.errors }

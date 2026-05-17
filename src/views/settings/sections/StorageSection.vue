@@ -150,6 +150,21 @@ const getTagOptionsStatus = () => {
       </div>
     </div>
 
+    <!-- 本地音乐扫描设置 -->
+    <div id="storage-local-scan" class="setting-group">
+      <h3>{{ t('settings.storage.localScanTitle') }}</h3>
+      <div class="setting-item">
+        <div class="item-info">
+          <div class="item-title">{{ t('settings.storage.skipHiddenFiles') }}</div>
+          <div class="item-desc">{{ t('settings.storage.skipHiddenFilesDesc') }}</div>
+        </div>
+        <t-switch
+          v-model="settings.skipHiddenFiles"
+          @change="() => settingsStore.saveSettings()"
+        />
+      </div>
+    </div>
+
     <!-- 下载文件名格式设置 -->
     <div id="storage-filename" class="setting-group">
       <h3>{{ t('settings.storage.filenameFormat') }}</h3>

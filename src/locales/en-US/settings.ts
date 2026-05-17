@@ -242,7 +242,10 @@ export default {
     confirmClear: 'Confirm Clear',
     letMeThink: 'Let me think',
     clearSuccess: 'Cache cleared successfully',
-    clearCacheFailed: 'Failed to clear cache, please retry'
+    clearCacheFailed: 'Failed to clear cache, please retry',
+    localScanTitle: 'Local Music Scan',
+    skipHiddenFiles: 'Skip Hidden Files',
+    skipHiddenFilesDesc: 'Skip hidden files and folders (starting with .) when scanning local music directories'
   },
   equalizer: {
     title: 'Global Equalizer (Professional EQ)',

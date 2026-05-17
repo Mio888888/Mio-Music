@@ -425,7 +425,7 @@ const api = {
   // Local music
   localMusic: {
     selectDirs: () => ipcInvoke('local_music__select_dirs'),
-    scan: (dirs: string[]) => ipcInvoke('local_music__scan', { dirs }),
+    scan: (dirs: string[], skipHidden: boolean = true) => ipcInvoke('local_music__scan', { dirs, skip_hidden: skipHidden }),
     writeTags: (filePath: string, songInfo: any, tagWriteOptions: any) =>
       ipcInvoke('local_music__write_tags', { filePath, songInfo, tagWriteOptions }),
     getDirs: () => ipcInvoke('dir__get_all'),

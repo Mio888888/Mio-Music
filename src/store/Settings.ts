@@ -34,6 +34,7 @@ export interface SettingsState {
   hasConfiguredCloseBehavior?: boolean
   routePreloadEnabled?: boolean
   backgroundRender?: BackgroundRenderSettings
+  skipHiddenFiles?: boolean
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -53,6 +54,7 @@ export const useSettingsStore = defineStore('settings', () => {
     closeToTray: true,
     hasConfiguredCloseBehavior: false,
     routePreloadEnabled: true,
+    skipHiddenFiles: true,
     backgroundRender: DEFAULT_BACKGROUND_RENDER_SETTINGS
   }
 
@@ -96,6 +98,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (typeof settings.value.closeToTray === 'undefined') settings.value.closeToTray = true
     if (typeof settings.value.hasConfiguredCloseBehavior === 'undefined') settings.value.hasConfiguredCloseBehavior = false
     if (typeof settings.value.routePreloadEnabled === 'undefined') settings.value.routePreloadEnabled = true
+    if (typeof settings.value.skipHiddenFiles === 'undefined') settings.value.skipHiddenFiles = true
     if (!settings.value.language) settings.value.language = 'system'
     if (!settings.value.tagWriteOptions) {
       settings.value.tagWriteOptions = { basicInfo: true, cover: true, lyrics: true, downloadLyrics: false, lyricFormat: 'word-by-word' }

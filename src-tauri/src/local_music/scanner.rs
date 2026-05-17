@@ -140,7 +140,14 @@ pub struct ScanResult {
     pub errors: usize,
 }
 
-pub fn scan_directories(conn: &rusqlite::Connection, dirs: &[String]) -> ScanResult {
+fn is_hidden(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with('.'))
+        .unwrap_or(false)
+}
+
+pub fn scan_directories(conn: &rusqlite::Connection, dirs: &[String], skip_hidden: bool) -> ScanResult {
     let mut result = ScanResult { scanned: 0, added: 0, updated: 0, errors: 0 };
 
     // Get existing stats for incremental scan
@@ -154,7 +161,11 @@ pub fn scan_directories(conn: &rusqlite::Connection, dirs: &[String]) -> ScanRes
     let mut found_paths: Vec<String> = Vec::new();
 
     for dir in dirs {
-        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+        let walker = WalkDir::new(dir).into_iter().filter_entry(|e| {
+            if !skip_hidden { return true; }
+            !is_hidden(e.path())
+        });
+        for entry in walker.filter_map(|e| e.ok()) {
             let path = entry.path();
             if !path.is_file() || !is_audio_file(path) { continue; }
 

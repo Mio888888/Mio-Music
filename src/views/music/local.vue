@@ -4,6 +4,7 @@ import { useVirtualList } from '@vueuse/core'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { playSong } from '@/utils/audio/globaPlayList'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
+import { useSettingsStore } from '@/store/Settings'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
@@ -20,6 +21,7 @@ const { t } = useI18n()
 const router = useRouter()
 const localUserStore = LocalUserDetailStore()
 const playStatus = useGlobalPlayStatusStore()
+const settingsStore = useSettingsStore()
 
 const loading = ref(false)
 const scanning = ref(false)
@@ -150,7 +152,7 @@ const scanLibrary = async () => {
   }
   scanning.value = true
   try {
-    const scanRes = await (window as any).api?.localMusic?.scan?.(scanDirs.value)
+    const scanRes = await (window as any).api?.localMusic?.scan?.(scanDirs.value, !!settingsStore.settings.skipHiddenFiles)
     if (scanRes?.success) {
       const data = scanRes.data
       const parts = [t('music.local.scanComplete', { scanned: data.scanned, added: data.added })]

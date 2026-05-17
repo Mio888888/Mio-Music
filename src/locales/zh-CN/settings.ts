@@ -251,7 +251,10 @@ export default {
     confirmClear: '确定清除',
     letMeThink: '我再想想',
     clearSuccess: '缓存清除成功',
-    clearCacheFailed: '清除缓存失败，请重试'
+    clearCacheFailed: '清除缓存失败，请重试',
+    localScanTitle: '本地音乐扫描',
+    skipHiddenFiles: '忽略隐藏文件',
+    skipHiddenFilesDesc: '扫描本地音乐目录时跳过以 . 开头的隐藏文件和隐藏文件夹'
   },
   equalizer: {
     title: '全局均衡器 (Professional EQ)',
