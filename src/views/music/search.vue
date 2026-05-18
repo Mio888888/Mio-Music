@@ -264,7 +264,7 @@ watch(activeTab, async (val) => {
         @scroll="handleScroll"
       >
         <template v-if="selectedSource === 'all'">
-          <div v-if="songs.aggregateLoading" class="loading-state" role="status" aria-live="polite">
+          <div v-if="songs.aggregateLoading && songs.aggregateResults.length === 0" class="loading-state" role="status" aria-live="polite">
             <div class="loading-spinner"></div>
             <p>{{ t('music.search.searchingSources') }}</p>
           </div>
@@ -288,6 +288,9 @@ watch(activeTab, async (val) => {
                 <span class="song-duration">{{ song.interval || '--:--' }}</span>
               </div>
             </div>
+            <div v-if="songs.aggregateLoading" class="load-more-indicator" role="status" aria-live="polite">
+              <div class="loading-spinner small"></div>
+            </div>
           </div>
           <div v-else-if="songs.aggregateSearched" class="empty-state"><div class="empty-content"><h3>{{ t('music.search.noSongResults') }}</h3><p>{{ t('music.search.tryOther') }}</p></div></div>
         </template>
@@ -309,6 +312,9 @@ watch(activeTab, async (val) => {
                 </span>
               </div>
               <span class="song-duration">{{ song.interval || '--:--' }}</span>
+            </div>
+            <div v-if="songs.loading" class="load-more-indicator" role="status" aria-live="polite">
+              <div class="loading-spinner small"></div>
             </div>
           </div>
           <div v-else-if="!songs.loading" class="empty-state"><div class="empty-content"><h3>{{ t('music.search.noSongResults') }}</h3><p>{{ t('music.search.tryOther') }}</p></div></div>
@@ -401,28 +407,35 @@ watch(activeTab, async (val) => {
 .grid-fade-enter-active, .grid-fade-leave-active { transition: background-color var(--motion-duration-standard) var(--motion-ease-standard), border-color var(--motion-duration-standard) var(--motion-ease-standard), color var(--motion-duration-standard) var(--motion-ease-standard), box-shadow var(--motion-duration-standard) var(--motion-ease-standard), opacity var(--motion-duration-standard) var(--motion-ease-standard), transform var(--motion-duration-standard) var(--motion-ease-standard); }
 .grid-fade-enter-from, .grid-fade-leave-to { opacity: 0; transform: translateY(6px) scale(0.98); }
 
+.load-more-indicator { display: flex; align-items: center; justify-content: center; padding: 12px; min-height: 44px; }
+.loading-spinner.small { width: 20px; height: 20px; border-width: 2px; margin-bottom: 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .loading-spinner { animation: none; }
 }
 
 @media (max-width: 768px) {
   .search-container { padding: var(--mobile-page-top-gutter) var(--mobile-page-gutter) 0; }
-  .search-header { margin-bottom: 1rem; }
-  .header-row { align-items: flex-start; flex-direction: column; gap: 0.35rem; }
-  .search-title { max-width: 100%; border-left: none; padding-left: 0; font-size: clamp(1.8rem, 8vw, 2.35rem); line-height: 1.1; letter-spacing: -0.04em; word-break: break-word; }
-  .result-info { font-size: 0.95rem; }
-  .search-tab-button { min-height: var(--mobile-touch-target); }
-  .source-filter { gap: 6px; padding: 6px 0; }
-  .source-chip { padding: 4px 12px; font-size: 12px; }
+  .search-header { margin-bottom: 6px; }
+  .header-row { align-items: center; gap: 10px; margin-bottom: 4px; }
+  .search-title { max-width: 100%; border-left: none; padding-left: 0; font-size: 18px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .result-info { font-size: 12px; flex-shrink: 0; }
+  .tabs-row { gap: 16px; margin-bottom: 0; }
+  .search-tab-button { min-height: var(--mobile-touch-target); font-size: 15px; }
+  .source-filter { gap: 6px; padding: 6px 0 2px; }
+  .source-chip { padding: 6px 14px; font-size: 12px; min-height: 32px; border-radius: var(--mobile-control-radius); touch-action: manipulation; transition: transform 0.1s ease, opacity 0.1s ease; }
+  .source-chip:active { transform: scale(0.95); opacity: 0.8; }
   .song-tab, .playlist-tab, .grid-scroll-container { min-height: 0; -webkit-overflow-scrolling: touch; }
-  .song-item { min-height: 56px; padding: 8px 10px; border-radius: var(--mobile-card-radius-small); touch-action: manipulation; }
-  .song-index { width: 28px; }
+  .song-item { min-height: 56px; padding: 8px 12px; border-radius: var(--mobile-card-radius-small); touch-action: manipulation; border-bottom: none; transition: background-color 0.1s ease, transform 0.1s ease; }
+  .song-item:active { background: color-mix(in srgb, var(--td-bg-color-component-hover) 80%, transparent); transform: scale(0.985); }
+  .song-index { width: 28px; font-size: 13px; }
   .song-name { font-size: 15px; }
   .song-meta { gap: 8px; margin-left: 8px; max-width: 42%; }
-  .source-badge { max-width: 72px; padding: 1px 6px; }
+  .source-badge { max-width: 72px; padding: 2px 8px; font-size: 11px; }
   .grid-scroll-container { padding: 0; }
   .playlist-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .playlist-card { border-radius: var(--mobile-card-radius-small); }
+  .playlist-card { border-radius: var(--mobile-card-radius-small); touch-action: manipulation; transition: transform 0.15s ease; }
+  .playlist-card:active { transform: scale(0.97); }
   .playlist-info { padding: 10px; }
 }
 </style>
