@@ -70,9 +70,7 @@ const showLeftPanel = computed({
   set: (val) => playSetting.setShowLeftPanel(val)
 })
 
-onMounted(() => {
-  if (import.meta.env.DEV) console.debug('[DEBUG] FullPlay.vue mounted, lyrics lines:', player.value.lyrics.lines.length)
-})
+onMounted(() => {})
 
 interface Props {
   show?: boolean
@@ -362,8 +360,6 @@ const initBackgroundRender = async () => {
     return
   }
 
-  console.log('[FullPlay] 初始化背景渲染器，配置:', backgroundConfig.value)
-
   disposeBackgroundRender()
   bgRef.value = CoreBackgroundRender.new(PixiRenderer)
   const canvas = bgRef.value.getElement()
@@ -377,17 +373,12 @@ const initBackgroundRender = async () => {
 
   // 应用配置
   applyBackgroundConfig()
-  console.log('[FullPlay] 背景配置已应用')
 
   bgRef.value.setHasLyric(player.value.lyrics.lines.length > 10)
   await bgRef.value.setAlbum(actualCoverImage.value, false)
   bgRef.value.resume()
 
-  console.log('[FullPlay] 背景渲染器已启动')
-
-  // 如果启用了音频响应，启动它
   if (audioResponseEnabled.value && Audio.value.isPlay) {
-    console.log('[FullPlay] 启动音频响应')
     startAudioResponse()
   }
 }
@@ -395,14 +386,6 @@ const initBackgroundRender = async () => {
 // 应用背景配置到渲染器
 const applyBackgroundConfig = () => {
   if (!bgRef.value || !backgroundConfig.value) return
-
-  console.log('[FullPlay] 应用背景配置:', {
-    renderScale: backgroundConfig.value.renderScale,
-    flowSpeed: backgroundConfig.value.flowSpeed,
-    fps: backgroundConfig.value.fps,
-    staticMode: backgroundConfig.value.staticMode,
-    audioResponse: backgroundConfig.value.audioResponse
-  })
 
   bgRef.value.setRenderScale(backgroundConfig.value.renderScale)
   bgRef.value.setFlowSpeed(backgroundConfig.value.flowSpeed)
@@ -524,8 +507,16 @@ watch(
 
 // 监听背景配置变化，动态更新渲染器
 watch(
-  () => backgroundConfig.value,
-  (newConfig) => {
+  [
+    () => backgroundConfig.value?.enabled,
+    () => backgroundConfig.value?.renderScale,
+    () => backgroundConfig.value?.flowSpeed,
+    () => backgroundConfig.value?.fps,
+    () => backgroundConfig.value?.staticMode,
+    () => backgroundConfig.value?.audioResponse,
+  ],
+  () => {
+    const newConfig = backgroundConfig.value
     if (!newConfig) return
 
     if (!newConfig.enabled) {
@@ -549,8 +540,7 @@ watch(
         stopAudioResponse()
       }
     }
-  },
-  { deep: true }
+  }
 )
 
 const lightMainColor = computed(() => player.value.coverDetail.lightMainColor || 'rgba(255, 255, 255, 0.9)')

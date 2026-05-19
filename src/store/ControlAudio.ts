@@ -66,7 +66,6 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       unlisteners = []
     }
     Audio.eventInit = true
-    Audio.eventInit = true
 
     const un1 = await listen('player:state', (event: any) => {
       const { state, position, duration, volume, url, isPlaying } = event.payload

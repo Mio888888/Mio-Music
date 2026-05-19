@@ -242,32 +242,6 @@ const removeSelected = () => {
   selectedSet.value = new Set([...selectedSet.value].filter(id => !removeIds.has(id)))
 }
 
-// --- Song data cache (avoids repeated computed lookups per row) ---
-const songCache = new Map<number, MusicItem>()
-const songIdCache = new Map<number, string>()
-
-watch(() => [props.songs, sortType.value], () => {
-  songCache.clear()
-  songIdCache.clear()
-})
-
-const getSong = (index: number): MusicItem | undefined => {
-  let s = songCache.get(index)
-  if (s !== undefined) return s
-  s = sortedSongs.value[index]
-  if (s) songCache.set(index, s)
-  return s
-}
-
-const getSongId = (index: number): string => {
-  let id = songIdCache.get(index)
-  if (id !== undefined) return id
-  const s = getSong(index)
-  id = s ? String(s.songmid) : ''
-  songIdCache.set(index, id)
-  return id
-}
-
 // --- Like / favorites ---
 const likedSet = ref<Set<string | number>>(new Set())
 const loadFavorites = async () => {

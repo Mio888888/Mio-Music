@@ -66,16 +66,6 @@ const { list, userInfo } = storeToRefs(localUserStore)
 const { player } = storeToRefs(globalPlayStatus)
 const songInfo = computed(() => player.value.songInfo || ({} as any))
 
-const {} = controlAudio
-
-watch(
-  () => dlnaStore.currentDevice,
-  (device) => {
-    // DLNA 投屏时本地静音由 Rust 后端处理
-  },
-  { immediate: true }
-)
-
 let clearDlnaSync: (() => void) | null = null
 
 watch(
@@ -218,24 +208,27 @@ const toggleDesktopLyric = async () => {
 let isFull = false
 
 // 获取播放模式图标类名
-const playModeTip = ref('')
 const playModeIconClass = computed(() => {
   switch (playMode.value) {
     case PlayMode.LIST:
-      playModeTip.value = t('play.modeList')
       return 'iconfont icon-shunxubofangtubiao'
     case PlayMode.SEQUENCE:
-      playModeTip.value = t('play.modeSequence')
       return 'iconfont icon-bofang-xunhuanbofang'
     case PlayMode.RANDOM:
-      playModeTip.value = t('play.modeRandom')
       return 'iconfont icon-suijibofang'
     case PlayMode.SINGLE:
-      playModeTip.value = t('play.modeSingle')
       return 'iconfont icon-bofang-xunhuanbofang'
     default:
-      playModeTip.value = t('play.modeList')
       return 'iconfont icon-shunxubofangtubiao'
+  }
+})
+const playModeTip = computed(() => {
+  switch (playMode.value) {
+    case PlayMode.LIST: return t('play.modeList')
+    case PlayMode.SEQUENCE: return t('play.modeSequence')
+    case PlayMode.RANDOM: return t('play.modeRandom')
+    case PlayMode.SINGLE: return t('play.modeSingle')
+    default: return t('play.modeList')
   }
 })
 
@@ -309,7 +302,7 @@ const togglePlaylist = (e: MouseEvent) => {
   })
 
   // 如果打开播放列表，滚动到当前播放歌曲
-  if (!showPlaylist.value) {
+  if (showPlaylist.value) {
     nextTick(() => {
       playlistDrawerRef.value?.scrollToCurrentSong()
     })
@@ -430,7 +423,6 @@ onMounted(async () => {
 
 // 组件被激活时（从缓存中恢复）
 onActivated(async () => {
-  console.log('PlayMusic组件被激活')
   if (isFull) {
     showFullPlay.value = true
   }
@@ -438,7 +430,6 @@ onActivated(async () => {
 
 // 组件被停用时（缓存但不销毁）
 onDeactivated(() => {
-  console.log('PlayMusic组件被停用')
   // 仅记录状态，不主动暂停，避免页面切换导致音乐暂停
   // wasPlaying = Audio.value.isPlay
   isFull = showFullPlay.value
@@ -848,7 +839,6 @@ watch(
 watch(showFullPlay, (val) => {
   globalPlayStatus.setFullPlayOpen(val)
   if (val) {
-    console.log('背景hei')
     bg.value = '#00000020'
   } else {
     bg.value = 'var(--player-bg-default)'
