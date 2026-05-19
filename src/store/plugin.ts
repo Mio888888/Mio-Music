@@ -268,7 +268,7 @@ export const usePluginStore = defineStore('plugin', () => {
 
   async function selectAndAdd(pluginType: string) {
     const res = await (window as any).api.plugins.selectAndAdd(pluginType)
-    if (res?.canceled) return null
+    if (res?.data?.canceled) return null
     if (res?.success) {
       await refresh()
       return res.data as LoadedPlugin
