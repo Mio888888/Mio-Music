@@ -89,7 +89,6 @@ const handleImportFromFile = async () => {
     const importedPlaylist = await importPlaylistFromFile(uploadedFile.value)
 
     if (!validateImportedPlaylist(importedPlaylist)) {
-      console.log(importedPlaylist)
       throw new Error(t('settings.playlist.importFailedFormat'))
     }
 

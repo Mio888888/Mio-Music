@@ -113,7 +113,6 @@ const currentPluginName = computed(() => {
 const currentSourceQualities = computed(() => {
   if (!hasPluginData.value || !userInfo.value.selectSources) return []
   const selectedSource = userInfo.value.supportedSources?.[userInfo.value.selectSources]
-  console.log('当前插件支持的音质：', userInfo.value.supportedSources)
   return sortQualities(selectedSource?.qualitys || [])
 })
 

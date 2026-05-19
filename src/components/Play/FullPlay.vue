@@ -70,8 +70,6 @@ const showLeftPanel = computed({
   set: (val) => playSetting.setShowLeftPanel(val)
 })
 
-onMounted(() => {})
-
 interface Props {
   show?: boolean
   showComments?: boolean
@@ -290,10 +288,7 @@ const startPerformanceDegrader = () => {
   if (!settingsStore.settings.backgroundRender?.fullPlay?.enabled) return
   performanceDegrader.stop()
   performanceDegrader.start({
-    onTick: (fps) => {
-      // 可选：实时 FPS 显示（调试用）
-      // console.log('[Performance] FPS:', fps.toFixed(1))
-    },
+    onTick: () => {},
     onDegrade: (degradedConfig) => {
       console.warn('[FullPlay] 检测到性能问题，自动降低背景效果')
       hasAutoDegraded.value = true

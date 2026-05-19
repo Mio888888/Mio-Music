@@ -667,9 +667,7 @@ async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
   if (cached) return cached
 
   const code = await getPluginCode(pluginId)
-  console.log(`[PluginWorker] 加载插件 ${pluginId}, 代码长度: ${code.length}, Cr格式: ${isCrPlugin(code)}`)
   const exports = executePluginCode(code)
-  console.log(`[PluginWorker] 插件导出: musicUrl=${typeof exports.musicUrl}, keys=[${Object.keys(exports).join(', ')}]`)
 
   const plugin: LoadedPlugin = { exports, code }
   pluginCache.set(pluginId, plugin)
@@ -691,14 +689,12 @@ async function reloadPlugin(pluginId: string): Promise<LoadedPlugin> {
   return plugin
 }
 
-function normalizeMusicUrlResult(source: string, result: any): string {
+function normalizeMusicUrlResult(_source: string, result: any): string {
   if (typeof result === 'string') {
-    console.log(`[PluginWorker] ${source} musicUrl 返回字符串: ${result.substring(0, 120)}`)
     return result
   }
   if (typeof result === 'object' && result !== null) {
     const obj = result as Record<string, any>
-    console.log(`[PluginWorker] ${source} musicUrl 返回对象:`, JSON.stringify(obj).substring(0, 200))
     if (obj.error) throw new Error(String(obj.error))
     if (obj.url && typeof obj.url === 'string') return obj.url
   }

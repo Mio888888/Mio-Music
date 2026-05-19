@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { MessagePlugin } from 'tdesign-vue-next'
 import i18n from '@/locales'
 
@@ -44,6 +44,7 @@ export const useAudioOutputStore = defineStore(
       channelCount: 0,
       latency: 0
     })
+    let rustDeviceChangeUnlisten: UnlistenFn | null = null
 
     // For A/B testing
     const primaryDeviceId = ref<string>('default')
@@ -250,19 +251,18 @@ export const useAudioOutputStore = defineStore(
     }
 
     const handleDeviceChange = () => {
-      console.log('Audio devices changed, rescanning...')
       scanDevices()
     }
 
     const init = async () => {
-      // Listen for Rust device change events
-      try {
-        await listen('audio-device-changed', () => {
-          console.log('Rust audio device change detected, rescanning...')
-          scanRustDevices()
-        })
-      } catch {
-        // Event system not available in non-Tauri environment
+      if (!rustDeviceChangeUnlisten) {
+        try {
+          rustDeviceChangeUnlisten = await listen('audio-device-changed', () => {
+            scanRustDevices()
+          })
+        } catch {
+          // Event system not available in non-Tauri environment
+        }
       }
 
       // Listen for Web API device change
@@ -272,6 +272,14 @@ export const useAudioOutputStore = defineStore(
       }
 
       await scanDevices()
+    }
+
+    const destroy = () => {
+      if (rustDeviceChangeUnlisten) {
+        rustDeviceChangeUnlisten()
+        rustDeviceChangeUnlisten = null
+      }
+      navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange)
     }
 
     const playTestSound = (deviceId: string) => {
@@ -335,6 +343,7 @@ export const useAudioOutputStore = defineStore(
       getDeviceVolume,
       toggleAB,
       init,
+      destroy,
       playTestSound,
       simulateDevices
     }

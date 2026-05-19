@@ -238,6 +238,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('toggle-audio-ab-if-visible', handleGlobalToggle)
+  store.destroy()
 })
 </script>
 
