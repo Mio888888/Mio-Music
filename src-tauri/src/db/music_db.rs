@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, params_from_iter, Connection, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,13 +307,27 @@ pub fn prune_outside_keep(conn: &Connection, keep_paths: &[String]) -> Result<us
     if keep_paths.is_empty() {
         return clear_tracks(conn);
     }
-    let placeholders: Vec<String> = keep_paths.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
-    let sql = format!(
-        "DELETE FROM tracks WHERE path NOT IN ({})",
-        placeholders.join(",")
-    );
-    let params: Vec<&dyn rusqlite::ToSql> = keep_paths.iter().map(|p| p as &dyn rusqlite::ToSql).collect();
-    conn.execute(&sql, params.as_slice())
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths (path TEXT PRIMARY KEY)", [])?;
+    tx.execute("DELETE FROM scan_keep_paths", [])?;
+
+    {
+        let mut stmt = tx.prepare("INSERT OR IGNORE INTO scan_keep_paths (path) VALUES (?1)")?;
+        for chunk in keep_paths.chunks(500) {
+            for path in chunk {
+                stmt.execute(params_from_iter([path]))?;
+            }
+        }
+    }
+
+    let deleted = tx.execute(
+        "DELETE FROM tracks WHERE NOT EXISTS (SELECT 1 FROM scan_keep_paths WHERE scan_keep_paths.path = tracks.path)",
+        [],
+    )?;
+    tx.execute("DELETE FROM scan_keep_paths", [])?;
+    tx.commit()?;
+    Ok(deleted)
 }
 
 // --- Directory management ---

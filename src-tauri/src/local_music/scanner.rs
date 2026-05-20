@@ -1,6 +1,7 @@
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::tag::{Accessor, ItemKey, ItemValue, Tag, TagType};
+use std::fs::Metadata;
 use std::path::Path;
 use std::time::SystemTime;
 use walkdir::WalkDir;
@@ -140,6 +141,52 @@ pub struct ScanResult {
     pub errors: usize,
 }
 
+fn metadata_mtime_ms(metadata: &Metadata) -> i64 {
+    metadata.modified()
+        .ok()
+        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn fallback_track(path: &Path, metadata: &Metadata, mtime_ms: i64) -> TrackRow {
+    let file_name = path.file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+    TrackRow {
+        songmid: format!("local_{}", md5_hash(path.to_string_lossy().as_bytes())),
+        path: path.to_string_lossy().to_string(),
+        url: None,
+        singer: String::new(),
+        name: file_name,
+        album_name: String::new(),
+        album_id: 0,
+        source: "local".to_string(),
+        interval: String::new(),
+        has_cover: 0,
+        cover_key: None,
+        year: 0,
+        lrc: None,
+        types: "[]".to_string(),
+        _types: "{}".to_string(),
+        type_url: "{}".to_string(),
+        bitrate: 0,
+        sample_rate: 0,
+        channels: 0,
+        duration: 0.0,
+        size: metadata.len() as i64,
+        mtime_ms,
+        hash: None,
+        updated_at: chrono::Utc::now().timestamp(),
+    }
+}
+
+fn flush_tracks(conn: &rusqlite::Connection, tracks: &mut Vec<TrackRow>) {
+    if tracks.is_empty() { return; }
+    let _ = music_db::upsert_tracks(conn, tracks);
+    tracks.clear();
+}
+
 fn is_hidden(path: &Path) -> bool {
     path.file_name()
         .and_then(|n| n.to_str())
@@ -148,16 +195,16 @@ fn is_hidden(path: &Path) -> bool {
 }
 
 pub fn scan_directories(conn: &rusqlite::Connection, dirs: &[String], skip_hidden: bool) -> ScanResult {
+    const UPSERT_BATCH_SIZE: usize = 128;
     let mut result = ScanResult { scanned: 0, added: 0, updated: 0, errors: 0 };
 
-    // Get existing stats for incremental scan
     let existing_stats: Vec<TrackStat> = music_db::get_all_stats(conn).unwrap_or_default();
     let stat_map: std::collections::HashMap<String, TrackStat> = existing_stats
         .into_iter()
         .map(|s| (s.path.clone(), s))
         .collect();
 
-    let mut new_tracks: Vec<TrackRow> = Vec::new();
+    let mut new_tracks: Vec<TrackRow> = Vec::with_capacity(UPSERT_BATCH_SIZE);
     let mut found_paths: Vec<String> = Vec::new();
 
     for dir in dirs {
@@ -166,79 +213,46 @@ pub fn scan_directories(conn: &rusqlite::Connection, dirs: &[String], skip_hidde
             !is_hidden(e.path())
         });
         for entry in walker.filter_map(|e| e.ok()) {
+            if !entry.file_type().is_file() { continue; }
             let path = entry.path();
-            if !path.is_file() || !is_audio_file(path) { continue; }
+            if !is_audio_file(path) { continue; }
 
             result.scanned += 1;
             let path_str = path.to_string_lossy().to_string();
             found_paths.push(path_str.clone());
 
-            // Check mtime for incremental update
-            let mtime_ms = path.metadata()
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+            let metadata = match entry.metadata() {
+                Ok(metadata) => metadata,
+                Err(_) => {
+                    result.errors += 1;
+                    continue;
+                }
+            };
+            let mtime_ms = metadata_mtime_ms(&metadata);
 
             if let Some(existing) = stat_map.get(&path_str) {
-                if existing.mtime_ms == mtime_ms { continue; } // Unchanged
+                if existing.mtime_ms == mtime_ms { continue; }
+                result.updated += 1;
+            } else {
+                result.added += 1;
             }
 
             match read_tags(path) {
                 Some(track) => new_tracks.push(track),
                 None => {
-                    // Fallback: create a basic track entry when tag parsing fails
-                    let file_name = path.file_stem()
-                        .map(|s| s.to_string_lossy().to_string())
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    let mtime_ms_fallback = path.metadata()
-                        .and_then(|m| m.modified())
-                        .ok()
-                        .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
-                        .map(|d| d.as_millis() as i64)
-                        .unwrap_or(0);
-                    let file_size_fallback = path.metadata().map(|m| m.len() as i64).unwrap_or(0);
-                    let songmid_fallback = format!("local_{}", md5_hash(path.to_string_lossy().as_bytes()));
-                    new_tracks.push(TrackRow {
-                        songmid: songmid_fallback,
-                        path: path.to_string_lossy().to_string(),
-                        url: None,
-                        singer: String::new(),
-                        name: file_name,
-                        album_name: String::new(),
-                        album_id: 0,
-                        source: "local".to_string(),
-                        interval: String::new(),
-                        has_cover: 0,
-                        cover_key: None,
-                        year: 0,
-                        lrc: None,
-                        types: "[]".to_string(),
-                        _types: "{}".to_string(),
-                        type_url: "{}".to_string(),
-                        bitrate: 0,
-                        sample_rate: 0,
-                        channels: 0,
-                        duration: 0.0,
-                        size: file_size_fallback,
-                        mtime_ms: mtime_ms_fallback,
-                        hash: None,
-                        updated_at: chrono::Utc::now().timestamp(),
-                    });
+                    new_tracks.push(fallback_track(path, &metadata, mtime_ms));
                     result.errors += 1;
                 }
+            }
+
+            if new_tracks.len() >= UPSERT_BATCH_SIZE {
+                flush_tracks(conn, &mut new_tracks);
             }
         }
     }
 
-    // Batch upsert new/changed tracks
-    if !new_tracks.is_empty() {
-        result.added = new_tracks.len();
-        let _ = music_db::upsert_tracks(conn, &new_tracks);
-    }
+    flush_tracks(conn, &mut new_tracks);
 
-    // Prune tracks that are no longer in scan directories
     let _ = music_db::prune_outside_keep(conn, &found_paths);
 
     result
