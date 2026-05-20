@@ -8,7 +8,6 @@ import { useSettingsStore } from '@/store/Settings'
 import { useRouter } from 'vue-router'
 import { MessagePlugin } from 'tdesign-vue-next'
 import {
-  ChevronRightIcon,
   RefreshIcon,
   EllipsisIcon,
   PlayCircleIcon,
@@ -368,11 +367,15 @@ onBeforeUnmount(() => {
         </h2>
       </div>
       <div class="right-container">
-        <t-button shape="round" theme="primary" variant="text" @click="showDirModal = true">
-          <span style="display: flex; align-items: center">
-            <span style="font-weight: bold">{{ t('music.local.selectDir') }}</span>
-            <ChevronRightIcon :stroke-width="2.5" style="margin-left: 2px" />
-          </span>
+        <t-button
+          shape="round"
+          theme="primary"
+          variant="base"
+          class="select-dir-trigger"
+          @click="showDirModal = true"
+        >
+          <template #icon><FolderIcon size="16px" /></template>
+          {{ t('music.local.selectDir') }}
         </t-button>
       </div>
     </div>
@@ -505,12 +508,23 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-else class="empty">
-      <i class="iconfont icon-shouye empty-icon"></i>
-      <p class="empty-text">{{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.noMusicDir') }}</p>
-      <t-button v-if="!searchQuery" theme="primary" class="empty-action" @click="showDirModal = true">
-        <template #icon><FolderIcon /></template>
-        {{ t('music.local.selectDir') }}
-      </t-button>
+      <div class="empty-card" :class="{ 'is-search-empty': !!searchQuery }">
+        <div class="empty-visual">
+          <FolderIcon v-if="!searchQuery" size="44px" :stroke-width="1.5" />
+          <SearchIcon v-else size="44px" :stroke-width="1.5" />
+        </div>
+        <div class="empty-copy">
+          <h3>{{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.emptyTitle') }}</h3>
+          <p>{{ searchQuery ? t('music.local.emptySearchHint') : t('music.local.noMusicDir') }}</p>
+        </div>
+        <div v-if="!searchQuery" class="empty-actions">
+          <t-button theme="primary" size="large" class="empty-action" @click="showDirModal = true">
+            <template #icon><FolderIcon /></template>
+            {{ t('music.local.selectDir') }}
+          </t-button>
+          <span class="empty-tip">{{ t('music.local.emptyScanTip') }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- 目录管理弹窗 -->
@@ -523,6 +537,13 @@ onBeforeUnmount(() => {
     >
       <div class="dir-modal-content">
         <div class="dir-hint">{{ t('music.local.selectDirTip') }}</div>
+        <div v-if="scanDirs.length === 0" class="dir-empty">
+          <div class="dir-empty-icon"><FolderIcon size="28px" :stroke-width="1.5" /></div>
+          <div>
+            <strong>{{ t('music.local.dirEmptyTitle') }}</strong>
+            <p>{{ t('music.local.dirEmptyHint') }}</p>
+          </div>
+        </div>
         <div v-for="d in scanDirs" :key="d" class="dir-row">
           <span class="dir-path">{{ d }}</span>
           <t-button size="small" variant="text" theme="danger" @click="removeDir(d)">{{ t('common.delete') }}</t-button>
@@ -600,6 +621,12 @@ onBeforeUnmount(() => {
   font-size: 18px;
 }
 
+/* 头部选择目录入口 */
+.select-dir-trigger {
+  min-height: 40px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--td-brand-color) 18%, transparent);
+}
 /* 控制栏 */
 .controls {
   display: flex;
@@ -835,6 +862,75 @@ onBeforeUnmount(() => {
   color: var(--td-text-color-placeholder);
 }
 
+.empty-card {
+  width: min(100%, 520px);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--td-brand-color) 16%, var(--td-border-level-1-color));
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--td-brand-color) 12%, transparent), transparent 58%),
+    color-mix(in srgb, var(--td-bg-color-container) 88%, transparent);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--td-text-color-primary) 8%, transparent);
+}
+
+.empty-card.is-search-empty {
+  border-color: var(--td-border-level-1-color);
+  background: var(--td-bg-color-container);
+}
+
+.empty-visual {
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28px;
+  color: var(--td-brand-color);
+  background: color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--td-brand-color) 18%, transparent);
+}
+
+.empty-copy h3 {
+  margin: 0 0 8px;
+  color: var(--td-text-color-primary);
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.empty-copy p {
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 360px;
+}
+
+.empty-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.empty-action {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0 28px;
+  font-weight: 700;
+}
+
+.empty-tip {
+  color: var(--td-text-color-placeholder);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 /* 目录弹窗 */
 .dir-modal-content {
   padding: 0;
@@ -846,6 +942,42 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
+.dir-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--td-border-level-2-color);
+  border-radius: 14px;
+  background: var(--td-bg-color-container-hover);
+}
+
+.dir-empty-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 16px;
+  color: var(--td-brand-color);
+  background: color-mix(in srgb, var(--td-brand-color) 12%, transparent);
+}
+
+.dir-empty strong {
+  display: block;
+  color: var(--td-text-color-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.dir-empty p {
+  margin: 0;
+  color: var(--td-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
 .dir-row {
   display: flex;
   justify-content: space-between;
@@ -1112,31 +1244,34 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  /* 空状态 */
   .empty {
-    flex-direction: column;
-    gap: 16px;
-    padding: 60px 24px;
+    padding: 24px 0;
   }
 
-  .empty-icon {
-    font-size: 48px;
-    opacity: 0.2;
-    line-height: 1;
+  .empty-card {
+    padding: 28px 20px;
+    gap: 18px;
+    border-radius: var(--mobile-card-radius, 20px);
   }
 
-  .empty-text {
-    font-size: 15px;
-    text-align: center;
-    line-height: 1.6;
-    margin: 0;
+  .empty-visual {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+  }
+
+  .empty-copy h3 {
+    font-size: 18px;
+  }
+
+  .empty-copy p {
+    font-size: 14px;
   }
 
   .empty-action {
     min-height: var(--mobile-touch-target);
     border-radius: var(--mobile-control-radius);
     padding: 0 28px;
-    margin-top: 4px;
   }
 
   /* 批量操作栏 */
