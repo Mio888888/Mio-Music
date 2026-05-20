@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import PluginRunner from '@/utils/plugin/PluginRunner'
+import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { withIpcPerformance } from '@/utils/performanceMonitor'
 import { rewriteImageUrls } from '@/utils/imageProxy'
 
@@ -139,7 +140,6 @@ const api = {
   music: {
     requestSdk: async (method: string, args: any) => {
       if (args?.source === 'subsonic' && !args.subsonicConfig) {
-        const { LocalUserDetailStore } = await import('@/store/LocalUserDetail')
         const store = LocalUserDetailStore()
         const config = store.userInfo.subsonicConfig
         if (config) {

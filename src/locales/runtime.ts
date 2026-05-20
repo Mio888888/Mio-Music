@@ -1,5 +1,6 @@
 import i18n from '@/locales'
 import type { AppLocale } from '@/store/Settings'
+import { locale as getSystemLocale } from '@tauri-apps/plugin-os'
 
 export type ResolvedLocale = 'zh-CN' | 'en-US'
 
@@ -17,8 +18,7 @@ export const resolveAppLocale = async (language: AppLocale | undefined): Promise
   if (language && language !== 'system') return language
 
   try {
-    const { locale } = await import('@tauri-apps/plugin-os')
-    return normalizeLocale(await locale())
+    return normalizeLocale(await getSystemLocale())
   } catch {
     return 'zh-CN'
   }

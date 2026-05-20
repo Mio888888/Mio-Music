@@ -49,7 +49,7 @@ const dragThreshold = 10
 const draggedSong = ref<any>(null)
 const isDragStarted = ref(false)
 const wasLongPressed = ref(false)
-const autoScrollTimer = ref<number | null>(null)
+const autoScrollFrame = ref<number | null>(null)
 const scrollSpeed = ref(0)
 const originalList = ref<any[]>([])
 
@@ -74,15 +74,13 @@ const scrollToCurrentSong = () => {
   if (!props.currentSongId) return
   nextTick(() => {
     const index = list.value.findIndex((song) => song.songmid === props.currentSongId)
-    if (index !== -1) {
-      const container = document.querySelector('.playlist-content')
-      if (container) {
-        const itemHeight = 66
-        const containerHeight = container.clientHeight
-        let targetScrollTop = index * itemHeight - containerHeight / 2 + itemHeight / 2
-        targetScrollTop = Math.max(0, targetScrollTop)
-        container.scrollTo({ top: targetScrollTop, behavior: 'smooth' })
-      }
+    const container = containerProps.ref.value
+    if (index !== -1 && container) {
+      const itemHeight = 66
+      const containerHeight = container.clientHeight
+      let targetScrollTop = index * itemHeight - containerHeight / 2 + itemHeight / 2
+      targetScrollTop = Math.max(0, targetScrollTop)
+      container.scrollTo({ top: targetScrollTop, behavior: 'smooth' })
     }
   })
 }
@@ -199,15 +197,15 @@ const startDragSort = (index: number, song: any) => {
 }
 
 const updateDragOverIndex = (clientY: number) => {
-  const playlistContainer = document.querySelector('.playlist-content')
-  if (!playlistContainer) return
-  const containerRect = playlistContainer.getBoundingClientRect()
+  const container = containerProps.ref.value
+  if (!container) return
+  const containerRect = container.getBoundingClientRect()
   const scrollThreshold = 80
   const maxScrollSpeed = 15
   const distanceFromTop = clientY - containerRect.top
   const distanceFromBottom = containerRect.bottom - clientY
-  const canScrollUp = playlistContainer.scrollTop > 0
-  const canScrollDown = playlistContainer.scrollTop < playlistContainer.scrollHeight - playlistContainer.clientHeight
+  const canScrollUp = container.scrollTop > 0
+  const canScrollDown = container.scrollTop < container.scrollHeight - container.clientHeight
 
   if (distanceFromTop < scrollThreshold && distanceFromTop > 0 && canScrollUp) {
     scrollSpeed.value = -((scrollThreshold - distanceFromTop) / scrollThreshold) * maxScrollSpeed
@@ -248,18 +246,25 @@ const updatePreviewList = () => {
 }
 
 const startAutoScroll = () => {
-  if (autoScrollTimer.value) return
-  autoScrollTimer.value = window.setInterval(() => {
-    const playlistContainer = document.querySelector('.playlist-content')
-    if (playlistContainer && scrollSpeed.value !== 0) {
-      playlistContainer.scrollTop += scrollSpeed.value
+  if (autoScrollFrame.value !== null) return
+  const tick = () => {
+    const container = containerProps.ref.value
+    if (container && scrollSpeed.value !== 0) {
+      container.scrollTop += scrollSpeed.value
       if (isDragSorting.value) updateDragOverIndex(dragCurrentY.value)
+      autoScrollFrame.value = requestAnimationFrame(tick)
+      return
     }
-  }, 16)
+    autoScrollFrame.value = null
+  }
+  autoScrollFrame.value = requestAnimationFrame(tick)
 }
 
 const stopAutoScroll = () => {
-  if (autoScrollTimer.value) { clearInterval(autoScrollTimer.value); autoScrollTimer.value = null }
+  if (autoScrollFrame.value !== null) {
+    cancelAnimationFrame(autoScrollFrame.value)
+    autoScrollFrame.value = null
+  }
   scrollSpeed.value = 0
 }
 

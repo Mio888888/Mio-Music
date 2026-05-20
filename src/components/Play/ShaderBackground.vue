@@ -14,6 +14,8 @@ let program: WebGLProgram | null = null
 let vertexBuffer: WebGLBuffer | null = null
 let vertexShader: WebGLShader | null = null
 let fragmentShader: WebGLShader | null = null
+let uTimeLocation: WebGLUniformLocation | null = null
+let uColorLocation: WebGLUniformLocation | null = null
 let animationFrameId: number | null = null
 const startTime = Date.now()
 const dominantColor = ref({ r: 0.3, g: 0.3, b: 0.5 })
@@ -226,6 +228,8 @@ function initWebGL() {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
   const pos = gl.getAttribLocation(program, 'a_position')
+  uTimeLocation = gl.getUniformLocation(program, 'u_time')
+  uColorLocation = gl.getUniformLocation(program, 'u_color')
   gl.enableVertexAttribArray(pos)
   gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0)
   gl.useProgram(program)
@@ -245,11 +249,11 @@ function resizeCanvas() {
 }
 
 function render() {
-  if (!gl || !program) return
+  if (!gl || !program || !uTimeLocation || !uColorLocation) return
   const t = (Date.now() - startTime) / 1000
-  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), t)
+  gl.uniform1f(uTimeLocation, t)
   gl.uniform3f(
-    gl.getUniformLocation(program, 'u_color'),
+    uColorLocation,
     dominantColor.value.r,
     dominantColor.value.g,
     dominantColor.value.b
@@ -284,6 +288,8 @@ function disposeWebGL() {
     if (program) { gl.deleteProgram(program); program = null }
     if (vertexShader) { gl.deleteShader(vertexShader); vertexShader = null }
     if (fragmentShader) { gl.deleteShader(fragmentShader); fragmentShader = null }
+    uTimeLocation = null
+    uColorLocation = null
     gl = null
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, watch, onActivated, onMounted, computed } from 'vue'
+import { ref, reactive, watch, onActivated, onMounted, onBeforeUnmount, computed } from 'vue'
 import { searchValue as useSearchStore } from '@/store/search'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { type MusicItem } from '@/services/musicSdk'
@@ -84,21 +84,17 @@ const handlePlay = (song: MusicItem) => {
 }
 
 const handleScroll = (event: Event) => {
-  if (activeTab.value === 'songs') {
+  if (activeTab.value !== 'songs' || songScrollFrame !== null) return
+  const target = event.target as HTMLElement
+  songScrollFrame = requestAnimationFrame(() => {
+    songScrollFrame = null
+    if (!isNearBottom(target)) return
     if (selectedSource.value === 'all') {
-      const target = event.target as HTMLElement
-      const { scrollTop, scrollHeight, clientHeight } = target
-      if (scrollHeight - scrollTop - clientHeight < 100 && !songs.aggregateLoading && songs.aggregateHasMore) {
-        songs.fetchAggregateNextPage(keyword.value)
-      }
-    } else {
-      const target = event.target as HTMLElement
-      const { scrollTop, scrollHeight, clientHeight } = target
-      if (scrollHeight - scrollTop - clientHeight < 100 && !songs.loading && songs.hasMore) {
-        songs.fetchPage(keyword.value, selectedSource.value, false)
-      }
+      if (!songs.aggregateLoading && songs.aggregateHasMore) songs.fetchAggregateNextPage(keyword.value)
+    } else if (!songs.loading && songs.hasMore) {
+      songs.fetchPage(keyword.value, selectedSource.value, false)
     }
-  }
+  })
 }
 
 const routerToPlaylist = (playlist: PlaylistCardItem) => {
@@ -110,12 +106,14 @@ const routerToPlaylist = (playlist: PlaylistCardItem) => {
 }
 
 const onPlaylistScroll = (event: Event) => {
-  if (selectedSource.value === 'all') return
+  if (selectedSource.value === 'all' || playlistScrollFrame !== null) return
   const target = event.target as HTMLElement
-  const { scrollTop, scrollHeight, clientHeight } = target
-  if (scrollHeight - scrollTop - clientHeight < 100 && playlists.results.length < playlists.total && !playlists.loading) {
-    playlists.fetch(keyword.value, selectedSource.value, sourceKeys(), sourceOrderMap.value, false)
-  }
+  playlistScrollFrame = requestAnimationFrame(() => {
+    playlistScrollFrame = null
+    if (isNearBottom(target) && playlists.results.length < playlists.total && !playlists.loading) {
+      playlists.fetch(keyword.value, selectedSource.value, sourceKeys(), sourceOrderMap.value, false)
+    }
+  })
 }
 
 const songKey = (song: MusicItem, index: number) => {
@@ -125,6 +123,14 @@ const songKey = (song: MusicItem, index: number) => {
 }
 
 const playlistKey = (playlist: PlaylistCardItem) => `${playlist.source || selectedSource.value}-${playlist.id}`
+
+let songScrollFrame: number | null = null
+let playlistScrollFrame: number | null = null
+
+const isNearBottom = (target: HTMLElement) => {
+  const { scrollTop, scrollHeight, clientHeight } = target
+  return scrollHeight - scrollTop - clientHeight < 100
+}
 
 onMounted(async () => {
   const val = searchStore.getValue.trim()
@@ -144,6 +150,11 @@ onActivated(async () => {
     resetResults()
     await searchActiveTab()
   }
+})
+
+onBeforeUnmount(() => {
+  if (songScrollFrame !== null) cancelAnimationFrame(songScrollFrame)
+  if (playlistScrollFrame !== null) cancelAnimationFrame(playlistScrollFrame)
 })
 
 watch(
