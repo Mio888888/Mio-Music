@@ -78,11 +78,11 @@ let sources = {{}};
 
 function getSourceName(sourceId) {{
   const nameMap = {{
-    'kw': '酷我音乐',
-    'kg': '酷狗音乐',
-    'tx': 'QQ音乐',
-    'wy': '网易云音乐',
-    'mg': '咪咕音乐'
+    'kw': '小蜗',
+    'kg': '小苟',
+    'tx': '小鹅',
+    'wy': '小芸',
+    'mg': '菇菇'
   }};
   return nameMap[sourceId] || sourceId.toUpperCase() + '音乐';
 }}
@@ -126,11 +126,11 @@ function extractDefaultSources() {{
 
   // 解析失败，使用默认配置
   return {{
-    kw: {{ name: "酷我音乐", type: "music", qualitys: ['128k', '320k'] }},
-    kg: {{ name: "酷狗音乐", type: "music", qualitys: ['128k', '320k'] }},
-    tx: {{ name: "QQ音乐", type: "music", qualitys: ['128k', '320k'] }},
-    wy: {{ name: "网易云音乐", type: "music", qualitys: ['128k', '320k'] }},
-    mg: {{ name: "咪咕音乐", type: "music", qualitys: ['128k', '320k'] }}
+    kw: {{ name: "小蜗", type: "music", qualitys: ['128k', '320k'] }},
+    kg: {{ name: "小苟", type: "music", qualitys: ['128k', '320k'] }},
+    tx: {{ name: "小鹅", type: "music", qualitys: ['128k', '320k'] }},
+    wy: {{ name: "小芸", type: "music", qualitys: ['128k', '320k'] }},
+    mg: {{ name: "菇菇", type: "music", qualitys: ['128k', '320k'] }}
   }};
 }}
 

@@ -2,11 +2,11 @@ import { computed } from 'vue'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 
 const FALLBACK_SOURCE_NAMES: Record<string, string> = {
-  wy: '网易云音乐',
-  kg: '酷狗音乐',
-  mg: '咪咕音乐',
-  tx: 'QQ音乐',
-  kw: '酷我音乐',
+  wy: '小芸',
+  kg: '小苟',
+  mg: '菇菇',
+  tx: '小鹅',
+  kw: '小蜗',
   bd: '波点音乐',
   git: 'GitCode',
   subsonic: 'Subsonic',

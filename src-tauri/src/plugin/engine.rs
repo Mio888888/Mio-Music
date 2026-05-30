@@ -245,7 +245,7 @@ impl PluginEngine {
         let mut sources = Vec::new();
 
         let source_ids = ["kw", "kg", "tx", "wy", "mg", "mgt", "bd", "local"];
-        let source_names = ["酷我音乐", "酷狗音乐", "QQ音乐", "网易云音乐", "咪咕音乐", "咪咕音乐", "百度音乐", "本地"];
+        let source_names = ["小蜗", "小苟", "小鹅", "小芸", "菇菇", "菇菇", "百度音乐", "本地"];
 
         for (id, default_name) in source_ids.iter().zip(source_names.iter()) {
             if code.contains(&format!("\"{}\"", id)) || code.contains(&format!("'{}'", id)) {
