@@ -23,8 +23,8 @@ https://mio888888.github.io/Mio-Music/
 
 > 本仓库未附带自动发布 workflow。如需发布到 GitHub Pages，请自行在仓库
 > `Settings -> Pages -> Build and deployment -> Source` 选择 `GitHub Actions`
-> 并添加一个把 `website/` 作为静态站点上传的 workflow，或使用 `Deploy from
-> a branch` 直接指向 `website/` 目录。
+> 并添加一个把 `website/` 作为静态站点上传的 workflow。`Deploy from a
+> branch` 仅支持分支根目录或 `/docs`，不能直接发布 `website/` 目录。
 
 ## 下载链接
 

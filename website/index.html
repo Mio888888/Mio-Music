@@ -963,6 +963,7 @@
             '暂停 · 恢复 · 批量 · 重试': 'Pause · resume · batch · retry',
             'S3 加密备份': 'S3 encrypted backup',
             'AES-GCM · 密码保护': 'AES-GCM · password protected',
+            'AES-GCM + 密码保护': 'AES-GCM + password protection',
             'DLNA 投屏': 'DLNA casting',
             '设备发现 · 播放控制': 'Device discovery · playback control',
             '自动更新': 'Auto-update',
@@ -1246,6 +1247,7 @@
       }
 
       function choosePlatform(platforms, os){
+        if(os === 'mac') return null;
         var keys = platformPriority[os] || [];
         for(var i = 0; i < keys.length; i += 1){
           var item = platforms && platforms[keys[i]];
@@ -1261,6 +1263,7 @@
       }
 
       function chooseAsset(assets, os){
+        if(os === 'mac') return null;
         var matchers = assetMatchers[os] || [];
         for(var i = 0; i < matchers.length; i += 1){
           for(var j = 0; j < assets.length; j += 1){
@@ -1379,6 +1382,8 @@
             if(primaryLabel) primaryLabel.textContent = currentLang === 'en' ? 'Download ' + osLabels[currentOS] : '下载 ' + osLabels[currentOS] + ' 版';
             latestAssetName = primaryAsset.name;
             setDownloadStatus((currentLang === 'en' ? 'Matched latest installer: ' : '已匹配最新安装包：') + primaryAsset.name, 'ready');
+          }else if(currentOS === 'mac'){
+            setDownloadStatus(currentLang === 'en' ? 'macOS installers vary by chip architecture. Choose the matching build on GitHub Releases.' : 'macOS 安装包按芯片架构区分，请在 GitHub Releases 页面选择对应版本。', 'fallback');
           }else{
             setDownloadStatus(currentLang === 'en' ? 'No direct installer was found for this system. Keeping the GitHub Releases page.' : '没有找到当前系统的直接安装包，已保留 GitHub Release 下载页。', 'fallback');
           }
