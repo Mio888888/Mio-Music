@@ -22,7 +22,7 @@
 
 ```
 website/
-├── index.html              # 全部页面（markup + 内联 CSS + 内联 JS）
+├── index.html              # SEO、结构化数据与静态页面标记
 ├── README.md               # 本地预览与下载/版本机制说明
 ├── .nojekyll               # 让 GitHub Pages 原样发布
 ├── robots.txt              # Allow: / + Sitemap
@@ -30,6 +30,11 @@ website/
 ├── site.webmanifest        # PWA manifest
 └── assets/
     ├── app-icon.png        # 从音乐项目 public/icon.png 复制
+    ├── site.css            # 字体、背景、入场与轮播样式
+    ├── site-data.js        # i18n、下载源与页面状态数据
+    ├── site-ui.js          # 轮播、语言切换与设备识别
+    ├── site-downloads.js   # release 获取与安装包匹配
+    ├── site-init.js        # 页面初始化入口
     ├── screenshots/
     │   └── home.png        # 占位图，从音乐项目 public/home.png 复制
     └── vendor/             # 从 OpsBatch/website/assets/vendor 复制
@@ -122,7 +127,7 @@ website/
 
 1. `website/` 目录存在且包含上列全部文件。
 2. `index.html` 内 `<title>` 含「Mio Music」，所有 GitHub 链接指向 `Mio888888/Mio-Music`，保底版本为 `v0.2.8`。
-3. `index.html` 中无任何 `OpsBatch` / emerald 绿残留字符串；强调色为紫青。
+3. `website/` 页面资源中无任何 `OpsBatch` / emerald 绿残留字符串；强调色为紫青。
 4. CN/EN 切换可改写全部可见文本、title、meta、og 标签与轮播文案。
 5. 下载脚本的 `releasesUrl` / `latestJsonUrls` / `latestReleaseApi` 全部指向 `Mio888888/Mio-Music`。
 6. `python3 -m http.server 4173 -d website` 可在 `http://localhost:4173` 正常打开，控制台无 404（vendor / 字体 / 图标路径正确）。

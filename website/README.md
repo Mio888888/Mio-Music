@@ -15,6 +15,10 @@ python3 -m http.server 4173
 
 官网为纯静态文件，可托管到任意静态站点服务（GitHub Pages、Cloudflare Pages、Netlify、Nginx 等）。把 `website/` 目录整体作为站点根发布即可，所有资源引用均为相对路径。
 
+页面结构保留在 `index.html`，站点样式、翻译数据、交互与下载逻辑分别位于
+`assets/site.css`、`assets/site-data.js`、`assets/site-ui.js`、
+`assets/site-downloads.js` 与 `assets/site-init.js`。
+
 发布地址沿用页面中的 canonical URL：
 
 ```text
