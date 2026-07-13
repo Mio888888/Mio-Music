@@ -16,10 +16,6 @@ dist-ssr
 .claude
 .trellis
 AGENTS.md
-
-# Reference project
-CeruMusic-main
-lx-music-desktop-master
 # Editor directories and files
 .vscode
 .idea
@@ -29,3 +25,6 @@ lx-music-desktop-master
 *.njsproj
 *.sln
 *.sw?
+.codex
+.agents
+/docs/superpowers/
