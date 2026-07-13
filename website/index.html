@@ -1,0 +1,1405 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="Mio">
+<meta name="keywords" content="Mio Music, 音乐播放器, 桌面音乐, 无损音乐, 均衡器, 歌词, Apple Music 风格歌词, Tauri, Vue 3, Rust, 跨平台, 桌面应用, 插件, Subsonic">
+<meta name="description" content="Mio Music 是基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器，Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词与插件多音源，跨平台可用。">
+<meta name="theme-color" content="#0B0F19">
+<meta name="application-name" content="Mio Music">
+<meta property="og:title" content="Mio Music - 原生高保真桌面音乐播放器">
+<meta property="og:description" content="基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器：Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词、插件多音源，数据优先留在本机。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/">
+<meta property="og:image" content="./assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<meta name="twitter:title" content="Mio Music - 原生高保真桌面音乐播放器">
+<meta name="twitter:description" content="基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器：Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词、插件多音源。">
+<meta name="twitter:card" content="summary_large_image">
+<title>Mio Music - 原生高保真桌面音乐播放器</title>
+<link rel="icon" href="./assets/app-icon.png">
+<script src="./assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="./assets/vendor/iconify/local-icons.js"></script>
+<style>
+@font-face { font-family: 'DotGothic16'; font-style: normal; font-weight: 400; font-display: swap; src: url('./assets/vendor/fonts/dotgothic16-regular.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 300; font-display: swap; src: url('./assets/vendor/fonts/jetbrainsmono-300.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./assets/vendor/fonts/jetbrainsmono-400.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./assets/vendor/fonts/jetbrainsmono-500.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('./assets/vendor/fonts/jetbrainsmono-600.ttf') format('truetype'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('./assets/vendor/fonts/jetbrainsmono-700.ttf') format('truetype'); }
+.font-dot { font-family: 'DotGothic16', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+.kanban-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
+.kanban-scroll::-webkit-scrollbar-track { background: transparent; }
+.kanban-scroll::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 10px; }
+.grid-bg { background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px); background-size: 60px 60px; }
+.ambient-orb-lg { width: min(800px, 100vw); height: min(800px, 100vw); }
+.ambient-orb-md { width: min(500px, 82vw); height: min(500px, 82vw); }
+</style>
+<style>
+.reveal{opacity:0;transform:translateY(20px);filter:blur(8px);transition:opacity .8s ease-out,transform .8s ease-out,filter .8s ease-out}.reveal.in-view{opacity:1;transform:translateY(0);filter:blur(0)}.reveal-left{opacity:0;transform:translateX(-30px);filter:blur(8px);transition:opacity .8s ease-out,transform .8s ease-out,filter .8s ease-out}.reveal-left.in-view{opacity:1;transform:translateX(0);filter:blur(0)}.reveal-right{opacity:0;transform:translateX(30px);filter:blur(8px);transition:opacity .8s ease-out,transform .8s ease-out,filter .8s ease-out}.reveal-right.in-view{opacity:1;transform:translateX(0);filter:blur(0)}.reveal-fade{opacity:0;filter:blur(8px);transition:opacity .8s ease-out,filter .8s ease-out}.reveal-fade.in-view{opacity:1;filter:blur(0)}.carousel-slide{opacity:0;transform:translateX(18px) scale(.985);pointer-events:none;transition:opacity .38s ease,transform .38s ease}.carousel-slide.is-active{opacity:1;transform:translateX(0) scale(1);pointer-events:auto}.carousel-thumb[aria-selected=true]{border-color:rgba(34,211,238,.55);background:rgba(34,211,238,.12);color:#cffafe}.carousel-thumb[aria-selected=true] img{opacity:1}.carousel-thumb[aria-selected=true] .thumb-dot{background:#22d3ee}@media (prefers-reduced-motion:reduce){.reveal,.reveal-left,.reveal-right,.reveal-fade,.carousel-slide{transition:none;filter:none;transform:none}}
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "Mio Music",
+      "applicationCategory": "MusicApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "url": "https://mio888888.github.io/Mio-Music/",
+      "downloadUrl": "https://github.com/Mio888888/Mio-Music/releases/latest",
+      "softwareVersion": "0.2.8",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "Mio Music 是基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器，Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词与插件多音源。",
+      "inLanguage": ["zh-CN", "en"],
+      "featureList": [
+        "Rust 原生音频引擎（AAC/MP3/FLAC/WAV/OGG）",
+        "10 段参数均衡器与音效",
+        "Apple Music 风格动态歌词",
+        "插件多音源 + Subsonic 自托管",
+        "专辑封面主色动态主题",
+        "S3 加密备份与 DLNA 投屏"
+      ],
+      "author": { "@type": "Person", "name": "Mio" },
+      "publisher": { "@type": "Organization", "name": "Mio Music" }
+    },
+    {
+      "@type": "Organization",
+      "name": "Mio Music",
+      "url": "https://mio888888.github.io/Mio-Music/",
+      "logo": "https://mio888888.github.io/Mio-Music/assets/app-icon.png",
+      "sameAs": ["https://github.com/Mio888888/Mio-Music"]
+    },
+    {
+      "@type": "WebSite",
+      "name": "Mio Music",
+      "url": "https://mio888888.github.io/Mio-Music/",
+      "inLanguage": "zh-CN",
+      "publisher": { "@type": "Organization", "name": "Mio Music" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Mio Music 是免费的吗？",
+          "acceptedAnswer": { "@type": "Answer", "text": "Mio Music 开源免费，基于 Tauri 2 + Vue 3 + Rust，音乐库与播放列表优先存储在本机。" }
+        },
+        {
+          "@type": "Question",
+          "name": "Mio Music 支持哪些操作系统？",
+          "acceptedAnswer": { "@type": "Answer", "text": "支持 Windows、macOS 与 Linux，可在 GitHub Releases 下载对应安装包。" }
+        },
+        {
+          "@type": "Question",
+          "name": "Mio Music 包含哪些核心能力？",
+          "acceptedAnswer": { "@type": "Answer", "text": "Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词、插件多音源、专辑封面主题、S3 加密备份与 DLNA 投屏。" }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body class="bg-[#0B0F19] text-white font-mono overflow-x-hidden min-h-screen selection:bg-purple-500/30">
+  <!-- Background -->
+  <div class="absolute inset-x-0 top-0 z-[-1] bg-[#0B0F19] h-screen overflow-hidden">
+    <div class="absolute inset-0 grid-bg"></div>
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 ambient-orb-lg rounded-full bg-purple-500/10 blur-[120px]"></div>
+    <div class="absolute top-1/3 right-0 ambient-orb-md rounded-full bg-cyan-500/10 blur-[120px]"></div>
+    <div class="absolute bottom-0 left-0 ambient-orb-md rounded-full bg-pink-500/[0.07] blur-[120px]"></div>
+  </div>
+
+  <!-- Nav -->
+  <header class="w-full flex justify-between items-center px-6 md:px-10 py-6 z-50 relative reveal-fade">
+    <a href="#" class="flex items-center gap-2.5 text-white font-medium text-base">
+      <img src="./assets/app-icon.png" alt="Mio Music" class="w-7 h-7 rounded-lg">
+      <span class="tracking-tight font-mono">Mio Music</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-8 text-xs text-gray-400 font-medium">
+      <a href="#features" class="hover:text-white transition-colors">能力</a>
+      <a href="#workflow" class="hover:text-white transition-colors">聆听流程</a>
+      <a href="#architecture" class="hover:text-white transition-colors">架构</a>
+      <a href="#privacy" class="hover:text-white transition-colors">隐私</a>
+      <a href="#download" class="hover:text-white transition-colors">下载</a>
+    </nav>
+    <div class="flex items-center gap-3 sm:gap-6">
+      <a href="https://github.com/Mio888888/Mio-Music" target="_blank" rel="noreferrer" class="text-xs text-gray-300 hover:text-white transition-colors hidden sm:flex items-center gap-1.5">
+        <iconify-icon icon="solar:star-linear" width="14"></iconify-icon>
+        GitHub
+      </a>
+      <div class="inline-flex rounded-full border border-white/10 bg-white/[0.04] p-1 text-[10px] text-gray-400" role="group" aria-label="Language switcher">
+        <button type="button" class="px-2.5 py-1 rounded-full transition-all" data-lang-toggle="zh">CN</button>
+        <button type="button" class="px-2.5 py-1 rounded-full transition-all" data-lang-toggle="en">EN</button>
+      </div>
+      <a href="#download" class="px-5 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium hover:bg-purple-500/20 transition-all backdrop-blur-md">
+        免费下载
+      </a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <main class="relative z-10 pt-12 md:pt-20 pb-12 px-4 flex flex-col items-center text-center reveal" data-delay="200">
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md mb-8 reveal">
+      <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+      <span class="text-xs text-gray-300">开源免费 · 本地优先 · 跨平台</span>
+    </div>
+    <h1 class="text-4xl md:text-6xl lg:text-7xl tracking-tight text-white mb-6 max-w-4xl mx-auto leading-[1.1] font-dot reveal" data-delay="100">
+      原生高保真桌面音乐播放器
+    </h1>
+    <p class="text-sm md:text-base text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+      基于 CeruMusic 重构，Tauri 2 (Rust) 后端 + Vue 3 前端。Rust 原生音频引擎、10 段均衡器、Apple Music 风格动态歌词，通过插件接入多音乐源，无需部署中心服务。
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 items-center reveal" data-delay="300">
+      <a href="#download" class="px-6 py-3 rounded-full bg-purple-500 text-white font-semibold text-xs hover:bg-purple-400 transition-all shadow-[0_0_30px_rgba(168,85,247,0.35)]">
+        免费下载桌面版 →
+      </a>
+      <a href="https://github.com/Mio888888/Mio-Music" target="_blank" rel="noreferrer" class="px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white text-xs font-medium hover:bg-white/10 transition-all backdrop-blur-md">
+        查看源码
+      </a>
+    </div>
+    <!-- Stats inline -->
+    <div class="grid grid-cols-3 gap-6 md:gap-16 mt-16 max-w-2xl">
+      <div class="text-center reveal">
+        <div id="latest-version-stat" class="text-3xl md:text-4xl text-white font-dot tracking-tight">v0.2.8</div>
+        <div class="text-xs text-gray-500 mt-1">当前版本</div>
+      </div>
+      <div class="text-center border-x border-white/5 reveal" data-delay="100">
+        <div class="text-3xl md:text-4xl text-white font-dot tracking-tight">8+</div>
+        <div class="text-xs text-gray-500 mt-1">支持格式</div>
+      </div>
+      <div class="text-center reveal" data-delay="200">
+        <div class="text-3xl md:text-4xl text-white font-dot tracking-tight">100%</div>
+        <div class="text-xs text-gray-500 mt-1">本地数据</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Product Carousel -->
+  <section class="relative w-full max-w-6xl mx-auto mt-12 px-4 sm:px-6 z-20 pb-24" aria-labelledby="product-carousel-title">
+    <h2 id="product-carousel-title" class="sr-only">产品截图轮播</h2>
+    <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent shadow-[0_30px_100px_-20px_rgba(0,0,0,1)] reveal" data-carousel tabindex="0">
+      <div class="bg-[#1C1F26]/95 rounded-3xl overflow-hidden ring-1 ring-white/5">
+        <div class="grid md:grid-cols-[minmax(0,1fr)_132px] bg-[#090D14]">
+          <div class="relative min-w-0 bg-[#090D14]">
+          <div class="relative aspect-[16/10] overflow-hidden">
+            <figure class="carousel-slide is-active absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music 播放主界面截图" class="w-full h-full object-contain object-top" width="1536" height="1024" fetchpriority="high">
+            </figure>
+            <figure class="carousel-slide absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music Apple Music 风格动态歌词截图" class="w-full h-full object-contain object-top" width="1536" height="1024" loading="lazy">
+            </figure>
+            <figure class="carousel-slide absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music 10 段均衡器与音效截图" class="w-full h-full object-contain object-top" width="1536" height="1024" loading="lazy">
+            </figure>
+            <figure class="carousel-slide absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music 频谱可视化截图" class="w-full h-full object-contain object-top" width="1536" height="1024" loading="lazy">
+            </figure>
+            <figure class="carousel-slide absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music 下载管理截图" class="w-full h-full object-contain object-top" width="1536" height="1024" loading="lazy">
+            </figure>
+            <figure class="carousel-slide absolute inset-0" data-slide>
+              <img src="./assets/screenshots/home.png" alt="Mio Music AI 助手截图" class="w-full h-full object-contain object-top" width="1536" height="1024" loading="lazy">
+            </figure>
+
+            <div class="absolute inset-x-0 bottom-0 px-5 py-5 md:px-7 md:py-6 bg-gradient-to-t from-[#090D14]/95 via-[#090D14]/70 to-transparent" aria-live="polite">
+              <h3 class="text-lg md:text-2xl font-dot tracking-tight text-white" data-carousel-title>播放主界面</h3>
+              <p class="text-xs md:text-sm text-gray-300 leading-relaxed mt-2 max-w-2xl" data-carousel-copy>Rust 原生引擎驱动，专辑封面主色动态主题与频谱实时可视化。</p>
+            </div>
+          </div>
+
+          <button type="button" class="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#0B0F19]/75 border border-white/10 text-white backdrop-blur-md hover:bg-purple-500/20 hover:border-purple-400/40 transition-all active:scale-95 flex items-center justify-center" data-carousel-prev aria-label="上一张截图">
+            <iconify-icon icon="solar:alt-arrow-left-linear" width="18"></iconify-icon>
+          </button>
+          <button type="button" class="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#0B0F19]/75 border border-white/10 text-white backdrop-blur-md hover:bg-purple-500/20 hover:border-purple-400/40 transition-all active:scale-95 flex items-center justify-center" data-carousel-next aria-label="下一张截图">
+            <iconify-icon icon="solar:alt-arrow-right-linear" width="18"></iconify-icon>
+          </button>
+          </div>
+
+          <div class="hidden md:flex flex-col gap-1.5 border-l border-white/5 bg-[#171A22] p-2" role="tablist" aria-label="产品截图轮播">
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="true" aria-label="查看播放主界面">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="false" aria-label="查看 Apple Music 风格动态歌词">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="false" aria-label="查看 10 段均衡器与音效">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="false" aria-label="查看频谱可视化">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="false" aria-label="查看下载管理">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+            <button type="button" class="carousel-thumb w-full rounded-xl border border-white/10 bg-white/[0.03] p-1 text-left text-gray-400 transition-all hover:border-white/25" data-carousel-thumb aria-selected="false" aria-label="查看 AI 助手">
+              <img src="./assets/screenshots/home.png" alt="" class="aspect-[16/10] w-full rounded-lg object-cover object-top opacity-70 transition-opacity" width="160" height="100" loading="lazy">
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAIN POINTS -->
+  <section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="why">
+    <div class="text-center mb-16 reveal">
+      <div class="text-xs text-purple-400 mb-3 tracking-widest uppercase">// Why Mio Music</div>
+      <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">音乐播放器够多，但音质与体验总差一口气</h2>
+      <p class="text-sm text-gray-400 max-w-xl mx-auto">
+        网页播放器压缩音质、歌词只能逐行、音源被锁死在单一平台。Mio Music 用 Rust 原生引擎与插件架构把它们一次解决。
+      </p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="bg-[#262A34] rounded-2xl border border-white/5 p-6 reveal-left">
+        <div class="flex items-center gap-2 mb-4">
+          <iconify-icon icon="solar:volume-loud-linear" width="18" class="text-red-400"></iconify-icon>
+          <span class="text-[10px] text-red-400/70 uppercase tracking-widest">痛点</span>
+        </div>
+        <p class="text-sm text-gray-200 leading-relaxed mb-4 font-dot">"网页播放器压缩音质，没有均衡器"</p>
+        <div class="flex items-center gap-2 pt-4 border-t border-white/5 text-xs text-cyan-400">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="12"></iconify-icon>
+          <span>Rust 原生音频引擎 + 10 段参数均衡器 + 低音增强 / 环绕声</span>
+        </div>
+      </div>
+      <div class="bg-[#262A34] rounded-2xl border border-white/5 p-6 ring-1 ring-purple-500/20 reveal" data-delay="150">
+        <div class="flex items-center gap-2 mb-4">
+          <iconify-icon icon="solar:chat-square-linear" width="18" class="text-red-400"></iconify-icon>
+          <span class="text-[10px] text-red-400/70 uppercase tracking-widest">痛点</span>
+        </div>
+        <p class="text-sm text-gray-200 leading-relaxed mb-4 font-dot">"歌词只能逐行滚动，也没有翻译"</p>
+        <div class="flex items-center gap-2 pt-4 border-t border-white/5 text-xs text-cyan-400">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="12"></iconify-icon>
+          <span>LRC / YRC / QRC / TTML 多格式 + 翻译合并 + Apple Music 风格动态歌词</span>
+        </div>
+      </div>
+      <div class="bg-[#262A34] rounded-2xl border border-white/5 p-6 reveal-right">
+        <div class="flex items-center gap-2 mb-4">
+          <iconify-icon icon="solar:lock-keyhole-linear" width="18" class="text-red-400"></iconify-icon>
+          <span class="text-[10px] text-red-400/70 uppercase tracking-widest">痛点</span>
+        </div>
+        <p class="text-sm text-gray-200 leading-relaxed mb-4 font-dot">"音源被锁死在单一平台"</p>
+        <div class="flex items-center gap-2 pt-4 border-t border-white/5 text-xs text-cyan-400">
+          <iconify-icon icon="solar:alt-arrow-right-linear" width="12"></iconify-icon>
+          <span>插件系统 + Subsonic 自托管 + 本地音乐库扫描</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="features">
+    <div class="text-center mb-16 reveal">
+      <div class="text-xs text-cyan-400 mb-3 tracking-widest uppercase">// Core Features</div>
+      <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">一站式音乐能力</h2>
+      <p class="text-sm text-gray-400 max-w-xl mx-auto">
+        从原生音频引擎到动态歌词，从插件音源到加密备份，覆盖桌面音乐播放的高频场景。
+      </p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-4">
+            <iconify-icon icon="solar:music-note-2-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">原生音频引擎</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            Rodio + cpal + Symphonia 驱动，支持 <code class="text-purple-300">AAC / MP3 / FLAC / WAV / OGG</code>；无缝播放（Gapless）与可配置交叉淡入淡出（Crossfade），系统集成媒体键。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-purple-400"></span>
+            FFT 频谱实时可视化
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal" data-delay="100">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-4">
+            <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">歌词系统</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            解析 <code class="text-cyan-300">LRC / YRC / QRC / TTML / LRC-A2</code>，翻译合并显示；Apple Music 风格动态歌词；独立桌面歌词窗（透明悬浮）与自定义字体。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-cyan-400"></span>
+            @applemusic-like-lyrics
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal" data-delay="200">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400 mb-4">
+            <iconify-icon icon="solar:tuning-2-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">均衡器与音效</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            10 段参数均衡器，内置 8 种预设（流行、摇滚、爵士、古典等）；低音增强、环绕声模拟（小/中/大空间）、立体声平衡；A/B 双音频输出设备对比。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-pink-400"></span>
+            rustfft (FFT) + biquad (EQ)
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
+            <iconify-icon icon="solar:widget-5-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">插件音源</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            插件系统支持 <code class="text-emerald-300">澜音</code> 与 <code class="text-emerald-300">洛雪</code> 两种类型，动态安装、配置、测试；Subsonic 服务器接入自托管音乐库。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-emerald-400"></span>
+            动态安装 + 配置 + 测试
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal" data-delay="100">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400 mb-4">
+            <iconify-icon icon="solar:palette-round-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">专辑封面主题</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            自动提取专辑封面主色，适配明暗模式，生成 <code class="text-yellow-300">50+</code> CSS 变量；PixiJS 着色器背景与音频响应式频谱；Three.js 粒子欢迎页。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-yellow-400"></span>
+            Three.js / PixiJS 图形渲染
+          </div>
+        </div>
+      </div>
+      <div class="rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal" data-delay="200">
+        <div class="bg-[#1C1F26] rounded-2xl p-6 h-full">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 mb-4">
+            <iconify-icon icon="solar:download-minimalistic-linear" width="20"></iconify-icon>
+          </div>
+          <h3 class="text-base font-dot mb-2 tracking-tight">下载与数据</h3>
+          <p class="text-xs text-gray-400 leading-relaxed mb-4">
+            下载管理器：暂停 / 恢复 / 取消 / 重试 / 批量；S3 兼容云存储备份（<code class="text-blue-300">AES-GCM</code> 加密 + 密码保护）；DLNA 投屏；SQLite 本地库 + 标签编辑。
+          </p>
+          <div class="text-xs text-gray-500 flex items-center gap-2">
+            <span class="w-1 h-1 rounded-full bg-blue-400"></span>
+            S3 备份 · DLNA · 本地扫描
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WORKFLOW (聆听流程) -->
+  <section class="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-20 md:py-24" id="workflow">
+    <div class="text-left md:text-center mb-9 md:mb-16 reveal">
+      <div class="text-[11px] md:text-xs text-purple-400 mb-3 tracking-widest uppercase">// Listening Flow</div>
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-dot tracking-tight mb-4 leading-tight">从选源到沉浸的聆听流程</h2>
+      <p class="text-sm text-gray-400 max-w-xl md:mx-auto leading-relaxed">
+        选好音源，调校音质，进入动态歌词，再用加密备份与投屏把音乐库带到任何地方。
+      </p>
+    </div>
+    <div class="grid gap-3 md:grid-cols-4 md:gap-4 relative">
+      <div class="absolute left-5 top-5 bottom-5 w-px bg-gradient-to-b from-purple-400/0 via-purple-400/35 to-cyan-400/0 md:hidden"></div>
+      <div class="hidden md:block absolute top-6 left-12 right-12 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent"></div>
+      <div class="relative reveal pl-14 pr-4 py-4 rounded-2xl bg-white/[0.035] border border-white/10 shadow-[0_14px_35px_-28px_rgba(168,85,247,0.8)] md:pl-0 md:pr-0 md:py-0 md:rounded-none md:bg-transparent md:border-0 md:shadow-none">
+        <div class="absolute left-0 top-4 w-10 h-10 md:relative md:left-auto md:top-auto md:w-12 md:h-12 rounded-2xl bg-[#1C1F26] border border-purple-400/20 md:border-white/10 flex items-center justify-center text-purple-400 md:mb-4 z-10 shadow-[0_0_0_4px_rgba(11,15,25,0.95)] md:shadow-none">
+          <iconify-icon icon="solar:widget-5-linear" width="20"></iconify-icon>
+        </div>
+        <div class="flex items-baseline gap-2 mb-2 md:block md:mb-0">
+          <div class="text-[10px] text-purple-300/80 md:text-gray-600 md:mb-1 tracking-widest">01</div>
+          <h3 class="font-dot text-base md:mb-2 tracking-tight">选择音源</h3>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">从插件、Subsonic 自托管或本地音乐库中挑选想听的内容。</p>
+      </div>
+      <div class="relative reveal pl-14 pr-4 py-4 rounded-2xl bg-white/[0.035] border border-white/10 shadow-[0_14px_35px_-28px_rgba(244,114,182,0.8)] md:pl-0 md:pr-0 md:py-0 md:rounded-none md:bg-transparent md:border-0 md:shadow-none" data-delay="100">
+        <div class="absolute left-0 top-4 w-10 h-10 md:relative md:left-auto md:top-auto md:w-12 md:h-12 rounded-2xl bg-[#1C1F26] border border-pink-400/20 md:border-white/10 flex items-center justify-center text-pink-400 md:mb-4 z-10 shadow-[0_0_0_4px_rgba(11,15,25,0.95)] md:shadow-none">
+          <iconify-icon icon="solar:tuning-2-linear" width="20"></iconify-icon>
+        </div>
+        <div class="flex items-baseline gap-2 mb-2 md:block md:mb-0">
+          <div class="text-[10px] text-pink-300/80 md:text-gray-600 md:mb-1 tracking-widest">02</div>
+          <h3 class="font-dot text-base md:mb-2 tracking-tight">调校音质</h3>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">10 段参数 EQ + 8 预设，加上低音增强与环绕声，调出你的声音。</p>
+      </div>
+      <div class="relative reveal pl-14 pr-4 py-4 rounded-2xl bg-white/[0.035] border border-white/10 shadow-[0_14px_35px_-28px_rgba(34,211,238,0.8)] md:pl-0 md:pr-0 md:py-0 md:rounded-none md:bg-transparent md:border-0 md:shadow-none" data-delay="200">
+        <div class="absolute left-0 top-4 w-10 h-10 md:relative md:left-auto md:top-auto md:w-12 md:h-12 rounded-2xl bg-[#1C1F26] border border-cyan-400/20 md:border-white/10 flex items-center justify-center text-cyan-400 md:mb-4 z-10 shadow-[0_0_0_4px_rgba(11,15,25,0.95)] md:shadow-none">
+          <iconify-icon icon="solar:document-text-linear" width="20"></iconify-icon>
+        </div>
+        <div class="flex items-baseline gap-2 mb-2 md:block md:mb-0">
+          <div class="text-[10px] text-cyan-300/80 md:text-gray-600 md:mb-1 tracking-widest">03</div>
+          <h3 class="font-dot text-base md:mb-2 tracking-tight">沉浸歌词</h3>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">Apple Music 风格动态歌词、翻译合并，或独立桌面悬浮歌词窗。</p>
+      </div>
+      <div class="relative reveal pl-14 pr-4 py-4 rounded-2xl bg-white/[0.035] border border-white/10 shadow-[0_14px_35px_-28px_rgba(59,130,246,0.8)] md:pl-0 md:pr-0 md:py-0 md:rounded-none md:bg-transparent md:border-0 md:shadow-none" data-delay="300">
+        <div class="absolute left-0 top-4 w-10 h-10 md:relative md:left-auto md:top-auto md:w-12 md:h-12 rounded-2xl bg-[#1C1F26] border border-blue-400/20 md:border-white/10 flex items-center justify-center text-blue-400 md:mb-4 z-10 shadow-[0_0_0_4px_rgba(11,15,25,0.95)] md:shadow-none">
+          <iconify-icon icon="solar:cloud-storage-linear" width="20"></iconify-icon>
+        </div>
+        <div class="flex items-baseline gap-2 mb-2 md:block md:mb-0">
+          <div class="text-[10px] text-blue-300/80 md:text-gray-600 md:mb-1 tracking-widest">04</div>
+          <h3 class="font-dot text-base md:mb-2 tracking-tight">管理与同步</h3>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">下载到本地、S3 加密备份、DLNA 投屏，把音乐库带到任何设备。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE BENTO -->
+  <section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="architecture">
+    <div class="text-center mb-16 reveal">
+      <div class="text-xs text-yellow-400 mb-3 tracking-widest uppercase">// Architecture</div>
+      <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">本地优先高保真架构</h2>
+      <p class="text-sm text-gray-400 max-w-xl mx-auto">
+        前端 Vue 3 + TypeScript + Vite，后端 Rust + Tauri 2。核心数据持久化在本地 SQLite，无需云服务即可运行。
+      </p>
+    </div>
+    <div class="grid grid-cols-12 gap-4">
+      <div class="col-span-12 md:col-span-6 rounded-2xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal-left">
+        <div class="bg-[#1C1F26] rounded-2xl p-8 h-full relative overflow-hidden">
+          <div class="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl"></div>
+          <div class="relative">
+            <div class="text-xs text-gray-500 mb-3">数据流</div>
+            <div class="text-5xl md:text-6xl font-dot tracking-tight text-white mb-2 leading-none">Vue → Rust</div>
+            <div class="mt-6 space-y-2 font-mono text-[11px]">
+              <div class="flex items-center gap-2 text-purple-300">
+                <iconify-icon icon="mdi:circle-small" width="8"></iconify-icon> Vue 3 / Vite UI → Pinia stores
+              </div>
+              <div class="flex items-center gap-2 text-pink-300">
+                <iconify-icon icon="mdi:circle-small" width="8"></iconify-icon> Tauri invoke() commands
+              </div>
+              <div class="flex items-center gap-2 text-cyan-300">
+                <iconify-icon icon="mdi:circle-small" width="8"></iconify-icon> Rust 后端 → 音频引擎 / SQLite / 插件
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-span-6 md:col-span-3 rounded-2xl bg-[#262A34] border border-white/5 p-6 reveal" data-delay="100">
+        <iconify-icon icon="solar:rugby-linear" width="20" class="text-purple-400 mb-3"></iconify-icon>
+        <div class="text-2xl font-dot tracking-tight">Tauri 2</div>
+        <div class="text-xs text-gray-500 mt-1">桌面容器</div>
+      </div>
+      <div class="col-span-6 md:col-span-3 rounded-2xl bg-[#262A34] border border-white/5 p-6 reveal" data-delay="200">
+        <iconify-icon icon="solar:database-linear" width="20" class="text-cyan-400 mb-3"></iconify-icon>
+        <div class="text-2xl font-dot tracking-tight">SQLite</div>
+        <div class="text-xs text-gray-500 mt-1">本地持久化 · rusqlite</div>
+      </div>
+      <div class="col-span-12 md:col-span-4 rounded-2xl bg-gradient-to-br from-purple-500/20 via-[#1C1F26] to-[#1C1F26] border border-white/5 p-6 flex flex-col justify-between min-h-[200px] reveal">
+        <iconify-icon icon="solar:atom-linear" width="24" class="text-purple-300"></iconify-icon>
+        <div>
+          <div class="text-base font-dot tracking-tight">Vue 3 + TypeScript</div>
+          <div class="text-xs text-gray-400 mt-1">Vite 6 · Pinia 3 · TDesign / Naive UI · Three.js · PixiJS</div>
+        </div>
+      </div>
+      <div class="col-span-12 md:col-span-4 rounded-2xl bg-[#262A34] border border-white/5 p-6 flex flex-col justify-between min-h-[200px] reveal" data-delay="100">
+        <iconify-icon icon="solar:soundwave-linear" width="24" class="text-cyan-300"></iconify-icon>
+        <div>
+          <div class="text-base font-dot tracking-tight">Rust 原生音频引擎</div>
+          <div class="text-xs text-gray-400 mt-1">Rodio · cpal · Symphonia · rustfft · biquad</div>
+        </div>
+      </div>
+      <div class="col-span-12 md:col-span-4 rounded-2xl bg-gradient-to-br from-cyan-500/20 via-[#1C1F26] to-[#1C1F26] border border-white/5 p-6 flex flex-col justify-between min-h-[200px] reveal" data-delay="200">
+        <iconify-icon icon="solar:shield-keyhole-linear" width="24" class="text-cyan-300"></iconify-icon>
+        <div>
+          <div class="text-base font-dot tracking-tight">加密与自动更新</div>
+          <div class="text-xs text-gray-400 mt-1">S3 AES-GCM · Ed25519 签名 · 无云依赖即可运行</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CAPABILITY LIST -->
+  <section class="relative z-10 max-w-5xl mx-auto px-6 py-24">
+    <div class="text-center mb-16 reveal">
+      <div class="text-xs text-pink-400 mb-3 tracking-widest uppercase">// What's Included</div>
+      <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">一个应用，全部能力</h2>
+    </div>
+    <div class="rounded-2xl border border-white/5 bg-[#1C1F26] divide-y divide-white/5 reveal">
+      <div class="grid grid-cols-12 px-6 py-4 text-xs text-gray-500 uppercase tracking-widest">
+        <div class="col-span-6">能力项</div>
+        <div class="col-span-3 hidden md:block">技术</div>
+        <div class="col-span-3 text-right">状态</div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 md:col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <iconify-icon icon="solar:music-note-2-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">音频格式支持</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">AAC · MP3 · FLAC · WAV · OGG</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
+            <iconify-icon icon="solar:tuning-2-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">均衡器预设</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">10 段参数 · 8 内置预设</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <iconify-icon icon="solar:document-text-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">歌词格式</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">LRC · YRC · QRC · TTML</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <iconify-icon icon="solar:widget-5-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">插件音源</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">澜音 · 洛雪 + Subsonic</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400">
+            <iconify-icon icon="solar:palette-round-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">专辑色主题</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">50+ CSS 变量 · 明暗适配</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+            <iconify-icon icon="solar:download-minimalistic-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">下载管理</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">暂停 · 恢复 · 批量 · 重试</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+            <iconify-icon icon="solar:cloud-storage-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">S3 加密备份</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">AES-GCM · 密码保护</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <iconify-icon icon="solar:server-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">DLNA 投屏</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">设备发现 · 播放控制</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <iconify-icon icon="solar:refresh-circle-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">自动更新</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">GitHub Releases · Ed25519</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+      <div class="grid grid-cols-12 px-6 py-5 items-center hover:bg-white/[0.02] transition-colors">
+        <div class="col-span-6 flex items-center gap-3">
+          <div class="w-7 h-7 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400">
+            <iconify-icon icon="solar:translation-linear" width="14"></iconify-icon>
+          </div>
+          <span class="text-xs text-white">国际化</span>
+        </div>
+        <div class="col-span-3 hidden md:block text-xs text-gray-400">中文 · English</div>
+        <div class="col-span-6 md:col-span-3 text-right">
+          <iconify-icon icon="solar:check-circle-bold" width="18" class="text-cyan-400"></iconify-icon>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY / LOCAL-FIRST -->
+  <section class="relative z-10 max-w-6xl mx-auto px-6 py-24" id="privacy">
+    <div class="rounded-3xl p-[1px] bg-gradient-to-b from-white/20 via-white/5 to-transparent reveal">
+      <div class="bg-[#1C1F26] rounded-3xl p-8 md:p-16 grid md:grid-cols-2 gap-12 items-center">
+        <div>
+          <div class="text-xs text-purple-400 mb-3 tracking-widest uppercase">// Privacy</div>
+          <h2 class="text-3xl md:text-4xl font-dot tracking-tight mb-6 leading-tight">本地优先，音乐库在你手里</h2>
+          <p class="text-sm text-gray-400 leading-relaxed mb-4">
+            Mio Music 是本地优先的桌面应用，不依赖中心服务。音乐库、播放列表与设置主要保存在本地 SQLite，S3 备份采用 AES-GCM 加密 + 密码保护，密钥由你自管。
+          </p>
+          <p class="text-sm text-gray-400 leading-relaxed mb-6">
+            本项目不直接获取 / 存储 / 传输任何音乐数据，仅提供插件运行框架。通过插件获取的数据，其合法性由插件提供者与用户自行负责。
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs">无云依赖</span>
+            <span class="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs">加密备份</span>
+            <span class="px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 text-pink-300 text-xs">签名自动更新</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs">开源免费</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-[#262A34] rounded-2xl p-5 border border-white/5">
+            <iconify-icon icon="solar:cloud-storage-linear" width="20" class="text-purple-400 mb-2"></iconify-icon>
+            <div class="text-sm font-dot text-white tracking-tight">加密备份</div>
+            <div class="text-xs text-gray-500 mt-1">AES-GCM + 密码保护</div>
+          </div>
+          <div class="bg-[#262A34] rounded-2xl p-5 border border-white/5 mt-6">
+            <iconify-icon icon="solar:database-linear" width="20" class="text-cyan-400 mb-2"></iconify-icon>
+            <div class="text-sm font-dot text-white tracking-tight">本地优先</div>
+            <div class="text-xs text-gray-500 mt-1">SQLite · 无云依赖</div>
+          </div>
+          <div class="bg-[#262A34] rounded-2xl p-5 border border-white/5">
+            <iconify-icon icon="solar:refresh-circle-linear" width="20" class="text-emerald-400 mb-2"></iconify-icon>
+            <div class="text-sm font-dot text-white tracking-tight">签名更新</div>
+            <div class="text-xs text-gray-500 mt-1">Ed25519 签名验证</div>
+          </div>
+          <div class="bg-[#262A34] rounded-2xl p-5 border border-white/5 mt-6">
+            <iconify-icon icon="solar:shield-check-linear" width="20" class="text-pink-400 mb-2"></iconify-icon>
+            <div class="text-sm font-dot text-white tracking-tight">插件框架</div>
+            <div class="text-xs text-gray-500 mt-1">不托管音乐数据</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD CTA -->
+  <section class="relative z-10 max-w-4xl mx-auto px-6 py-24 text-center reveal" id="download">
+    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 backdrop-blur-md mb-8">
+      <iconify-icon icon="solar:download-minimalistic-linear" width="14" class="text-purple-400"></iconify-icon>
+      <span class="text-xs text-purple-300">GitHub Releases · 免费开源</span>
+    </div>
+    <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">下载适合你的桌面版</h2>
+    <p class="text-sm text-gray-400 mb-6 max-w-lg mx-auto">
+      自动识别当前设备，并从 GitHub Releases 读取最新版本与安装包地址。
+    </p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-4 text-left">
+      <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+        <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">当前识别</div>
+        <div id="detected-os" class="text-sm text-white font-dot tracking-tight" aria-live="polite">正在识别系统...</div>
+      </div>
+      <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+        <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">最新版本</div>
+        <div id="latest-version-label" class="text-sm text-white font-dot tracking-tight" aria-live="polite">正在读取...</div>
+      </div>
+    </div>
+    <p id="download-status" class="text-xs text-gray-500 mb-6 min-h-[1.25rem]" aria-live="polite">正在读取最新安装包列表...</p>
+    <a id="primary-download" href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="mb-8 px-7 py-3 rounded-full bg-purple-500 text-white font-semibold text-xs hover:bg-purple-400 transition-all shadow-[0_0_30px_rgba(168,85,247,0.35)] inline-flex items-center gap-2">
+      <iconify-icon icon="solar:download-minimalistic-linear" width="14"></iconify-icon>
+      <span data-primary-download-label>打开下载页</span>
+    </a>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl mx-auto">
+      <a data-download-option data-os="mac" href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="bg-[#262A34] rounded-2xl border border-white/5 p-5 hover:border-purple-500/30 transition-all text-left">
+        <iconify-icon icon="simple-icons:apple" width="22" class="text-gray-300 mb-2"></iconify-icon>
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-sm text-white font-dot tracking-tight">macOS</div>
+          <span data-recommended-badge class="hidden text-[10px] text-cyan-300">推荐</span>
+        </div>
+        <div data-download-name class="text-xs text-gray-500 mt-1 break-all">.dmg / .app.tar.gz</div>
+      </a>
+      <a data-download-option data-os="windows" href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="bg-[#262A34] rounded-2xl border border-white/5 p-5 hover:border-purple-500/30 transition-all text-left">
+        <iconify-icon icon="simple-icons:windows11" width="22" class="text-gray-300 mb-2"></iconify-icon>
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-sm text-white font-dot tracking-tight">Windows</div>
+          <span data-recommended-badge class="hidden text-[10px] text-cyan-300">推荐</span>
+        </div>
+        <div data-download-name class="text-xs text-gray-500 mt-1 break-all">.exe / .msi</div>
+      </a>
+      <a data-download-option data-os="linux" href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="bg-[#262A34] rounded-2xl border border-white/5 p-5 hover:border-purple-500/30 transition-all text-left">
+        <iconify-icon icon="solar:server-linear" width="22" class="text-gray-300 mb-2"></iconify-icon>
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-sm text-white font-dot tracking-tight">Linux</div>
+          <span data-recommended-badge class="hidden text-[10px] text-cyan-300">推荐</span>
+        </div>
+        <div data-download-name class="text-xs text-gray-500 mt-1 break-all">.AppImage / .deb / .rpm</div>
+      </a>
+    </div>
+    <div class="mt-8">
+      <a href="https://github.com/Mio888888/Mio-Music" target="_blank" rel="noreferrer" class="px-7 py-3 rounded-full bg-white text-[#0B0F19] font-semibold text-xs hover:bg-gray-200 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] inline-flex items-center gap-2">
+        <iconify-icon icon="solar:star-bold" width="14"></iconify-icon>
+        在 GitHub 上 Star →
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="relative z-10 border-t border-white/5 bg-[#0B0F19] reveal-fade">
+    <div class="max-w-6xl mx-auto px-6 py-16">
+      <div class="grid md:grid-cols-5 gap-10 mb-12">
+        <div class="md:col-span-2">
+          <a href="#" class="flex items-center gap-2.5 text-white font-medium text-base mb-4">
+            <img src="./assets/app-icon.png" alt="Mio Music" class="w-7 h-7 rounded-lg">
+            <span class="tracking-tight">Mio Music</span>
+          </a>
+          <p class="text-xs text-gray-500 max-w-xs leading-relaxed mb-6">
+            基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器。Rust 原生引擎、均衡器、动态歌词与插件多音源，数据优先留在本机。
+          </p>
+          <div class="flex items-center gap-2">
+            <a href="https://github.com/Mio888888/Mio-Music" target="_blank" rel="noreferrer" class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="GitHub">
+              <iconify-icon icon="solar:star-linear" width="14"></iconify-icon>
+            </a>
+            <a href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="下载">
+              <iconify-icon icon="solar:download-minimalistic-linear" width="14"></iconify-icon>
+            </a>
+            <a href="https://github.com/Mio888888/Mio-Music/issues" target="_blank" rel="noreferrer" class="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all" aria-label="Issue">
+              <iconify-icon icon="solar:chat-round-dots-linear" width="14"></iconify-icon>
+            </a>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-white font-semibold mb-4 tracking-widest uppercase">产品</div>
+          <ul class="space-y-3 text-xs text-gray-400">
+            <li><a href="#features" class="hover:text-white transition-colors">能力</a></li>
+            <li><a href="#workflow" class="hover:text-white transition-colors">聆听流程</a></li>
+            <li><a href="#architecture" class="hover:text-white transition-colors">架构</a></li>
+            <li><a href="#privacy" class="hover:text-white transition-colors">隐私</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-xs text-white font-semibold mb-4 tracking-widest uppercase">资源</div>
+          <ul class="space-y-3 text-xs text-gray-400">
+            <li><a href="#download" class="hover:text-white transition-colors">下载</a></li>
+            <li><a href="https://github.com/Mio888888/Mio-Music/releases/latest" target="_blank" rel="noreferrer" class="hover:text-white transition-colors">Release</a></li>
+            <li><a href="https://github.com/Mio888888/Mio-Music/issues" target="_blank" rel="noreferrer" class="hover:text-white transition-colors">提交 Issue</a></li>
+          </ul>
+        </div>
+        <div>
+          <div class="text-xs text-white font-semibold mb-4 tracking-widest uppercase">源码</div>
+          <ul class="space-y-3 text-xs text-gray-400">
+            <li><a href="https://github.com/Mio888888/Mio-Music" target="_blank" rel="noreferrer" class="hover:text-white transition-colors">GitHub 仓库</a></li>
+            <li><a href="https://github.com/Mio888888/Mio-Music/blob/main/README.md" target="_blank" rel="noreferrer" class="hover:text-white transition-colors">README 文档</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="text-xs text-gray-500">© 2026 Mio Music · 开源免费 · 由 Mio 维护</div>
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+          <span>Tauri 2 + Vue 3 + Rust</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function(){
+      var carouselItems = [
+        { title: '播放主界面', copy: 'Rust 原生引擎驱动，专辑封面主色动态主题与频谱实时可视化。' },
+        { title: 'Apple Music 风格动态歌词', copy: '逐字动画、翻译合并显示，沉浸感拉满。' },
+        { title: '10 段均衡器与音效', copy: '参数 EQ、低音增强、环绕声模拟，调出你的声音。' },
+        { title: '频谱可视化', copy: 'FFT 实时频谱与 PixiJS 着色器背景随音频律动。' },
+        { title: '下载管理', copy: '暂停 / 恢复 / 批量操作，实时进度追踪。' },
+        { title: 'AI 助手', copy: '在音乐上下文里对话，探索与发现新内容。' }
+      ];
+      var releasesUrl = 'https://github.com/Mio888888/Mio-Music/releases/latest';
+      var fallbackVersion = 'v0.2.8';
+      // 注意：github.com 上的 release 资源（含 latest.json）不返回 CORS 头，
+      // 浏览器无法跨源读取。因此这里只保留支持 CORS 的源：
+      //   - jsDelivr GitHub Raw 镜像（仓库分支中的 latest.json）
+      //   - raw.githubusercontent 镜像
+      //   - GitHub API 兜底（api.github.com 返回 CORS 头）
+      var latestJsonUrls = [
+        'https://cdn.jsdelivr.net/gh/Mio888888/Mio-Music@main/latest.json',
+        'https://raw.githubusercontent.com/Mio888888/Mio-Music/main/latest.json'
+      ];
+      var latestReleaseApi = 'https://api.github.com/repos/Mio888888/Mio-Music/releases/latest';
+      var osLabels = { mac: 'macOS', windows: 'Windows', linux: 'Linux', unknown: '未知系统' };
+      var platformPriority = {
+        mac: ['darwin-aarch64', 'darwin-aarch64-app', 'darwin-x86_64', 'darwin-x86_64-app'],
+        windows: ['windows-x86_64', 'windows-x86_64-nsis', 'windows-x86_64-msi'],
+        linux: ['linux-x86_64', 'linux-x86_64-appimage', 'linux-x86_64-deb', 'linux-x86_64-rpm']
+      };
+      var assetMatchers = {
+        mac: [/\.dmg$/i, /\.app\.tar\.gz$/i],
+        windows: [/\.exe$/i, /\.msi$/i],
+        linux: [/\.AppImage$/i, /\.deb$/i, /\.rpm$/i]
+      };
+      var zhMeta = {
+        title: 'Mio Music - 原生高保真桌面音乐播放器',
+        description: 'Mio Music，基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器。Rust 原生音频引擎、10 段均衡器、Apple Music 风格歌词与插件多音源，一个桌面应用全搞定。',
+        ogTitle: 'Mio Music - 原生高保真桌面音乐播放器',
+        ogDescription: 'Rust 原生引擎、10 段均衡器、Apple Music 风格歌词、插件多音源，数据优先留在本机。',
+        ogLocale: 'zh_CN'
+      };
+      var i18n = {
+        en: {
+          title: 'Mio Music - Native Hi-Fi Desktop Music Player',
+          metaDescription: 'Mio Music is a cross-platform desktop music player built with Tauri 2 + Vue 3. Native Rust audio engine, 10-band EQ, Apple Music-style lyrics, and plugin-based music sources in one app.',
+          ogTitle: 'Mio Music - Native Hi-Fi Desktop Music Player',
+          ogDescription: 'Native Rust engine, 10-band EQ, Apple Music-style lyrics, and plugin music sources, with data kept local by default.',
+          ogLocale: 'en_US',
+          osLabels: { mac: 'macOS', windows: 'Windows', linux: 'Linux', unknown: 'Unknown system' },
+          carouselItems: [
+            { title: 'Main Player', copy: 'Driven by the native Rust engine, with album-art dynamic theming and real-time spectrum.' },
+            { title: 'Apple Music-style Lyrics', copy: 'Word-by-word animation with merged translations for full immersion.' },
+            { title: '10-band EQ & Effects', copy: 'Parametric EQ, bass boost, and surround simulation to tune your sound.' },
+            { title: 'Spectrum Visualizer', copy: 'Real-time FFT spectrum and PixiJS shader background react to the audio.' },
+            { title: 'Download Manager', copy: 'Pause / resume / batch operations with live progress tracking.' },
+            { title: 'AI Assistant', copy: 'Chat inside your music context to explore and discover.' }
+          ],
+          text: {
+            'Mio Music - 原生高保真桌面音乐播放器': 'Mio Music - Native Hi-Fi Desktop Music Player',
+            '能力': 'Features',
+            '聆听流程': 'Listening Flow',
+            '架构': 'Architecture',
+            '隐私': 'Privacy',
+            '下载': 'Download',
+            '免费下载': 'Free Download',
+            '开源免费 · 本地优先 · 跨平台': 'Open source · Local-first · Cross-platform',
+            '原生高保真桌面音乐播放器': 'Native Hi-Fi Desktop Music Player',
+            '基于 CeruMusic 重构，Tauri 2 (Rust) 后端 + Vue 3 前端。Rust 原生音频引擎、10 段均衡器、Apple Music 风格动态歌词，通过插件接入多音乐源，无需部署中心服务。': 'Rebuilt from CeruMusic with a Tauri 2 (Rust) backend and Vue 3 frontend. Native Rust audio engine, 10-band EQ, Apple Music-style lyrics, and plugin-based music sources — no central service required.',
+            '免费下载桌面版 →': 'Download Desktop →',
+            '查看源码': 'View Source',
+            '当前版本': 'Current Version',
+            '支持格式': 'Formats',
+            '本地数据': 'Local Data',
+            '产品截图轮播': 'Product Screenshot Carousel',
+            '播放主界面': 'Main Player',
+            'Rust 原生引擎驱动，专辑封面主色动态主题与频谱实时可视化。': 'Driven by the native Rust engine, with album-art dynamic theming and real-time spectrum.',
+            '音乐播放器够多，但音质与体验总差一口气': 'Music players are everywhere. Sound quality and experience still fall short.',
+            '网页播放器压缩音质、歌词只能逐行、音源被锁死在单一平台。Mio Music 用 Rust 原生引擎与插件架构把它们一次解决。': 'Web players compress audio, lyrics only scroll line by line, and sources stay locked to one platform. Mio Music solves all of it with a native Rust engine and a plugin architecture.',
+            '痛点': 'Pain point',
+            '"网页播放器压缩音质，没有均衡器"': '"Web players compress audio with no equalizer."',
+            'Rust 原生音频引擎 + 10 段参数均衡器 + 低音增强 / 环绕声': 'Native Rust audio engine + 10-band parametric EQ + bass boost / surround.',
+            '"歌词只能逐行滚动，也没有翻译"': '"Lyrics only scroll line by line, with no translations."',
+            'LRC / YRC / QRC / TTML 多格式 + 翻译合并 + Apple Music 风格动态歌词': 'LRC / YRC / QRC / TTML formats + merged translations + Apple Music-style lyrics.',
+            '"音源被锁死在单一平台"': '"Music sources stay locked to one platform."',
+            '插件系统 + Subsonic 自托管 + 本地音乐库扫描': 'Plugin system + Subsonic self-hosting + local library scanning.',
+            '一站式音乐能力': 'All-in-one Music Capabilities',
+            '从原生音频引擎到动态歌词，从插件音源到加密备份，覆盖桌面音乐播放的高频场景。': 'From the native audio engine to dynamic lyrics, from plugin sources to encrypted backup, Mio Music covers common desktop music scenarios.',
+            '原生音频引擎': 'Native Audio Engine',
+            '无缝播放（Gapless）与可配置交叉淡入淡出（Crossfade），系统集成媒体键。': 'Gapless playback with configurable crossfade and system media-key integration.',
+            'AAC / MP3 / FLAC / WAV / OGG': 'AAC / MP3 / FLAC / WAV / OGG',
+            'FFT 频谱实时可视化': 'Real-time FFT spectrum',
+            '歌词系统': 'Lyrics System',
+            '独立桌面歌词窗（透明悬浮）与自定义字体。': 'Standalone desktop lyrics window (transparent overlay) with custom fonts.',
+            '翻译合并显示；Apple Music 风格动态歌词': 'Merged translations; Apple Music-style dynamic lyrics.',
+            '解析': 'Parses',
+            '多格式，翻译合并显示': 'multiple formats with merged translations',
+            'LRC / YRC / QRC / TTML / LRC-A2': 'LRC / YRC / QRC / TTML / LRC-A2',
+            '均衡器与音效': 'EQ & Effects',
+            '10 段参数均衡器，内置 8 种预设（流行、摇滚、爵士、古典等）；低音增强、环绕声模拟（小/中/大空间）、立体声平衡；A/B 双音频输出设备对比。': '10-band parametric EQ with 8 presets (Pop, Rock, Jazz, Classical…); bass boost, surround simulation (small/medium/large), stereo balance; A/B dual output comparison.',
+            'rustfft (FFT) + biquad (EQ)': 'rustfft (FFT) + biquad (EQ)',
+            '插件音源': 'Plugin Sources',
+            '插件系统支持': 'The plugin system supports',
+            '澜音': 'LanYin',
+            '与': 'and',
+            '洛雪': 'LuoXue',
+            '两种类型，动态安装、配置、测试；Subsonic 服务器接入自托管音乐库。': 'types with dynamic install, configure, and test; Subsonic servers connect to self-hosted libraries.',
+            '动态安装 + 配置 + 测试': 'Dynamic install + configure + test',
+            '专辑封面主题': 'Album-art Theme',
+            '自动提取专辑封面主色，适配明暗模式，生成': 'Auto-extracts dominant colors from album art, adapts to light/dark, generates',
+            'CSS 变量；PixiJS 着色器背景与音频响应式频谱；Three.js 粒子欢迎页。': 'CSS variables; PixiJS shader background with audio-reactive spectrum; Three.js particle welcome screen.',
+            'Three.js / PixiJS 图形渲染': 'Three.js / PixiJS rendering',
+            '下载与数据': 'Downloads & Data',
+            '下载管理器：暂停 / 恢复 / 取消 / 重试 / 批量；S3 兼容云存储备份（': 'Download manager: pause / resume / cancel / retry / batch; S3-compatible cloud backup (',
+            '加密 + 密码保护）；DLNA 投屏；SQLite 本地库 + 标签编辑。': 'encryption + password); DLNA casting; local SQLite library + tag editing.',
+            'S3 备份 · DLNA · 本地扫描': 'S3 backup · DLNA · local scan',
+            '从选源到沉浸的聆听流程': 'From Source to Immersion',
+            '选好音源，调校音质，进入动态歌词，再用加密备份与投屏把音乐库带到任何地方。': 'Pick a source, tune the sound, dive into dynamic lyrics, then take your library anywhere with encrypted backup and casting.',
+            '选择音源': 'Pick a Source',
+            '从插件、Subsonic 自托管或本地音乐库中挑选想听的内容。': 'Choose what to play from plugins, Subsonic self-hosting, or your local library.',
+            '调校音质': 'Tune the Sound',
+            '10 段参数 EQ + 8 预设，加上低音增强与环绕声，调出你的声音。': '10-band parametric EQ + 8 presets, plus bass boost and surround, to shape your sound.',
+            '沉浸歌词': 'Immerse in Lyrics',
+            'Apple Music 风格动态歌词、翻译合并，或独立桌面悬浮歌词窗。': 'Apple Music-style dynamic lyrics with merged translations, or a standalone desktop overlay.',
+            '管理与同步': 'Manage & Sync',
+            '下载到本地、S3 加密备份、DLNA 投屏，把音乐库带到任何设备。': 'Download locally, back up to S3, and cast via DLNA to take your library anywhere.',
+            '本地优先高保真架构': 'Local-first Hi-Fi Architecture',
+            '前端 Vue 3 + TypeScript + Vite，后端 Rust + Tauri 2。核心数据持久化在本地 SQLite，无需云服务即可运行。': 'Frontend: Vue 3 + TypeScript + Vite. Backend: Rust + Tauri 2. Core data persists in local SQLite and runs without cloud services.',
+            '数据流': 'Data Flow',
+            'Rust 后端 → 音频引擎 / SQLite / 插件': 'Rust backend → Audio engine / SQLite / Plugins',
+            '桌面容器': 'Desktop container',
+            '本地持久化 · rusqlite': 'Local persistence · rusqlite',
+            'Rust 原生音频引擎': 'Native Rust Audio Engine',
+            'Rodio · cpal · Symphonia · rustfft · biquad': 'Rodio · cpal · Symphonia · rustfft · biquad',
+            '加密与自动更新': 'Encryption & Auto-update',
+            'S3 AES-GCM · Ed25519 签名 · 无云依赖即可运行': 'S3 AES-GCM · Ed25519 signatures · runs without cloud dependency',
+            '一个应用，全部能力': 'One App, Every Capability',
+            '能力项': 'Capability',
+            '技术': 'Tech',
+            '状态': 'Status',
+            '音频格式支持': 'Audio format support',
+            '均衡器预设': 'EQ presets',
+            '10 段参数 · 8 内置预设': '10-band parametric · 8 built-in presets',
+            '歌词格式': 'Lyrics formats',
+            '插件音源': 'Plugin sources',
+            '澜音 · 洛雪 + Subsonic': 'LanYin · LuoXue + Subsonic',
+            '专辑色主题': 'Album-art theme',
+            '50+ CSS 变量 · 明暗适配': '50+ CSS variables · light/dark',
+            '下载管理': 'Download manager',
+            '暂停 · 恢复 · 批量 · 重试': 'Pause · resume · batch · retry',
+            'S3 加密备份': 'S3 encrypted backup',
+            'AES-GCM · 密码保护': 'AES-GCM · password protected',
+            'DLNA 投屏': 'DLNA casting',
+            '设备发现 · 播放控制': 'Device discovery · playback control',
+            '自动更新': 'Auto-update',
+            'GitHub Releases · Ed25519': 'GitHub Releases · Ed25519',
+            '国际化': 'Internationalization',
+            '中文 · English': 'Chinese · English',
+            '本地优先，音乐库在你手里': 'Local-first. Your Library Stays With You.',
+            'Mio Music 是本地优先的桌面应用，不依赖中心服务。音乐库、播放列表与设置主要保存在本地 SQLite，S3 备份采用 AES-GCM 加密 + 密码保护，密钥由你自管。': 'Mio Music is a local-first desktop app with no central service dependency. Your library, playlists, and settings stay in local SQLite, and S3 backups use AES-GCM encryption with a password you control.',
+            '本项目不直接获取 / 存储 / 传输任何音乐数据，仅提供插件运行框架。通过插件获取的数据，其合法性由插件提供者与用户自行负责。': 'This project does not fetch, store, or transmit any music data — it only provides a plugin runtime. The legality of data obtained through plugins is the responsibility of plugin providers and users.',
+            '无云依赖': 'No cloud dependency',
+            '加密备份': 'Encrypted backup',
+            '签名自动更新': 'Signed auto-update',
+            '开源免费': 'Free and open source',
+            '本地优先': 'Local-first',
+            'SQLite · 无云依赖': 'SQLite · no cloud dependency',
+            '签名更新': 'Signed updates',
+            'Ed25519 签名验证': 'Ed25519 signature verification',
+            '插件框架': 'Plugin framework',
+            '不托管音乐数据': 'Hosts no music data',
+            'GitHub Releases · 免费开源': 'GitHub Releases · Free and open source',
+            '下载适合你的桌面版': 'Download the Desktop Build for Your System',
+            '自动识别当前设备，并从 GitHub Releases 读取最新版本与安装包地址。': 'Automatically detects your device and reads the latest version and installer links from GitHub Releases.',
+            '当前识别': 'Detected system',
+            '正在识别系统...': 'Detecting system...',
+            '最新版本': 'Latest version',
+            '正在读取...': 'Loading...',
+            '正在读取最新安装包列表...': 'Loading the latest installer list...',
+            '打开下载页': 'Open download page',
+            '未能自动识别，请手动选择': 'Could not detect your system. Choose manually.',
+            '没有找到当前系统的直接安装包，已保留 GitHub Release 下载页。': 'No direct installer was found for this system. Keeping the GitHub Releases page.',
+            '无法读取最新安装包列表，已保留 GitHub Release 下载页。': 'Could not load the latest installer list. Keeping the GitHub Releases page.',
+            '推荐': 'Recommended',
+            '在 GitHub 上 Star →': 'Star on GitHub →',
+            '基于 Tauri 2 + Vue 3 的跨平台桌面音乐播放器。Rust 原生引擎、均衡器、动态歌词与插件多音源，数据优先留在本机。': 'A cross-platform desktop music player built with Tauri 2 + Vue 3. Native Rust engine, EQ, dynamic lyrics, and plugin sources keep data local by default.',
+            '产品': 'Product',
+            '资源': 'Resources',
+            '提交 Issue': 'Submit Issue',
+            '源码': 'Source',
+            'GitHub 仓库': 'GitHub Repository',
+            'README 文档': 'README',
+            '© 2026 Mio Music · 开源免费 · 由 Mio 维护': '© 2026 Mio Music · Free and open source · Maintained by Mio'
+          },
+          attrs: {
+            'Mio Music 播放主界面截图': 'Mio Music main player screenshot',
+            'Mio Music Apple Music 风格动态歌词截图': 'Mio Music Apple Music-style lyrics screenshot',
+            'Mio Music 10 段均衡器与音效截图': 'Mio Music 10-band EQ & effects screenshot',
+            'Mio Music 频谱可视化截图': 'Mio Music spectrum visualizer screenshot',
+            'Mio Music 下载管理截图': 'Mio Music download manager screenshot',
+            'Mio Music AI 助手截图': 'Mio Music AI assistant screenshot',
+            '上一张截图': 'Previous screenshot',
+            '下一张截图': 'Next screenshot',
+            '查看播放主界面': 'View main player screenshot',
+            '查看 Apple Music 风格动态歌词': 'View Apple Music-style lyrics screenshot',
+            '查看 10 段均衡器与音效': 'View 10-band EQ & effects screenshot',
+            '查看频谱可视化': 'View spectrum visualizer screenshot',
+            '查看下载管理': 'View download manager screenshot',
+            '查看 AI 助手': 'View AI assistant screenshot',
+            '产品截图轮播': 'Product screenshot carousel',
+            '软件下载': 'Software downloads',
+            '推荐下载 macOS 版本': 'Recommended macOS download',
+            '推荐下载 Windows 版本': 'Recommended Windows download',
+            '推荐下载 Linux 版本': 'Recommended Linux download',
+            '下载 macOS 版本': 'Download macOS version',
+            '下载 Windows 版本': 'Download Windows version',
+            '下载 Linux 版本': 'Download Linux version'
+          }
+        }
+      };
+      var currentLang = 'zh';
+      var translations = i18n.en.text;
+      var attrTranslations = i18n.en.attrs;
+      var originalText = new Map();
+      var originalAttrs = new Map();
+      var activeCarouselIndex = 0;
+      var currentOS = 'unknown';
+      var latestAssetName = '';
+
+      function initReveal(){
+        var els = document.querySelectorAll('.reveal,.reveal-left,.reveal-right,.reveal-fade');
+        var io = new IntersectionObserver(function(entries){
+          entries.forEach(function(e){
+            if(e.isIntersecting){
+              var d = e.target.getAttribute('data-delay') || 0;
+              setTimeout(function(){ e.target.classList.add('in-view'); }, parseInt(d, 10));
+              io.unobserve(e.target);
+            }
+          });
+        }, { threshold: 0.12 });
+        els.forEach(function(el){ io.observe(el); });
+      }
+
+      function initCarousel(){
+        var root = document.querySelector('[data-carousel]');
+        if(!root) return;
+        var slides = Array.prototype.slice.call(root.querySelectorAll('[data-slide]'));
+        var thumbs = Array.prototype.slice.call(root.querySelectorAll('[data-carousel-thumb]'));
+        var prev = root.querySelector('[data-carousel-prev]');
+        var next = root.querySelector('[data-carousel-next]');
+        var title = root.querySelector('[data-carousel-title]');
+        var copy = root.querySelector('[data-carousel-copy]');
+        var active = 0;
+
+        function setActive(index){
+          active = (index + slides.length) % slides.length;
+          activeCarouselIndex = active;
+          var items = currentLang === 'en' ? i18n.en.carouselItems : carouselItems;
+          slides.forEach(function(slide, i){
+            slide.classList.toggle('is-active', i === active);
+            slide.setAttribute('aria-hidden', i === active ? 'false' : 'true');
+          });
+          thumbs.forEach(function(thumb, i){
+            thumb.setAttribute('aria-selected', i === active ? 'true' : 'false');
+          });
+          if(title) title.textContent = items[active].title;
+          if(copy) copy.textContent = items[active].copy;
+          if(thumbs[active] && thumbs[active].offsetParent) thumbs[active].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+
+        thumbs.forEach(function(thumb, i){
+          thumb.addEventListener('click', function(){ setActive(i); });
+        });
+        if(prev) prev.addEventListener('click', function(){ setActive(active - 1); });
+        if(next) next.addEventListener('click', function(){ setActive(active + 1); });
+        root.addEventListener('keydown', function(e){
+          if(e.key === 'ArrowLeft') setActive(active - 1);
+          if(e.key === 'ArrowRight') setActive(active + 1);
+        });
+        setActive(0);
+      }
+
+      function detectOS(){
+        var platform = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '').toLowerCase();
+        var agent = (navigator.userAgent || '').toLowerCase();
+        var text = platform + ' ' + agent;
+        if(text.indexOf('mac') >= 0 || text.indexOf('iphone') >= 0 || text.indexOf('ipad') >= 0) return 'mac';
+        if(text.indexOf('win') >= 0) return 'windows';
+        if(text.indexOf('linux') >= 0 || text.indexOf('x11') >= 0) return 'linux';
+        return 'unknown';
+      }
+
+      function fileNameFromUrl(url){
+        if(!url) return '';
+        try{
+          return decodeURIComponent(url.split('/').pop().split('?')[0]);
+        }catch(e){
+          return url.split('/').pop().split('?')[0];
+        }
+      }
+
+      function setText(selector, text){
+        var el = document.querySelector(selector);
+        if(el) el.textContent = text;
+      }
+
+      function safeStorageGet(key){
+        try { return localStorage.getItem('mio-music-lang'); } catch (error) { return null; }
+      }
+
+      function safeStorageSet(key, value){
+        try { localStorage.setItem('mio-music-lang', value); } catch (error) {}
+      }
+
+      function t(text){
+        return currentLang === 'en' ? (translations[text] || text) : text;
+      }
+
+      function trAttr(value){
+        return currentLang === 'en' ? (attrTranslations[value] || value) : value;
+      }
+
+      function detectPreferredLang(){
+        var saved = safeStorageGet('mio-music-lang');
+        if(saved === 'zh' || saved === 'en') return saved;
+        var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'zh'];
+        return Array.prototype.some.call(langs, function(lang){
+          return String(lang || '').toLowerCase().indexOf('en') === 0;
+        }) ? 'en' : 'zh';
+      }
+
+      function captureOriginalText(){
+        var nodes = [];
+        function visit(node){
+          if(!node) return;
+          if(node.nodeType === 3){
+            if(node.nodeValue && node.nodeValue.trim() && /[\u4e00-\u9fff]/.test(node.nodeValue)){
+              nodes.push(node);
+            }
+            return;
+          }
+          if(node.nodeType !== 1) return;
+          var tag = node.tagName && node.tagName.toLowerCase();
+          if(tag === 'script' || tag === 'style') return;
+          Array.prototype.forEach.call(node.childNodes || [], visit);
+        }
+        visit(document.body);
+        nodes.forEach(function(node){
+          if(!originalText.has(node)) originalText.set(node, node.nodeValue);
+        });
+        document.querySelectorAll('[alt],[aria-label],[title]').forEach(function(el){
+          ['alt', 'aria-label', 'title'].forEach(function(attr){
+            if(!el.hasAttribute(attr)) return;
+            var value = el.getAttribute(attr);
+            if(!value || !/[\u4e00-\u9fff]/.test(value)) return;
+            var attrs = originalAttrs.get(el) || {};
+            attrs[attr] = attrs[attr] || value;
+            originalAttrs.set(el, attrs);
+          });
+        });
+      }
+
+      function setMeta(selector, value){
+        var el = document.querySelector(selector);
+        if(el && value) el.setAttribute('content', value);
+      }
+
+      function updateLanguageToggle(){
+        document.querySelectorAll('[data-lang-toggle]').forEach(function(button){
+          var isActive = button.dataset.langToggle === currentLang;
+          button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+          button.classList.toggle('bg-cyan-400', isActive);
+          button.classList.toggle('text-[#0B0F19]', isActive);
+          button.classList.toggle('text-gray-400', !isActive);
+        });
+      }
+
+      function updateStaticText(){
+        originalText.forEach(function(original, node){
+          node.nodeValue = currentLang === 'en' ? (translations[original.trim()] || original) : original;
+        });
+        originalAttrs.forEach(function(attrs, el){
+          Object.keys(attrs).forEach(function(attr){
+            el.setAttribute(attr, trAttr(attrs[attr]));
+          });
+        });
+        document.documentElement.lang = currentLang === 'en' ? 'en' : 'zh-CN';
+        var meta = currentLang === 'en' ? i18n.en : zhMeta;
+        document.title = meta.title;
+        setMeta('meta[name="description"]', currentLang === 'en' ? meta.metaDescription : meta.description);
+        setMeta('meta[property="og:title"]', meta.ogTitle);
+        setMeta('meta[property="og:description"]', meta.ogDescription);
+        setMeta('meta[property="og:locale"]', meta.ogLocale);
+        setMeta('meta[name="twitter:title"]', meta.ogTitle);
+        setMeta('meta[name="twitter:description"]', meta.ogDescription);
+      }
+
+      function updateCarouselLanguage(){
+        var title = document.querySelector('[data-carousel-title]');
+        var copy = document.querySelector('[data-carousel-copy]');
+        var items = currentLang === 'en' ? i18n.en.carouselItems : carouselItems;
+        if(title) title.textContent = items[activeCarouselIndex].title;
+        if(copy) copy.textContent = items[activeCarouselIndex].copy;
+      }
+
+      function setLanguage(lang, persist){
+        currentLang = lang === 'en' ? 'en' : 'zh';
+        if(persist) safeStorageSet('mio-music-lang', currentLang);
+        updateStaticText();
+        updateCarouselLanguage();
+        updateLanguageToggle();
+        initDownloads();
+      }
+
+      function initLanguage(){
+        currentLang = detectPreferredLang();
+        captureOriginalText();
+        document.querySelectorAll('[data-lang-toggle]').forEach(function(button){
+          button.addEventListener('click', function(){ setLanguage(button.dataset.langToggle, true); });
+        });
+        window.__mioMusicSetLang = function(lang){ setLanguage(lang, true); };
+        setLanguage(currentLang, false);
+      }
+
+      function setDownloadStatus(message, tone){
+        var status = document.querySelector('#download-status');
+        if(!status) return;
+        status.textContent = t(message);
+        status.className = 'text-xs mb-6 min-h-[1.25rem]';
+        if(tone === 'ready') status.classList.add('text-cyan-300');
+        else if(tone === 'fallback') status.classList.add('text-yellow-300');
+        else status.classList.add('text-gray-500');
+      }
+
+      function choosePlatform(platforms, os){
+        var keys = platformPriority[os] || [];
+        for(var i = 0; i < keys.length; i += 1){
+          var item = platforms && platforms[keys[i]];
+          if(item && item.url) return { url: item.url, name: fileNameFromUrl(item.url) };
+        }
+        return null;
+      }
+
+      function chooseBestAsset(platforms, assets, os){
+        var direct = choosePlatform(platforms, os);
+        if(direct) return direct;
+        return chooseAsset(assets || [], os);
+      }
+
+      function chooseAsset(assets, os){
+        var matchers = assetMatchers[os] || [];
+        for(var i = 0; i < matchers.length; i += 1){
+          for(var j = 0; j < assets.length; j += 1){
+            var asset = assets[j];
+            if(matchers[i].test(asset.name || '') && asset.browser_download_url){
+              return { url: asset.browser_download_url, name: asset.name };
+            }
+          }
+        }
+        return null;
+      }
+
+      function normalizeVersion(version){
+        if(!version) return '';
+        return String(version).charAt(0).toLowerCase() === 'v' ? String(version) : 'v' + version;
+      }
+
+      function setVersionLabels(version){
+        var normalized = normalizeVersion(version) || fallbackVersion;
+        setText('#latest-version-stat', normalized);
+        setText('#latest-version-label', normalized);
+      }
+
+      function applyDownloadOption(option, asset, isRecommended){
+        if(!option) return;
+        option.classList.toggle('border-purple-500/40', !!isRecommended);
+        option.classList.toggle('bg-purple-500/10', !!isRecommended);
+        option.setAttribute('aria-label', isRecommended ? t('推荐下载 ' + osLabels[option.dataset.os] + ' 版本') : t('下载 ' + osLabels[option.dataset.os] + ' 版本'));
+        var name = option.querySelector('[data-download-name]');
+        var badge = option.querySelector('[data-recommended-badge]');
+        if(badge) badge.classList.toggle('hidden', !isRecommended);
+        if(!asset) return;
+        option.href = asset.url;
+        if(name) name.textContent = asset.name || fileNameFromUrl(asset.url);
+      }
+
+      async function fetchJsonFromUrls(urls){
+        var lastError = null;
+        for(var i = 0; i < urls.length; i += 1){
+          try{
+            var response = await fetch(urls[i], { headers: { Accept: 'application/json' }, cache: 'no-cache' });
+            if(!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+          }catch(error){
+            // 这里捕获的失败可能包含 CORS 跨源错误，浏览器控制台仍可能打印拦截日志，
+            // 属于正常兜底逻辑：继续尝试下一个源或回退到 GitHub API。
+            lastError = error;
+          }
+        }
+        throw lastError || new Error('No latest.json URL available');
+      }
+
+      async function fetchReleaseFromGitHubApi(){
+        // api.github.com 会返回 CORS 头，浏览器可正常跨源读取。
+        var response = await fetch(latestReleaseApi, {
+          headers: { Accept: 'application/vnd.github+json' },
+          cache: 'no-cache'
+        });
+        if(!response.ok) throw new Error('HTTP ' + response.status);
+        var release = await response.json();
+        return {
+          source: 'GitHub API',
+          version: release.tag_name || release.name,
+          assets: Array.isArray(release.assets) ? release.assets : []
+        };
+      }
+
+      async function getDownloadManifest(){
+        // 默认走支持 CORS 的 GitHub API；若仓库默认分支存在 latest.json，
+        // 再通过 CORS 友好的镜像（jsDelivr / raw.githubusercontent）读取作为增强。
+        try{
+          return await fetchReleaseFromGitHubApi();
+        }catch(apiError){
+          try{
+            var manifest = await fetchJsonFromUrls(latestJsonUrls);
+            return { source: 'latest.json', version: manifest.version, platforms: manifest.platforms || {} };
+          }catch(jsonError){
+            throw apiError;
+          }
+        }
+      }
+
+      function initDownloads(){
+        currentOS = detectOS();
+        var primary = document.querySelector('#primary-download');
+        var primaryLabel = document.querySelector('[data-primary-download-label]');
+        var options = Array.prototype.slice.call(document.querySelectorAll('[data-download-option]'));
+        osLabels = currentLang === 'en' ? i18n.en.osLabels : { mac: 'macOS', windows: 'Windows', linux: 'Linux', unknown: '未知系统' };
+
+        setVersionLabels(fallbackVersion);
+        setText('#detected-os', currentOS === 'unknown' ? t('未能自动识别，请手动选择') : (currentLang === 'en' ? osLabels[currentOS] + ' device' : osLabels[currentOS] + ' 设备'));
+        if(primary){
+          primary.href = releasesUrl;
+          if(primaryLabel) primaryLabel.textContent = currentOS === 'unknown' ? t('打开下载页') : (currentLang === 'en' ? 'Download ' + osLabels[currentOS] : '下载 ' + osLabels[currentOS] + ' 版');
+        }
+        options.forEach(function(option){
+          applyDownloadOption(option, null, option.dataset.os === currentOS);
+        });
+
+        getDownloadManifest().then(function(manifest){
+          var version = normalizeVersion(manifest.version);
+          setVersionLabels(version);
+
+          var selectedAsset = null;
+          options.forEach(function(option){
+            var os = option.dataset.os;
+            var asset = manifest.platforms ? choosePlatform(manifest.platforms, os) : chooseAsset(manifest.assets || [], os);
+            var isRecommended = os === currentOS;
+            applyDownloadOption(option, asset, isRecommended);
+            if(isRecommended && asset) selectedAsset = asset;
+          });
+
+          var primaryAsset = chooseBestAsset(manifest.platforms, manifest.assets, currentOS) || selectedAsset;
+          if(primary && primaryAsset){
+            primary.href = primaryAsset.url;
+            if(primaryLabel) primaryLabel.textContent = currentLang === 'en' ? 'Download ' + osLabels[currentOS] : '下载 ' + osLabels[currentOS] + ' 版';
+            latestAssetName = primaryAsset.name;
+            setDownloadStatus((currentLang === 'en' ? 'Matched latest installer: ' : '已匹配最新安装包：') + primaryAsset.name, 'ready');
+          }else{
+            setDownloadStatus(currentLang === 'en' ? 'No direct installer was found for this system. Keeping the GitHub Releases page.' : '没有找到当前系统的直接安装包，已保留 GitHub Release 下载页。', 'fallback');
+          }
+        }).catch(function(){
+          setDownloadStatus(currentLang === 'en' ? 'Could not load the latest installer list. Keeping the GitHub Releases page.' : '无法读取最新安装包列表，已保留 GitHub Release 下载页。', 'fallback');
+          setVersionLabels(fallbackVersion);
+        });
+      }
+
+      function init(){
+        initReveal();
+        initCarousel();
+        initLanguage();
+      }
+
+      if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', init);
+      }else{
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
