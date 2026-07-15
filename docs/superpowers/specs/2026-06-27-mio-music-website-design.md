@@ -79,7 +79,7 @@ website/
 | Architecture | 技术架构 | 标题「本地优先高保真架构」。前端 Vue 3 + TypeScript + Vite 6；后端 Rust + Tauri 2；核心数据持久化在本地 SQLite，无需云服务即可运行。数据流：Rust 后端 → 音频引擎 / SQLite / 插件 / 网络。底部能力条：Rodio · cpal · Symphonia · rusqlite · rustfft · biquad |
 | All-in-one | 一体化能力表 | 表格三列（能力 / 技术 / 状态），行：音频格式支持（AAC/MP3/FLAC/WAV/OGG）、均衡器预设（8 内置）、歌词格式（LRC/YRC/QRC/TTML）、插件音源（澜音/洛雪 + Subsonic）、专辑色主题（50+ CSS 变量）、下载管理（暂停/恢复/批量）、S3 加密备份（AES-GCM + 密码）、DLNA 投屏、自动更新（Ed25519 签名）、国际化（中 / English） |
 | Privacy / Local | 隐私 · 本地优先 | 标题「本地优先，音乐库在你手里」。音乐库 / 播放列表 / 设置存本地 SQLite；S3 备份采用 AES-GCM 加密 + 密码保护，密钥由用户自管；插件数据合法性由插件提供者与用户负责。声明：本项目不直接获取 / 存储 / 传输任何音乐数据，仅提供插件运行框架。四个小徽标：无云依赖 / 加密备份 / 签名自动更新 / 开源免费 |
-| Download | 下载 | 同 OpsBatch：识别系统（macOS / Windows / Linux）+ 读取 `latest.json`（jsDelivr + raw.githubusercontent + GitHub API 兜底，指向 `Mio888888/Mio-Music`）+ 主下载按钮 + 三平台卡片（.dmg / .app.tar.gz · .exe / .msi · .AppImage / .deb / .rpm）+ GitHub Star。保底版本 `v0.2.8` |
+| Download | 下载 | 同 OpsBatch：识别系统（macOS / Windows / Linux）+ 优先读取 GitHub API，失败后读取 `latest.json` 镜像（jsDelivr + raw.githubusercontent，指向 `Mio888888/Mio-Music`）+ 主下载按钮 + 三平台卡片（.dmg / .app.tar.gz · .exe / .msi · .AppImage / .deb / .rpm）+ GitHub Star。保底版本 `v0.2.8` |
 | Footer | 页脚 | 简介 + GitHub / Release / Issue 图标 + 产品 / 资源 / 源码 三列链接 + 版权「© 2026 Mio Music · 开源免费 · 由 Mio 维护」+ 技术栈条「Tauri 2 + Vue 3 + Rust」 |
 
 ## 5. SEO / 结构化数据 / i18n
@@ -101,7 +101,7 @@ website/
 - `latestReleaseApi = 'https://api.github.com/repos/Mio888888/Mio-Music/releases/latest'`
 - `fallbackVersion = 'v0.2.8'`
 - `platformPriority`（macOS：darwin-aarch64 / darwin-x86_64 等；Windows：windows-x86_64 等；Linux：linux-x86_64 等）与 `assetMatchers`（mac：.dmg / .app.tar.gz；win：.exe / .msi；linux：.AppImage / .deb / .rpm）与 OpsBatch 一致。
-- CORS 兜底行为一致：依次尝试 jsDelivr → raw → GitHub API（后者返回 CORS 头）；全部失败回退到 releases 页 + 保底版本。
+- CORS 兜底顺序：优先请求 GitHub API（返回 CORS 头）；失败后依次尝试 jsDelivr → raw 镜像；全部失败回退到 releases 页 + 保底版本。
 
 > 注：`tauri.conf.json` 已将 updater endpoint 指向 `.../Mio-Music/releases/latest/download/latest.json`，即 `latest.json` 随 release 发布。官网脚本读取的 `@main/latest.json` 镜像为可选增强项，若未提交到默认分支则由 GitHub API 兜底，不影响下载卡片功能。
 

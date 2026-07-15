@@ -56,8 +56,17 @@ function applyDownloadOption(option, asset, isRecommended){
   option.setAttribute('aria-label', trAttr(isRecommended ? '推荐下载 ' + osLabels[option.dataset.os] + ' 版本' : '下载 ' + osLabels[option.dataset.os] + ' 版本'));
   var name = option.querySelector('[data-download-name]');
   var badge = option.querySelector('[data-recommended-badge]');
+  var fallbackName = option.dataset.downloadFallbackName;
+  if(!fallbackName && name){
+    fallbackName = name.textContent;
+    option.dataset.downloadFallbackName = fallbackName;
+  }
   if(badge) badge.classList.toggle('hidden', !isRecommended);
-  if(!asset) return;
+  if(!asset){
+    option.href = releasesUrl;
+    if(name) name.textContent = fallbackName;
+    return;
+  }
   option.href = asset.url;
   if(name) name.textContent = asset.name || fileNameFromUrl(asset.url);
 }
@@ -109,6 +118,7 @@ async function getDownloadManifest(){
 }
 
 function initDownloads(){
+  var requestId = ++downloadRequestId;
   currentOS = detectOS();
   var primary = document.querySelector('#primary-download');
   var primaryLabel = document.querySelector('[data-primary-download-label]');
@@ -116,6 +126,7 @@ function initDownloads(){
   osLabels = currentLang === 'en' ? i18n.en.osLabels : { mac: 'macOS', windows: 'Windows', linux: 'Linux', unknown: '未知系统' };
 
   setVersionLabels(fallbackVersion);
+  setDownloadStatus('正在读取最新安装包列表...');
   setText('#detected-os', currentOS === 'unknown' ? t('未能自动识别，请手动选择') : (currentLang === 'en' ? osLabels[currentOS] + ' device' : osLabels[currentOS] + ' 设备'));
   if(primary){
     primary.href = releasesUrl;
@@ -126,6 +137,7 @@ function initDownloads(){
   });
 
   getDownloadManifest().then(function(manifest){
+    if(requestId !== downloadRequestId) return;
     var version = normalizeVersion(manifest.version);
     setVersionLabels(version);
 
@@ -150,6 +162,7 @@ function initDownloads(){
       setDownloadStatus(currentLang === 'en' ? 'No direct installer was found for this system. Keeping the GitHub Releases page.' : '没有找到当前系统的直接安装包，已保留 GitHub Release 下载页。', 'fallback');
     }
   }).catch(function(){
+    if(requestId !== downloadRequestId) return;
     setDownloadStatus(currentLang === 'en' ? 'Could not load the latest installer list. Keeping the GitHub Releases page.' : '无法读取最新安装包列表，已保留 GitHub Release 下载页。', 'fallback');
     setVersionLabels(fallbackVersion);
   });

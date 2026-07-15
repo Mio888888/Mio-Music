@@ -227,3 +227,4 @@ var originalAttrs = new Map();
 var activeCarouselIndex = 0;
 var currentOS = 'unknown';
 var latestAssetName = '';
+var downloadRequestId = 0;

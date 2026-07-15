@@ -6,7 +6,7 @@
 @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('./vendor/fonts/jetbrainsmono-700.ttf') format('truetype'); }
 html { overflow-x: hidden; }
 .font-dot { font-family: 'DotGothic16', sans-serif; }
-.font-mono { font-family: 'JetBrains Mono', monospace; }
+.site-font-mono { font-family: 'JetBrains Mono', monospace; }
 .kanban-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
 .kanban-scroll::-webkit-scrollbar-track { background: transparent; }
 .kanban-scroll::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.1); border-radius: 10px; }
