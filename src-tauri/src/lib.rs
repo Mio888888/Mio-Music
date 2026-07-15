@@ -247,7 +247,12 @@ pub fn run() {
             #[cfg(target_os = "android")]
             let _ = ANDROID_APP_HANDLE.set(app_handle.clone());
             let download_manager = DownloadManager::new(&app_data_dir, app_handle.clone());
+            let startup_download_manager = download_manager.clone();
             app.manage(download_manager);
+            tauri::async_runtime::spawn(async move {
+                startup_download_manager.load_tasks().await;
+                startup_download_manager.spawn_next().await;
+            });
 
             // Start audio device change listener
             audio_device::start_device_listener(app_handle.clone());

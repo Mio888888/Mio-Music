@@ -5,8 +5,9 @@ use hmac::{Hmac, Mac};
 use pbkdf2::pbkdf2_hmac;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use tauri::State;
 
-use crate::db;
+use crate::db::{self, playlist_db, AppDb};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -181,6 +182,8 @@ const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599
 const PBKDF2_ITERATIONS: u32 = 600_000;
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
+const BACKUP_MAGIC: &[u8; 4] = b"MIOB";
+const BACKUP_ENVELOPE_VERSION: u8 = 1;
 
 fn derive_key(password: &str, salt: &[u8]) -> [u8; 32] {
     let mut key = [0u8; 32];
@@ -228,9 +231,53 @@ fn decrypt_data(encrypted: &[u8], password: &str) -> Result<Vec<u8>, String> {
         .map_err(|_| "解密失败：密码错误或数据损坏".to_string())
 }
 
+fn encode_backup_envelope(plaintext: &[u8], password: &str) -> Result<String, String> {
+    let encrypted = encrypt_data(plaintext, password)?;
+    let mut envelope = Vec::with_capacity(BACKUP_MAGIC.len() + 1 + encrypted.len());
+    envelope.extend_from_slice(BACKUP_MAGIC);
+    envelope.push(BACKUP_ENVELOPE_VERSION);
+    envelope.extend_from_slice(&encrypted);
+    Ok(BASE64.encode(envelope))
+}
+
+fn decode_backup_envelope(body: &str, password: &str) -> Result<Vec<u8>, String> {
+    let envelope = BASE64
+        .decode(body.trim())
+        .map_err(|_| "备份格式错误：不是有效的加密备份".to_string())?;
+    if envelope.len() <= BACKUP_MAGIC.len() || !envelope.starts_with(BACKUP_MAGIC) {
+        return Err("备份格式错误：缺少加密信封".to_string());
+    }
+    if envelope[BACKUP_MAGIC.len()] != BACKUP_ENVELOPE_VERSION {
+        return Err("备份格式错误：不支持的信封版本".to_string());
+    }
+    decrypt_data(&envelope[BACKUP_MAGIC.len() + 1..], password)
+}
+
+fn validate_backup_data(data: &Value) -> Result<(), String> {
+    if data.get("version").and_then(Value::as_u64) != Some(3) {
+        return Err("不支持的备份数据版本".to_string());
+    }
+    if !data.get("settings").is_some_and(Value::is_object) {
+        return Err("备份设置格式错误".to_string());
+    }
+    Ok(())
+}
+
 // ====================
 // Plugin helpers
 // ====================
+
+fn validate_plugin_id(id: &str) -> Result<(), String> {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    {
+        return Err("插件 ID 格式无效".to_string());
+    }
+    Ok(())
+}
 
 fn read_plugins_data() -> Result<Vec<Value>, String> {
     let plugins_dir = db::get_app_data_dir().join("plugins");
@@ -300,6 +347,11 @@ fn restore_plugins(plugins: &[Value]) -> Result<u32, String> {
     };
 
     let mut restored = 0u32;
+
+    for plugin in plugins {
+        let id = plugin.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        validate_plugin_id(id)?;
+    }
 
     for plugin in plugins {
         let id = plugin.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -463,9 +515,7 @@ pub async fn s3__test_connection(args: Value) -> Result<bool, String> {
 
 #[allow(non_snake_case)]
 #[tauri::command]
-pub async fn s3__backup(args: Value) -> Result<Value, String> {
-    eprintln!("[S3-DEBUG] backup args keys: {:?}", args.as_object().map(|o| o.keys().collect::<Vec<_>>()));
-    eprintln!("[S3-DEBUG] password field: {:?}", args.get("password"));
+pub async fn s3__backup(state: State<'_, AppDb>, args: Value) -> Result<Value, String> {
     let endpoint = get_str(&args, "endpoint")?;
     let region = resolve_region(&get_str_or(&args, "region", "auto"));
     let access_key = get_str(&args, "accessKeyId")?;
@@ -473,20 +523,26 @@ pub async fn s3__backup(args: Value) -> Result<Value, String> {
     let bucket_input = get_str_or(&args, "bucket", "");
     let password = get_str(&args, "password")?;
     let max_backups = args.get("maxBackups").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
-    let playlists = args.get("playlists").cloned().unwrap_or(Value::Null);
     let settings = args.get("settings").cloned().unwrap_or(Value::Null);
+    if !settings.is_object() {
+        return Err("备份设置格式错误".to_string());
+    }
 
     let (base_endpoint, bucket) = resolve_endpoint_and_bucket(endpoint, &bucket_input)?;
 
     // Read plugins from filesystem
     let plugins = read_plugins_data()?;
+    let playlists = {
+        let conn = state.playlist.lock().map_err(|e| e.to_string())?;
+        playlist_db::export_playlists(&conn).map_err(|e| format!("导出歌单失败: {}", e))?
+    };
 
     let now = chrono::Utc::now();
     let timestamp = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
     let key_name = format!("mio-backup-{}.enc", now.format("%Y-%m-%dT%H-%M-%S-%fZ"));
 
     let backup_data = serde_json::json!({
-        "version": 2,
+        "version": 3,
         "timestamp": timestamp,
         "playlists": playlists,
         "settings": settings,
@@ -495,9 +551,7 @@ pub async fn s3__backup(args: Value) -> Result<Value, String> {
     let json_str = serde_json::to_string(&backup_data)
         .map_err(|e| format!("序列化失败: {}", e))?;
 
-    // Encrypt
-    let encrypted = encrypt_data(json_str.as_bytes(), password)?;
-    let body = BASE64.encode(&encrypted);
+    let body = encode_backup_envelope(json_str.as_bytes(), password)?;
 
     let url = format!("{}/{}/{}", base_endpoint, bucket, key_name);
     let host = extract_host(&url)?;
@@ -533,13 +587,17 @@ pub async fn s3__backup(args: Value) -> Result<Value, String> {
 
 #[allow(non_snake_case)]
 #[tauri::command]
-pub async fn s3__restore(args: Value) -> Result<Value, String> {
+pub async fn s3__restore(state: State<'_, AppDb>, args: Value) -> Result<Value, String> {
     let endpoint = get_str(&args, "endpoint")?;
     let region = resolve_region(&get_str_or(&args, "region", "auto"));
     let access_key = get_str(&args, "accessKeyId")?;
     let secret_key = get_str(&args, "secretAccessKey")?;
     let bucket_input = get_str_or(&args, "bucket", "");
     let password = get_str(&args, "password")?;
+    let mode = get_str_or(&args, "mode", "overwrite");
+    if mode != "overwrite" && mode != "merge" {
+        return Err("恢复模式无效".to_string());
+    }
 
     let (base_endpoint, bucket) = resolve_endpoint_and_bucket(endpoint, &bucket_input)?;
 
@@ -599,18 +657,17 @@ pub async fn s3__restore(args: Value) -> Result<Value, String> {
 
     let body = resp.text().await.map_err(|e| format!("读取备份数据失败: {}", e))?;
 
-    // Try encrypted format first (base64)
-    let data: Value = if let Ok(encrypted) = BASE64.decode(&body) {
-        let decrypted = decrypt_data(&encrypted, password)?;
-        let json_str = String::from_utf8(decrypted)
-            .map_err(|e| format!("解密数据UTF8解码失败: {}", e))?;
-        serde_json::from_str(&json_str)
-            .map_err(|e| format!("解析备份数据失败: {}", e))?
-    } else {
-        // Fallback: try plain JSON (backward compat)
-        serde_json::from_str(&body)
-            .map_err(|e| format!("解析备份数据失败（可能密码错误）: {}", e))?
-    };
+    let decrypted = decode_backup_envelope(&body, password)?;
+    let data: Value = serde_json::from_slice(&decrypted)
+        .map_err(|e| format!("解析备份数据失败: {}", e))?;
+    validate_backup_data(&data)?;
+
+    let playlists: playlist_db::PlaylistBackup = serde_json::from_value(
+        data.get("playlists")
+            .cloned()
+            .ok_or_else(|| "备份缺少歌单数据".to_string())?,
+    )
+    .map_err(|e| format!("歌单备份格式错误: {}", e))?;
 
     // Restore plugins if present
     let mut plugins_restored = 0u32;
@@ -622,9 +679,53 @@ pub async fn s3__restore(args: Value) -> Result<Value, String> {
         plugins_restored = restore_plugins(&plugins_arr)?;
     }
 
+    {
+        let mut conn = state.playlist.lock().map_err(|e| e.to_string())?;
+        playlist_db::restore_playlists(&mut conn, &playlists, &mode)
+            .map_err(|e| format!("恢复歌单失败: {}", e))?;
+    }
+
     Ok(serde_json::json!({
         "success": true,
         "data": data,
         "pluginsRestored": plugins_restored,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_backup_envelope, encode_backup_envelope, validate_backup_data, validate_plugin_id};
+
+    #[test]
+    fn backup_envelope_round_trips() {
+        let body = encode_backup_envelope(br#"{"version":3}"#, "password").unwrap();
+        let decoded = decode_backup_envelope(&body, "password").unwrap();
+        assert_eq!(br#"{"version":3}"#, decoded.as_slice());
+    }
+
+    #[test]
+    fn backup_envelope_rejects_plain_json() {
+        let error = decode_backup_envelope(r#"{"version":2}"#, "password").unwrap_err();
+        assert!(error.contains("格式"));
+    }
+
+    #[test]
+    fn backup_envelope_rejects_wrong_password() {
+        let body = encode_backup_envelope(b"secret", "right").unwrap();
+        assert!(decode_backup_envelope(&body, "wrong").is_err());
+    }
+
+    #[test]
+    fn plugin_id_rejects_path_components() {
+        assert!(validate_plugin_id("../../outside").is_err());
+        assert!(validate_plugin_id("").is_err());
+        assert!(validate_plugin_id("safe_ID-123").is_ok());
+    }
+
+    #[test]
+    fn backup_data_requires_object_settings() {
+        assert!(validate_backup_data(&serde_json::json!({ "version": 3 })).is_err());
+        assert!(validate_backup_data(&serde_json::json!({ "version": 3, "settings": [] })).is_err());
+        assert!(validate_backup_data(&serde_json::json!({ "version": 3, "settings": {} })).is_ok());
+    }
 }

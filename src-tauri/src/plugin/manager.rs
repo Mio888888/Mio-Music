@@ -6,6 +6,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+fn validate_plugin_id(id: &str) -> Result<(), String> {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    {
+        return Err("插件 ID 格式无效".to_string());
+    }
+    Ok(())
+}
+
 pub struct PluginManager {
     plugins: Arc<RwLock<HashMap<String, LoadedPlugin>>>,
     engines: Arc<RwLock<HashMap<String, PluginEngine>>>,
@@ -92,6 +104,7 @@ impl PluginManager {
             .map_err(|e| e.to_string())?;
 
         let plugin_id = if let Some(id) = target_plugin_id {
+            validate_plugin_id(&id)?;
             id
         } else {
             let plugins = self.plugins.read().await;
@@ -135,6 +148,7 @@ impl PluginManager {
 
     /// Remove a plugin.
     pub async fn uninstall_plugin(&self, plugin_id: &str) -> Result<(), String> {
+        validate_plugin_id(plugin_id)?;
         self.remove_plugin_file(plugin_id).await;
         // Also remove config file
         let config_path = self.plugins_dir.join(format!("{}.config.json", plugin_id));
@@ -177,6 +191,7 @@ impl PluginManager {
 
     /// Get saved config for a plugin.
     pub async fn get_config(&self, plugin_id: &str) -> Result<serde_json::Value, String> {
+        validate_plugin_id(plugin_id)?;
         let config_path = self.plugins_dir.join(format!("{}.config.json", plugin_id));
         if !config_path.exists() {
             return Ok(serde_json::json!({}));
@@ -189,6 +204,7 @@ impl PluginManager {
 
     /// Save config for a plugin.
     pub async fn save_config(&self, plugin_id: &str, config: serde_json::Value) -> Result<(), String> {
+        validate_plugin_id(plugin_id)?;
         let config_path = self.plugins_dir.join(format!("{}.config.json", plugin_id));
         let content = serde_json::to_string_pretty(&config)
             .map_err(|e| format!("序列化配置失败: {}", e))?;
@@ -325,5 +341,18 @@ impl PluginManager {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_plugin_id;
+
+    #[test]
+    fn plugin_id_allows_only_filename_safe_characters() {
+        assert!(validate_plugin_id("safe_ID-123").is_ok());
+        assert!(validate_plugin_id("../outside").is_err());
+        assert!(validate_plugin_id("nested/path").is_err());
+        assert!(validate_plugin_id("").is_err());
     }
 }

@@ -38,7 +38,7 @@ export default {
   region: '区域',
   bucket: '存储桶',
   accessKeyId: '访问密钥 ID',
-  secretAccessKey: '访问密钥',
+  secretAccessKey: '访问密钥（不会保存）',
   testConnection: '测试连接',
   connectedRetest: '已连接 — 点击重新测试',
   backupPassword: '备份密码',

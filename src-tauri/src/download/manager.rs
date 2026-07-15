@@ -1,5 +1,5 @@
 use super::types::{DownloadStatus, DownloadTask};
-use futures_util::StreamExt;
+use futures_util::{future::BoxFuture, FutureExt, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,10 +11,69 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
+#[derive(Debug, PartialEq, Eq)]
+enum DownloadMode {
+    Append { downloaded: u64, total: u64 },
+    Truncate { total: u64 },
+}
+
+fn normalize_restored_tasks(tasks: &mut [DownloadTask]) -> Vec<String> {
+    let mut queued = Vec::new();
+    for task in tasks {
+        if task.status == DownloadStatus::Downloading {
+            task.status = DownloadStatus::Paused;
+            task.speed = 0.0;
+            task.remaining_time = None;
+        } else if task.status == DownloadStatus::Queued {
+            queued.push(task.id.clone());
+        }
+    }
+    queued
+}
+
+fn parse_content_range(value: &reqwest::header::HeaderValue) -> Option<(u64, u64)> {
+    let value = value.to_str().ok()?.strip_prefix("bytes ")?;
+    let (range, total) = value.split_once('/')?;
+    let (start, _) = range.split_once('-')?;
+    Some((start.parse().ok()?, total.parse().ok()?))
+}
+
+fn resolve_download_mode(
+    status: reqwest::StatusCode,
+    content_range: Option<&reqwest::header::HeaderValue>,
+    start_byte: u64,
+    content_length: Option<u64>,
+) -> Result<DownloadMode, String> {
+    if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        let (range_start, total) = content_range
+            .and_then(parse_content_range)
+            .ok_or_else(|| "断点续传响应缺少有效 Content-Range".to_string())?;
+        if range_start != start_byte {
+            return Err("断点续传起点与本地临时文件不一致".to_string());
+        }
+        if content_length == Some(0) || total <= start_byte {
+            return Err("断点续传响应大小无效".to_string());
+        }
+        return Ok(DownloadMode::Append {
+            downloaded: start_byte,
+            total,
+        });
+    }
+    if status == reqwest::StatusCode::OK {
+        let total = content_length.ok_or_else(|| "响应缺少文件大小".to_string())?;
+        if total == 0 {
+            return Err("文件大小为0".to_string());
+        }
+        return Ok(DownloadMode::Truncate { total });
+    }
+    Err(format!("下载失败: HTTP {}", status))
+}
+
 #[derive(Clone)]
 pub struct DownloadManager {
     tasks: Arc<RwLock<HashMap<String, DownloadTask>>>,
     queue: Arc<Mutex<Vec<String>>>,
+    scheduler: Arc<Mutex<()>>,
     max_concurrent: Arc<RwLock<usize>>,
     abort_handles: Arc<RwLock<HashMap<String, tokio::task::AbortHandle>>>,
     client: Client,
@@ -33,6 +92,7 @@ impl DownloadManager {
         Self {
             tasks: Arc::new(RwLock::new(HashMap::new())),
             queue: Arc::new(Mutex::new(Vec::new())),
+            scheduler: Arc::new(Mutex::new(())),
             max_concurrent: Arc::new(RwLock::new(3)),
             abort_handles: Arc::new(RwLock::new(HashMap::new())),
             client,
@@ -53,21 +113,15 @@ impl DownloadManager {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn load_tasks(&self) {
         if let Ok(data) = fs::read_to_string(self.downloads_file()) {
             if let Ok(mut vec) = serde_json::from_str::<Vec<DownloadTask>>(&data) {
-                for t in vec.iter_mut() {
-                    if t.status == DownloadStatus::Downloading {
-                        t.status = DownloadStatus::Paused;
-                    }
-                }
+                let restored_queue = normalize_restored_tasks(&mut vec);
                 let mut tasks = self.tasks.write().await;
                 let mut queue = self.queue.lock().await;
+                queue.clear();
+                queue.extend(restored_queue);
                 for t in vec {
-                    if t.status == DownloadStatus::Queued {
-                        queue.push(t.id.clone());
-                    }
                     tasks.insert(t.id.clone(), t);
                 }
             }
@@ -154,6 +208,7 @@ impl DownloadManager {
         }
         self.save_tasks().await;
         let _ = self.app_handle.emit("download:task-status-changed", &task_snapshot);
+        self.spawn_next().await;
         Ok(())
     }
 
@@ -198,6 +253,7 @@ impl DownloadManager {
         }
         self.save_tasks().await;
         let _ = self.app_handle.emit("download:task-status-changed", &task_snapshot);
+        self.spawn_next().await;
         Ok(())
     }
 
@@ -341,7 +397,13 @@ impl DownloadManager {
         Ok(())
     }
 
-    pub(crate) async fn spawn_next(&self) {
+    pub(crate) fn spawn_next(&self) -> BoxFuture<'static, ()> {
+        let manager = self.clone();
+        async move { manager.spawn_next_inner().await }.boxed()
+    }
+
+    async fn spawn_next_inner(&self) {
+        let _scheduler_guard = self.scheduler.lock().await;
         loop {
             let mc = *self.max_concurrent.read().await;
             let active = self.tasks.read().await.values()
@@ -452,6 +514,7 @@ async fn run_download_task(
             }
             dm.save_tasks().await;
             if should_retry {
+                dm.queue.lock().await.push(id.clone());
                 let _ = dm.app_handle.emit("download:task-status-changed", &task_snapshot);
             } else {
                 let _ = dm.app_handle.emit("download:task-error", &task_snapshot);
@@ -459,6 +522,7 @@ async fn run_download_task(
         }
     }
     dm.abort_handles.write().await.remove(&id);
+    dm.spawn_next().await;
 }
 
 async fn execute_download(
@@ -482,11 +546,16 @@ async fn execute_download(
     }
 
     let response = request.send().await.map_err(|e| e.to_string())?;
-    let total_size = response.content_length().unwrap_or(0) + start_byte;
-
-    if total_size == 0 {
-        return Err("文件大小为0".into());
-    }
+    let mode = resolve_download_mode(
+        response.status(),
+        response.headers().get(reqwest::header::CONTENT_RANGE),
+        start_byte,
+        response.content_length(),
+    )?;
+    let (downloaded_start, total_size, append) = match mode {
+        DownloadMode::Append { downloaded, total } => (downloaded, total, true),
+        DownloadMode::Truncate { total } => (0, total, false),
+    };
 
     // Update total_size in task
     {
@@ -500,12 +569,14 @@ async fn execute_download(
 
     let mut file = tokio::fs::OpenOptions::new()
         .create(true)
-        .append(true)
+        .write(true)
+        .append(append)
+        .truncate(!append)
         .open(&temp_path)
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut downloaded = start_byte as u64;
+    let mut downloaded = downloaded_start;
     let mut last_emit = std::time::Instant::now();
     let mut last_speed_time = std::time::Instant::now();
     let mut last_speed_bytes = downloaded;
@@ -518,13 +589,13 @@ async fn execute_download(
         downloaded += chunk.len() as u64;
 
         let now = std::time::Instant::now();
-        let size_since_last = downloaded.abs_diff(start_byte);
+        let size_since_last = downloaded.abs_diff(downloaded_start);
 
         if size_since_last >= progress_threshold || now.duration_since(last_emit) >= emit_interval {
             let progress = if total_size > 0 { (downloaded as f64 / total_size as f64) * 100.0 } else { 0.0 };
             let elapsed = now.duration_since(last_speed_time).as_secs_f64();
             let speed = if elapsed > 0.0 { ((downloaded - last_speed_bytes) as f64 / elapsed) as f64 } else { 0.0 };
-            let remaining = if speed > 0.0 { Some((total_size - downloaded) as f64 / speed) } else { None };
+            let remaining = if speed > 0.0 { Some(total_size.saturating_sub(downloaded) as f64 / speed) } else { None };
 
             let task_snapshot;
             {
@@ -548,6 +619,74 @@ async fn execute_download(
 
     file.flush().await.map_err(|e| e.to_string())?;
     drop(file);
+    if downloaded != total_size {
+        return Err(format!("下载文件大小不一致: 预期 {}, 实际 {}", total_size, downloaded));
+    }
     fs::rename(&temp_path, file_path).map_err(|e| e.to_string())?;
     Ok(file_path.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_restored_tasks, resolve_download_mode, DownloadMode};
+    use crate::download::types::{DownloadStatus, DownloadTask};
+    use reqwest::{header::HeaderValue, StatusCode};
+    use serde_json::Value;
+
+    fn task(id: &str, status: DownloadStatus) -> DownloadTask {
+        DownloadTask {
+            id: id.into(),
+            song_info: Value::Null,
+            url: "https://example.com/file".into(),
+            plugin_id: None,
+            quality: None,
+            file_path: format!("/tmp/{id}"),
+            status,
+            progress: 0.0,
+            speed: 0.0,
+            total_size: 0,
+            downloaded_size: 0,
+            remaining_time: None,
+            retries: 0,
+            error: None,
+            priority: 0,
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn restored_downloading_tasks_become_paused_and_queued_are_scheduled() {
+        let mut tasks = vec![
+            task("active", DownloadStatus::Downloading),
+            task("queued", DownloadStatus::Queued),
+        ];
+        let queue = normalize_restored_tasks(&mut tasks);
+
+        assert_eq!(DownloadStatus::Paused, tasks[0].status);
+        assert_eq!(vec!["queued"], queue);
+    }
+
+    #[test]
+    fn rejects_unsuccessful_download_response() {
+        assert!(resolve_download_mode(StatusCode::NOT_FOUND, None, 0, Some(10)).is_err());
+    }
+
+    #[test]
+    fn appends_only_matching_partial_content() {
+        let range = HeaderValue::from_static("bytes 5-9/10");
+        assert_eq!(
+            DownloadMode::Append { downloaded: 5, total: 10 },
+            resolve_download_mode(StatusCode::PARTIAL_CONTENT, Some(&range), 5, Some(5)).unwrap()
+        );
+        let wrong = HeaderValue::from_static("bytes 0-4/10");
+        assert!(resolve_download_mode(StatusCode::PARTIAL_CONTENT, Some(&wrong), 5, Some(5)).is_err());
+    }
+
+    #[test]
+    fn restarts_when_server_ignores_range() {
+        assert_eq!(
+            DownloadMode::Truncate { total: 10 },
+            resolve_download_mode(StatusCode::OK, None, 5, Some(10)).unwrap()
+        );
+    }
 }

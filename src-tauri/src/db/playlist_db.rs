@@ -34,6 +34,18 @@ pub struct PlaylistSongRow {
     pub img: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistBackupItem {
+    pub playlist: PlaylistRow,
+    pub songs: Vec<PlaylistSongRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlaylistBackup {
+    pub playlists: Vec<PlaylistBackupItem>,
+}
+
 pub fn init_tables(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS playlists (
@@ -171,6 +183,85 @@ pub fn list_songs(conn: &Connection, playlist_id: &str) -> Result<Vec<PlaylistSo
         })
     })?;
     rows.collect()
+}
+
+pub fn export_playlists(conn: &Connection) -> Result<PlaylistBackup> {
+    let playlists = list_playlists(conn)?
+        .into_iter()
+        .map(|playlist| {
+            let songs = list_songs(conn, &playlist.id)?;
+            Ok(PlaylistBackupItem { playlist, songs })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(PlaylistBackup { playlists })
+}
+
+pub fn restore_playlists(
+    conn: &mut Connection,
+    backup: &PlaylistBackup,
+    mode: &str,
+) -> Result<()> {
+    if mode != "overwrite" && mode != "merge" {
+        return Err(rusqlite::Error::InvalidParameterName(mode.to_string()));
+    }
+
+    let tx = conn.transaction()?;
+    if mode == "overwrite" {
+        tx.execute("DELETE FROM playlist_songs", [])?;
+        tx.execute("DELETE FROM playlists", [])?;
+    }
+
+    for item in &backup.playlists {
+        let playlist = &item.playlist;
+        tx.execute(
+            "INSERT OR IGNORE INTO playlists (id, name, description, coverImgUrl, source, meta, createTime, updateTime)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+            params![
+                playlist.id,
+                playlist.name,
+                playlist.description,
+                playlist.cover_img_url,
+                playlist.source,
+                playlist.meta,
+                playlist.create_time,
+                playlist.update_time
+            ],
+        )?;
+        let mut next_position = if mode == "merge" {
+            tx.query_row(
+                "SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_songs WHERE playlist_id = ?1",
+                [&playlist.id],
+                |row| row.get::<_, i64>(0),
+            )?
+        } else {
+            0
+        };
+        for song in &item.songs {
+            let position = if mode == "merge" {
+                next_position
+            } else {
+                song.position
+            };
+            let inserted = tx.execute(
+                "INSERT OR IGNORE INTO playlist_songs (playlist_id, songmid, position, data, name, singer, albumName, img)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+                params![
+                    playlist.id,
+                    song.songmid,
+                    position,
+                    song.data,
+                    song.name,
+                    song.singer,
+                    song.album_name,
+                    song.img
+                ],
+            )?;
+            if mode == "merge" && inserted > 0 {
+                next_position += 1;
+            }
+        }
+    }
+    tx.commit()
 }
 
 pub fn count_songs(conn: &Connection, playlist_id: &str) -> Result<i64> {
@@ -372,4 +463,74 @@ pub fn kv_set(conn: &Connection, key: &str, value: &str) -> Result<()> {
         params![key, value],
     )?;
     Ok(())
+}
+
+#[cfg(test)]
+mod backup_tests {
+    use super::*;
+
+    fn playlist(id: &str, name: &str) -> PlaylistRow {
+        PlaylistRow {
+            id: id.into(),
+            name: name.into(),
+            description: String::new(),
+            cover_img_url: "default-cover".into(),
+            source: "local".into(),
+            meta: "{}".into(),
+            create_time: "2026-01-01T00:00:00Z".into(),
+            update_time: "2026-01-01T00:00:00Z".into(),
+            song_count: 0,
+        }
+    }
+
+    fn song(playlist_id: &str, songmid: &str) -> PlaylistSongRow {
+        PlaylistSongRow {
+            playlist_id: playlist_id.into(),
+            position: 0,
+            data: "{}".into(),
+            songmid: songmid.into(),
+            name: songmid.into(),
+            singer: String::new(),
+            album_name: String::new(),
+            img: String::new(),
+        }
+    }
+
+    #[test]
+    fn export_and_overwrite_restore_playlists() {
+        let source = Connection::open_in_memory().unwrap();
+        init_tables(&source).unwrap();
+        insert_playlist(&source, &playlist("source", "Source")).unwrap();
+        add_songs(&source, "source", &[song("source", "song-1")]).unwrap();
+        let backup = export_playlists(&source).unwrap();
+
+        let mut target = Connection::open_in_memory().unwrap();
+        init_tables(&target).unwrap();
+        insert_playlist(&target, &playlist("old", "Old")).unwrap();
+        restore_playlists(&mut target, &backup, "overwrite").unwrap();
+
+        assert!(get_playlist(&target, "old").unwrap().is_none());
+        assert_eq!(1, list_songs(&target, "source").unwrap().len());
+    }
+
+    #[test]
+    fn merge_restore_keeps_existing_and_adds_missing_songs() {
+        let mut target = Connection::open_in_memory().unwrap();
+        init_tables(&target).unwrap();
+        insert_playlist(&target, &playlist("shared", "Local Name")).unwrap();
+        add_songs(&target, "shared", &[song("shared", "local")]).unwrap();
+
+        let backup = PlaylistBackup {
+            playlists: vec![PlaylistBackupItem {
+                playlist: playlist("shared", "Cloud Name"),
+                songs: vec![song("shared", "cloud")],
+            }],
+        };
+        restore_playlists(&mut target, &backup, "merge").unwrap();
+
+        assert_eq!("Local Name", get_playlist(&target, "shared").unwrap().unwrap().name);
+        let songs = list_songs(&target, "shared").unwrap();
+        assert_eq!(vec!["local", "cloud"], songs.iter().map(|song| song.songmid.as_str()).collect::<Vec<_>>());
+        assert_eq!(vec![0, 1], songs.iter().map(|song| song.position).collect::<Vec<_>>());
+    }
 }

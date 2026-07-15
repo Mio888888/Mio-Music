@@ -296,71 +296,188 @@ pub async fn audio_proxy(url: String) -> Result<String, String> {
 ///
 /// By default (raw: false), follows redirects and returns JSON-wrapped response:
 ///   { "statusCode": N, "headers": {}, "body": <parsed JSON or string> }
+struct ValidatedHttpTarget {
+    url: reqwest::Url,
+    host: String,
+    addresses: Vec<std::net::SocketAddr>,
+}
+
+fn is_blocked_network_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(ip) => {
+            let [a, b, c, _] = ip.octets();
+            ip.is_private()
+                || ip.is_loopback()
+                || ip.is_link_local()
+                || ip.is_multicast()
+                || ip.is_broadcast()
+                || ip.is_unspecified()
+                || a == 0
+                || (a == 100 && (64..=127).contains(&b))
+                || (a == 192 && b == 0 && c == 0)
+                || (a == 192 && b == 0 && c == 2)
+                || (a == 192 && b == 88 && c == 99)
+                || (a == 198 && (b == 18 || b == 19))
+                || (a == 198 && b == 51 && c == 100)
+                || (a == 203 && b == 0 && c == 113)
+                || a >= 240
+        }
+        std::net::IpAddr::V6(ip) => {
+            let segments = ip.segments();
+            if let Some(ipv4) = ip.to_ipv4() {
+                return is_blocked_network_ip(std::net::IpAddr::V4(ipv4));
+            }
+            ip.is_loopback()
+                || ip.is_multicast()
+                || ip.is_unspecified()
+                || (segments[0] & 0xfe00) == 0xfc00
+                || (segments[0] & 0xffc0) == 0xfe80
+                || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+        }
+    }
+}
+
+async fn validate_public_http_url(raw_url: &str) -> Result<ValidatedHttpTarget, String> {
+    let url = reqwest::Url::parse(raw_url).map_err(|e| format!("URL 格式错误: {}", e))?;
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return Err("仅允许 HTTP 或 HTTPS 地址".to_string());
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err("URL 不允许包含用户凭据".to_string());
+    }
+    let host = url
+        .host_str()
+        .ok_or_else(|| "URL 缺少主机名".to_string())?
+        .to_string();
+    if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
+        return Err("禁止访问本机或内网地址".to_string());
+    }
+    let port = url.port_or_known_default().ok_or_else(|| "URL 缺少有效端口".to_string())?;
+    let addresses: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), port))
+        .await
+        .map_err(|e| format!("解析主机失败: {}", e))?
+        .collect();
+    if addresses.is_empty()
+        || addresses
+            .iter()
+            .any(|address| is_blocked_network_ip(address.ip()))
+    {
+        return Err("禁止访问本机或内网地址".to_string());
+    }
+    Ok(ValidatedHttpTarget {
+        url,
+        host,
+        addresses,
+    })
+}
+
+fn build_public_http_client(
+    target: &ValidatedHttpTarget,
+    timeout_ms: u64,
+) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_millis(timeout_ms.clamp(1, 120_000)))
+        .redirect(reqwest::redirect::Policy::none())
+        .resolve_to_addrs(&target.host, &target.addresses)
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
+}
+
+fn strip_cross_origin_credentials(headers: &mut std::collections::HashMap<String, String>) {
+    headers.retain(|name, _| {
+        !name.eq_ignore_ascii_case("authorization")
+            && !name.eq_ignore_ascii_case("cookie")
+            && !name.eq_ignore_ascii_case("proxy-authorization")
+    });
+}
+
 #[tauri::command]
 pub async fn http_proxy(args: Value) -> Result<Value, String> {
-    let url = args.get("url").and_then(|v| v.as_str()).ok_or("缺少 url 参数")?;
-    let method = args.get("method").and_then(|v| v.as_str()).unwrap_or("GET");
-    let headers: Option<std::collections::HashMap<String, String>> =
+    let initial_url = args.get("url").and_then(|v| v.as_str()).ok_or("缺少 url 参数")?;
+    let mut method = args.get("method").and_then(|v| v.as_str()).unwrap_or("GET").to_uppercase();
+    let mut headers: Option<std::collections::HashMap<String, String>> =
         args.get("headers").and_then(|v| serde_json::from_value(v.clone()).ok());
-    let body = args.get("body").and_then(|v| v.as_str());
+    if headers
+        .as_ref()
+        .is_some_and(|headers| headers.keys().any(|name| name.eq_ignore_ascii_case("host")))
+    {
+        return Err("不允许覆盖 Host 请求头".to_string());
+    }
+    let mut body = args.get("body").and_then(|v| v.as_str()).map(str::to_string);
     let timeout_ms = args.get("timeout").and_then(|v| v.as_u64()).unwrap_or(15000);
     let raw = args.get("raw").and_then(|v| v.as_bool()).unwrap_or(false);
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(timeout_ms))
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+    let mut target = validate_public_http_url(initial_url).await?;
+    let mut redirects = 0u8;
+    let resp = loop {
+        let client = build_public_http_client(&target, timeout_ms)?;
+        let referer_origin = target.url.origin().ascii_serialization();
+        let mut response = None;
+        for attempt in 0..3u32 {
+            let mut req_builder = match method.as_str() {
+                "POST" => client.post(target.url.clone()),
+                "PUT" => client.put(target.url.clone()),
+                "DELETE" => client.delete(target.url.clone()),
+                "PATCH" => client.patch(target.url.clone()),
+                _ => client.get(target.url.clone()),
+            };
 
-    let referer_origin = url.split("://").nth(1)
-        .and_then(|host_port| host_port.split('/').next())
-        .map(|host| format!("https://{}", host))
-        .unwrap_or_default();
+            req_builder = req_builder
+                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                .header("Accept", "*/*")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                .header("Referer", &referer_origin)
+                .header("Origin", &referer_origin)
+                .header("Sec-Fetch-Dest", "empty")
+                .header("Sec-Fetch-Mode", "cors")
+                .header("Sec-Fetch-Site", "cross-site");
 
-    let max_attempts = 3u32;
-    let mut last_status: u16 = 0;
-    let mut resp: Option<reqwest::Response> = None;
+            if let Some(ref hdrs) = headers {
+                for (key, value) in hdrs {
+                    req_builder = req_builder.header(key.as_str(), value.as_str());
+                }
+            }
+            if let Some(ref request_body) = body {
+                req_builder = req_builder.body(request_body.clone());
+            }
 
-    for attempt in 0..max_attempts {
-        let mut req_builder: reqwest::RequestBuilder = match method.to_uppercase().as_str() {
-            "POST" => client.post(url),
-            "PUT" => client.put(url),
-            "DELETE" => client.delete(url),
-            "PATCH" => client.patch(url),
-            _ => client.get(url),
-        };
-
-        req_builder = req_builder
-            .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-            .header("Accept", "*/*")
-            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            .header("Referer", &referer_origin)
-            .header("Origin", &referer_origin)
-            .header("Sec-Fetch-Dest", "empty")
-            .header("Sec-Fetch-Mode", "cors")
-            .header("Sec-Fetch-Site", "cross-site");
-
-        if let Some(ref hdrs) = headers {
-            for (k, v) in hdrs {
-                req_builder = req_builder.header(k.as_str(), v.as_str());
+            let current = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
+            if current.status().is_server_error() && attempt < 2 {
+                tokio::time::sleep(std::time::Duration::from_millis(500 * (attempt as u64 + 1))).await;
+            } else {
+                response = Some(current);
+                break;
             }
         }
-        if let Some(b) = body {
-            req_builder = req_builder.body(b.to_string());
+        let current = response.ok_or_else(|| "请求失败：重试次数已用尽".to_string())?;
+        if !current.status().is_redirection() {
+            break current;
         }
-
-        let r = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
-        last_status = r.status().as_u16();
-
-        if r.status().is_server_error() && attempt + 1 < max_attempts {
-            tokio::time::sleep(std::time::Duration::from_millis(500 * (attempt as u64 + 1))).await;
-            continue;
+        if redirects >= 10 {
+            return Err("重定向次数过多".to_string());
         }
-        resp = Some(r);
-        break;
-    }
-
-    let resp = resp.ok_or_else(|| format!("请求失败: HTTP {}", last_status))?;
+        let location = current
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| "重定向响应缺少 Location".to_string())?;
+        let next_url = target.url.join(location).map_err(|e| format!("重定向地址无效: {}", e))?;
+        if target.url.origin() != next_url.origin() {
+            if let Some(headers) = headers.as_mut() {
+                strip_cross_origin_credentials(headers);
+            }
+        }
+        if current.status() == reqwest::StatusCode::SEE_OTHER
+            || ((current.status() == reqwest::StatusCode::MOVED_PERMANENTLY
+                || current.status() == reqwest::StatusCode::FOUND)
+                && method == "POST")
+        {
+            method = "GET".to_string();
+            body = None;
+        }
+        target = validate_public_http_url(next_url.as_str()).await?;
+        redirects += 1;
+    };
     let status = resp.status().as_u16();
     let resp_headers: std::collections::HashMap<String, String> = resp
         .headers()
@@ -387,6 +504,56 @@ pub async fn http_proxy(args: Value) -> Result<Value, String> {
         "headers": resp_headers,
         "body": body_value
     }))
+}
+
+#[cfg(test)]
+mod http_proxy_tests {
+    use super::{is_blocked_network_ip, strip_cross_origin_credentials, validate_public_http_url};
+    use std::collections::HashMap;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+    #[test]
+    fn blocks_non_public_ip_ranges() {
+        let blocked = [
+            IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            IpAddr::V4(Ipv4Addr::new(169, 254, 1, 1)),
+            IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            IpAddr::V6(Ipv6Addr::LOCALHOST),
+            "fc00::1".parse().unwrap(),
+            "fe80::1".parse().unwrap(),
+        ];
+        assert!(blocked.into_iter().all(is_blocked_network_ip));
+        assert!(!is_blocked_network_ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+    }
+
+    #[tokio::test]
+    async fn rejects_local_and_non_http_urls() {
+        assert!(validate_public_http_url("file:///etc/passwd").await.is_err());
+        assert!(validate_public_http_url("http://127.0.0.1:8080").await.is_err());
+        assert!(validate_public_http_url("http://[::1]/").await.is_err());
+        assert!(validate_public_http_url("http://localhost/").await.is_err());
+        assert!(validate_public_http_url("http://user:pass@example.com/").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn accepts_public_ip_url() {
+        let target = validate_public_http_url("https://1.1.1.1/path").await.unwrap();
+        assert_eq!("1.1.1.1", target.url.host_str().unwrap());
+    }
+
+    #[test]
+    fn strips_credentials_before_cross_origin_redirect() {
+        let mut headers = HashMap::from([
+            ("Authorization".to_string(), "Bearer secret".to_string()),
+            ("Cookie".to_string(), "session=secret".to_string()),
+            ("Accept".to_string(), "application/json".to_string()),
+        ]);
+        strip_cross_origin_credentials(&mut headers);
+        assert_eq!(Some(&"application/json".to_string()), headers.get("Accept"));
+        assert!(!headers.contains_key("Authorization"));
+        assert!(!headers.contains_key("Cookie"));
+    }
 }
 
 #[derive(Serialize)]

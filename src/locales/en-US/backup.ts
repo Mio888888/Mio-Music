@@ -38,7 +38,7 @@ export default {
   region: 'Region',
   bucket: 'Bucket',
   accessKeyId: 'Access Key ID',
-  secretAccessKey: 'Secret Access Key',
+  secretAccessKey: 'Secret Access Key (not saved)',
   testConnection: 'Test Connection',
   connectedRetest: 'Connected — Click to retest',
   backupPassword: 'Backup Password',

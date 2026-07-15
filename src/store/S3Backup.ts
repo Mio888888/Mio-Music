@@ -13,9 +13,7 @@ export interface S3Config {
 export interface BackupData {
   version: number
   timestamp: string
-  playlists: any
   settings: any
-  plugins?: Array<{ id: string; name: string; code: string; config: any }>
 }
 
 type RestoreMode = 'overwrite' | 'merge'
@@ -52,8 +50,22 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        const parsed = JSON.parse(saved)
-        config.value = { ...config.value, ...parsed }
+        const parsed = JSON.parse(saved) as Partial<S3Config>
+        config.value = {
+          endpoint: parsed.endpoint || '',
+          region: parsed.region || 'auto',
+          accessKeyId: parsed.accessKeyId || '',
+          secretAccessKey: '',
+          bucket: parsed.bucket || ''
+        }
+        if (parsed.secretAccessKey) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            endpoint: config.value.endpoint,
+            region: config.value.region,
+            accessKeyId: config.value.accessKeyId,
+            bucket: config.value.bucket
+          }))
+        }
       }
       const time = localStorage.getItem('lastBackupTime')
       if (time) lastBackupTime.value = time
@@ -65,7 +77,13 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
   }
 
   function saveConfig() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value))
+    const persistedConfig = {
+      endpoint: config.value.endpoint,
+      region: config.value.region,
+      accessKeyId: config.value.accessKeyId,
+      bucket: config.value.bucket
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistedConfig))
     localStorage.setItem('maxBackups', String(maxBackups.value))
   }
 
@@ -109,12 +127,10 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     isBackingUp.value = true
     errorMessage.value = null
     try {
-      const playlists = JSON.parse(localStorage.getItem('playlists') || '[]')
       const settings = JSON.parse(localStorage.getItem('appSettings') || '{}')
 
       const result = await (window as any).api.s3.backup(
         toApiConfig(),
-        playlists,
         settings,
         backupPassword.value,
         maxBackups.value
@@ -144,22 +160,12 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
     isRestoring.value = true
     errorMessage.value = null
     try {
-      const result = await (window as any).api.s3.restore(toApiConfig(), password)
+      const result = await (window as any).api.s3.restore(toApiConfig(), password, mode)
       const data: BackupData = result.data
 
       if (mode === 'overwrite') {
-        localStorage.setItem('playlists', JSON.stringify(data.playlists))
         localStorage.setItem('appSettings', JSON.stringify(data.settings))
       } else {
-        const existing = JSON.parse(localStorage.getItem('playlists') || '[]')
-        const merged = [...existing]
-        for (const pl of data.playlists) {
-          if (!merged.some((e: any) => e.id === pl.id)) {
-            merged.push(pl)
-          }
-        }
-        localStorage.setItem('playlists', JSON.stringify(merged))
-
         const localSettings = JSON.parse(localStorage.getItem('appSettings') || '{}')
         const mergedSettings = { ...data.settings, ...localSettings }
         localStorage.setItem('appSettings', JSON.stringify(mergedSettings))
@@ -176,7 +182,7 @@ export const useS3BackupStore = defineStore('s3Backup', () => {
 
   // Initialize
   loadConfig()
-  if (config.value.endpoint && config.value.accessKeyId) {
+  if (config.value.endpoint && config.value.accessKeyId && config.value.secretAccessKey) {
     testConnection()
   }
 
