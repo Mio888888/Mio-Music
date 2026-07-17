@@ -4,7 +4,13 @@ import { LocalUserDetailStore } from '@/store/LocalUserDetail'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useSettingsStore } from '@/store/Settings'
 import { playSetting } from '@/store/playSetting'
-import { PlayMode, type SongList, type UnsubscribeFunction } from '@/types/audio'
+import {
+  PlayMode,
+  type PlayerSnapshotPayload,
+  type PlayerSnapshotResult,
+  type SongList,
+  type UnsubscribeFunction
+} from '@/types/audio'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { calculateBestQuality, compareQuality, normalizeTypes } from '@/utils/quality'
 import { musicSdk } from '@/services/musicSdk'
@@ -514,17 +520,6 @@ async function syncAndroidNativeQueue(startIndex = _playIndex) {
   }
 }
 
-interface PlayerSnapshotResult {
-  success?: boolean
-  data?: {
-    position?: number
-    duration?: number
-    volume?: number
-    url?: string
-    isPlaying?: boolean
-  }
-}
-
 export async function syncAndroidCurrentPlaybackState() {
   if (androidSyncingPlaybackState || !(await isAndroid())) return
   androidSyncingPlaybackState = true
@@ -570,6 +565,12 @@ export async function syncAndroidCurrentPlaybackState() {
   }
 }
 
+function isPlayerSnapshotResult(
+  payload: PlayerSnapshotPayload | PlayerSnapshotResult
+): payload is PlayerSnapshotResult {
+  return 'data' in payload
+}
+
 async function doPrefetchNext() {
   const nextSong = computeNextSong()
   if (!nextSong || nextSong.source === 'local') return
@@ -582,6 +583,7 @@ async function doPrefetchNext() {
 
     const cacheKey = buildCacheKey(toRaw(nextSong) as any)
     await invoke('player__preload', { url, cacheKey })
+    if (requestId !== prefetchRequestId) return
     preloadedSong = nextSong
   } catch {
   }
@@ -611,12 +613,12 @@ export async function scheduleNextPrefetch() {
 
   // duration 有效且剩余时长足够：延迟到接近结束时再预加载
   if (duration > 0 && duration > PREFETCH_LEAD_TIME) {
-    const delayMs = (duration - PREFETCH_LEAD_TIME) * 1000
     const current = audio.Audio.currentTime
     const remainingMs = (duration - current) * 1000
+    const delayMs = Math.max(0, remainingMs - PREFETCH_LEAD_TIME * 1000)
 
     // 已经接近结束（可能 seek 过），立即触发
-    if (remainingMs <= PREFETCH_LEAD_TIME * 1000) {
+    if (delayMs === 0) {
       doPrefetchNext()
       return
     }
@@ -837,13 +839,25 @@ function updateSeamlessState() {
  * Rust 自动 crossfade 完成后的前端状态同步
  * Rust 后端自动完成 slot 交换后通知前端，前端使用已有的 preloadedSong 更新 UI
  */
-export function onCrossfadeSwap() {
-  if (!preloadedSong) return
+export function onCrossfadeSwap(payload?: PlayerSnapshotPayload | PlayerSnapshotResult) {
+  const audio = ControlAudioStore()
+  const snapshot = payload && isPlayerSnapshotResult(payload) ? payload.data : payload
+
+  if (snapshot) {
+    Object.assign(audio.Audio, {
+      url: typeof snapshot.url === 'string' ? snapshot.url : audio.Audio.url,
+      isPlay: typeof snapshot.isPlaying === 'boolean' ? snapshot.isPlaying : audio.Audio.isPlay,
+      currentTime: typeof snapshot.position === 'number' ? snapshot.position : audio.Audio.currentTime,
+      duration: typeof snapshot.duration === 'number' ? snapshot.duration : audio.Audio.duration,
+      volume: typeof snapshot.volume === 'number' ? snapshot.volume : audio.Audio.volume
+    })
+  }
+
+  const song = preloadedSong
+  if (!song) return
 
   const store = LocalUserDetailStore()
   const globalPlayStatus = useGlobalPlayStatusStore()
-  const audio = ControlAudioStore()
-  const song = preloadedSong
 
   const idx = store.list.findIndex((s) => s.songmid === song.songmid)
   if (idx !== -1) {
@@ -858,7 +872,7 @@ export function onCrossfadeSwap() {
       title: song.name || i18n.global.t('common.unknownSong'),
       artist: song.singer || i18n.global.t('common.unknownArtist'),
       album: song.albumName || '',
-      duration: 0,
+      duration: audio.Audio.duration,
       coverUrl: song.img || null
     })
   } catch {}

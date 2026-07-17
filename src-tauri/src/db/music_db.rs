@@ -85,7 +85,7 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<TrackRow>> {
         "SELECT songmid, path, url, singer, name, albumName, albumId, source, interval,
                 hasCover, coverKey, year, lrc, types, _types, typeUrl, bitrate, sampleRate,
                 channels, duration, size, mtime_ms, hash, updated_at
-         FROM tracks ORDER BY name COLLATE NOCASE"
+         FROM tracks ORDER BY name COLLATE NOCASE",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(TrackRow {
@@ -118,7 +118,10 @@ pub fn get_all_tracks(conn: &Connection) -> Result<Vec<TrackRow>> {
     rows.collect()
 }
 
-pub fn get_track_paths_by_ids(conn: &Connection, songmids: &[String]) -> Result<Vec<(String, String)>> {
+pub fn get_track_paths_by_ids(
+    conn: &Connection,
+    songmids: &[String],
+) -> Result<Vec<(String, String)>> {
     let mut stmt = conn.prepare("SELECT songmid, path FROM tracks WHERE songmid = ?1")?;
     let mut result = Vec::with_capacity(songmids.len());
     for songmid in songmids {
@@ -135,7 +138,7 @@ pub fn get_track_by_id(conn: &Connection, songmid: &str) -> Result<Option<TrackR
         "SELECT songmid, path, url, singer, name, albumName, albumId, source, interval,
                 hasCover, coverKey, year, lrc, types, _types, typeUrl, bitrate, sampleRate,
                 channels, duration, size, mtime_ms, hash, updated_at
-         FROM tracks WHERE songmid = ?1"
+         FROM tracks WHERE songmid = ?1",
     )?;
     let mut rows = stmt.query_map([songmid], |row| {
         Ok(TrackRow {
@@ -176,7 +179,7 @@ pub fn get_track_by_path(conn: &Connection, path: &str) -> Result<Option<TrackRo
         "SELECT songmid, path, url, singer, name, albumName, albumId, source, interval,
                 hasCover, coverKey, year, lrc, types, _types, typeUrl, bitrate, sampleRate,
                 channels, duration, size, mtime_ms, hash, updated_at
-         FROM tracks WHERE path = ?1"
+         FROM tracks WHERE path = ?1",
     )?;
     let mut rows = stmt.query_map([path], |row| {
         Ok(TrackRow {
@@ -305,11 +308,14 @@ pub fn get_all_stats(conn: &Connection) -> Result<Vec<TrackStat>> {
 
 pub fn prune_outside_keep(conn: &Connection, keep_paths: &[String]) -> Result<usize> {
     if keep_paths.is_empty() {
-        return clear_tracks(conn);
+        return Ok(0);
     }
 
     let tx = conn.unchecked_transaction()?;
-    tx.execute("CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths (path TEXT PRIMARY KEY)", [])?;
+    tx.execute(
+        "CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths (path TEXT PRIMARY KEY)",
+        [],
+    )?;
     tx.execute("DELETE FROM scan_keep_paths", [])?;
 
     {
@@ -326,6 +332,57 @@ pub fn prune_outside_keep(conn: &Connection, keep_paths: &[String]) -> Result<us
         [],
     )?;
     tx.execute("DELETE FROM scan_keep_paths", [])?;
+    tx.commit()?;
+    Ok(deleted)
+}
+
+pub fn prune_scanned_roots(
+    conn: &Connection,
+    roots: &[String],
+    keep_paths: &[String],
+) -> Result<usize> {
+    if roots.is_empty() {
+        return Ok(0);
+    }
+
+    let tx = conn.unchecked_transaction()?;
+    tx.execute_batch(
+        "CREATE TEMP TABLE IF NOT EXISTS scan_keep_paths (path TEXT PRIMARY KEY);
+         CREATE TEMP TABLE IF NOT EXISTS scan_roots (path TEXT PRIMARY KEY);",
+    )?;
+    tx.execute("DELETE FROM scan_keep_paths", [])?;
+    tx.execute("DELETE FROM scan_roots", [])?;
+
+    {
+        let mut stmt = tx.prepare("INSERT OR IGNORE INTO scan_roots (path) VALUES (?1)")?;
+        for root in roots {
+            stmt.execute([root])?;
+        }
+    }
+    {
+        let mut stmt = tx.prepare("INSERT OR IGNORE INTO scan_keep_paths (path) VALUES (?1)")?;
+        for path in keep_paths {
+            stmt.execute([path])?;
+        }
+    }
+
+    let deleted = tx.execute(
+        "DELETE FROM tracks
+         WHERE EXISTS (
+             SELECT 1 FROM scan_roots
+             WHERE substr(tracks.path, 1, length(scan_roots.path)) = scan_roots.path
+               AND (
+                   substr(scan_roots.path, -1, 1) IN ('/', '\\')
+                   OR substr(tracks.path, length(scan_roots.path) + 1, 1) IN ('/', '\\')
+               )
+         )
+           AND NOT EXISTS (
+             SELECT 1 FROM scan_keep_paths WHERE scan_keep_paths.path = tracks.path
+         )",
+        [],
+    )?;
+    tx.execute("DELETE FROM scan_keep_paths", [])?;
+    tx.execute("DELETE FROM scan_roots", [])?;
     tx.commit()?;
     Ok(deleted)
 }

@@ -67,21 +67,70 @@ const { player } = storeToRefs(globalPlayStatus)
 const songInfo = computed(() => player.value.songInfo || ({} as any))
 
 let clearDlnaSync: (() => void) | null = null
+let dlnaDeviceGeneration = 0
+let dlnaHandoffToken = 0
+let positionRequestPending = false
+let expectedLocalPlayState: boolean | null = null
+let dlnaResumeRequested = Audio.value.isPlay
+let activeDlnaHandoffToken: number | null = null
+
+const isCurrentDlnaDevice = (generation: number, usn: string) =>
+  dlnaDeviceGeneration === generation && dlnaStore.currentDevice?.usn === usn
+
+const isCurrentHandoff = (token: number, generation: number, usn: string, url: string) =>
+  dlnaHandoffToken === token &&
+  Audio.value.url === url &&
+  isCurrentDlnaDevice(generation, usn)
+
+const setLocalPlayState = async (isPlay: boolean, isCurrent: () => boolean) => {
+  expectedLocalPlayState = isPlay
+  try {
+    await invoke(isPlay ? 'player__resume' : 'player__pause')
+    return isCurrent()
+  } catch (error) {
+    throw error
+  }
+}
+
+const handleTogglePlayPause = () => {
+  dlnaResumeRequested = !Audio.value.isPlay
+  togglePlayPause()
+}
+
+const syncDlnaPosition = async (generation: number, usn: string, handoffToken: number) => {
+  if (positionRequestPending || !Audio.value.isPlay) return
+  positionRequestPending = true
+  try {
+    const positionInfo = await dlnaStore.getPosition()
+    if (
+      !isCurrentDlnaDevice(generation, usn) ||
+      dlnaHandoffToken !== handoffToken ||
+      !Audio.value.isPlay
+    ) return
+    if (positionInfo.duration > 0) controlAudio.setDuration(positionInfo.duration)
+    if (Math.abs(Audio.value.currentTime - positionInfo.position) > 2) {
+      await invoke('player__seek', { position: positionInfo.position })
+    }
+  } catch (error) {
+    if (isCurrentDlnaDevice(generation, usn)) {
+      console.error('DLNA position sync failed', error)
+    }
+  } finally {
+    positionRequestPending = false
+  }
+}
 
 watch(
   () => dlnaStore.currentDevice,
   (device) => {
+    dlnaDeviceGeneration += 1
+    dlnaHandoffToken += 1
+    const generation = dlnaDeviceGeneration
     if (clearDlnaSync) { clearDlnaSync(); clearDlnaSync = null }
     if (device) {
-      clearDlnaSync = lifecycle.addInterval(async () => {
-        if (Audio.value.isPlay) {
-          const position = await dlnaStore.getPosition()
-          if (position && typeof position === 'number') {
-            if (Math.abs(Audio.value.currentTime - position) > 2) {
-              invoke('player__seek', { position })
-            }
-          }
-        }
+      const usn = device.usn
+      clearDlnaSync = lifecycle.addInterval(() => {
+        void syncDlnaPosition(generation, usn, dlnaHandoffToken)
       }, 1000)
     }
   }
@@ -89,37 +138,88 @@ watch(
 
 watch(
   () => Audio.value.url,
-  (newUrl) => {
-    if (dlnaStore.currentDevice && newUrl) {
-      invoke('player__pause')
-      dlnaStore.play(newUrl, songInfo.value.name || 'CeruMusic').then(() => {
-        setTimeout(async () => {
-          const pos = await dlnaStore.getPosition()
-          if (pos && typeof pos === 'number') {
-            invoke('player__seek', { position: pos })
-          }
-          invoke('player__resume')
-        }, 1500)
-      })
+  async (newUrl) => {
+    const token = ++dlnaHandoffToken
+    const deviceUsn = dlnaStore.currentDevice?.usn
+    if (!deviceUsn || !newUrl) return
+    const generation = dlnaDeviceGeneration
+    activeDlnaHandoffToken = token
+    dlnaResumeRequested = Audio.value.isPlay
+    try {
+      if (!await setLocalPlayState(
+        false,
+        () => isCurrentHandoff(token, generation, deviceUsn, newUrl)
+      )) return
+      await dlnaStore.play(newUrl, songInfo.value.name || 'CeruMusic')
+      if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      const positionInfo = await dlnaStore.getPosition()
+      if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      if (positionInfo.duration > 0) controlAudio.setDuration(positionInfo.duration)
+      await invoke('player__seek', { position: positionInfo.position })
+      if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      if (dlnaResumeRequested) {
+        if (!await setLocalPlayState(
+          true,
+          () => isCurrentHandoff(token, generation, deviceUsn, newUrl)
+        )) return
+      } else {
+        await dlnaStore.pause()
+        if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      }
+    } catch (error) {
+      if (!isCurrentHandoff(token, generation, deviceUsn, newUrl)) return
+      dlnaStore.selectDevice(null)
+      console.error('DLNA track handoff failed', error)
+    } finally {
+      if (activeDlnaHandoffToken === token) activeDlnaHandoffToken = null
     }
   }
 )
 
 watch(
   () => Audio.value.isPlay,
-  (isPlay) => {
-    if (dlnaStore.currentDevice) {
-      if (isPlay) dlnaStore.resume()
-      else dlnaStore.pause()
+  async (isPlay) => {
+    if (expectedLocalPlayState === isPlay) {
+      expectedLocalPlayState = null
+      if (!isPlay && activeDlnaHandoffToken !== null && dlnaResumeRequested) {
+        expectedLocalPlayState = true
+        Audio.value.isPlay = true
+      }
+      return
+    }
+    expectedLocalPlayState = null
+    dlnaResumeRequested = isPlay
+    if (activeDlnaHandoffToken !== null) return
+    const deviceUsn = dlnaStore.currentDevice?.usn
+    if (deviceUsn) {
+      const generation = dlnaDeviceGeneration
+      try {
+        if (isPlay) await dlnaStore.resume()
+        else await dlnaStore.pause()
+        if (!isCurrentDlnaDevice(generation, deviceUsn)) return
+      } catch (error) {
+        if (isCurrentDlnaDevice(generation, deviceUsn)) dlnaStore.selectDevice(null)
+        console.error('DLNA play state sync failed', error)
+      }
     }
   }
 )
 
 watch(
   () => Audio.value.volume,
-  (newVol) => {
-    if (dlnaStore.currentDevice) {
-      dlnaStore.setVolume(newVol)
+  async (newVol) => {
+    const deviceUsn = dlnaStore.currentDevice?.usn
+    if (deviceUsn) {
+      const generation = dlnaDeviceGeneration
+      try {
+        await dlnaStore.setVolume(newVol)
+        if (!isCurrentDlnaDevice(generation, deviceUsn)) return
+      } catch (error) {
+        if (isCurrentDlnaDevice(generation, deviceUsn)) dlnaStore.selectDevice(null)
+        console.error('DLNA volume sync failed', error)
+      }
     }
   }
 )
@@ -330,7 +430,7 @@ function globalControls(e: Event) {
   if (name === 'toggleFullPlay') {
     toggleFullPlay()
   } else if (name === 'toggle') {
-    togglePlayPause()
+    handleTogglePlayPause()
   } else if (name === 'playPrev') {
     playPrevious()
   } else if (name === 'playNext') {
@@ -624,25 +724,8 @@ const handleProgressClick = (event: MouseEvent) => {
   // 更新临时进度值，使UI立即响应
   tempProgressPercentage.value = percentage
 
-  const wasPlaying = Audio.value.isPlay
   const newTime = (percentage / 100) * Audio.value.duration
-  if (dlnaStore.currentDevice) {
-    invoke('player__pause')
-    dlnaStore.seek(newTime).then(() => {
-      seekTo(newTime)
-      setTimeout(async () => {
-        if (wasPlaying) {
-          const position = await dlnaStore.getPosition()
-          if (position && typeof position === 'number') {
-            invoke('player__seek', { position })
-          }
-          invoke('player__resume')
-        }
-      }, 1000)
-    })
-  } else {
-    seekTo(newTime)
-  }
+  seekTo(newTime)
 }
 
 const handleProgressDragMove = (event: MouseEvent) => {
@@ -671,26 +754,8 @@ const handleProgressDragEnd = (event: MouseEvent) => {
   const rect = progressRef.value.getBoundingClientRect()
   const offsetX = Math.max(0, Math.min(event.clientX - rect.left, rect.width))
   const percentage = (offsetX / rect.width) * 100
-  const wasPlaying = Audio.value.isPlay
   const newTime = (percentage / 100) * Audio.value.duration
-
-  if (dlnaStore.currentDevice) {
-    invoke('player__pause')
-    dlnaStore.seek(newTime).then(() => {
-      seekTo(newTime)
-      setTimeout(async () => {
-        if (wasPlaying) {
-          const position = await dlnaStore.getPosition()
-          if (position && typeof position === 'number') {
-            invoke('player__seek', { position })
-          }
-          invoke('player__resume')
-        }
-      }, 1000)
-    })
-  } else {
-    seekTo(newTime)
-  }
+  seekTo(newTime)
 
   isDraggingProgress.value = false
   window.removeEventListener('mousemove', handleProgressDragMove)
@@ -742,14 +807,7 @@ const handleProgressTouchEnd = () => {
   if (!isDraggingProgress.value) return
   const percentage = tempProgressPercentage.value
   const newTime = (percentage / 100) * Audio.value.duration
-  if (dlnaStore.currentDevice) {
-    invoke('player__pause')
-    dlnaStore.seek(newTime).then(() => {
-      seekTo(newTime)
-    })
-  } else {
-    seekTo(newTime)
-  }
+  seekTo(newTime)
   isDraggingProgress.value = false
 }
 
@@ -846,6 +904,8 @@ watch(showFullPlay, (val) => {
 })
 
 onBeforeUnmount(() => {
+  dlnaDeviceGeneration += 1
+  dlnaHandoffToken += 1
   globalPlayStatus.setFullPlayOpen(false)
 })
 </script>
@@ -963,7 +1023,7 @@ onBeforeUnmount(() => {
         <button
           class="control-btn play-btn"
           :disabled="isLoadingSong"
-          @click.stop="() => !isLoadingSong && togglePlayPause()"
+          @click.stop="() => !isLoadingSong && handleTogglePlayPause()"
         >
           <transition name="fade" mode="out-in">
             <div v-if="isLoadingSong" key="loading" class="loading-spinner play-loading"></div>
@@ -1003,7 +1063,7 @@ onBeforeUnmount(() => {
           <button
             class="control-btn play-btn"
             :disabled="isLoadingSong"
-            @click.stop="() => !isLoadingSong && togglePlayPause()"
+            @click.stop="() => !isLoadingSong && handleTogglePlayPause()"
           >
             <transition name="fade" mode="out-in">
               <div v-if="isLoadingSong" key="loading" class="loading-spinner play-loading"></div>

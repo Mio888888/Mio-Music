@@ -1,6 +1,21 @@
 import type playList from './playList'
 
-export type AudioEventCallback = () => void
+export interface PlayerSnapshotPayload {
+  state?: string
+  position?: number
+  duration?: number
+  volume?: number
+  primarySlot?: AudioSlot
+  url?: string
+  isPlaying?: boolean
+}
+
+export interface PlayerSnapshotResult {
+  success?: boolean
+  data?: PlayerSnapshotPayload
+}
+
+export type AudioEventCallback = (payload?: PlayerSnapshotPayload) => void
 export type AudioEventType = 'ended' | 'seeked' | 'timeupdate' | 'play' | 'pause' | 'error' | 'canplay' | 'slotSwap'
 export type AudioSlot = 'A' | 'B'
 

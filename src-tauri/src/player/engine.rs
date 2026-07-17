@@ -797,11 +797,136 @@ struct CrossfadeState {
     duration_ms: u64,
 }
 
+fn cancel_crossfade(crossfade: &mut Option<CrossfadeState>) -> bool {
+    crossfade.take().is_some()
+}
+
+fn clear_slot<T>(slot: AudioSlot, primary: &mut Option<T>, secondary: &mut Option<T>) {
+    match slot {
+        AudioSlot::A => *primary = None,
+        AudioSlot::B => *secondary = None,
+    }
+}
+
 // ==================== 预加载/异步播放结果 ====================
 
-enum AsyncPipelineResult {
+struct AsyncPipelineResult {
+    generation: u64,
+    outcome: AsyncPipelineOutcome,
+}
+
+enum AsyncPipelineOutcome {
     Ready(SlotPipeline),
     Error(String),
+}
+
+#[derive(Default)]
+struct PipelineGenerations {
+    play: u64,
+    preload: u64,
+}
+
+impl PipelineGenerations {
+    fn next_play(&mut self) -> u64 {
+        self.play = self.play.wrapping_add(1);
+        self.play
+    }
+
+    fn next_preload(&mut self) -> u64 {
+        self.preload = self.preload.wrapping_add(1);
+        self.preload
+    }
+
+    fn invalidate_slot(&mut self, slot: AudioSlot) {
+        match slot {
+            AudioSlot::A => {
+                self.next_play();
+            }
+            AudioSlot::B => {
+                self.next_preload();
+            }
+        }
+    }
+}
+
+fn is_current_generation(result_generation: u64, current_generation: u64) -> bool {
+    result_generation == current_generation
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_stale_play_result() {
+        assert!(!is_current_generation(1, 2));
+        assert!(is_current_generation(2, 2));
+    }
+
+    #[test]
+    fn play_and_preload_generations_are_independent() {
+        let mut generations = PipelineGenerations::default();
+        let play = generations.next_play();
+        let preload = generations.next_preload();
+
+        assert_eq!(play, 1);
+        assert_eq!(preload, 1);
+    }
+
+    #[test]
+    fn stopping_secondary_invalidates_only_preload_generation() {
+        let mut generations = PipelineGenerations::default();
+        let play = generations.next_play();
+        let preload = generations.next_preload();
+
+        generations.invalidate_slot(AudioSlot::B);
+
+        assert_eq!(generations.play, play);
+        assert_eq!(generations.preload, preload + 1);
+    }
+
+    #[test]
+    fn cancel_crossfade_removes_pending_swap() {
+        let mut crossfade = Some(CrossfadeState {
+            active: true,
+            start: Instant::now(),
+            duration_ms: 1,
+        });
+
+        assert!(cancel_crossfade(&mut crossfade));
+
+        assert!(crossfade.is_none());
+    }
+
+    #[test]
+    fn stopping_secondary_preserves_primary() {
+        let mut primary = Some("primary");
+        let mut secondary = Some("secondary");
+
+        clear_slot(AudioSlot::B, &mut primary, &mut secondary);
+
+        assert_eq!(primary, Some("primary"));
+        assert_eq!(secondary, None);
+    }
+
+    #[test]
+    fn snapshot_fields_serialize_as_camel_case() {
+        let snapshot = PlayerSnapshot {
+            state: PlaybackState::Stopped,
+            position: 0.0,
+            duration: 0.0,
+            volume: 80.0,
+            primary_slot: AudioSlot::A,
+            url: String::new(),
+            is_playing: false,
+        };
+        let value = serde_json::to_value(snapshot).expect("snapshot should serialize");
+
+        assert!(value.get("primarySlot").is_some());
+        assert!(value.get("isPlaying").is_some());
+        assert!(value.get("primary_slot").is_none());
+        assert!(value.get("is_playing").is_none());
+    }
 }
 
 // ==================== 播放引擎 ====================
@@ -823,6 +948,7 @@ pub struct PlayerEngine {
     // 预加载通道
     preload_tx: std::sync::mpsc::Sender<AsyncPipelineResult>,
     preload_rx: std::sync::mpsc::Receiver<AsyncPipelineResult>,
+    pipeline_generations: PipelineGenerations,
     // 无缝换曲配置
     crossfade_duration_ms: u64,
     auto_crossfade_enabled: bool,
@@ -858,6 +984,7 @@ impl PlayerEngine {
             play_rx,
             preload_tx,
             preload_rx,
+            pipeline_generations: PipelineGenerations::default(),
             crossfade_duration_ms: 3000,
             auto_crossfade_enabled: false,
             ended_emitted: false,
@@ -890,8 +1017,9 @@ impl PlayerEngine {
         _slot: Option<AudioSlot>,
         _cache_key: Option<String>,
     ) -> Result<(), String> {
+        let generation = self.pipeline_generations.next_play();
         self.primary = None;
-        self.secondary = None;
+        self.clear_secondary();
         self.crossfade = None;
         self.ended_emitted = false;
 
@@ -905,18 +1033,18 @@ impl PlayerEngine {
         let is_http = url.starts_with("http://") || url.starts_with("https://");
 
         std::thread::spawn(move || {
-            let result = if is_http {
+            let outcome = if is_http {
                 match stream_to_temp(&url) {
                     Ok((path, state)) => {
                         match SlotPipeline::from_spool(&stream_handle, &path, state, &url, volume) {
                             Ok(pipeline) => {
                                 pipeline.apply_eq_settings(&eq_settings);
-                                AsyncPipelineResult::Ready(pipeline)
+                                AsyncPipelineOutcome::Ready(pipeline)
                             }
-                            Err(e) => AsyncPipelineResult::Error(e),
+                            Err(e) => AsyncPipelineOutcome::Error(e),
                         }
                     }
-                    Err(e) => AsyncPipelineResult::Error(e),
+                    Err(e) => AsyncPipelineOutcome::Error(e),
                 }
             } else {
                 match resolve_audio_file(&url) {
@@ -924,15 +1052,18 @@ impl PlayerEngine {
                         match SlotPipeline::from_file(&stream_handle, &path, &url, volume) {
                             Ok(pipeline) => {
                                 pipeline.apply_eq_settings(&eq_settings);
-                                AsyncPipelineResult::Ready(pipeline)
+                                AsyncPipelineOutcome::Ready(pipeline)
                             }
-                            Err(e) => AsyncPipelineResult::Error(e),
+                            Err(e) => AsyncPipelineOutcome::Error(e),
                         }
                     }
-                    Err(e) => AsyncPipelineResult::Error(e),
+                    Err(e) => AsyncPipelineOutcome::Error(e),
                 }
             };
-            let _ = tx.send(result);
+            let _ = tx.send(AsyncPipelineResult {
+                generation,
+                outcome,
+            });
         });
         Ok(())
     }
@@ -951,14 +1082,17 @@ impl PlayerEngine {
         self.emit_state();
     }
 
-    pub fn stop_slot(&mut self, _slot: AudioSlot) {
-        self.primary = None;
+    pub fn stop_slot(&mut self, slot: AudioSlot) {
+        clear_slot(slot, &mut self.primary, &mut self.secondary);
+        self.pipeline_generations.invalidate_slot(slot);
+        self.cancel_active_crossfade();
         self.emit_state();
     }
 
     pub fn stop_all(&mut self) {
         self.primary = None;
-        self.secondary = None;
+        self.pipeline_generations.next_play();
+        self.clear_secondary();
         self.emit_state();
     }
 
@@ -997,14 +1131,13 @@ impl PlayerEngine {
             return;
         }
         let handle = self.stream_handle.as_ref().unwrap();
-        let new_pipeline =
-            match Self::build_pipeline_symphonia(handle, &file_path, &url, volume) {
-                Ok(p) => p,
-                Err(e) => {
-                    eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
-                    return;
-                }
-            };
+        let new_pipeline = match Self::build_pipeline_symphonia(handle, &file_path, &url, volume) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[PlayerEngine] symphonia rebuild failed: {}", e);
+                return;
+            }
+        };
 
         // 在新管线上应用全局 EQ 快照并 seek
         new_pipeline.apply_eq_settings(&self.eq_settings);
@@ -1069,6 +1202,7 @@ impl PlayerEngine {
     }
 
     pub fn crossfade_to(&mut self, url: &str, duration_ms: u64) -> Result<(), String> {
+        self.pipeline_generations.next_preload();
         let file_path = resolve_audio_file(url)?;
         self.ensure_stream_handle()?;
         let handle = self.stream_handle.as_ref().unwrap();
@@ -1125,11 +1259,12 @@ impl PlayerEngine {
 
     /// 异步预加载：在后台线程下载 + 解码，完成后通过 channel 送回
     pub fn preload(&mut self, url: String, cache_key: Option<String>) {
-        self.secondary = None;
+        self.clear_secondary();
         self.start_preload_job(url, cache_key);
     }
 
     fn start_preload_job(&mut self, url: String, cache_key: Option<String>) {
+        let generation = self.pipeline_generations.next_preload();
         let stream_handle = match self.ensure_stream_handle() {
             Ok(()) => self.stream_handle.clone().unwrap(),
             Err(_) => return,
@@ -1146,17 +1281,20 @@ impl PlayerEngine {
                 cache_key.as_deref(),
                 cache_max_size,
             );
-            let result = match file_path {
+            let outcome = match file_path {
                 Ok(path) => match SlotPipeline::from_file_paused(&stream_handle, &path, &url) {
                     Ok(pipeline) => {
                         pipeline.apply_eq_settings(&eq_settings);
-                        AsyncPipelineResult::Ready(pipeline)
+                        AsyncPipelineOutcome::Ready(pipeline)
                     }
-                    Err(e) => AsyncPipelineResult::Error(e),
+                    Err(e) => AsyncPipelineOutcome::Error(e),
                 },
-                Err(e) => AsyncPipelineResult::Error(e),
+                Err(e) => AsyncPipelineOutcome::Error(e),
             };
-            let _ = tx.send(result);
+            let _ = tx.send(AsyncPipelineResult {
+                generation,
+                outcome,
+            });
         });
     }
 
@@ -1211,8 +1349,21 @@ impl PlayerEngine {
     /// 清除 secondary slot，释放内存
     pub fn clear_secondary(&mut self) {
         self.secondary = None;
-        // 排空 channel 中残留的预加载结果
-        while self.preload_rx.try_recv().is_ok() {}
+        self.pipeline_generations.next_preload();
+        self.cancel_active_crossfade();
+    }
+
+    fn cancel_active_crossfade(&mut self) {
+        if !cancel_crossfade(&mut self.crossfade) {
+            return;
+        }
+        if let Some(ref primary) = self.primary {
+            primary.set_volume(self.volume / 100.0);
+        }
+        if let Some(ref secondary) = self.secondary {
+            secondary.pause();
+            secondary.set_volume(0.0);
+        }
     }
 
     /// 配置无缝换曲参数
@@ -1264,16 +1415,20 @@ impl PlayerEngine {
         }
         self.poll_tick = self.poll_tick.wrapping_add(1);
 
-        // 检查异步播放结果（非阻塞）
-        if let Ok(result) = self.play_rx.try_recv() {
-            match result {
-                AsyncPipelineResult::Ready(pipeline) => {
+        // 排空异步播放结果，只接受当前播放请求的结果。
+        while let Ok(result) = self.play_rx.try_recv() {
+            if !is_current_generation(result.generation, self.pipeline_generations.play) {
+                continue;
+            }
+
+            match result.outcome {
+                AsyncPipelineOutcome::Ready(pipeline) => {
                     pipeline.apply_eq_settings(&self.eq_settings);
                     self.primary = Some(pipeline);
                     self.ended_emitted = false;
                     self.emit_state();
                 }
-                AsyncPipelineResult::Error(e) => {
+                AsyncPipelineOutcome::Error(e) => {
                     let _ = self
                         .app_handle
                         .emit("player:error", serde_json::json!({ "error": e }));
@@ -1281,17 +1436,21 @@ impl PlayerEngine {
             }
         }
 
-        // 检查预加载结果（非阻塞）
-        if let Ok(result) = self.preload_rx.try_recv() {
-            match result {
-                AsyncPipelineResult::Ready(pipeline) => {
+        // 排空预加载结果，只接受当前预加载请求的结果。
+        while let Ok(result) = self.preload_rx.try_recv() {
+            if !is_current_generation(result.generation, self.pipeline_generations.preload) {
+                continue;
+            }
+
+            match result.outcome {
+                AsyncPipelineOutcome::Ready(pipeline) => {
                     pipeline.apply_eq_settings(&self.eq_settings);
                     self.secondary = Some(pipeline);
                     let _ = self
                         .app_handle
                         .emit("player:preload_ready", serde_json::json!({}));
                 }
-                AsyncPipelineResult::Error(e) => {
+                AsyncPipelineOutcome::Error(e) => {
                     eprintln!("预加载失败: {e}");
                 }
             }
@@ -1395,9 +1554,7 @@ impl PlayerEngine {
         if progress >= 1.0 {
             self.primary = self.secondary.take();
             self.ended_emitted = false;
-            let _ = self
-                .app_handle
-                .emit("player:crossfade_swap", serde_json::json!({}));
+            self.emit_snapshot("player:crossfade_swap");
             done = true;
         }
 
@@ -1407,9 +1564,13 @@ impl PlayerEngine {
     }
 
     fn emit_state(&self) {
+        self.emit_snapshot("player:state");
+    }
+
+    fn emit_snapshot(&self, event: &str) {
         let s = self.snapshot();
         let _ = self.app_handle.emit(
-            "player:state",
+            event,
             serde_json::json!({
                 "state": format!("{:?}", s.state), "position": s.position, "duration": s.duration,
                 "volume": s.volume, "url": s.url, "isPlaying": s.is_playing,

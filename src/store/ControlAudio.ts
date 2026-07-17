@@ -10,6 +10,7 @@ import type {
   AudioEventType,
   AudioSlot,
   AudioSubscriber,
+  PlayerSnapshotPayload,
   UnsubscribeFunction,
   ControlAudioState
 } from '../types/audio'
@@ -42,9 +43,9 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
     }
   }
 
-  const publish = (eventType: AudioEventType): void => {
+  const publish = (eventType: AudioEventType, payload?: PlayerSnapshotPayload): void => {
     subscribers[eventType].forEach((subscriber) => {
-      try { subscriber.callback() } catch (error) { console.error(`音频事件回调执行错误 [${eventType}]:`, error) }
+      try { subscriber.callback(payload) } catch (error) { console.error(`音频事件回调执行错误 [${eventType}]:`, error) }
     })
   }
 
@@ -94,8 +95,8 @@ export const ControlAudioStore = defineStore('controlAudio', () => {
       publish('ended')
     })
 
-    const un4 = await listen('player:crossfade_swap', () => {
-      publish('slotSwap')
+    const un4 = await listen<PlayerSnapshotPayload>('player:crossfade_swap', (event) => {
+      publish('slotSwap', event.payload)
     })
 
     const un5 = await listen('player:error', (event: any) => {

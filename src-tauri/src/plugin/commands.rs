@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
-use crate::plugin::manager::PluginManager;
+use crate::network::{HttpPolicy, RestrictedHttpClient};
 use crate::plugin::converter;
+use crate::plugin::manager::PluginManager;
 use serde_json::Value;
 use tauri::State;
 
@@ -25,14 +26,16 @@ fn payload(args: &Value) -> Value {
 }
 
 fn require_str(payload: &Value, key: &str) -> Result<String, String> {
-    payload.get(key)
+    payload
+        .get(key)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .ok_or_else(|| format!("缺少参数: {}", key))
 }
 
 fn opt_str(payload: &Value, key: &str) -> Option<String> {
-    payload.get(key)
+    payload
+        .get(key)
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -51,23 +54,19 @@ pub async fn plugin__get_list(pm: State<'_, PluginManager>) -> ApiResult {
 }
 
 #[tauri::command]
-pub async fn plugin__add(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__add(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_code = require_str(&p, "pluginCode")?;
     let plugin_name = require_str(&p, "pluginName")?;
     let target_plugin_id = opt_str(&p, "targetPluginId");
-    let result = pm.add_plugin(&plugin_code, &plugin_name, target_plugin_id).await?;
+    let result = pm
+        .add_plugin(&plugin_code, &plugin_name, target_plugin_id)
+        .await?;
     ok(serde_json::to_value(result).unwrap_or_default())
 }
 
 #[tauri::command]
-pub async fn plugin__uninstall(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__uninstall(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     pm.uninstall_plugin(&plugin_id).await?;
@@ -75,46 +74,50 @@ pub async fn plugin__uninstall(
 }
 
 #[tauri::command]
-pub async fn plugin__get_info(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_info(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     let plugins = pm.get_plugins_list().await;
-    let plugin = plugins.iter().find(|pl| pl.plugin_id == plugin_id)
+    let plugin = plugins
+        .iter()
+        .find(|pl| pl.plugin_id == plugin_id)
         .ok_or_else(|| format!("插件 {} 未找到", plugin_id))?;
     ok(serde_json::to_value(plugin).unwrap_or_default())
 }
 
 #[tauri::command]
-pub async fn plugin__call_method(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__call_method(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     let method = require_str(&p, "method")?;
-    let args_json = p.get("argsJson")
-        .and_then(|v| v.as_str())
-        .unwrap_or("[]");
+    let args_json = p.get("argsJson").and_then(|v| v.as_str()).unwrap_or("[]");
     let result = pm.call_plugin_method(&plugin_id, &method, args_json)?;
     let parsed: Value = serde_json::from_str(&result).unwrap_or(Value::String(result));
     ok(parsed)
 }
 
 #[tauri::command]
-pub async fn plugin__download_and_add(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__download_and_add(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let url = require_str(&p, "url")?;
     let plugin_type = require_str(&p, "pluginType")?;
     let target_plugin_id = opt_str(&p, "targetPluginId");
 
-    let response = reqwest::get(&url).await.map_err(|e| format!("下载失败: {}", e))?;
-    let plugin_code = response.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
+    let response = RestrictedHttpClient::new(HttpPolicy::public_proxy())
+        .fetch_bytes(
+            &url,
+            5 * 1024 * 1024,
+            &[
+                "application/javascript",
+                "application/x-javascript",
+                "text/javascript",
+                "text/*",
+            ],
+        )
+        .await
+        .map_err(|error| format!("下载失败: {error}"))?;
+    let plugin_code = String::from_utf8(response.bytes)
+        .map_err(|error| format!("插件内容不是 UTF-8 文本: {error}"))?;
 
     if plugin_type == "cr" && !plugin_code.to_lowercase().contains("cerumusic") {
         return Err("澜音插件格式校验失败".into());
@@ -130,17 +133,16 @@ pub async fn plugin__download_and_add(
     };
 
     let file_name = format!("downloaded_{}", chrono::Utc::now().timestamp_millis());
-    let result = pm.add_plugin(&plugin_code, &file_name, target_plugin_id).await?;
+    let result = pm
+        .add_plugin(&plugin_code, &file_name, target_plugin_id)
+        .await?;
     ok(serde_json::to_value(result).unwrap_or_default())
 }
 
 // ==================== New commands ====================
 
 #[tauri::command]
-pub async fn plugin__get_type(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_type(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     match pm.get_plugin_type(&plugin_id).await {
@@ -150,10 +152,7 @@ pub async fn plugin__get_type(
 }
 
 #[tauri::command]
-pub async fn plugin__get_log(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_log(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     let logs = pm.get_plugin_log(&plugin_id).await;
@@ -161,10 +160,7 @@ pub async fn plugin__get_log(
 }
 
 #[tauri::command]
-pub async fn plugin__get_config_schema(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_config_schema(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     match pm.get_config_schema(&plugin_id).await {
@@ -174,10 +170,7 @@ pub async fn plugin__get_config_schema(
 }
 
 #[tauri::command]
-pub async fn plugin__get_config(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_config(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     match pm.get_config(&plugin_id).await {
@@ -187,10 +180,7 @@ pub async fn plugin__get_config(
 }
 
 #[tauri::command]
-pub async fn plugin__save_config(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__save_config(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     let config = p.get("config").cloned().unwrap_or(serde_json::json!({}));
@@ -201,10 +191,7 @@ pub async fn plugin__save_config(
 }
 
 #[tauri::command]
-pub async fn plugin__test_connection(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__test_connection(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     match pm.test_connection(&plugin_id).await {
@@ -214,10 +201,7 @@ pub async fn plugin__test_connection(
 }
 
 #[tauri::command]
-pub async fn plugin__get_code(
-    pm: State<'_, PluginManager>,
-    args: Value,
-) -> ApiResult {
+pub async fn plugin__get_code(pm: State<'_, PluginManager>, args: Value) -> ApiResult {
     let p = payload(&args);
     let plugin_id = require_str(&p, "pluginId")?;
     match pm.get_plugin_code(&plugin_id) {
@@ -237,7 +221,8 @@ pub async fn plugin__select_and_add(
     let p = payload(&args);
     let plugin_type = require_str(&p, "pluginType")?;
 
-    let file_path = app.dialog()
+    let file_path = app
+        .dialog()
         .file()
         .add_filter("插件文件", &["js", "txt"])
         .blocking_pick_file();
@@ -247,11 +232,10 @@ pub async fn plugin__select_and_add(
         None => return ok(serde_json::json!({ "canceled": true })),
     };
 
-    let path_str = path.as_path()
-        .ok_or_else(|| "无效文件路径".to_string())?;
+    let path_str = path.as_path().ok_or_else(|| "无效文件路径".to_string())?;
 
-    let plugin_code = std::fs::read_to_string(path_str)
-        .map_err(|e| format!("读取文件失败: {}", e))?;
+    let plugin_code =
+        std::fs::read_to_string(path_str).map_err(|e| format!("读取文件失败: {}", e))?;
 
     if plugin_type == "cr" && !plugin_code.to_lowercase().contains("cerumusic") {
         return Err("澜音插件格式校验失败".into());
@@ -266,7 +250,8 @@ pub async fn plugin__select_and_add(
         plugin_code
     };
 
-    let file_name = path_str.file_stem()
+    let file_name = path_str
+        .file_stem()
         .and_then(|s: &std::ffi::OsStr| s.to_str())
         .unwrap_or("imported_plugin")
         .to_string();

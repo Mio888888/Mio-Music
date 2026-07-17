@@ -19,6 +19,17 @@ import { rewriteImageUrls } from '@/utils/imageProxy'
 const listeners = new Map<string, Set<UnlistenFn>>()
 const listenerByHandler = new Map<string, Map<Function, Set<UnlistenFn>>>()
 
+interface DlnaApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+interface DlnaPositionInfo {
+  position: number
+  duration: number
+}
+
 // ============================================================
 // IPC Response Cache — avoids redundant IPC calls for same params
 // ============================================================
@@ -250,20 +261,20 @@ const api = {
     addTask: (songInfo: any, url: string, filePath: string, pluginId?: string, quality?: string, priority?: number) =>
       ipcInvoke('download__add_task', { songInfo, url, filePath, pluginId, quality, priority }),
     getTasks: () => ipcInvoke('download__get_tasks'),
-    pauseTask: (taskId: string) => ipcInvoke('download__pause_task', taskId),
-    resumeTask: (taskId: string) => ipcInvoke('download__resume_task', taskId),
-    cancelTask: (taskId: string) => ipcInvoke('download__cancel_task', taskId),
+    pauseTask: (taskId: string) => ipcInvoke('download__pause_task', { taskId }),
+    resumeTask: (taskId: string) => ipcInvoke('download__resume_task', { taskId }),
+    cancelTask: (taskId: string) => ipcInvoke('download__cancel_task', { taskId }),
     deleteTask: (taskId: string, deleteFile: boolean = false) =>
-      ipcInvoke('download__delete_task', { task_id: taskId, delete_file: deleteFile }),
+      ipcInvoke('download__delete_task', { taskId, deleteFile }),
     pauseAllTasks: () => ipcInvoke('download__pause_all_tasks'),
     resumeAllTasks: () => ipcInvoke('download__resume_all_tasks'),
-    retryTask: (taskId: string) => ipcInvoke('download__retry_task', taskId),
+    retryTask: (taskId: string) => ipcInvoke('download__retry_task', { taskId }),
     setMaxConcurrent: (max: number) => ipcInvoke('download__set_max_concurrent', { max }),
     getMaxConcurrent: () => ipcInvoke('download__get_max_concurrent'),
     clearTasks: (type: 'queue' | 'completed' | 'failed' | 'all') =>
-      ipcInvoke('download__clear_tasks', { task_type: type }),
+      ipcInvoke('download__clear_tasks', { taskType: type }),
     validateFiles: () => ipcInvoke('download__validate_files'),
-    openFileLocation: (filePath: string) => ipcInvoke('download__open_file_location', { file_path: filePath }),
+    openFileLocation: (filePath: string) => ipcInvoke('download__open_file_location', { filePath }),
     onTaskAdded: (callback: (event: any, task: any) => void) => {
       const p = ipcOn('download:task-added', callback)
       return () => {
@@ -425,7 +436,7 @@ const api = {
   // Local music
   localMusic: {
     selectDirs: () => ipcInvoke('local_music__select_dirs'),
-    scan: (dirs: string[], skipHidden: boolean = true) => ipcInvoke('local_music__scan', { dirs, skip_hidden: skipHidden }),
+    scan: (dirs: string[], skipHidden: boolean = true) => ipcInvoke('local_music__scan', { dirs, skipHidden }),
     writeTags: (filePath: string, songInfo: any, tagWriteOptions: any) =>
       ipcInvoke('local_music__write_tags', { filePath, songInfo, tagWriteOptions }),
     getDirs: () => ipcInvoke('dir__get_all'),
@@ -532,7 +543,7 @@ const api = {
     stop: () => ipcInvoke('dlna__stop'),
     seek: (seconds: number) => ipcInvoke('dlna__seek', { seconds }),
     setVolume: (volume: number) => ipcInvoke('dlna__set_volume', { volume }),
-    getPosition: () => ipcInvoke('dlna__get_position')
+    getPosition: (): Promise<DlnaApiResponse<DlnaPositionInfo>> => ipcInvoke('dlna__get_position')
   },
 
   // S3 Backup & Restore

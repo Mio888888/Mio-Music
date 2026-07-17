@@ -39,8 +39,8 @@ onMounted(async () => {
   unsubscribeEnded = audioStore.subscribe('ended', () => {
     playNext()
   })
-  unsubscribeSlotSwap = audioStore.subscribe('slotSwap', () => {
-    onCrossfadeSwap()
+  unsubscribeSlotSwap = audioStore.subscribe('slotSwap', (payload) => {
+    onCrossfadeSwap(payload)
     syncAndroidCurrentPlaybackState()
   })
   document.addEventListener('visibilitychange', handleVisibilityChange)

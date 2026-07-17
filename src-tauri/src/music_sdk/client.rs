@@ -1,12 +1,14 @@
+use once_cell::sync::Lazy;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use once_cell::sync::Lazy;
 
 #[allow(dead_code)]
 static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
     Client::builder()
         .user_agent("Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36")
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
         .gzip(true)
         .brotli(true)
         .build()
@@ -280,8 +282,15 @@ pub struct CommentItem {
 
 /// Main entry point for SDK requests.
 /// Routes to the appropriate source handler based on the current source.
-pub async fn handle_request(method: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("kw").to_string();
+pub async fn handle_request(
+    method: &str,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let source = args
+        .get("source")
+        .and_then(|v| v.as_str())
+        .unwrap_or("kw")
+        .to_string();
     crate::music_sdk::sources::dispatch(&source, method, args).await
 }
 
@@ -290,47 +299,85 @@ const SEARCH_EXCLUDE: &[&str] = &["xm"];
 
 /// Search across all sources concurrently
 pub async fn search_music(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-    let singer = args.get("singer").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let singer = args
+        .get("singer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     let current_source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
     let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(25);
     let query = format!("{} {}", name, singer).trim().to_string();
 
-    let mut handles = Vec::new();
-    for src in ALL_SOURCES {
-        if *src == current_source || SEARCH_EXCLUDE.contains(src) { continue; }
-        let search_args = serde_json::json!({ "keyword": query, "page": 1, "limit": limit });
-        let src_str = src.to_string();
-        handles.push(tokio::spawn(async move {
-            crate::music_sdk::sources::dispatch(&src_str, "search", search_args).await.ok()
-        }));
-    }
-
-    let mut results = Vec::new();
-    for h in handles {
-        if let Ok(Some(res)) = h.await {
-            if let Some(list) = res.get("list").and_then(|v| v.as_array()) {
-                if !list.is_empty() {
-                    results.push(res);
-                }
+    let searches = ALL_SOURCES
+        .iter()
+        .filter(|source| **source != current_source && !SEARCH_EXCLUDE.contains(source))
+        .map(|source| {
+            let search_args = serde_json::json!({ "keyword": query, "page": 1, "limit": limit });
+            let source = (*source).to_string();
+            async move {
+                crate::music_sdk::sources::dispatch(&source, "search", search_args)
+                    .await
+                    .ok()
             }
-        }
-    }
-
+        });
+    let responses = tokio::time::timeout(
+        std::time::Duration::from_secs(35),
+        futures_util::future::join_all(searches),
+    )
+    .await
+    .map_err(|_| "跨源搜索超时".to_string())?;
+    let results: Vec<_> = responses
+        .into_iter()
+        .flatten()
+        .filter(|response| {
+            response
+                .get("list")
+                .and_then(|value| value.as_array())
+                .is_some_and(|list| !list.is_empty())
+        })
+        .collect();
     Ok(serde_json::json!(results))
 }
 
 /// Find matching songs across sources using fuzzy matching
 pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, String> {
-    let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-    let singer = args.get("singer").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-    let album_name = args.get("albumName").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
-    let interval = args.get("interval").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+    let name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let singer = args
+        .get("singer")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let album_name = args
+        .get("albumName")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    let interval = args
+        .get("interval")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim()
+        .to_string();
     let current_source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
 
     let lists = search_music(serde_json::json!({
         "name": name, "singer": singer, "source": current_source, "limit": 25
-    })).await?;
+    }))
+    .await?;
 
     let source_lists = match lists.as_array() {
         Some(arr) => arr,
@@ -338,10 +385,40 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
     };
 
     let filter_str = |s: &str| -> String {
-        s.chars().filter(|c| !c.is_whitespace() && !matches!(c, '\'' | '.' | ',' | '&' | '"' | '、' | '(' | ')' | '（' | '）' | '`' | '~' | '-' | '<' | '>' | '|' | '/' | ']' | '[' | '!' | '！')).collect::<String>().to_lowercase()
+        s.chars()
+            .filter(|c| {
+                !c.is_whitespace()
+                    && !matches!(
+                        c,
+                        '\'' | '.'
+                            | ','
+                            | '&'
+                            | '"'
+                            | '、'
+                            | '('
+                            | ')'
+                            | '（'
+                            | '）'
+                            | '`'
+                            | '~'
+                            | '-'
+                            | '<'
+                            | '>'
+                            | '|'
+                            | '/'
+                            | ']'
+                            | '['
+                            | '!'
+                            | '！'
+                    )
+            })
+            .collect::<String>()
+            .to_lowercase()
     };
     let sort_single = |singer: &str| -> String {
-        let parts: Vec<&str> = singer.split(&['、', '&', ';', '；', '/', ',', '，', '|'][..]).collect();
+        let parts: Vec<&str> = singer
+            .split(&['、', '&', ';', '；', '/', ',', '，', '|'][..])
+            .collect();
         if parts.len() > 1 {
             let mut sorted: Vec<String> = parts.iter().map(|s| s.trim().to_string()).collect();
             sorted.sort();
@@ -365,33 +442,43 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
     let f_interval = get_interval_secs(&interval);
 
     let is_eq_interval = |item_interval: i64| -> bool {
-        if f_interval == 0 || item_interval == 0 { return true; }
+        if f_interval == 0 || item_interval == 0 {
+            return true;
+        }
         (f_interval - item_interval).abs() < 5
     };
-    let is_includes_name = |item_name: &str| -> bool {
-        f_name.contains(item_name) || item_name.contains(&f_name)
-    };
+    let is_includes_name =
+        |item_name: &str| -> bool { f_name.contains(item_name) || item_name.contains(&f_name) };
     let is_includes_singer = |item_singer: &str| -> bool {
-        if f_singer.is_empty() { return true; }
+        if f_singer.is_empty() {
+            return true;
+        }
         f_singer.contains(item_singer) || item_singer.contains(&f_singer)
     };
-    let is_eq_album = |item_album: &str| -> bool {
-        f_album.is_empty() || f_album == item_album
-    };
+    let is_eq_album = |item_album: &str| -> bool { f_album.is_empty() || f_album == item_album };
 
     let mut all_items: Vec<serde_json::Value> = Vec::new();
 
     for source_result in source_lists {
-        let items = source_result.get("list").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+        let items = source_result
+            .get("list")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
         let mut matched: Option<serde_json::Value> = None;
 
         // Priority 1: exact name + singer match
         for item in &items {
             let item_name = filter_str(item.get("name").and_then(|v| v.as_str()).unwrap_or(""));
-            let item_singer = filter_str(&sort_single(item.get("singer").and_then(|v| v.as_str()).unwrap_or("")));
-            let item_interval = get_interval_secs(item.get("interval").and_then(|v| v.as_str()).unwrap_or(""));
+            let item_singer = filter_str(&sort_single(
+                item.get("singer").and_then(|v| v.as_str()).unwrap_or(""),
+            ));
+            let item_interval =
+                get_interval_secs(item.get("interval").and_then(|v| v.as_str()).unwrap_or(""));
 
-            if !is_eq_interval(item_interval) { continue; }
+            if !is_eq_interval(item_interval) {
+                continue;
+            }
             if item_name == f_name && is_includes_singer(&item_singer) {
                 matched = Some(item.clone());
                 break;
@@ -402,10 +489,15 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
         if matched.is_none() {
             for item in &items {
                 let item_name = filter_str(item.get("name").and_then(|v| v.as_str()).unwrap_or(""));
-                let item_singer = filter_str(&sort_single(item.get("singer").and_then(|v| v.as_str()).unwrap_or("")));
-                let item_interval = get_interval_secs(item.get("interval").and_then(|v| v.as_str()).unwrap_or(""));
+                let item_singer = filter_str(&sort_single(
+                    item.get("singer").and_then(|v| v.as_str()).unwrap_or(""),
+                ));
+                let item_interval =
+                    get_interval_secs(item.get("interval").and_then(|v| v.as_str()).unwrap_or(""));
 
-                if !is_eq_interval(item_interval) { continue; }
+                if !is_eq_interval(item_interval) {
+                    continue;
+                }
                 if item_singer == f_singer && is_includes_name(&item_name) {
                     matched = Some(item.clone());
                     break;
@@ -417,10 +509,16 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
         if matched.is_none() {
             for item in &items {
                 let item_name = filter_str(item.get("name").and_then(|v| v.as_str()).unwrap_or(""));
-                let item_singer = filter_str(&sort_single(item.get("singer").and_then(|v| v.as_str()).unwrap_or("")));
-                let item_album = filter_str(item.get("albumName").and_then(|v| v.as_str()).unwrap_or(""));
+                let item_singer = filter_str(&sort_single(
+                    item.get("singer").and_then(|v| v.as_str()).unwrap_or(""),
+                ));
+                let item_album =
+                    filter_str(item.get("albumName").and_then(|v| v.as_str()).unwrap_or(""));
 
-                if is_eq_album(&item_album) && is_includes_singer(&item_singer) && is_includes_name(&item_name) {
+                if is_eq_album(&item_album)
+                    && is_includes_singer(&item_singer)
+                    && is_includes_name(&item_name)
+                {
                     matched = Some(item.clone());
                     break;
                 }
@@ -441,7 +539,9 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
         let item = &all_items[idx];
         (
             filter_str(item.get("name").and_then(|v| v.as_str()).unwrap_or("")),
-            filter_str(&sort_single(item.get("singer").and_then(|v| v.as_str()).unwrap_or(""))),
+            filter_str(&sort_single(
+                item.get("singer").and_then(|v| v.as_str()).unwrap_or(""),
+            )),
             filter_str(item.get("albumName").and_then(|v| v.as_str()).unwrap_or("")),
             get_interval_secs(item.get("interval").and_then(|v| v.as_str()).unwrap_or("")),
         )
@@ -450,7 +550,9 @@ pub async fn find_music(args: serde_json::Value) -> Result<serde_json::Value, St
     // Priority sort passes
     #[allow(clippy::type_complexity)]
     let passes: Vec<Box<dyn Fn(&(String, String, String, i64)) -> bool>> = vec![
-        Box::new(|(n, s, _, i)| *n == f_name && *s == f_singer && (*i == f_interval || f_interval == 0)),
+        Box::new(|(n, s, _, i)| {
+            *n == f_name && *s == f_singer && (*i == f_interval || f_interval == 0)
+        }),
         Box::new(|(n, s, a, _)| *n == f_name && *s == f_singer && *a == f_album),
         Box::new(|(n, s, _, _)| *n == f_name && *s == f_singer),
         Box::new(|(n, _, _, i)| *n == f_name && (*i == f_interval || f_interval == 0)),

@@ -1,33 +1,36 @@
 mod audio_capture;
 mod audio_device;
-mod db;
 mod commands;
-mod music_sdk;
-mod local_music;
+mod db;
+mod dlna;
 mod download;
-mod plugin;
+mod local_music;
+mod music_sdk;
+mod network;
 mod player;
+mod plugin;
 
 #[cfg(target_os = "android")]
 static ANDROID_APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
 #[cfg(target_os = "android")]
-static MUSIC_SERVICE_CLASS: std::sync::OnceLock<jni::objects::GlobalRef> = std::sync::OnceLock::new();
+static MUSIC_SERVICE_CLASS: std::sync::OnceLock<jni::objects::GlobalRef> =
+    std::sync::OnceLock::new();
 
+use commands::hotkey_commands;
 use db::AppDb;
 use download::manager::DownloadManager;
-use plugin::manager::PluginManager;
 #[allow(unused_imports)]
 use player::SharedPlayer;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-#[cfg(desktop)]
-use tauri::Emitter;
-use tauri::http::{StatusCode, header};
-#[cfg(target_os = "macos")]
-use tauri::TitleBarStyle;
-use commands::hotkey_commands;
+use plugin::manager::PluginManager;
 use std::borrow::Cow;
 use std::sync::Mutex;
+use tauri::http::{header, StatusCode};
+#[cfg(desktop)]
+use tauri::Emitter;
+#[cfg(target_os = "macos")]
+use tauri::TitleBarStyle;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -57,6 +60,7 @@ pub fn run() {
             is_open: Mutex::new(false),
             is_locked: Mutex::new(false),
         })
+        .manage(dlna::DlnaManager::new())
         .register_asynchronous_uri_scheme_protocol("imgproxy", |_ctx, request, responder| {
             let uri = request.uri().to_string();
             let path = request.uri().path().to_string();
@@ -82,70 +86,33 @@ pub fn run() {
             }
 
             tauri::async_runtime::spawn(async move {
-                let client = match reqwest::Client::builder()
-                    .timeout(std::time::Duration::from_secs(15))
-                    .redirect(reqwest::redirect::Policy::limited(10))
-                    .build()
+                match crate::network::RestrictedHttpClient::new(
+                    crate::network::HttpPolicy::public_proxy(),
+                )
+                .fetch_bytes(&original_url, 20 * 1024 * 1024, &["image/*"])
+                .await
                 {
-                    Ok(c) => c,
-                    Err(e) => {
-                        responder.respond(
-                            tauri::http::Response::builder()
-                                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                .body(Cow::Owned(format!("client error: {e}").into_bytes()))
-                                .unwrap(),
-                        );
-                        return;
-                    }
-                };
-
-                let referer = original_url
-                    .split("://")
-                    .nth(1)
-                    .and_then(|h| h.split('/').next())
-                    .map(|h| format!("https://{h}"))
-                    .unwrap_or_default();
-
-                match client
-                    .get(&original_url)
-                    .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-                    .header("Accept", "image/*,*/*;q=0.8")
-                    .header("Referer", &referer)
-                    .header("Origin", &referer)
-                    .send()
-                    .await
-                {
-                    Ok(resp) => {
-                        let status = resp.status();
-                        let content_type = resp
-                            .headers()
+                    Ok(response) => {
+                        let content_type = response
+                            .headers
                             .get(header::CONTENT_TYPE)
                             .and_then(|v| v.to_str().ok())
                             .unwrap_or("image/jpeg")
                             .to_string();
-
-                        match resp.bytes().await {
-                            Ok(bytes) => responder.respond(
-                                tauri::http::Response::builder()
-                                    .status(status)
-                                    .header(header::CONTENT_TYPE, &content_type)
-                                    .header(header::CACHE_CONTROL, "public, max-age=86400")
-                                    .header("Access-Control-Allow-Origin", "*")
-                                    .body(Cow::Owned(bytes.to_vec()))
-                                    .unwrap(),
-                            ),
-                            Err(e) => responder.respond(
-                                tauri::http::Response::builder()
-                                    .status(StatusCode::BAD_GATEWAY)
-                                    .body(Cow::Owned(format!("read body error: {e}").into_bytes()))
-                                    .unwrap(),
-                            ),
-                        }
+                        responder.respond(
+                            tauri::http::Response::builder()
+                                .status(response.status)
+                                .header(header::CONTENT_TYPE, &content_type)
+                                .header(header::CACHE_CONTROL, "public, max-age=86400")
+                                .header("Access-Control-Allow-Origin", "*")
+                                .body(Cow::Owned(response.bytes))
+                                .unwrap(),
+                        );
                     }
-                    Err(e) => responder.respond(
+                    Err(error) => responder.respond(
                         tauri::http::Response::builder()
                             .status(StatusCode::BAD_GATEWAY)
-                            .body(Cow::Owned(format!("fetch error: {e}").into_bytes()))
+                            .body(Cow::Owned(format!("fetch error: {error}").into_bytes()))
                             .unwrap(),
                     ),
                 }
@@ -210,8 +177,8 @@ pub fn run() {
             {
                 use cocoa::appkit::{NSColor, NSWindow, NSWindowButton, NSWindowTitleVisibility};
                 use cocoa::base::{id, nil, YES};
-                use objc::{msg_send, sel, sel_impl};
                 use objc::runtime::Object;
+                use objc::{msg_send, sel, sel_impl};
 
                 unsafe fn hide_button(button: id) {
                     let _: () = msg_send![button as *mut Object, setHidden: YES];
@@ -308,31 +275,30 @@ pub fn run() {
                     .icon(app.default_window_icon().unwrap().clone())
                     .menu(&tray_menu)
                     .tooltip("Mio Music")
-                    .on_menu_event(|app_handle, event| {
-                        match event.id().as_ref() {
-                            "unlock" => {
-                                if let Some(window) = app_handle.get_webview_window("desktop-lyric") {
-                                    let _ = window.set_ignore_cursor_events(false);
-                                }
-                                let state = app_handle.state::<commands::DesktopLyricState>();
-                                if let Ok(mut locked) = state.is_locked.lock() {
-                                    *locked = false;
-                                }
-                                let _ = app_handle.emit("desktop-lyric-force-unlock", true);
+                    .on_menu_event(|app_handle, event| match event.id().as_ref() {
+                        "unlock" => {
+                            if let Some(window) = app_handle.get_webview_window("desktop-lyric") {
+                                let _ = window.set_ignore_cursor_events(false);
                             }
-                            "quit" => {
-                                app_handle.cleanup_before_exit();
-                                std::process::exit(0);
+                            let state = app_handle.state::<commands::DesktopLyricState>();
+                            if let Ok(mut locked) = state.is_locked.lock() {
+                                *locked = false;
                             }
-                            _ => {}
+                            let _ = app_handle.emit("desktop-lyric-force-unlock", true);
                         }
+                        "quit" => {
+                            app_handle.cleanup_before_exit();
+                            std::process::exit(0);
+                        }
+                        _ => {}
                     })
                     .on_tray_icon_event(|tray, event| {
                         if let tauri::tray::TrayIconEvent::Click {
                             button: tauri::tray::MouseButton::Left,
                             button_state: tauri::tray::MouseButtonState::Up,
                             ..
-                        } = event {
+                        } = event
+                        {
                             let app_handle = tray.app_handle();
                             if let Some(window) = app_handle.get_webview_window("main") {
                                 let _ = window.show();
@@ -497,6 +463,17 @@ pub fn run() {
             player::commands::player__set_seamless_config,
             player::commands::player__set_cache_config,
             player::commands::player__set_native_queue,
+            // DLNA / Screen casting
+            dlna::commands::dlna__start_search,
+            dlna::commands::dlna__stop_search,
+            dlna::commands::dlna__get_devices,
+            dlna::commands::dlna__play,
+            dlna::commands::dlna__pause,
+            dlna::commands::dlna__resume,
+            dlna::commands::dlna__stop,
+            dlna::commands::dlna__seek,
+            dlna::commands::dlna__set_volume,
+            dlna::commands::dlna__get_position,
             // S3 Backup
             commands::s3_commands::s3__test_connection,
             commands::s3_commands::s3__backup,
@@ -550,7 +527,9 @@ pub extern "system" fn Java_com_vant_Mio_Music_MainActivity_initAndroidContext(
         }
     }
 
-    unsafe { ndk_context::initialize_android_context(vm_ptr, activity_ptr); }
+    unsafe {
+        ndk_context::initialize_android_context(vm_ptr, activity_ptr);
+    }
     eprintln!("[Android] ndk-context initialized from MainActivity");
 }
 

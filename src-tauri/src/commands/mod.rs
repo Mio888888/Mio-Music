@@ -1,19 +1,23 @@
+pub mod config_commands;
+pub mod directory_commands;
+pub mod hotkey_commands;
 pub mod music_commands;
 pub mod playlist_commands;
-pub mod config_commands;
-pub mod hotkey_commands;
-pub mod directory_commands;
 pub mod power_save;
 pub mod s3_commands;
 
 use crate::db::AppDb;
+use crate::network::{clamp_proxy_timeout, decode_response_text, HttpPolicy, RestrictedHttpClient};
 use base64::Engine;
+use serde::Serialize;
 use serde_json::Value;
 use std::sync::Mutex;
-use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
 pub type DbState<'a> = State<'a, AppDb>;
+
+const AUDIO_PROXY_MAX_BYTES: usize = 64 * 1024 * 1024;
+const HTTP_PROXY_MAX_BYTES: usize = 64 * 1024 * 1024;
 
 /// Shared state for the desktop lyric window
 pub struct DesktopLyricState {
@@ -32,7 +36,10 @@ fn lyric_window_state_path() -> std::path::PathBuf {
 fn save_lyric_window_state(is_open: bool, x: i32, y: i32) {
     let path = lyric_window_state_path();
     let json = serde_json::json!({"is_open": is_open, "x": x, "y": y});
-    let _ = std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap_or_default());
+    let _ = std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&json).unwrap_or_default(),
+    );
 }
 
 /// Create the desktop lyric window with saved or default position.
@@ -68,7 +75,8 @@ pub fn create_desktop_lyric_window(app: &AppHandle) -> Result<(), String> {
                 val.get("x").and_then(|v| v.as_i64()),
                 val.get("y").and_then(|v| v.as_i64()),
             ) {
-                let scale = app.primary_monitor()
+                let scale = app
+                    .primary_monitor()
                     .ok()
                     .flatten()
                     .map(|m| m.scale_factor())
@@ -107,7 +115,10 @@ pub fn create_desktop_lyric_window(app: &AppHandle) -> Result<(), String> {
     window.on_window_event(move |event| {
         if let WindowEvent::Moved(pos) = event {
             let json = serde_json::json!({"is_open": true, "x": pos.x, "y": pos.y});
-            let _ = std::fs::write(&save_path, serde_json::to_string_pretty(&json).unwrap_or_default());
+            let _ = std::fs::write(
+                &save_path,
+                serde_json::to_string_pretty(&json).unwrap_or_default(),
+            );
         }
     });
 
@@ -139,7 +150,9 @@ pub async fn change_desktop_lyric(
             if let Ok(pos) = window.outer_position() {
                 save_lyric_window_state(false, pos.x, pos.y);
             }
-            window.close().map_err(|e| format!("关闭桌面歌词窗口失败: {}", e))?;
+            window
+                .close()
+                .map_err(|e| format!("关闭桌面歌词窗口失败: {}", e))?;
         }
         *state.is_open.lock().map_err(|e| e.to_string())? = false;
     }
@@ -231,60 +244,48 @@ pub async fn get_desktop_lyric_option() -> Result<Option<Value>, String> {
     if !path.exists() {
         return Ok(None);
     }
-    let data = std::fs::read_to_string(&path).map_err(|e| format!("读取桌面歌词配置失败: {}", e))?;
-    let val: Value = serde_json::from_str(&data).map_err(|e| format!("解析桌面歌词配置失败: {}", e))?;
+    let data =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取桌面歌词配置失败: {}", e))?;
+    let val: Value =
+        serde_json::from_str(&data).map_err(|e| format!("解析桌面歌词配置失败: {}", e))?;
     Ok(Some(val))
 }
 
 /// 桌面歌词选项 — 保存到 app_data_dir/desktop_lyric_option.json 并广播事件到桌面歌词窗口
 #[tauri::command]
-pub async fn set_desktop_lyric_option(
-    app: AppHandle,
-    args: Vec<Value>,
-) -> Result<(), String> {
+pub async fn set_desktop_lyric_option(app: AppHandle, args: Vec<Value>) -> Result<(), String> {
     let options = args.first().ok_or("缺少配置参数")?.clone();
     let dir = crate::db::get_app_data_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建目录失败: {}", e))?;
     let path = dir.join("desktop_lyric_option.json");
-    let data = serde_json::to_string_pretty(&options).map_err(|e| format!("序列化配置失败: {}", e))?;
+    let data =
+        serde_json::to_string_pretty(&options).map_err(|e| format!("序列化配置失败: {}", e))?;
     std::fs::write(&path, data).map_err(|e| format!("写入桌面歌词配置失败: {}", e))?;
     // 广播到桌面歌词窗口使其实时更新
-    app.emit("desktop-lyric-style-change", options).map_err(|e| format!("广播样式事件失败: {}", e))?;
+    app.emit("desktop-lyric-style-change", options)
+        .map_err(|e| format!("广播样式事件失败: {}", e))?;
     Ok(())
 }
 
 /// Audio proxy — fetches a remote audio URL via Rust backend (bypassing CORS)
 /// and returns a `data:` URI that the WebView `<audio>` element can play.
+/// The 64 MiB response limit leaves headroom for the base64-encoded data URI.
 /// Follows up to 10 redirects.
 #[tauri::command]
 pub async fn audio_proxy(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .build()
-        .map_err(|e| format!("创建音频代理客户端失败: {}", e))?;
-
-    let resp = client
-        .get(&url)
-        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
-        .send()
+    let response = RestrictedHttpClient::new(HttpPolicy::public_proxy())
+        .fetch_bytes(&url, AUDIO_PROXY_MAX_BYTES, &["audio/*"])
         .await
-        .map_err(|e| format!("音频请求失败: {}", e))?;
-
-    let content_type = resp
-        .headers()
+        .map_err(|error| format!("音频请求失败: {error}"))?;
+    let content_type = response
+        .headers
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("audio/mpeg")
         .to_string();
-
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| format!("读取音频数据失败: {}", e))?;
-
-    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
-    Ok(format!("data:{};base64,{}", content_type, b64))
+    let mut data_uri = format!("data:{content_type};base64,");
+    base64::engine::general_purpose::STANDARD.encode_string(&response.bytes, &mut data_uri);
+    Ok(data_uri)
 }
 
 /// HTTP proxy command — bypasses CORS by making requests from the Rust backend.
@@ -296,219 +297,68 @@ pub async fn audio_proxy(url: String) -> Result<String, String> {
 ///
 /// By default (raw: false), follows redirects and returns JSON-wrapped response:
 ///   { "statusCode": N, "headers": {}, "body": <parsed JSON or string> }
-struct ValidatedHttpTarget {
-    url: reqwest::Url,
-    host: String,
-    addresses: Vec<std::net::SocketAddr>,
-}
-
-fn is_blocked_network_ip(ip: std::net::IpAddr) -> bool {
-    match ip {
-        std::net::IpAddr::V4(ip) => {
-            let [a, b, c, _] = ip.octets();
-            ip.is_private()
-                || ip.is_loopback()
-                || ip.is_link_local()
-                || ip.is_multicast()
-                || ip.is_broadcast()
-                || ip.is_unspecified()
-                || a == 0
-                || (a == 100 && (64..=127).contains(&b))
-                || (a == 192 && b == 0 && c == 0)
-                || (a == 192 && b == 0 && c == 2)
-                || (a == 192 && b == 88 && c == 99)
-                || (a == 198 && (b == 18 || b == 19))
-                || (a == 198 && b == 51 && c == 100)
-                || (a == 203 && b == 0 && c == 113)
-                || a >= 240
-        }
-        std::net::IpAddr::V6(ip) => {
-            let segments = ip.segments();
-            if let Some(ipv4) = ip.to_ipv4() {
-                return is_blocked_network_ip(std::net::IpAddr::V4(ipv4));
-            }
-            ip.is_loopback()
-                || ip.is_multicast()
-                || ip.is_unspecified()
-                || (segments[0] & 0xfe00) == 0xfc00
-                || (segments[0] & 0xffc0) == 0xfe80
-                || (segments[0] == 0x2001 && segments[1] == 0x0db8)
-        }
-    }
-}
-
-async fn validate_public_http_url(raw_url: &str) -> Result<ValidatedHttpTarget, String> {
-    let url = reqwest::Url::parse(raw_url).map_err(|e| format!("URL 格式错误: {}", e))?;
-    if url.scheme() != "http" && url.scheme() != "https" {
-        return Err("仅允许 HTTP 或 HTTPS 地址".to_string());
-    }
-    if !url.username().is_empty() || url.password().is_some() {
-        return Err("URL 不允许包含用户凭据".to_string());
-    }
-    let host = url
-        .host_str()
-        .ok_or_else(|| "URL 缺少主机名".to_string())?
-        .to_string();
-    if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
-        return Err("禁止访问本机或内网地址".to_string());
-    }
-    let port = url.port_or_known_default().ok_or_else(|| "URL 缺少有效端口".to_string())?;
-    let addresses: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), port))
-        .await
-        .map_err(|e| format!("解析主机失败: {}", e))?
-        .collect();
-    if addresses.is_empty()
-        || addresses
-            .iter()
-            .any(|address| is_blocked_network_ip(address.ip()))
-    {
-        return Err("禁止访问本机或内网地址".to_string());
-    }
-    Ok(ValidatedHttpTarget {
-        url,
-        host,
-        addresses,
-    })
-}
-
-fn build_public_http_client(
-    target: &ValidatedHttpTarget,
-    timeout_ms: u64,
-) -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(timeout_ms.clamp(1, 120_000)))
-        .redirect(reqwest::redirect::Policy::none())
-        .resolve_to_addrs(&target.host, &target.addresses)
-        .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
-}
-
-fn strip_cross_origin_credentials(headers: &mut std::collections::HashMap<String, String>) {
-    headers.retain(|name, _| {
-        !name.eq_ignore_ascii_case("authorization")
-            && !name.eq_ignore_ascii_case("cookie")
-            && !name.eq_ignore_ascii_case("proxy-authorization")
-    });
-}
-
+/// Response bodies are limited to 64 MiB to retain headroom when raw mode base64 encodes them.
 #[tauri::command]
 pub async fn http_proxy(args: Value) -> Result<Value, String> {
-    let initial_url = args.get("url").and_then(|v| v.as_str()).ok_or("缺少 url 参数")?;
-    let mut method = args.get("method").and_then(|v| v.as_str()).unwrap_or("GET").to_uppercase();
-    let mut headers: Option<std::collections::HashMap<String, String>> =
-        args.get("headers").and_then(|v| serde_json::from_value(v.clone()).ok());
-    if headers
-        .as_ref()
-        .is_some_and(|headers| headers.keys().any(|name| name.eq_ignore_ascii_case("host")))
-    {
-        return Err("不允许覆盖 Host 请求头".to_string());
-    }
-    let mut body = args.get("body").and_then(|v| v.as_str()).map(str::to_string);
-    let timeout_ms = args.get("timeout").and_then(|v| v.as_u64()).unwrap_or(15000);
+    let url = args
+        .get("url")
+        .and_then(|v| v.as_str())
+        .ok_or("缺少 url 参数")?;
+    let method = args
+        .get("method")
+        .and_then(|v| v.as_str())
+        .unwrap_or("GET")
+        .parse::<reqwest::Method>()
+        .map_err(|error| format!("HTTP 方法无效: {error}"))?;
+    let headers: std::collections::HashMap<String, String> = args
+        .get("headers")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+    let body = args
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|value| value.as_bytes().to_vec());
+    let timeout = clamp_proxy_timeout(
+        args.get("timeout")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(15_000),
+    );
     let raw = args.get("raw").and_then(|v| v.as_bool()).unwrap_or(false);
-
-    let mut target = validate_public_http_url(initial_url).await?;
-    let mut redirects = 0u8;
-    let resp = loop {
-        let client = build_public_http_client(&target, timeout_ms)?;
-        let referer_origin = target.url.origin().ascii_serialization();
-        let mut response = None;
-        for attempt in 0..3u32 {
-            let mut req_builder = match method.as_str() {
-                "POST" => client.post(target.url.clone()),
-                "PUT" => client.put(target.url.clone()),
-                "DELETE" => client.delete(target.url.clone()),
-                "PATCH" => client.patch(target.url.clone()),
-                _ => client.get(target.url.clone()),
-            };
-
-            req_builder = req_builder
-                .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
-                .header("Accept", "*/*")
-                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                .header("Referer", &referer_origin)
-                .header("Origin", &referer_origin)
-                .header("Sec-Fetch-Dest", "empty")
-                .header("Sec-Fetch-Mode", "cors")
-                .header("Sec-Fetch-Site", "cross-site");
-
-            if let Some(ref hdrs) = headers {
-                for (key, value) in hdrs {
-                    req_builder = req_builder.header(key.as_str(), value.as_str());
-                }
-            }
-            if let Some(ref request_body) = body {
-                req_builder = req_builder.body(request_body.clone());
-            }
-
-            let current = req_builder.send().await.map_err(|e| format!("请求失败: {}", e))?;
-            if current.status().is_server_error() && attempt < 2 {
-                tokio::time::sleep(std::time::Duration::from_millis(500 * (attempt as u64 + 1))).await;
-            } else {
-                response = Some(current);
-                break;
-            }
-        }
-        let current = response.ok_or_else(|| "请求失败：重试次数已用尽".to_string())?;
-        if !current.status().is_redirection() {
-            break current;
-        }
-        if redirects >= 10 {
-            return Err("重定向次数过多".to_string());
-        }
-        let location = current
-            .headers()
-            .get(reqwest::header::LOCATION)
-            .and_then(|value| value.to_str().ok())
-            .ok_or_else(|| "重定向响应缺少 Location".to_string())?;
-        let next_url = target.url.join(location).map_err(|e| format!("重定向地址无效: {}", e))?;
-        if target.url.origin() != next_url.origin() {
-            if let Some(headers) = headers.as_mut() {
-                strip_cross_origin_credentials(headers);
-            }
-        }
-        if current.status() == reqwest::StatusCode::SEE_OTHER
-            || ((current.status() == reqwest::StatusCode::MOVED_PERMANENTLY
-                || current.status() == reqwest::StatusCode::FOUND)
-                && method == "POST")
-        {
-            method = "GET".to_string();
-            body = None;
-        }
-        target = validate_public_http_url(next_url.as_str()).await?;
-        redirects += 1;
-    };
-    let status = resp.status().as_u16();
-    let resp_headers: std::collections::HashMap<String, String> = resp
-        .headers()
+    let response = RestrictedHttpClient::new(HttpPolicy::public_proxy())
+        .proxy_request_bytes(method, url, headers, body, HTTP_PROXY_MAX_BYTES, timeout)
+        .await?;
+    let status = response.status.as_u16();
+    let response_headers: std::collections::HashMap<String, String> = response
+        .headers
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
         .collect();
 
     if raw {
-        let bytes = resp.bytes().await.map_err(|e| format!("读取响应失败: {}", e))?;
-        let body_base64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        let body_base64 = base64::engine::general_purpose::STANDARD.encode(&response.bytes);
         return Ok(serde_json::json!({
             "statusCode": status,
-            "headers": resp_headers,
+            "headers": response_headers,
             "body": body_base64,
             "isBase64": true
         }));
     }
 
-    let text = resp.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
+    let text = decode_response_text(&response.headers, &response.bytes);
     let body_value: Value = serde_json::from_str(&text).unwrap_or(Value::String(text));
 
     Ok(serde_json::json!({
         "statusCode": status,
-        "headers": resp_headers,
+        "headers": response_headers,
         "body": body_value
     }))
 }
 
 #[cfg(test)]
 mod http_proxy_tests {
-    use super::{is_blocked_network_ip, strip_cross_origin_credentials, validate_public_http_url};
+    use crate::network::{
+        is_blocked_network_ip, strip_cross_origin_credentials, validate_public_http_url,
+    };
     use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -524,21 +374,31 @@ mod http_proxy_tests {
             "fe80::1".parse().unwrap(),
         ];
         assert!(blocked.into_iter().all(is_blocked_network_ip));
-        assert!(!is_blocked_network_ip(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1))));
+        assert!(!is_blocked_network_ip(IpAddr::V4(Ipv4Addr::new(
+            1, 1, 1, 1
+        ))));
     }
 
     #[tokio::test]
     async fn rejects_local_and_non_http_urls() {
-        assert!(validate_public_http_url("file:///etc/passwd").await.is_err());
-        assert!(validate_public_http_url("http://127.0.0.1:8080").await.is_err());
+        assert!(validate_public_http_url("file:///etc/passwd")
+            .await
+            .is_err());
+        assert!(validate_public_http_url("http://127.0.0.1:8080")
+            .await
+            .is_err());
         assert!(validate_public_http_url("http://[::1]/").await.is_err());
         assert!(validate_public_http_url("http://localhost/").await.is_err());
-        assert!(validate_public_http_url("http://user:pass@example.com/").await.is_err());
+        assert!(validate_public_http_url("http://user:pass@example.com/")
+            .await
+            .is_err());
     }
 
     #[tokio::test]
     async fn accepts_public_ip_url() {
-        let target = validate_public_http_url("https://1.1.1.1/path").await.unwrap();
+        let target = validate_public_http_url("https://1.1.1.1/path")
+            .await
+            .unwrap();
         assert_eq!("1.1.1.1", target.url.host_str().unwrap());
     }
 

@@ -35,17 +35,26 @@ impl PluginEngine {
 
     /// Create engine from file path.
     pub fn from_file(path: &Path) -> Result<Self, String> {
-        let code = std::fs::read_to_string(path)
-            .map_err(|e| format!("读取插件文件失败: {}", e))?;
+        let code = std::fs::read_to_string(path).map_err(|e| format!("读取插件文件失败: {}", e))?;
         Self::new(&code)
     }
 
-    pub fn info(&self) -> &PluginInfo { &self.info }
-    pub fn sources(&self) -> &[PluginSource] { &self.sources }
-    pub fn plugin_type(&self) -> &str { &self.plugin_type }
-    pub fn config_schema(&self) -> &[PluginConfigField] { &self.config_schema }
+    pub fn info(&self) -> &PluginInfo {
+        &self.info
+    }
+    pub fn sources(&self) -> &[PluginSource] {
+        &self.sources
+    }
+    pub fn plugin_type(&self) -> &str {
+        &self.plugin_type
+    }
+    pub fn config_schema(&self) -> &[PluginConfigField] {
+        &self.config_schema
+    }
     #[allow(dead_code)]
-    pub fn code(&self) -> &str { &self.code }
+    pub fn code(&self) -> &str {
+        &self.code
+    }
 
     fn extract_plugin_type(code: &str) -> String {
         if let Some(val) = Self::extract_string_field(code, "pluginType") {
@@ -106,24 +115,30 @@ impl PluginEngine {
     }
 
     fn find_matching_bracket(code: &str, open: char, close: char) -> Option<usize> {
-        let mut depth = 0;
+        let mut depth = 0usize;
+        let mut quote = None;
+        let mut escaped = false;
         let start = code.find(open)?;
         for (i, c) in code[start..].char_indices() {
-            match c {
-                '"' | '\'' => {
-                    // Skip string content
-                    let mut j = i + 1;
-                    while j < code[start..].len() {
-                        let cc = code[start + j..].chars().next()?;
-                        j += cc.len_utf8();
-                        if cc == c { break; }
-                        if cc == '\\' { j += 1; }
-                    }
+            if let Some(quote_char) = quote {
+                if escaped {
+                    escaped = false;
+                } else if c == '\\' {
+                    escaped = true;
+                } else if c == quote_char {
+                    quote = None;
                 }
+                continue;
+            }
+
+            match c {
+                '"' | '\'' | '`' => quote = Some(c),
                 _ if c == open => depth += 1,
                 _ if c == close => {
                     depth -= 1;
-                    if depth == 0 { return Some(start + i); }
+                    if depth == 0 {
+                        return Some(start + i);
+                    }
                 }
                 _ => {}
             }
@@ -139,7 +154,9 @@ impl PluginEngine {
         for (i, c) in inner.char_indices() {
             match c {
                 '{' => {
-                    if depth == 0 { start = Some(i); }
+                    if depth == 0 {
+                        start = Some(i);
+                    }
                     depth += 1;
                 }
                 '}' => {
@@ -159,11 +176,12 @@ impl PluginEngine {
     fn parse_config_field(obj_str: &str) -> Option<PluginConfigField> {
         let key = Self::extract_string_field(obj_str, "key")?;
         let label = Self::extract_string_field(obj_str, "label").unwrap_or_else(|| key.clone());
-        let field_type = Self::extract_string_field(obj_str, "type").unwrap_or_else(|| "text".to_string());
+        let field_type =
+            Self::extract_string_field(obj_str, "type").unwrap_or_else(|| "text".to_string());
         let required = Self::extract_bool_field(obj_str, "required");
         let placeholder = Self::extract_string_field(obj_str, "placeholder");
-        let default = Self::extract_string_field(obj_str, "default")
-            .map(|v| serde_json::Value::String(v));
+        let default =
+            Self::extract_string_field(obj_str, "default").map(|v| serde_json::Value::String(v));
 
         Some(PluginConfigField {
             key,
@@ -182,7 +200,10 @@ impl PluginEngine {
             format!(r#""{}"\s*:\s*true"#, field),
         ];
         for p in &patterns {
-            if regex_lite::Regex::new(p).map(|re| re.is_match(code)).unwrap_or(false) {
+            if regex_lite::Regex::new(p)
+                .map(|re| re.is_match(code))
+                .unwrap_or(false)
+            {
                 return true;
             }
         }
@@ -190,8 +211,7 @@ impl PluginEngine {
     }
 
     fn extract_string_field(code: &str, field: &str) -> Option<String> {
-        Self::extract_object_field(code, field)
-            .or_else(|| Self::extract_comment_field(code, field))
+        Self::extract_object_field(code, field).or_else(|| Self::extract_comment_field(code, field))
     }
 
     /// Extract a field value from @field comment format (e.g. @name PluginName).
@@ -206,20 +226,24 @@ impl PluginEngine {
 
     /// Extract pluginInfo from JS code by parsing the object literal.
     fn extract_plugin_info(code: &str) -> Result<PluginInfo, String> {
-        let name = Self::extract_string_field(code, "name")
-            .unwrap_or_else(|| "未知插件".to_string());
-        let version = Self::extract_string_field(code, "version")
-            .unwrap_or_else(|| "1.0.0".to_string());
-        let author = Self::extract_string_field(code, "author")
-            .unwrap_or_else(|| "未知作者".to_string());
-        let description = Self::extract_string_field(code, "description")
-            .unwrap_or_default();
+        let name =
+            Self::extract_string_field(code, "name").unwrap_or_else(|| "未知插件".to_string());
+        let version =
+            Self::extract_string_field(code, "version").unwrap_or_else(|| "1.0.0".to_string());
+        let author =
+            Self::extract_string_field(code, "author").unwrap_or_else(|| "未知作者".to_string());
+        let description = Self::extract_string_field(code, "description").unwrap_or_default();
 
         if name == "未知插件" {
             return Err("无法解析插件名称".to_string());
         }
 
-        Ok(PluginInfo { name, version, author, description })
+        Ok(PluginInfo {
+            name,
+            version,
+            author,
+            description,
+        })
     }
 
     /// Extract a string field value from JS code.
@@ -245,7 +269,16 @@ impl PluginEngine {
         let mut sources = Vec::new();
 
         let source_ids = ["kw", "kg", "tx", "wy", "mg", "mgt", "bd", "local"];
-        let source_names = ["小蜗", "小苟", "小鹅", "小芸", "菇菇", "菇菇", "百度音乐", "本地"];
+        let source_names = [
+            "小蜗",
+            "小苟",
+            "小鹅",
+            "小芸",
+            "菇菇",
+            "菇菇",
+            "百度音乐",
+            "本地",
+        ];
 
         for (id, default_name) in source_ids.iter().zip(source_names.iter()) {
             if code.contains(&format!("\"{}\"", id)) || code.contains(&format!("'{}'", id)) {
@@ -264,8 +297,11 @@ impl PluginEngine {
     /// Extract quality list for a specific source.
     fn extract_qualities_for_source(code: &str, source_id: &str) -> Vec<String> {
         let default_qualities = vec![
-            "128k".to_string(), "320k".to_string(), "flac".to_string(),
-            "flac24bit".to_string(), "hires".to_string(),
+            "128k".to_string(),
+            "320k".to_string(),
+            "flac".to_string(),
+            "flac24bit".to_string(),
+            "hires".to_string(),
         ];
 
         let sid = regex_lite::escape(source_id);
@@ -287,11 +323,16 @@ impl PluginEngine {
             if let Ok(re) = regex_lite::Regex::new(pattern) {
                 if let Some(caps) = re.captures(code) {
                     if let Some(m) = caps.get(1) {
-                        let quals: Vec<String> = m.as_str()
+                        let quals: Vec<String> = m
+                            .as_str()
                             .split(',')
                             .filter_map(|q| {
                                 let q = q.trim().trim_matches(|c| c == '\'' || c == '"');
-                                if q.is_empty() { None } else { Some(q.to_string()) }
+                                if q.is_empty() {
+                                    None
+                                } else {
+                                    Some(q.to_string())
+                                }
                             })
                             .collect();
                         if !quals.is_empty() {
@@ -303,5 +344,17 @@ impl PluginEngine {
         }
 
         default_qualities
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PluginEngine;
+
+    #[test]
+    fn escaped_non_ascii_does_not_panic() {
+        let code = r#"const configSchema = ["\你"];"#;
+
+        assert!(std::panic::catch_unwind(|| { PluginEngine::extract_config_schema(code) }).is_ok());
     }
 }

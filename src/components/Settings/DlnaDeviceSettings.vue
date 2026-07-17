@@ -6,7 +6,7 @@
         variant="text"
         shape="circle"
         :loading="dlnaStore.isSearching"
-        @click="dlnaStore.startSearch"
+        @click="searchDevices"
       >
         <template #icon><RefreshIcon /></template>
       </t-button>
@@ -14,7 +14,7 @@
 
     <div class="device-list dlna-device-list">
       <t-radio-group
-        v-model="dlnaStore.currentDevice"
+        :model-value="dlnaStore.currentDevice?.usn"
         class="device-radio-group"
         @change="handleDlnaDeviceChange"
       >
@@ -24,7 +24,7 @@
           class="device-item"
           :class="{ active: dlnaStore.currentDevice?.usn === device.usn }"
         >
-          <t-radio :value="device" class="device-radio">
+          <t-radio :value="device.usn" class="device-radio">
             <div class="device-info">
               <span class="device-name">{{ device.name }}</span>
               <span class="device-address">{{ device.address }}</span>
@@ -42,6 +42,7 @@
       <div v-if="dlnaStore.devices.length === 0 && !dlnaStore.isSearching" class="empty-msg">
         {{ t('settings.dlna.noDevice') }}
       </div>
+      <div v-if="dlnaStore.errorMessage" class="error-msg">{{ dlnaStore.errorMessage }}</div>
     </div>
   </div>
 </template>
@@ -58,27 +59,65 @@ const { t } = useI18n()
 const dlnaStore = useDlnaStore()
 const controlAudio = ControlAudioStore()
 const globalPlayStatus = useGlobalPlayStatusStore()
+let selectionToken = 0
 
-const handleDlnaDeviceChange = (val: any) => {
-  if (val) {
-    MessagePlugin.success(t('settings.dlna.connected', { name: val.name }))
+const isCurrentSelection = (token: number, usn: string) =>
+  selectionToken === token && dlnaStore.currentDevice?.usn === usn
 
-    if (controlAudio.Audio?.url) {
-      const url = controlAudio.Audio.url
-      const title = globalPlayStatus.player?.songInfo?.name || 'CeruMusic'
-      dlnaStore.play(url, title).then(() => {
-        if (controlAudio.Audio.isPlay) {
-          dlnaStore.resume()
-        }
-      })
-    }
+const searchDevices = async () => {
+  try {
+    await dlnaStore.startSearch()
+  } catch (error) {
+    MessagePlugin.error(error instanceof Error ? error.message : String(error))
   }
 }
 
-const stopDlna = () => {
-  dlnaStore.stop()
-  dlnaStore.currentDevice = null
-  MessagePlugin.success(t('settings.dlna.disconnected'))
+const handleDlnaDeviceChange = async (value: unknown) => {
+  if (typeof value !== 'string') return
+  const usn = value
+  const token = ++selectionToken
+  const previousDevice = dlnaStore.currentDevice
+  if (previousDevice?.usn !== usn) {
+    try {
+      await dlnaStore.stop()
+    } catch {}
+    if (selectionToken !== token) return
+  }
+  const device = dlnaStore.selectDevice(usn)
+  if (!device) return
+
+  try {
+    if (controlAudio.Audio?.url) {
+      const title = globalPlayStatus.player?.songInfo?.name || 'CeruMusic'
+      await dlnaStore.play(controlAudio.Audio.url, title)
+      if (!isCurrentSelection(token, usn)) return
+      if (controlAudio.Audio.isPlay) {
+        await dlnaStore.resume()
+        if (!isCurrentSelection(token, usn)) return
+      }
+    }
+    if (!isCurrentSelection(token, usn)) return
+    MessagePlugin.success(t('settings.dlna.connected', { name: device.name }))
+  } catch (error) {
+    if (!isCurrentSelection(token, usn)) return
+    dlnaStore.selectDevice(null)
+    MessagePlugin.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const stopDlna = async () => {
+  const usn = dlnaStore.currentDevice?.usn
+  if (!usn) return
+  const token = ++selectionToken
+  try {
+    await dlnaStore.stop()
+    if (!isCurrentSelection(token, usn)) return
+    dlnaStore.selectDevice(null)
+    MessagePlugin.success(t('settings.dlna.disconnected'))
+  } catch (error) {
+    if (!isCurrentSelection(token, usn)) return
+    MessagePlugin.error(error instanceof Error ? error.message : String(error))
+  }
 }
 </script>
 
@@ -182,5 +221,11 @@ const stopDlna = () => {
   text-align: center;
   color: var(--td-text-color-secondary);
   padding: 20px;
+}
+
+.error-msg {
+  color: var(--td-error-color);
+  font-size: 12px;
+  padding: 4px 0;
 }
 </style>

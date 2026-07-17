@@ -28,11 +28,18 @@ export interface DownloadTask {
   created_at: number
 }
 
+function cleanupListeners(unlisteners: UnlistenFn[]) {
+  for (const unlisten of unlisteners) {
+    try { unlisten() } catch {}
+  }
+}
+
 export const useDownloadStore = defineStore('download', {
   state: () => ({
     tasks: [] as DownloadTask[],
     isInitialized: false,
-    unlisteners: [] as UnlistenFn[]
+    unlisteners: [] as UnlistenFn[],
+    listenerGeneration: 0
   }),
   getters: {
     activeTasks: (state) => state.tasks.filter((t) =>
@@ -49,11 +56,12 @@ export const useDownloadStore = defineStore('download', {
     async init() {
       if (this.isInitialized) return
       this.isInitialized = true
+      const generation = this.listenerGeneration
 
       // Load initial tasks
       try {
         const res = await (window as any).api?.download?.getTasks?.()
-        if (res?.success && Array.isArray(res.data)) {
+        if (generation === this.listenerGeneration && res?.success && Array.isArray(res.data)) {
           this.tasks = res.data
         }
       } catch (error) {
@@ -62,32 +70,45 @@ export const useDownloadStore = defineStore('download', {
 
       // Register event listeners for real-time updates
       try {
-        const unlisteners = await Promise.all([
-          listen<DownloadTask>('download:task-added', (e) => {
+        const registrations: Array<() => Promise<UnlistenFn>> = [
+          () => listen<DownloadTask>('download:task-added', (e) => {
             const task = e.payload
             if (!this.tasks.find(t => t.id === task.id)) {
               this.tasks.push(task)
             }
           }),
-          listen<DownloadTask>('download:task-progress', (e) => {
+          () => listen<DownloadTask>('download:task-progress', (e) => {
             this.updateTask(e.payload)
           }),
-          listen<DownloadTask>('download:task-status-changed', (e) => {
+          () => listen<DownloadTask>('download:task-status-changed', (e) => {
             this.updateTask(e.payload)
           }),
-          listen<DownloadTask>('download:task-completed', (e) => {
+          () => listen<DownloadTask>('download:task-completed', (e) => {
             this.updateTask(e.payload)
           }),
-          listen<DownloadTask>('download:task-error', (e) => {
+          () => listen<DownloadTask>('download:task-error', (e) => {
             this.updateTask(e.payload)
           }),
-          listen<string>('download:task-deleted', (e) => {
+          () => listen<string>('download:task-deleted', (e) => {
             this.tasks = this.tasks.filter(t => t.id !== e.payload)
           }),
-          listen<DownloadTask[]>('download:tasks-reset', (e) => {
+          () => listen<DownloadTask[]>('download:tasks-reset', (e) => {
             this.tasks = e.payload
           }),
-        ])
+        ]
+        const results = await Promise.allSettled(registrations.map((register) => Promise.resolve().then(register)))
+        const unlisteners = results.flatMap((result) =>
+          result.status === 'fulfilled' ? [result.value] : []
+        )
+        const failedRegistration = results.find((result) => result.status === 'rejected')
+
+        if (generation !== this.listenerGeneration || failedRegistration) {
+          cleanupListeners(unlisteners)
+          if (failedRegistration) {
+            console.warn('[DownloadStore] Event listeners failed, falling back to polling:', failedRegistration.reason)
+          }
+          return
+        }
         this.unlisteners = unlisteners
       } catch (e) {
         console.warn('[DownloadStore] Event listeners failed, falling back to polling:', e)
@@ -96,8 +117,10 @@ export const useDownloadStore = defineStore('download', {
     },
 
     destroy() {
-      for (const un of this.unlisteners) { un() }
+      this.listenerGeneration++
+      cleanupListeners(this.unlisteners)
       this.unlisteners = []
+      this.isInitialized = false
     },
 
     updateTask(task: DownloadTask) {

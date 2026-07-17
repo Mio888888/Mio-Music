@@ -1,7 +1,7 @@
-use coreaudio_sys::*;
 use core_foundation_sys::string::{
     CFStringGetCString, CFStringGetCStringPtr, CFStringGetLength, CFStringRef,
 };
+use coreaudio_sys::*;
 use serde::Serialize;
 use std::ffi::CStr;
 use std::ptr;
@@ -57,7 +57,7 @@ unsafe fn get_audio_device_ids() -> Result<Vec<AudioDeviceID>, String> {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioHardwarePropertyDevices,
         mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
 
     let mut size: UInt32 = 0;
@@ -97,7 +97,7 @@ unsafe fn get_default_output_device_id() -> Result<AudioDeviceID, String> {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioHardwarePropertyDefaultOutputDevice,
         mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut id: AudioDeviceID = 0;
     let mut size = std::mem::size_of::<AudioDeviceID>() as UInt32;
@@ -119,7 +119,7 @@ unsafe fn get_device_name(id: AudioDeviceID) -> String {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioDevicePropertyDeviceNameCFString,
         mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut name: CFStringRef = ptr::null_mut();
     let mut size = std::mem::size_of::<CFStringRef>() as UInt32;
@@ -141,7 +141,7 @@ unsafe fn get_device_sample_rate(id: AudioDeviceID) -> f64 {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioDevicePropertyNominalSampleRate,
         mScope: kAudioDevicePropertyScopeOutput,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut rate: Float64 = 0.0;
     let mut size = std::mem::size_of::<Float64>() as UInt32;
@@ -153,14 +153,18 @@ unsafe fn get_device_sample_rate(id: AudioDeviceID) -> f64 {
         &mut size,
         &mut rate as *mut _ as *mut _,
     );
-    if !is_ok(status) { 0.0 } else { rate }
+    if !is_ok(status) {
+        0.0
+    } else {
+        rate
+    }
 }
 
 unsafe fn get_device_output_channels(id: AudioDeviceID) -> u32 {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioDevicePropertyStreamConfiguration,
         mScope: kAudioDevicePropertyScopeOutput,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut size: UInt32 = 0;
     let status = AudioObjectGetPropertyDataSize(id, &address, 0, ptr::null(), &mut size);
@@ -174,10 +178,13 @@ unsafe fn get_device_output_channels(id: AudioDeviceID) -> u32 {
     let status =
         AudioObjectGetPropertyData(id, &address, 0, ptr::null(), &mut size, layout as *mut _);
     let channels = if is_ok(status) {
-        let bl = &*layout;
-        (0..bl.mNumberBuffers)
-            .map(|i| bl.mBuffers[i as usize].mNumberChannels)
-            .sum()
+        let buffers_ptr = std::ptr::addr_of!((*layout).mBuffers).cast::<AudioBuffer>();
+        let buffers_offset = buffers_ptr as usize - layout as usize;
+        let buffer_count = ((*layout).mNumberBuffers as usize).min(
+            (size as usize).saturating_sub(buffers_offset) / std::mem::size_of::<AudioBuffer>(),
+        );
+        let buffers = std::slice::from_raw_parts(buffers_ptr, buffer_count);
+        buffers.iter().map(|buffer| buffer.mNumberChannels).sum()
     } else {
         0
     };
@@ -189,7 +196,7 @@ unsafe fn get_device_volume(id: AudioDeviceID) -> (f32, bool) {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioDevicePropertyVolumeScalar,
         mScope: kAudioDevicePropertyScopeOutput,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut vol: Float32 = 0.0;
     let mut size = std::mem::size_of::<Float32>() as UInt32;
@@ -212,7 +219,7 @@ unsafe fn device_has_output(id: AudioDeviceID) -> bool {
     let address = AudioObjectPropertyAddress {
         mSelector: kAudioDevicePropertyStreamConfiguration,
         mScope: kAudioDevicePropertyScopeOutput,
-        mElement: 1,
+        mElement: kAudioObjectPropertyElementMain,
     };
     let mut size: UInt32 = 0;
     let status = AudioObjectGetPropertyDataSize(id, &address, 0, ptr::null(), &mut size);
@@ -226,8 +233,13 @@ unsafe fn device_has_output(id: AudioDeviceID) -> bool {
     let status =
         AudioObjectGetPropertyData(id, &address, 0, ptr::null(), &mut size, layout as *mut _);
     let has = if is_ok(status) {
-        let bl = &*layout;
-        bl.mNumberBuffers > 0 && bl.mBuffers[0].mNumberChannels > 0
+        let buffers_ptr = std::ptr::addr_of!((*layout).mBuffers).cast::<AudioBuffer>();
+        let buffers_offset = buffers_ptr as usize - layout as usize;
+        let buffer_count = ((*layout).mNumberBuffers as usize).min(
+            (size as usize).saturating_sub(buffers_offset) / std::mem::size_of::<AudioBuffer>(),
+        );
+        let buffers = std::slice::from_raw_parts(buffers_ptr, buffer_count);
+        buffers.iter().any(|buffer| buffer.mNumberChannels > 0)
     } else {
         false
     };
@@ -270,7 +282,7 @@ pub fn set_output_device(device_id: u32) -> Result<(), String> {
         let address = AudioObjectPropertyAddress {
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: 1,
+            mElement: kAudioObjectPropertyElementMain,
         };
         let mut id = device_id;
         let status = AudioObjectSetPropertyData(
@@ -303,7 +315,7 @@ pub fn set_device_volume(device_id: u32, volume: f32) -> Result<(), String> {
         let address = AudioObjectPropertyAddress {
             mSelector: kAudioDevicePropertyVolumeScalar,
             mScope: kAudioDevicePropertyScopeOutput,
-            mElement: 1,
+            mElement: kAudioObjectPropertyElementMain,
         };
         let mut vol: Float32 = volume.clamp(0.0, 1.0);
         let status = AudioObjectSetPropertyData(
@@ -346,7 +358,7 @@ pub fn start_listening(app_handle: AppHandle) {
         let address = AudioObjectPropertyAddress {
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: 1,
+            mElement: kAudioObjectPropertyElementMain,
         };
         AudioObjectAddPropertyListener(
             kAudioObjectSystemObject,
@@ -358,7 +370,7 @@ pub fn start_listening(app_handle: AppHandle) {
         let address = AudioObjectPropertyAddress {
             mSelector: kAudioHardwarePropertyDefaultOutputDevice,
             mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: 1,
+            mElement: kAudioObjectPropertyElementMain,
         };
         AudioObjectAddPropertyListener(
             kAudioObjectSystemObject,

@@ -12,12 +12,20 @@ use std::sync::Arc;
 pub type SharedPlayer = Arc<Mutex<PlayerEngine>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub enum AudioSlot { A, B }
+pub enum AudioSlot {
+    A,
+    B,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
-pub enum PlaybackState { Stopped, Playing, Paused }
+pub enum PlaybackState {
+    Stopped,
+    Playing,
+    Paused,
+}
 
 #[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlayerSnapshot {
     pub state: PlaybackState,
     pub position: f64,
