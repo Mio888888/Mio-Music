@@ -45,7 +45,7 @@ https://github.com/Mio888888/Mio-Music/releases/latest
 
 读取成功后，页面会同步更新当前版本号、主下载按钮和 macOS / Windows / Linux
 下载卡片。读取失败时会回退到 GitHub Releases 最新发布页，并保留页面内的保底版本
-（`v0.2.8`）显示。
+（`v0.2.9`）显示。
 
 ## 截图替换
 

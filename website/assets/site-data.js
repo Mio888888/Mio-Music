@@ -7,7 +7,7 @@ var carouselItems = [
   { title: 'AI 助手', copy: '在音乐上下文里对话，探索与发现新内容。' }
 ];
 var releasesUrl = 'https://github.com/Mio888888/Mio-Music/releases/latest';
-var fallbackVersion = 'v0.2.8';
+var fallbackVersion = 'v0.2.9';
 // 注意：github.com 上的 release 资源（含 latest.json）不返回 CORS 头，
 // 浏览器无法跨源读取。因此这里只保留支持 CORS 的源：
 //   - jsDelivr GitHub Raw 镜像（仓库分支中的 latest.json）
