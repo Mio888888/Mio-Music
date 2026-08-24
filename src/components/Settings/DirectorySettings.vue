@@ -2,33 +2,34 @@
   <div class="directory-settings">
       <div class="section-header">
         <span class="section-title">{{ t('settings.storage.directoryConfig') }}</span>
-        <t-button theme="default" size="small" @click="resetDirectories"> {{ t('settings.storage.resetToDefault') }} </t-button>
+        <t-button theme="default" size="small" @click="resetDirectories">{{ t('settings.storage.resetToDefault') }}</t-button>
       </div>
 
       <div class="directory-section">
-        <h4>{{ t('settings.storage.cacheDirectory') }}</h4>
-        <p class="directory-description">{{ t('settings.storage.cacheDirectoryDesc') }}</p>
-
         <div class="directory-item">
-          <div class="directory-info">
-            <div class="directory-path">
-              <t-input
-                v-model="directories.cacheDir"
-                readonly
-                :placeholder="t('settings.storage.cacheDirPlaceholder')"
-                class="path-input"
-              />
-            </div>
-            <div class="directory-size">
-              <t-tag theme="primary" variant="light">
-                {{ cacheDirSize.formatted }}
-              </t-tag>
-            </div>
+          <div class="directory-head">
+            <h4>{{ t('settings.storage.cacheDirectory') }}</h4>
+            <t-tag class="dir-size-tag" theme="primary" variant="light">
+              {{ cacheDirSize.formatted }}
+            </t-tag>
           </div>
+          <p class="directory-description">{{ t('settings.storage.cacheDirectoryDesc') }}</p>
 
-          <div class="directory-actions">
-            <t-button theme="default" @click="selectCacheDir"> {{ t('settings.storage.selectDirectory') }} </t-button>
-            <t-button theme="default" variant="outline" @click="openCacheDir"> {{ t('settings.storage.openDirectory') }} </t-button>
+          <div class="directory-row">
+            <t-input
+              v-model="directories.cacheDir"
+              readonly
+              :placeholder="t('settings.storage.cacheDirPlaceholder')"
+              class="path-input"
+            />
+            <div class="directory-actions">
+              <t-button theme="default" size="small" @click="selectCacheDir">
+                {{ t('settings.storage.selectDirectory') }}
+              </t-button>
+              <t-button theme="default" size="small" variant="outline" @click="openCacheDir">
+                {{ t('settings.storage.openDirectory') }}
+              </t-button>
+            </div>
           </div>
         </div>
       </div>
@@ -36,37 +37,36 @@
       <t-divider />
 
       <div class="directory-section">
-        <h4>{{ t('settings.storage.downloadDirectory') }}</h4>
-        <p class="directory-description">{{ t('settings.storage.downloadDirectoryDesc') }}</p>
-
         <div class="directory-item">
-          <div class="directory-info">
-            <div class="directory-path">
-              <t-input
-                v-model="directories.downloadDir"
-                readonly
-                :placeholder="t('settings.storage.downloadDirPlaceholder')"
-                class="path-input"
-              />
-            </div>
-            <div class="directory-size">
-              <t-tag theme="success" variant="light">
-                {{ downloadDirSize.formatted }}
-              </t-tag>
-            </div>
+          <div class="directory-head">
+            <h4>{{ t('settings.storage.downloadDirectory') }}</h4>
+            <t-tag class="dir-size-tag" theme="success" variant="light">
+              {{ downloadDirSize.formatted }}
+            </t-tag>
           </div>
+          <p class="directory-description">{{ t('settings.storage.downloadDirectoryDesc') }}</p>
 
-          <div class="directory-actions">
-            <t-button theme="default" @click="selectDownloadDir"> {{ t('settings.storage.selectDirectory') }} </t-button>
-            <t-button theme="default" variant="outline" @click="openDownloadDir">
-              {{ t('settings.storage.openDirectory') }}
-            </t-button>
+          <div class="directory-row">
+            <t-input
+              v-model="directories.downloadDir"
+              readonly
+              :placeholder="t('settings.storage.downloadDirPlaceholder')"
+              class="path-input"
+            />
+            <div class="directory-actions">
+              <t-button theme="default" size="small" @click="selectDownloadDir">
+                {{ t('settings.storage.selectDirectory') }}
+              </t-button>
+              <t-button theme="default" size="small" variant="outline" @click="openDownloadDir">
+                {{ t('settings.storage.openDirectory') }}
+              </t-button>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="save-section">
-        <t-button theme="primary" size="large" :loading="isSaving" @click="saveDirectories">
+        <t-button theme="primary" :loading="isSaving" @click="saveDirectories">
           {{ t('settings.storage.saveSettings') }}
         </t-button>
       </div>
@@ -261,7 +261,7 @@ onMounted(() => {
 .directory-settings {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .section-header {
@@ -269,9 +269,9 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--td-border-level-1-color);
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .section-title {
@@ -282,71 +282,68 @@ onMounted(() => {
 }
 
 .directory-section {
-  margin-bottom: 24px;
+  margin-bottom: 4px;
 
   h4 {
-    margin: 0 0 8px 0;
-    font-size: 16px;
+    margin: 0;
+    font-size: 14px;
     font-weight: 600;
     color: var(--td-text-color-primary);
   }
 
   .directory-description {
-    margin: 0 0 16px 0;
-    font-size: 14px;
+    margin: 3px 0 8px;
+    font-size: 12.5px;
     color: var(--td-text-color-secondary);
   }
+}
+
+.directory-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dir-size-tag {
+  display: flex;
+  flex-shrink: 0;
 }
 
 .directory-item {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
-.directory-info {
-  display: flex;
+.directory-row {
   align-items: center;
   gap: 12px;
+  display: flex;
 
-  .directory-path {
+  .path-input {
     flex: 1;
-
-    .path-input {
-      width: 100%;
-    }
-  }
-
-  .directory-size {
-    flex-shrink: 0;
   }
 }
 
 .directory-actions {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
 }
 
 .save-section {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px solid var(--td-border-level-1-color);
-  text-align: center;
+  margin-top: 8px;
 }
 
-.cache-management {
-  margin-top: 24px;
-}
-
-/* 响应式设计 */
 @media (max-width: 768px) {
-  .directory-info {
+  .directory-row {
     flex-direction: column;
     align-items: stretch;
+    gap: 8px;
   }
 
   .directory-actions {
-    justify-content: stretch;
+    width: 100%;
 
     button {
       flex: 1;

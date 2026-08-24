@@ -248,7 +248,7 @@ const handleAboutClick = (e: MouseEvent) => {
         <div class="notice-item"><h4>{{ t('settings.about.copyrightCompliance') }}</h4><p>{{ t('settings.about.copyrightComplianceDesc') }}</p></div>
         <div class="notice-item"><h4>{{ t('settings.about.usageRestriction') }}</h4><p>{{ t('settings.about.usageRestrictionDesc') }}</p></div>
       </div>
-      <h3 style="margin-top: 2rem">{{ t('settings.about.aboutUs') }}</h3>
+      <h3 class="about-us-title">{{ t('settings.about.aboutUs') }}</h3>
       <div class="about-us">
         <p class="about-intro" v-html="aboutIntroHtml" @click="handleAboutClick"></p>
 
@@ -274,11 +274,11 @@ const handleAboutClick = (e: MouseEvent) => {
         <div class="support-card original-author">
           <div class="support-copy">
             <div class="support-title">
-              <span class="support-icon warm" aria-hidden="true">☕</span>
+              <span class="support-icon" aria-hidden="true">☕</span>
               {{ t('settings.about.originalAuthorTitle') }}
             </div>
             <p class="support-text">{{ t('settings.about.sponsorText') }}</p>
-            <ul class="support-points warm">
+            <ul class="support-points">
               <li>{{ t('settings.about.originalAuthorPoint') }}</li>
               <li>{{ t('settings.about.sponsorHint') }}</li>
             </ul>
@@ -565,8 +565,12 @@ const handleAboutClick = (e: MouseEvent) => {
 }
 
 .support-card {
-  margin: 0 0 1.25rem;
-  padding: 1.1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.95rem 1.05rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
   border: 1px solid color-mix(in srgb, var(--td-brand-color) 32%, transparent);
   border-radius: 0.75rem;
   background:
@@ -575,20 +579,8 @@ const handleAboutClick = (e: MouseEvent) => {
   box-shadow: 0 6px 18px color-mix(in srgb, var(--td-brand-color) 8%, transparent);
 }
 
-.support-card.current-author {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1.25rem;
-  align-items: center;
-}
-
 .support-card.original-author {
   margin-bottom: 0;
-  border-color: color-mix(in srgb, var(--td-warning-color) 34%, transparent);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--td-warning-color) 10%, transparent), transparent 58%),
-    var(--td-bg-color-container);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--td-warning-color) 8%, transparent);
 }
 
 .support-copy {
@@ -616,16 +608,10 @@ const handleAboutClick = (e: MouseEvent) => {
   background: color-mix(in srgb, var(--td-error-color) 16%, transparent);
   color: var(--td-error-color);
   font-size: 0.7rem;
-
-  &.warm {
-    background: color-mix(in srgb, var(--td-warning-color) 16%, transparent);
-    color: var(--td-warning-color);
-  }
 }
 
-.support-text,
-.support-copy .support-text {
-  margin: 0 0 1rem;
+.support-text {
+  margin: 0 0 0.7rem;
   color: var(--td-text-color-secondary);
   font-size: 0.85rem;
   line-height: 1.5;
@@ -636,16 +622,14 @@ const handleAboutClick = (e: MouseEvent) => {
   margin: 0;
   padding-left: 1.1rem;
   color: var(--td-text-color-secondary);
-  font-size: 0.8rem;
-  line-height: 1.65;
+  font-size: 0.78rem;
+  line-height: 1.55;
 
   li::marker { color: var(--td-brand-color); }
-
-  &.warm li::marker { color: var(--td-warning-color); }
 }
 
 .support-qr {
-  width: 168px;
+  width: 148px;
   margin: 0;
   text-align: center;
 
@@ -659,43 +643,74 @@ const handleAboutClick = (e: MouseEvent) => {
 
   figcaption {
     margin-top: 0.5rem;
-    color: var(--td-text-color-disabled);
+    color: var(--td-text-color-secondary);
     font-size: 0.72rem;
     line-height: 1.3;
   }
 }
 .legal-notice {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.75rem;
+
   .notice-item {
-    margin-bottom: 1.5rem; &:last-child { margin-bottom: 0; }
-    h4 { margin: 0 0 0.5rem; font-size: 0.875rem; font-weight: 600; color: var(--td-text-color-primary); }
-    p { margin: 0; font-size: 0.875rem; color: var(--td-text-color-secondary); line-height: 1.5; }
+    padding: 0.85rem 0.95rem;
+    background: var(--td-bg-color-page);
+    border: 1px solid var(--td-border-level-1-color);
+    border-radius: 0.65rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--td-brand-color) 32%, transparent);
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--td-brand-color) 7%, transparent);
+    }
+
+    h4 {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 0 0 0.35rem;
+      font-size: 0.8125rem;
+      font-weight: 650;
+      color: var(--td-text-color-primary);
+
+      &::before {
+        content: '';
+        width: 0.45rem;
+        height: 0.45rem;
+        flex-shrink: 0;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--td-brand-color) 72%, transparent);
+      }
+    }
+
+    p {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--td-text-color-secondary);
+      line-height: 1.55;
+    }
   }
 }
 
-.support-card.current-author {
+.support-card.current-author,
+.support-card.original-author {
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
     justify-items: center;
     text-align: left;
 
-    .support-qr { width: min(58vw, 180px); }
-  }
-}
-
-.support-card.original-author {
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-    justify-items: center;
-    text-align: left;
-
-    .support-qr { width: min(58vw, 180px); }
+    .support-qr { width: min(52vw, 160px); }
   }
 }
 
 .about-us {
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
   .about-intro {
-    margin: 0 0 1.25rem; color: var(--td-text-color-secondary); font-size: 0.9rem; line-height: 1.7;
+    margin: 0 0 1rem;
+    color: var(--td-text-color-secondary);
+    font-size: 0.85rem;
+    line-height: 1.65;
     .about-link {
       color: var(--td-brand-color); cursor: pointer; font-weight: 500;
       text-decoration: underline; text-decoration-color: var(--td-brand-color-3);
@@ -703,6 +718,10 @@ const handleAboutClick = (e: MouseEvent) => {
       &:hover { text-decoration-color: var(--td-brand-color); }
     }
   }
+}
+
+.setting-group .about-us-title {
+  margin-top: 1.25rem;
 }
 @media (max-width: 768px) {
   .setting-group {
@@ -790,12 +809,17 @@ const handleAboutClick = (e: MouseEvent) => {
     }
   }
 
-  .legal-notice .notice-item {
-    margin-bottom: 14px;
+  .legal-notice {
+    grid-template-columns: 1fr;
+    gap: 10px;
 
-    p {
-      font-size: 13px;
-      line-height: 1.55;
+    .notice-item {
+      padding: 12px;
+
+      p {
+        font-size: 13px;
+        line-height: 1.55;
+      }
     }
   }
 
