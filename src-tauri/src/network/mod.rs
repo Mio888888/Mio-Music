@@ -33,6 +33,11 @@ impl HttpPolicy {
         Self::new(false)
     }
 
+    /// Allow local/private sources only for explicit plugin package downloads.
+    pub const fn plugin_download() -> Self {
+        Self::new(true)
+    }
+
     pub const fn dlna_local() -> Self {
         Self::new(true)
     }
@@ -718,6 +723,32 @@ mod tests {
         assert!(error.contains("全局"));
         assert_eq!(1, governor.available_response_slots());
         assert_eq!(8, governor.available_bytes());
+    }
+
+    #[tokio::test]
+    async fn plugin_download_accepts_local_http_source() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            tokio::io::AsyncReadExt::read(&mut socket, &mut [0; 1024])
+                .await
+                .unwrap();
+            tokio::io::AsyncWriteExt::write_all(
+                &mut socket,
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+            )
+            .await
+            .unwrap();
+        });
+
+        let response = RestrictedHttpClient::new(HttpPolicy::plugin_download())
+            .fetch_bytes(&format!("http://{address}/plugin.js"), 1024, &["text/*"])
+            .await
+            .unwrap();
+        server.await.unwrap();
+
+        assert_eq!(b"ok", response.bytes.as_slice());
     }
 
     #[tokio::test]

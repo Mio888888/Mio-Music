@@ -103,7 +103,8 @@ pub async fn plugin__download_and_add(pm: State<'_, PluginManager>, args: Value)
     let plugin_type = require_str(&p, "pluginType")?;
     let target_plugin_id = opt_str(&p, "targetPluginId");
 
-    let response = RestrictedHttpClient::new(HttpPolicy::public_proxy())
+    // Plugin packages may be hosted on a user's own LAN/NAS or local dev server.
+    let response = RestrictedHttpClient::new(HttpPolicy::plugin_download())
         .fetch_bytes(
             &url,
             5 * 1024 * 1024,

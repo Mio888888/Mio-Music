@@ -2,10 +2,9 @@
 import { computed, ref } from 'vue'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
-import { check } from '@tauri-apps/plugin-updater'
-import { relaunch } from '@tauri-apps/plugin-process'
 import { platform as getPlatform } from '@tauri-apps/plugin-os'
 import { MessagePlugin } from 'tdesign-vue-next'
+import { useAppUpdater } from '@/composables/useAppUpdater'
 
 const { t } = useI18n()
 
@@ -17,104 +16,40 @@ const updateAutoUpdate = () => {
   settingsStore.updateSettings({ autoUpdate: autoUpdate.value })
 }
 
-const appVersion = ref('1.0.0')
-
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'
-const updateStatus = ref<UpdateStatus>('idle')
-const isChecking = ref(false)
-const newVersion = ref('')
-const updateBody = ref('')
-const downloadPercent = ref(0)
-const downloadDetail = ref('')
-const errorMsg = ref('')
+const {
+  status: updateStatus,
+  currentVersion: appVersion,
+  newVersion,
+  releaseNotes: updateBody,
+  progress: downloadPercent,
+  totalBytes,
+  downloadedMb,
+  totalMb,
+  error: errorMsg,
+  checkForUpdate,
+  downloadAndInstall,
+  restartToInstall,
+  dismiss: dismissUpdate
+} = useAppUpdater()
 
 const isMacOS = ref(false)
 try {
   isMacOS.value = getPlatform() === 'macos'
 } catch {}
 
-const getAppVersion = async () => {
-  try {
-    const { getVersion } = await import('@tauri-apps/api/app')
-    appVersion.value = await getVersion()
-  } catch { appVersion.value = '1.0.0' }
-}
-getAppVersion()
-
 const handleCheckUpdate = async () => {
-  isChecking.value = true
-  updateStatus.value = 'checking'
-  errorMsg.value = ''
-  newVersion.value = ''
-  downloadPercent.value = 0
-  downloadDetail.value = ''
-
-  try {
-    const update = await check()
-    if (!update) {
-      updateStatus.value = 'up-to-date'
-      return
-    }
-
-    newVersion.value = update.version
-    updateBody.value = update.body || ''
-    updateStatus.value = 'available'
-  } catch (e: any) {
-    console.error('检查更新错误:', e)
-    updateStatus.value = 'error'
-    errorMsg.value = e?.message || e?.toString?.() || JSON.stringify(e) || t('settings.about.checkUpdateFailed')
-  } finally {
-    isChecking.value = false
-  }
+  await checkForUpdate()
 }
 
-const handleDownloadAndInstall = async () => {
-  if (isMacOS.value) return
-
-  updateStatus.value = 'downloading'
-  downloadPercent.value = 0
-  downloadDetail.value = ''
-
-  try {
-    const update = await check()
-    if (!update) {
-      updateStatus.value = 'up-to-date'
-      return
-    }
-
-    let contentLength = 0
-    let downloaded = 0
-
-    await update.downloadAndInstall((event) => {
-      switch (event.event) {
-        case 'Started':
-          contentLength = event.data.contentLength ?? 0
-          break
-        case 'Progress':
-          downloaded += event.data.chunkLength
-          if (contentLength > 0) {
-            downloadPercent.value = Math.round(downloaded / contentLength * 100)
-            const mb = (downloaded / 1024 / 1024).toFixed(1)
-            const total = (contentLength / 1024 / 1024).toFixed(1)
-            downloadDetail.value = `${mb} MB / ${total} MB`
-          }
-          break
-        case 'Finished':
-          break
-      }
-    })
-
-    updateStatus.value = 'downloaded'
-  } catch (e: any) {
-    updateStatus.value = 'error'
-    errorMsg.value = e?.message || t('settings.about.downloadUpdateFailed')
-  }
+const handleUpdateInstall = async () => {
+  await downloadAndInstall()
 }
 
-const handleRelaunch = async () => {
+const restartNow = async () => {
   try {
-    await relaunch()
-  } catch {
+    await restartToInstall()
+  } catch (e) {
+    console.error('重启应用以安装更新失败:', e)
     MessagePlugin.error(t('settings.about.restartFailed'))
   }
 }
@@ -166,13 +101,13 @@ const handleAboutClick = (e: MouseEvent) => {
           <t-button
             class="update-check-button"
             theme="primary"
-            :disabled="isChecking || updateStatus === 'downloading'"
-            :aria-busy="isChecking"
+            :disabled="updateStatus === 'checking' || updateStatus === 'downloading'"
+            :aria-busy="updateStatus === 'checking'"
             @click="handleCheckUpdate"
           >
             <span class="update-check-content">
-              <span v-if="isChecking" class="update-check-spinner" aria-hidden="true" />
-              {{ isChecking ? t('settings.about.checking') : t('settings.about.checkUpdate') }}
+              <span v-if="updateStatus === 'checking'" class="update-check-spinner" aria-hidden="true" />
+              {{ updateStatus === 'checking' ? t('settings.about.checking') : t('settings.about.checkUpdate') }}
             </span>
           </t-button>
         </div>
@@ -203,11 +138,11 @@ const handleAboutClick = (e: MouseEvent) => {
             <t-button
               v-else
               theme="primary"
-              @click="handleDownloadAndInstall"
+              @click="handleUpdateInstall"
             >
               {{ t('settings.about.downloadAndInstall') }}
             </t-button>
-            <t-button variant="text" @click="updateStatus = 'idle'">{{ t('settings.about.remindLater') }}</t-button>
+            <t-button variant="text" @click="dismissUpdate">{{ t('settings.about.remindLater') }}</t-button>
           </div>
         </div>
 
@@ -218,7 +153,9 @@ const handleAboutClick = (e: MouseEvent) => {
             <span>{{ t('settings.about.downloading') }} v{{ newVersion }}...</span>
           </div>
           <t-progress :percentage="downloadPercent" theme="plump" :label="`${downloadPercent}%`" />
-          <div v-if="downloadDetail" class="progress-detail">{{ downloadDetail }}</div>
+          <div v-if="totalBytes > 0" class="progress-detail">
+            {{ downloadedMb }} MB / {{ totalMb }} MB
+          </div>
         </div>
 
         <!-- 下载完成 -->
@@ -227,7 +164,7 @@ const handleAboutClick = (e: MouseEvent) => {
             <span class="update-icon">✓</span>
             <span>{{ t('settings.about.updateDownloaded') }}</span>
           </div>
-          <t-button theme="primary" @click="handleRelaunch">{{ t('settings.about.restartNow') }}</t-button>
+          <t-button theme="primary" @click="restartNow">{{ t('settings.about.restartNow') }}</t-button>
         </div>
 
         <!-- 错误 -->

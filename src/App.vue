@@ -17,16 +17,26 @@ import Provider from '@/components/layout/Provider.vue'
 import GlobalContextMenu from '@/components/ContextMenu/GlobalContextMenu.vue'
 import { useAuthStore } from '@/store/Auth'
 import { LocalUserDetailStore } from '@/store/LocalUserDetail'
+import { useSettingsStore } from '@/store/Settings'
+import { useAppUpdater } from '@/composables/useAppUpdater'
 import { setupMediaButtonListener } from '@/utils/audio/globaPlayList'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const settingsStore = useSettingsStore()
+const { checkForUpdate } = useAppUpdater()
+
+async function checkForUpdateOnStartup() {
+  if (!settingsStore.settings.autoUpdate) return
+  await checkForUpdate()
+}
 
 onMounted(async () => {
   if (window.location.hash.includes('/desktop-lyric')) return
 
   setupMediaButtonListener()
   LocalUserDetailStore().init()
+  void checkForUpdateOnStartup()
   const url = new URL(window.location.href)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
