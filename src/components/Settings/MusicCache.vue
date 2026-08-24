@@ -9,10 +9,8 @@
       </div>
       <div class="card-body">
         <t-button
-          size="large"
           :loading="cacheInfo.clearing"
           :disabled="!cacheInfo.count || cacheInfo.count === 0"
-          block
           @click="clearCache"
         >
           {{ cacheInfo.clearing ? t('settings.storage.clearingCache') : t('settings.storage.clearLocalCache') }}
@@ -158,9 +156,9 @@ defineExpose({
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding-bottom: 16px;
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--td-border-level-1-color);
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .card-title {
@@ -171,20 +169,19 @@ defineExpose({
   }
 
   .cache-stats {
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--td-text-color-secondary);
     white-space: nowrap;
     text-align: right;
   }
 
   .card-body {
-    padding: 4px 0 0;
-    text-align: center;
+    padding: 0;
 
     .no-cache-tip {
-      margin-top: 10px;
+      margin-top: 8px;
       color: var(--td-text-color-placeholder);
-      font-size: 14px;
+      font-size: 12.5px;
     }
   }
 }

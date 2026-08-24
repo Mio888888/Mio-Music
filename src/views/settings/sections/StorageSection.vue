@@ -284,8 +284,8 @@ const getTagOptionsStatus = () => {
 .setting-group {
   background: var(--settings-group-bg, var(--td-bg-color-container));
   border-radius: 0.75rem;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 0.85rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
   box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out;
@@ -298,16 +298,16 @@ const getTagOptionsStatus = () => {
   }
 
   h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1.125rem;
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--td-text-color-primary);
   }
 
   > p {
-    margin: 0 0 1.5rem;
+    margin: 0 0 0.85rem;
     color: var(--td-text-color-secondary);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
 }
 
@@ -315,27 +315,27 @@ const getTagOptionsStatus = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.875rem 1rem;
+  padding: 0.65rem 0.85rem;
   border: 1px solid var(--settings-feature-border, var(--td-border-level-1-color));
   background: var(--settings-feature-bg, var(--td-bg-color-container));
   border-radius: 0.5rem;
-  margin-top: 0.75rem;
+  margin-top: 0.6rem;
 
   .item-info {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.15rem;
 
     .item-title {
       font-weight: 600;
       color: var(--td-text-color-primary);
-      font-size: 0.95rem;
+      font-size: 0.875rem;
       line-height: 1.2;
     }
 
     .item-desc {
       color: var(--td-text-color-secondary);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       line-height: 1.2;
     }
   }
@@ -370,7 +370,9 @@ const getTagOptionsStatus = () => {
 .template-tip {
   display: flex;
   align-items: center;
-  gap: 2em;
+  gap: 0.85em;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
   color: var(--td-text-color-secondary);
 }
 
@@ -379,14 +381,20 @@ const getTagOptionsStatus = () => {
   align-items: center;
   gap: 0.5em;
   color: var(--td-text-color-secondary);
+  font-size: 0.8125rem;
 }
 
 .preview-container {
   display: flex;
   align-items: center;
   gap: 0.5em;
-  margin: 0.5em 0 0 0;
+  margin: 0.5rem 0 0 0;
+  padding: 0.55rem 0.75rem;
   color: var(--td-text-color-secondary);
+  background: var(--settings-feature-bg, var(--td-bg-color-container));
+  border: 1px solid var(--td-border-level-1-color);
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
 }
 
 .preview-container > div:last-child {
@@ -398,33 +406,33 @@ const getTagOptionsStatus = () => {
 .tag-options {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
 
   .tag-option {
-    padding: 1rem;
+    padding: 0.7rem 0.85rem;
     background: var(--settings-feature-bg, var(--td-bg-color-container));
     border-radius: 0.5rem;
     border: 1px solid var(--td-border-level-1-color);
 
     .option-desc {
-      margin: 0.5rem 0 0 1.5rem;
-      font-size: 0.875rem;
+      margin: 0.3rem 0 0 1.5rem;
+      font-size: 0.78rem;
       color: var(--td-text-color-secondary);
       line-height: 1.4;
     }
   }
 
   .lyric-format-options {
-    padding-top: 1rem;
-    margin-top: 1rem;
+    padding-top: 0.7rem;
+    margin-top: 0;
     border-top: 1px solid var(--td-border-level-1-color);
   }
 }
 
 .tag-options-status {
   background: var(--td-bg-color-page);
-  padding: 1rem;
+  padding: 0.65rem 0.85rem;
   border-radius: 0.5rem;
   border: 1px solid var(--td-border-level-1-color);
 }
@@ -437,13 +445,13 @@ const getTagOptionsStatus = () => {
   .status-label {
     font-weight: 500;
     color: var(--td-text-color-secondary);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
 
   .status-value {
     font-weight: 600;
     color: var(--td-text-color-primary);
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
 }
 
@@ -478,7 +486,7 @@ const getTagOptionsStatus = () => {
   .setting-item {
     align-items: flex-start;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
     padding: 10px 12px;
 
     .item-info {
@@ -487,8 +495,7 @@ const getTagOptionsStatus = () => {
   }
 
   .template-tip {
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .template-tip-item {
@@ -504,18 +511,18 @@ const getTagOptionsStatus = () => {
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-radius: 8px;
     background: var(--settings-feature-bg, var(--td-bg-color-container));
     word-break: break-all;
   }
 
   .tag-options {
-    gap: 10px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 10px;
 
     .tag-option {
-      padding: 12px;
+      padding: 10px 12px;
 
       .option-desc {
         margin: 6px 0 0 0;
@@ -531,7 +538,7 @@ const getTagOptionsStatus = () => {
   }
 
   .tag-options-status {
-    padding: 12px;
+    padding: 10px 12px;
   }
 
   .status-summary {
