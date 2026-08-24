@@ -12,5 +12,10 @@ export function withViewTransition(
     return callback()
   }
   const transition = document.startViewTransition(callback)
-  return transition.finished.catch(() => {})
+  // A duplicate shared-element name aborts capture before "finished" settles.
+  // Attach handlers to every lifecycle promise so browser-generated rejections
+  // do not become unhandled promise rejections; callback errors still reject here.
+  transition.ready.catch(() => {})
+  transition.finished.catch(() => {})
+  return transition.updateCallbackDone
 }

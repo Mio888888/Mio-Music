@@ -165,6 +165,16 @@ npm run preview    # Preview production build
 - [LINUX DO](https://linux.do) — Community support
 - [AutoEq](https://github.com/jaakkopasanen/AutoEq) — Auto equalizer preset data
 
+## Support the Current Author
+
+Ongoing maintenance, cross-platform adaptation, and issue fixes for Mio Music are contributed by the current project author. If this project helps you, you can support future development with the appreciation code below.
+
+<p align="center">
+  <img src="src/assets/images/current-author-sponsor-qr.jpg" width="240" alt="Current project author's appreciation code" />
+</p>
+
+> All donations are voluntary and go directly toward the current author's continued development and maintenance.
+
 ## Disclaimer
 
 This project is for educational and personal use only. It does not directly fetch, store, or transmit any music data or copyrighted content — it only provides a plugin runtime framework. Use for any commercial purpose or infringement of third-party rights is prohibited.

@@ -165,6 +165,16 @@ npm run preview    # 预览生产构建
 - [LINUX DO](https://linux.do) — 社区支持
 - [AutoEq](https://github.com/jaakkopasanen/AutoEq) — 自动均衡器预设数据
 
+## 支持现项目作者
+
+Mio Music 的持续维护、跨平台适配和问题修复由现项目作者投入。如果这个项目对你有帮助，欢迎通过下面的赞赏码支持后续开发。
+
+<p align="center">
+  <img src="src/assets/images/current-author-sponsor-qr.jpg" width="240" alt="现项目作者赞赏码" />
+</p>
+
+> 所有赞赏均为自愿支持，将直接用于现项目作者的后续开发与维护。
+
 ## 声明
 
 本项目仅供学习交流使用，不直接获取、存储、传输任何音乐数据或版权内容，仅提供插件运行框架。禁止用于任何商业运营或侵犯第三方权益的场景。

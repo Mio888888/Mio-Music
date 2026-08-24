@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
 import { platform as getPlatform } from '@tauri-apps/plugin-os'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useAppUpdater } from '@/composables/useAppUpdater'
+import currentAuthorSponsorQr from '@/assets/images/current-author-sponsor-qr.jpg'
 
 const { t } = useI18n()
 
@@ -36,6 +39,57 @@ const isMacOS = ref(false)
 try {
   isMacOS.value = getPlatform() === 'macos'
 } catch {}
+
+const updateNotesHtml = ref('')
+const notesExpanded = ref(false)
+const notesContentRef = ref<HTMLElement | null>(null)
+const notesOverflowing = ref(false)
+
+const renderUpdateNotes = async () => {
+  const notes = updateBody.value.trim()
+  if (!notes) {
+    updateNotesHtml.value = ''
+    notesOverflowing.value = false
+    return
+  }
+
+  try {
+    updateNotesHtml.value = DOMPurify.sanitize(
+      await marked(notes, { gfm: true, breaks: true }),
+      { USE_PROFILES: { html: true } }
+    )
+  } catch (error) {
+    console.warn('渲染更新日志失败:', error)
+    updateNotesHtml.value = ''
+  }
+}
+
+const measureNotesOverflow = async () => {
+  await nextTick()
+  const el = notesContentRef.value
+  notesOverflowing.value = !!el && el.scrollHeight > el.clientHeight + 4
+}
+
+watch(updateBody, () => {
+  notesExpanded.value = false
+  renderUpdateNotes().then(measureNotesOverflow)
+})
+
+watch(notesExpanded, measureNotesOverflow)
+
+onMounted(() => {
+  renderUpdateNotes().then(measureNotesOverflow)
+})
+
+const handleNotesClick = (event: MouseEvent) => {
+  const anchor = (event.target as HTMLElement).closest('a')
+  if (!anchor) return
+  event.preventDefault()
+  const href = anchor.getAttribute('href')
+  if (href && /^https?:\/\//i.test(href)) {
+    openLink(href)
+  }
+}
 
 const handleCheckUpdate = async () => {
   await checkForUpdate()
@@ -121,9 +175,32 @@ const handleAboutClick = (e: MouseEvent) => {
         <div v-if="updateStatus === 'available'" class="update-card">
           <div class="update-header">
             <span class="update-icon new">↑</span>
-            <span>{{ t('settings.about.newVersionFound') }} <strong>v{{ newVersion }}</strong></span>
+            <div class="update-title">
+              <span>{{ t('settings.about.newVersionFound') }}</span>
+              <span class="version-badge">v{{ newVersion }}</span>
+            </div>
           </div>
-          <div v-if="updateBody" class="update-notes">{{ updateBody }}</div>
+
+          <div v-if="updateNotesHtml" class="release-notes">
+            <div class="release-notes-heading">{{ t('settings.about.releaseNotes') }}</div>
+            <div
+              ref="notesContentRef"
+              class="markdown-content"
+              :class="{ collapsed: !notesExpanded && notesOverflowing }"
+              v-html="updateNotesHtml"
+              @click="handleNotesClick"
+            ></div>
+            <div v-if="!notesExpanded && notesOverflowing" class="release-notes-fade" aria-hidden="true"></div>
+          </div>
+
+          <button
+            v-if="notesOverflowing || notesExpanded"
+            type="button"
+            class="notes-toggle"
+            @click="notesExpanded = !notesExpanded"
+          >
+            {{ notesExpanded ? t('settings.about.hideFullNotes') : t('settings.about.showFullNotes') }}
+          </button>
 
           <div class="update-actions-row">
             <!-- macOS: 引导手动下载 -->
@@ -159,11 +236,12 @@ const handleAboutClick = (e: MouseEvent) => {
         </div>
 
         <!-- 下载完成 -->
-        <div v-if="updateStatus === 'downloaded'" class="update-card success">
+        <div v-if="updateStatus === 'downloaded'" class="update-card downloaded">
           <div class="update-header">
             <span class="update-icon">✓</span>
             <span>{{ t('settings.about.updateDownloaded') }}</span>
           </div>
+          <div v-if="newVersion" class="downloaded-version">{{ t('settings.about.readyVersion') }} v{{ newVersion }}</div>
           <t-button theme="primary" @click="restartNow">{{ t('settings.about.restartNow') }}</t-button>
         </div>
 
@@ -171,25 +249,6 @@ const handleAboutClick = (e: MouseEvent) => {
         <div v-if="updateStatus === 'error'" class="update-card error">
           <span class="update-icon err">!</span> {{ errorMsg }}
         </div>
-      </div>
-    </div>
-
-    <div id="about-tech" class="setting-group">
-      <h3>{{ t('settings.about.techStack') }}</h3>
-      <div class="tech-stack">
-        <div class="tech-item"><span class="tech-name">Tauri 2</span><span class="tech-desc">{{ t('settings.about.techTauri2') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Rust</span><span class="tech-desc">{{ t('settings.about.techRust') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Vue 3</span><span class="tech-desc">{{ t('settings.about.techVue3') }}</span></div>
-        <div class="tech-item"><span class="tech-name">TypeScript</span><span class="tech-desc">{{ t('settings.about.techTypeScript') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Pinia</span><span class="tech-desc">{{ t('settings.about.techPinia') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">{{ t('settings.about.techVite') }}</span></div>
-        <div class="tech-item"><span class="tech-name">TDesign</span><span class="tech-desc">{{ t('settings.about.techTDesign') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Three.js</span><span class="tech-desc">{{ t('settings.about.techThreejs') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Rodio</span><span class="tech-desc">{{ t('settings.about.techRodio') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Symphonia</span><span class="tech-desc">{{ t('settings.about.techSymphonia') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Lofty</span><span class="tech-desc">{{ t('settings.about.techLofty') }}</span></div>
-        <div class="tech-item"><span class="tech-name">Rusqlite</span><span class="tech-desc">{{ t('settings.about.techRusqlite') }}</span></div>
-        <div class="tech-item link" style="cursor:pointer" @click="openLink('https://github.com/Steve-xmh/applemusic-like-lyrics')"><span class="tech-name">AMLL</span><span class="tech-desc">{{ t('settings.about.techAmll') }}</span></div>
       </div>
     </div>
 
@@ -203,6 +262,26 @@ const handleAboutClick = (e: MouseEvent) => {
       <h3 style="margin-top: 2rem">{{ t('settings.about.aboutUs') }}</h3>
       <div class="about-us">
         <p class="about-intro" v-html="aboutIntroHtml" @click="handleAboutClick"></p>
+
+        <div class="support-card current-author">
+          <div class="support-copy">
+            <div class="support-title">
+              <span class="support-icon" aria-hidden="true">♥</span>
+              {{ t('settings.about.supportCurrentAuthorTitle') }}
+            </div>
+            <p class="support-text">{{ t('settings.about.supportCurrentAuthorText') }}</p>
+            <ul class="support-points">
+              <li>{{ t('settings.about.supportPointMaintenance') }}</li>
+              <li>{{ t('settings.about.supportPointCompatibility') }}</li>
+              <li>{{ t('settings.about.supportPointTransparency') }}</li>
+            </ul>
+          </div>
+          <figure class="support-qr">
+            <img :src="currentAuthorSponsorQr" :alt="t('settings.about.currentSponsorImageAlt')" />
+            <figcaption>{{ t('settings.about.supportQrCaption') }}</figcaption>
+          </figure>
+        </div>
+
         <div class="sponsor-card">
           <p class="sponsor-text">{{ t('settings.about.sponsorText') }} ☕</p>
           <div class="sponsor-qr">
@@ -290,6 +369,10 @@ const handleAboutClick = (e: MouseEvent) => {
     color: var(--td-success-color);
     flex-direction: row; align-items: center; gap: 0.5rem;
   }
+
+  &.downloaded {
+    border-color: var(--td-success-color);
+  }
   &.error {
     border-color: var(--td-error-color);
     color: var(--td-error-color);
@@ -308,11 +391,150 @@ const handleAboutClick = (e: MouseEvent) => {
 }
 .update-header {
   display: flex; align-items: center; gap: 0.5rem;
-  strong { color: var(--td-brand-color); }
+
+  .update-title {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.45rem;
+    color: var(--td-text-color-primary);
+    font-weight: 600;
+  }
+
+  .version-badge {
+    display: inline-flex; align-items: center;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--td-brand-color-1);
+    border: 1px solid var(--td-brand-color-3);
+    color: var(--td-brand-color-6);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
 }
-.update-notes {
-  color: var(--td-text-color-secondary); font-size: 0.8rem; line-height: 1.5;
-  margin: 0.25rem 0 0.25rem 1.75rem; white-space: pre-wrap;
+
+.release-notes {
+  position: relative;
+  margin: 0.25rem 0 0.25rem 1.75rem;
+  border: 1px solid var(--td-border-level-1-color);
+  border-radius: 0.6rem;
+  background: var(--td-bg-color-container);
+  overflow: hidden;
+}
+
+.release-notes-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.65rem 0.85rem;
+  background: color-mix(in srgb, var(--td-brand-color) 7%, var(--td-bg-color-container));
+  border-bottom: 1px solid var(--td-border-level-1-color);
+  color: var(--td-text-color-primary);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.markdown-content {
+  max-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 0.9rem 0.9rem;
+  color: var(--td-text-color-secondary);
+  font-size: 0.8rem;
+  line-height: 1.55;
+
+  &.collapsed { overflow: hidden; }
+
+  :deep(h1), :deep(h2), :deep(h3), :deep(h4), :deep(h5), :deep(h6) {
+    margin: 0.85rem 0 0.45rem;
+    color: var(--td-text-color-primary);
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  :deep(h1:first-child), :deep(h2:first-child), :deep(h3:first-child),
+  :deep(p:first-child), :deep(ul:first-child), :deep(ol:first-child) {
+    margin-top: 0;
+  }
+
+  :deep(h1:last-child), :deep(h2:last-child), :deep(h3:last-child),
+  :deep(p:last-child), :deep(ul:last-child), :deep(ol:last-child) {
+    margin-bottom: 0;
+  }
+
+  :deep(p) { margin: 0.4rem 0; }
+
+  :deep(ul), :deep(ol) {
+    margin: 0.4rem 0;
+    padding-left: 1.35rem;
+  }
+
+  :deep(li) {
+    margin: 0.28rem 0;
+    line-height: 1.5;
+  }
+
+  :deep(li::marker) { color: var(--td-brand-color); }
+
+  :deep(strong) { color: var(--td-text-color-primary); }
+
+  :deep(code) {
+    padding: 0.1em 0.32em;
+    border-radius: 0.3rem;
+    background: color-mix(in srgb, var(--td-text-color-primary) 7%, transparent);
+    color: inherit;
+    font-size: 0.94em;
+  }
+
+  :deep(blockquote) {
+    margin: 0.5rem 0;
+    padding: 0.35rem 0.7rem;
+    border-left: 3px solid var(--td-brand-color);
+    background: color-mix(in srgb, var(--td-brand-color) 6%, transparent);
+    color: var(--td-text-color-secondary);
+  }
+
+  :deep(a) {
+    color: var(--td-brand-color);
+    text-decoration: none;
+    font-weight: 550;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; text-underline-offset: 2px; }
+  }
+}
+
+.release-notes-fade {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  height: 48px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--td-bg-color-container) 92%, transparent)
+  );
+}
+
+.notes-toggle {
+  align-self: flex-start;
+  margin: -0.15rem 0 0 1.75rem;
+  padding: 0.2rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--td-brand-color);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.downloaded-version {
+  color: var(--td-text-color-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: -0.15rem;
 }
 .update-actions-row {
   display: flex; gap: 0.5rem; margin-top: 0.25rem; padding-left: 1.75rem;
@@ -331,6 +553,91 @@ const handleAboutClick = (e: MouseEvent) => {
     &.link:hover { background-color: var(--td-brand-color-1); border-color: var(--td-brand-color); }
   }
 }
+
+.support-card {
+  margin: 0 0 1.25rem;
+  padding: 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--td-brand-color) 32%, transparent);
+  border-radius: 0.75rem;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--td-brand-color) 10%, transparent), transparent 58%),
+    var(--td-bg-color-container);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+}
+
+.support-card.current-author {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.support-copy {
+  min-width: 0;
+}
+
+.support-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+  color: var(--td-text-color-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.support-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--td-error-color) 16%, transparent);
+  color: var(--td-error-color);
+  font-size: 0.7rem;
+}
+
+.support-text,
+.sponsor-text {
+  margin: 0 0 1rem;
+  color: var(--td-text-color-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.support-points {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--td-text-color-secondary);
+  font-size: 0.8rem;
+  line-height: 1.65;
+
+  li::marker { color: var(--td-brand-color); }
+}
+
+.support-qr {
+  width: 168px;
+  margin: 0;
+  text-align: center;
+
+  img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 0.7rem;
+    border: 1px solid var(--td-border-level-1-color);
+  }
+
+  figcaption {
+    margin-top: 0.5rem;
+    color: var(--td-text-color-disabled);
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+}
 .legal-notice {
   .notice-item {
     margin-bottom: 1.5rem; &:last-child { margin-bottom: 0; }
@@ -338,6 +645,17 @@ const handleAboutClick = (e: MouseEvent) => {
     p { margin: 0; font-size: 0.875rem; color: var(--td-text-color-secondary); line-height: 1.5; }
   }
 }
+
+.support-card.current-author {
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: left;
+
+    .support-qr { width: min(58vw, 180px); }
+  }
+}
+
 .about-us {
   margin-top: 0.5rem;
   .about-intro {
@@ -420,13 +738,21 @@ const handleAboutClick = (e: MouseEvent) => {
     padding: 12px;
   }
 
+  .release-notes {
+    margin-left: 0;
+
+    .markdown-content {
+      max-height: min(46vh, 220px);
+    }
+  }
+
+  .notes-toggle {
+    margin-left: 0;
+  }
+
   .update-actions-row {
     padding-left: 0;
     flex-wrap: wrap;
-  }
-
-  .update-notes {
-    margin-left: 0;
   }
 
   .tech-stack {

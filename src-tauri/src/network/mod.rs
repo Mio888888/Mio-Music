@@ -436,7 +436,14 @@ pub async fn validate_public_http_url(raw_url: &str) -> Result<ValidatedHttpTarg
 pub fn is_blocked_network_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ip) => {
-            let [a, b, c, _] = ip.octets();
+            let [a, b, c, d] = ip.octets();
+            // RFC 2544 benchmark addresses (198.18.0.0/15) are often used by local
+            // proxy/VPN "fake-ip" DNS modes for public hostnames. They do not prove
+            // that the caller requested a private address, so only the shared loopback
+            // mapping remains blocked here.
+            if a == 198 && b == 18 && c == 0 && d == 1 {
+                return true;
+            }
             ip.is_private()
                 || ip.is_loopback()
                 || ip.is_link_local()
@@ -448,7 +455,6 @@ pub fn is_blocked_network_ip(ip: IpAddr) -> bool {
                 || (a == 192 && b == 0 && c == 0)
                 || (a == 192 && b == 0 && c == 2)
                 || (a == 192 && b == 88 && c == 99)
-                || (a == 198 && (b == 18 || b == 19))
                 || (a == 198 && b == 51 && c == 100)
                 || (a == 203 && b == 0 && c == 113)
                 || a >= 240
@@ -614,6 +620,14 @@ mod tests {
         for raw_ip in ["fec0::1", "feff:ffff::1"] {
             assert!(is_blocked_network_ip(raw_ip.parse::<IpAddr>().unwrap()));
         }
+    }
+
+    #[test]
+    fn allows_proxy_fake_ip_ranges_but_keeps_shared_loopback_blocked() {
+        for raw_ip in ["198.18.0.2", "198.18.255.254", "198.19.0.1", "198.19.255.255"] {
+            assert!(!is_blocked_network_ip(raw_ip.parse::<IpAddr>().unwrap()));
+        }
+        assert!(is_blocked_network_ip("198.18.0.1".parse::<IpAddr>().unwrap()));
     }
 
     #[test]
