@@ -620,15 +620,17 @@ fn parse_krc_lyric(str: &str) -> Result<serde_json::Value, String> {
         }
     }
 
-    // Parse main lyric with [time,duration] word-by-word format
-    let word_regex = regex_lite::Regex::new(r"\[(\d+),\d+\](.*)").unwrap();
+    // Parse main lyric with [time,duration] word-by-word format.
+    // Emit LYS for word-level karaoke rendering and standard LRC as a fallback.
+    let word_regex = regex_lite::Regex::new(r"\[(\d+),(\d+)\](.*)").unwrap();
     let word_detail_regex = regex_lite::Regex::new(r"<(\d+),(\d+),\d+>([^<]*)").unwrap();
 
     for line in content.lines() {
         if let Some(caps) = word_regex.captures(line) {
             let line_start_ms: i64 = caps[1].parse().unwrap_or(0);
+            let word_content = &caps[3];
+
             let time_tag = ms_to_lrc_time(line_start_ms);
-            let word_content = &caps[2];
 
             // Extract plain text (remove word timing tags)
             let plain_text = word_detail_regex.replace_all(word_content, "$3");
@@ -641,9 +643,11 @@ fn parse_krc_lyric(str: &str) -> Result<serde_json::Value, String> {
                 let duration: i64 = wc[2].parse().unwrap_or(0);
                 let word_text = &wc[3];
                 let abs_time = line_start_ms + offset;
-                cr_words.push_str(&format!("({},{},{})", abs_time, duration, word_text));
+                cr_words.push_str(&format!("{}({},{})", word_text, abs_time, duration));
             }
-            crlyric_lines.push(format!("[{}]{}", time_tag, cr_words));
+            if !cr_words.is_empty() {
+                crlyric_lines.push(format!("[0]{}", cr_words));
+            }
         }
     }
 

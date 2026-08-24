@@ -12,6 +12,7 @@ import {
   parseLrcA2,
   parseYrc,
   parseQrc,
+  parseLys,
   parseTTML
 } from '@applemusic-like-lyrics/lyric'
 import i18n from '@/locales'
@@ -88,6 +89,7 @@ const sanitizeLyricLines = (lines: LyricLine[]): LyricLine[] => {
 }
 
 const parseCrLyricBySource = (source: string, text: string): LyricLine[] => {
+  if (source === 'kg') return parseLys(text)
   return source === 'tx' ? (parseQrc(text) as any) : (parseYrc(text) as any)
 }
 
