@@ -7,7 +7,12 @@ import { musicSdk } from '@/services/musicSdk'
 import { ControlAudioStore } from '@/store/ControlAudio'
 import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { TreeRoundDotIcon } from 'tdesign-icons-vue-next'
-import fonts from '@/assets/icon_font/icons'
+import iconKw from '@/assets/images/sources/kw.png'
+import iconKg from '@/assets/images/sources/kg.png'
+import iconWy from '@/assets/images/sources/wy.png'
+import iconTx from '@/assets/images/sources/tx.png'
+import iconMg from '@/assets/images/sources/mg.png'
+import iconBd from '@/assets/images/sources/bd.png'
 
 const { t } = useI18n()
 
@@ -20,6 +25,18 @@ const QUALITY_ORDER: Record<string, number> = {
 
 const sortQualities = (qualities: string[]): string[] =>
   [...qualities].sort((a, b) => (QUALITY_ORDER[a] ?? 999) - (QUALITY_ORDER[b] ?? 999))
+
+const QUALITY_TIER: Record<string, string> = {
+  '128k': 'standard',
+  '320k': 'standard',
+  flac: 'lossless',
+  flac24bit: 'lossless',
+  hires: 'hires',
+  atmos: 'hires',
+  master: 'hires',
+}
+
+const getQualityTier = (quality: string) => QUALITY_TIER[quality] || 'standard'
 
 const userStore = LocalUserDetailStore()
 const { userInfo } = storeToRefs(userStore)
@@ -211,8 +228,17 @@ const getCurrentSourceName = () => {
 
 const goPlugin = () => { emit('switch-category', 'plugins') }
 
-const getSourceIcon = (key: string) => {
-  return fonts[key] || null
+const sourceIcons: Record<string, string> = {
+  kw: iconKw,
+  kg: iconKg,
+  wy: iconWy,
+  tx: iconTx,
+  mg: iconMg,
+  bd: iconBd,
+}
+
+const getSourceIcon = (key: string): string | undefined => {
+  return sourceIcons[key]
 }
 </script>
 
@@ -244,6 +270,7 @@ const getSourceIcon = (key: string) => {
     <div v-if="hasPluginData" class="music-config-container">
       <div class="setting-group">
         <div class="plugin-info">
+          <span class="plugin-dot" aria-hidden="true"></span>
           <span class="plugin-name">{{ t('settings.musicSource.currentConfig', { name: currentPluginName }) }}</span>
           <span class="plugin-status">{{ t('settings.musicSource.enabled') }}</span>
         </div>
@@ -260,27 +287,28 @@ const getSourceIcon = (key: string) => {
             @click="selectSource(String(key))"
           >
             <div class="source-icon">
-              <component :is="getSourceIcon(String(key))" v-if="getSourceIcon(String(key))" style="font-size: 2em" />
+              <img v-if="getSourceIcon(String(key))" :src="getSourceIcon(String(key))" :alt="source.name" class="source-icon-img" />
               <span v-else style="font-size: 1.5em">{{ source.name?.charAt(0) || '?' }}</span>
             </div>
             <div class="source-info">
               <div class="source-name">{{ source.name }}</div>
               <div class="source-type">
                 <span>{{ source.type || t('settings.musicSource.sourceType') }}</span>
-                <t-tag
+                <span
                   v-if="getSourceQuality(String(key))"
-                  size="small"
-                  theme="primary"
-                  variant="light"
                   class="source-quality-tag"
+                  :class="'tier-' + getQualityTier(String(getSourceQuality(String(key))))"
                 >
                   {{ getQualityDisplayName(getSourceQuality(String(key))!) }}
-                </t-tag>
+                </span>
               </div>
             </div>
             <div v-if="userInfo.selectSources === String(key)" class="source-check">
               <i class="iconfont icon-check" />
             </div>
+            <span v-if="userInfo.selectSources === String(key)" class="source-active-badge" aria-hidden="true">
+              <i class="iconfont icon-check" />
+            </span>
           </div>
         </div>
       </div>
@@ -295,6 +323,7 @@ const getSourceIcon = (key: string) => {
             :class="{ active: userInfo.selectQuality === quality }"
             @click="selectQualityTag(quality)"
           >
+            <i v-if="userInfo.selectQuality === quality" class="iconfont icon-check quality-tag-check" />
             <span class="quality-tag-name">{{ getQualityDisplayName(quality) }}</span>
           </div>
         </div>
@@ -345,7 +374,7 @@ const getSourceIcon = (key: string) => {
 .settings-section { animation: fadeInUp 0.4s ease-out; animation-fill-mode: both; }
 .setting-group {
   background: var(--settings-group-bg, var(--td-bg-color-container));
-  border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem;
+  border-radius: 0.75rem; padding: 1.15rem 1.25rem; margin-bottom: 0.85rem;
   border: 1px solid var(--settings-group-border, var(--td-border-level-1-color));
   box-shadow: 0 1px 3px var(--settings-group-shadow);
   animation: fadeInUp 0.4s ease-out; animation-fill-mode: both;
@@ -353,7 +382,7 @@ const getSourceIcon = (key: string) => {
   .subsonic-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
   .subsonic-switch-row {
     display: flex;
@@ -376,88 +405,197 @@ const getSourceIcon = (key: string) => {
     color: var(--settings-text-secondary, var(--td-text-color-secondary));
     font-size: 0.8125rem;
   }
-  h3 { margin: 0 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); }
+  h3 { margin: 0 0 0.35rem; font-size: 1rem; font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); }
 }
 .music-config-container {
   .plugin-info {
-    display: flex; align-items: center; gap: 1rem; padding: 1rem;
-    background: linear-gradient(135deg, var(--td-brand-color-1) 0%, var(--td-brand-color-2) 100%);
-    border-radius: 0.75rem; border: 1px solid var(--td-brand-color-3);
-    .plugin-name { font-weight: 600; font-size: 1rem; color: var(--td-brand-color-6); }
-    .plugin-status { background: var(--td-brand-color-5); color: var(--td-text-color-anti); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 500; }
+    display: flex; align-items: center; gap: 0.55rem; padding: 0.65rem 0.85rem;
+    background:
+      linear-gradient(135deg, color-mix(in srgb, var(--td-brand-color) 10%, transparent), transparent 62%),
+      var(--td-bg-color-container);
+    border-radius: 0.6rem;
+    border: 1px solid color-mix(in srgb, var(--td-brand-color) 30%, transparent);
+
+    .plugin-dot {
+      width: 0.5rem; height: 0.5rem; flex-shrink: 0; border-radius: 999px;
+      background: var(--td-success-color);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--td-success-color) 18%, transparent);
+    }
+
+    .plugin-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--settings-text-primary, var(--td-text-color-primary));
+    }
+
+    .plugin-status {
+      flex-shrink: 0;
+      padding: 0.15rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--td-success-color);
+      background: color-mix(in srgb, var(--td-success-color) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--td-success-color) 30%, transparent);
+    }
   }
-  .source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  .source-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 0.6rem; }
   .source-card {
-    display: flex; align-items: center; gap: 1rem; padding: 1rem;
+    position: relative;
+    display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 0.85rem;
     background: var(--settings-source-card-bg, var(--td-bg-color-container));
-    border: 2px solid var(--settings-source-card-border, var(--td-border-level-1-color));
+    border: 1.5px solid var(--settings-source-card-border, var(--td-border-level-1-color));
     border-radius: 0.75rem; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-    &:hover { border-color: var(--settings-source-card-hover-border, var(--td-brand-color-3)); box-shadow: var(--theme-shadow-light); }
-    &.active { border-color: var(--settings-source-card-active-border, var(--td-brand-color)); background: var(--settings-source-card-active-bg, var(--td-brand-color-1)); box-shadow: 0 0 0 3px var(--td-brand-color-2); }
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--td-brand-color) 40%, transparent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--td-brand-color) 8%, transparent);
+    }
+
+    &.active {
+      border-color: var(--settings-source-card-active-border, var(--td-brand-color));
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--td-brand-color) 9%, transparent), transparent 60%),
+        var(--settings-source-card-active-bg, var(--td-bg-color-container));
+      box-shadow: 0 2px 10px color-mix(in srgb, var(--td-brand-color) 14%, transparent);
+    }
+
     .source-icon {
-      width: 2.5rem; height: 2.5rem; background: var(--settings-source-icon-bg, var(--td-brand-color-1)); border-radius: 50%;
+      width: 2.25rem; height: 2.25rem; background: var(--settings-source-icon-bg, var(--td-brand-color-1)); border-radius: 50%;
       display: flex; align-items: center; justify-content: center; color: var(--settings-text-secondary, var(--td-text-color-secondary));
+
+      .source-icon-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+      }
     }
     .source-info { flex: 1;
       .source-name { font-weight: 600; font-size: 0.875rem; color: var(--settings-text-primary, var(--td-text-color-primary)); margin-bottom: 0.125rem; }
       .source-type {
         font-size: 0.75rem; color: var(--settings-text-secondary, var(--td-text-color-secondary));
         display: flex; align-items: center; gap: 0.375rem;
+        min-width: 0;
+
+        > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       }
     }
     .source-quality-tag {
-      font-size: 0.625rem;
-      line-height: 1;
-      padding: 0 0.25rem;
-      border-radius: 0.25rem;
+      display: inline-flex;
+      align-items: center;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: 0.01em;
+
+      &.tier-standard {
+        color: var(--td-text-color-secondary);
+        background: color-mix(in srgb, var(--td-text-color-primary) 6%, transparent);
+        border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 12%, transparent);
+      }
+
+      &.tier-lossless {
+        color: var(--td-brand-color);
+        background: color-mix(in srgb, var(--td-brand-color) 10%, transparent);
+        border: 1px solid color-mix(in srgb, var(--td-brand-color) 24%, transparent);
+      }
+
+      &.tier-hires {
+        color: #b8860b;
+        background: rgba(255, 193, 7, 0.14);
+        border: 1px solid rgba(255, 193, 7, 0.35);
+      }
     }
-    .source-check { color: var(--td-brand-color-5); font-size: 1.125rem; }
+    .source-check { display: none; }
+
+    .source-active-badge {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      width: 1.15rem;
+      height: 1.15rem;
+      border-radius: 999px;
+      background: var(--td-brand-color);
+      color: var(--td-text-color-anti);
+      font-size: 0.65rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px color-mix(in srgb, var(--td-brand-color) 40%, transparent);
+    }
   }
   .quality-source-hint {
     font-size: 0.875rem; font-weight: 400; color: var(--settings-text-secondary, var(--td-text-color-secondary));
   }
   .quality-tags-container {
-    display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 1rem 0;
+    display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem 0;
   }
   .quality-tag {
-    padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
-    border: 1.5px solid var(--td-border-level-2-color);
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.4rem 0.85rem; border-radius: 999px; cursor: pointer;
+    border: 1px solid color-mix(in srgb, var(--td-text-color-primary) 14%, transparent);
     background: var(--td-bg-color-container);
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     user-select: none;
-    .quality-tag-name { font-size: 0.8125rem; font-weight: 500; color: var(--td-text-color-primary); }
-    &:hover { border-color: var(--td-brand-color-3); box-shadow: var(--theme-shadow-light); }
+
+    .quality-tag-check {
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+
+    .quality-tag-name { font-size: 0.8125rem; font-weight: 500; color: var(--settings-text-secondary, var(--td-text-color-primary)); }
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--td-brand-color) 40%, transparent);
+      background: color-mix(in srgb, var(--td-brand-color) 5%, var(--td-bg-color-container));
+    }
+
     &.active {
-      border-color: var(--td-brand-color); background: var(--td-brand-color-1);
-      box-shadow: 0 0 0 2px var(--td-brand-color-2);
-      .quality-tag-name { color: var(--td-brand-color); font-weight: 600; }
+      border-color: var(--td-brand-color);
+      background: color-mix(in srgb, var(--td-brand-color) 10%, var(--td-bg-color-container));
+      box-shadow: 0 1px 6px color-mix(in srgb, var(--td-brand-color) 18%, transparent);
+
+      .quality-tag-check,
+      .quality-tag-name {
+        color: var(--td-brand-color);
+        font-weight: 600;
+      }
     }
   }
-  .quality-description { text-align: center; margin-top: 1rem;
-    p { margin: 0.5rem 0;
+  .quality-description { text-align: left; margin-top: 0.25rem;
+    p { margin: 0.35rem 0;
       &:first-child { font-size: 1rem; font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); }
-      &.quality-hint { font-size: 0.875rem; color: var(--settings-text-secondary, var(--td-text-color-secondary)); }
+      &.quality-hint { font-size: 0.8125rem; color: var(--settings-text-secondary, var(--td-text-color-secondary)); line-height: 1.45; }
     }
   }
-  .config-status { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
-    .status-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: var(--settings-status-item-bg, var(--td-bg-color-page)); border-radius: 0.5rem; border: 1px solid var(--settings-status-item-border, var(--td-border-level-1-color));
-      .status-label { font-weight: 500; color: var(--settings-text-secondary, var(--td-text-color-secondary)); font-size: 0.875rem; }
-      .status-value { font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); font-size: 0.875rem; }
+  .config-status { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;
+    .status-item { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; padding: 0.65rem 0.85rem; background: var(--settings-status-item-bg, var(--td-bg-color-page)); border-radius: 0.5rem; border: 1px solid var(--settings-status-item-border, var(--td-border-level-1-color));
+      .status-label { font-weight: 500; color: var(--settings-text-secondary, var(--td-text-color-secondary)); font-size: 0.8125rem; flex-shrink: 0; }
+      .status-value { font-weight: 600; color: var(--settings-text-primary, var(--td-text-color-primary)); font-size: 0.8125rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     }
   }
 }
 .plugin-prompt {
-  display: flex; align-items: center; gap: 1.5rem; padding: 2rem;
+  display: flex; align-items: center; gap: 1.25rem; padding: 1.25rem 1.4rem;
   background: var(--settings-plugin-prompt-bg, var(--td-bg-color-container)); border-radius: 1rem; border: 2px dashed var(--settings-plugin-prompt-border, var(--td-border-level-1-color));
   .prompt-icon {
-    width: 3rem; height: 3rem; background: linear-gradient(135deg, var(--td-brand-color-5) 0%, var(--td-brand-color-6) 100%);
+    width: 2.6rem; height: 2.6rem; background: linear-gradient(135deg, var(--td-brand-color-5) 0%, var(--td-brand-color-6) 100%);
     border-radius: 50%; display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; color: var(--td-text-color-anti); font-size: 1.5rem;
   }
   .prompt-content {
     flex: 1;
-    h4 { color: var(--settings-text-primary, var(--td-text-color-primary)); margin: 0 0 0.5rem 0; font-size: 1.125rem; font-weight: 600; }
-    p { color: var(--settings-text-secondary, var(--td-text-color-secondary)); margin: 0 0 1.5rem 0; line-height: 1.5; }
+    h4 { color: var(--settings-text-primary, var(--td-text-color-primary)); margin: 0 0 0.35rem 0; font-size: 1rem; font-weight: 600; }
+    p { color: var(--settings-text-secondary, var(--td-text-color-secondary)); margin: 0 0 0.9rem 0; line-height: 1.5; font-size: 0.85rem; }
   }
 }
 @media (max-width: 768px) {
@@ -466,7 +604,7 @@ const getSourceIcon = (key: string) => {
       align-items: flex-start;
       flex-direction: column;
       gap: 8px;
-      padding: 12px;
+      padding: 10px 12px;
     }
 
     .subsonic-config {
@@ -484,13 +622,17 @@ const getSourceIcon = (key: string) => {
 
     .source-cards {
       grid-template-columns: 1fr;
-      gap: 10px;
+      gap: 8px;
     }
 
     .source-card {
       gap: 10px;
       padding: 12px;
       border-width: 1px;
+
+      &.active {
+        border-width: 1.5px;
+      }
 
       .source-icon {
         width: 36px;
@@ -508,7 +650,7 @@ const getSourceIcon = (key: string) => {
 
     .quality-tags-container {
       gap: 8px;
-      padding: 10px 0;
+      padding: 6px 0;
     }
 
     .quality-tag {
@@ -540,7 +682,7 @@ const getSourceIcon = (key: string) => {
     flex-direction: column;
     text-align: center;
     gap: 12px;
-    padding: 18px 14px;
+    padding: 16px 14px;
 
     .prompt-icon {
       width: 44px;

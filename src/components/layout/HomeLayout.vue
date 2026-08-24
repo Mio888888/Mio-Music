@@ -9,6 +9,12 @@ import { useGlobalPlayStatusStore } from '@/store/GlobalPlayStatus'
 import { useRouter, useRoute } from 'vue-router'
 import { searchValue as useSearchStore } from '@/store/search'
 import { useSourceAccess } from '@/composables/useSourceAccess'
+import iconKw from '@/assets/images/sources/kw.png'
+import iconKg from '@/assets/images/sources/kg.png'
+import iconWy from '@/assets/images/sources/wy.png'
+import iconTx from '@/assets/images/sources/tx.png'
+import iconMg from '@/assets/images/sources/mg.png'
+import iconBd from '@/assets/images/sources/bd.png'
 
 const { t } = useI18n()
 
@@ -37,14 +43,14 @@ onUnmounted(() => {
 })
 
 const sourceicon: Record<string, string> = markRaw({
-  kg: 'kugouyinle',
-  wy: 'wangyiyun',
-  mg: 'mg',
-  tx: 'tx',
-  kw: 'kw',
-  bd: 'kw',
-  git: 'git',
-  subsonic: 'git'
+  kg: iconKg,
+  wy: iconWy,
+  mg: iconMg,
+  tx: iconTx,
+  kw: iconKw,
+  bd: iconBd,
+  git: '',
+  subsonic: ''
 })
 const source = ref('')
 
@@ -204,7 +210,8 @@ const handleKeyDown = () => {
             <div class="search-container">
               <div class="search-input">
                 <div v-if="sourceList.length" class="source-selector" @click="toggleSourceList">
-                  <svg class="icon" aria-hidden="true">
+                  <img v-if="source && source.endsWith('.png')" :src="source" class="source-icon-img" alt="" />
+                  <svg v-else class="icon" aria-hidden="true">
                     <use :xlink:href="`#icon-${source}`"></use>
                   </svg>
                 </div>
@@ -221,7 +228,8 @@ const handleKeyDown = () => {
                         :class="{ active: source === item.icon }"
                         @click="selectSource(item.key)"
                       >
-                        <svg class="source-icon" aria-hidden="true">
+                        <img v-if="item.icon && item.icon.endsWith('.png')" :src="item.icon" class="source-icon-img" alt="" />
+                        <svg v-else class="source-icon" aria-hidden="true">
                           <use :xlink:href="`#icon-${item.icon}`"></use>
                         </svg>
                         <span class="source-name">{{ item.name }}</span>
@@ -571,6 +579,18 @@ const handleKeyDown = () => {
   width: 1rem;
   height: 1rem;
   margin-right: 0.5rem;
+}
+
+.source-icon-img {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-right: 0.5rem;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.source-selector .source-icon-img {
+  margin-right: 0;
 }
 
 .source-name {
