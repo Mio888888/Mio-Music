@@ -4,7 +4,6 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useSettingsStore } from '@/store/Settings'
 import { storeToRefs } from 'pinia'
-import { platform as getPlatform } from '@tauri-apps/plugin-os'
 import { MessagePlugin } from 'tdesign-vue-next'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import currentAuthorSponsorQr from '@/assets/images/current-author-sponsor-qr.jpg'
@@ -34,11 +33,6 @@ const {
   restartToInstall,
   dismiss: dismissUpdate
 } = useAppUpdater()
-
-const isMacOS = ref(false)
-try {
-  isMacOS.value = getPlatform() === 'macos'
-} catch {}
 
 const updateNotesHtml = ref('')
 const notesExpanded = ref(false)
@@ -174,10 +168,10 @@ const handleAboutClick = (e: MouseEvent) => {
         <!-- 发现新版本 -->
         <div v-if="updateStatus === 'available'" class="update-card">
           <div class="update-header">
-            <span class="update-icon new">↑</span>
             <div class="update-title">
+              <span class="update-icon new" aria-hidden="true">↑</span>
               <span>{{ t('settings.about.newVersionFound') }}</span>
-              <span class="version-badge">v{{ newVersion }}</span>
+              <span class="version-badge">{{ t('settings.about.versionBadge', { version: newVersion }) }}</span>
             </div>
           </div>
 
@@ -203,17 +197,7 @@ const handleAboutClick = (e: MouseEvent) => {
           </button>
 
           <div class="update-actions-row">
-            <!-- macOS: 引导手动下载 -->
             <t-button
-              v-if="isMacOS"
-              theme="primary"
-              @click="openLink('https://github.com/Mio888888/Mio-Music/releases/latest')"
-            >
-              {{ t('settings.about.goToGithub') }}
-            </t-button>
-            <!-- Windows/Linux: 自动下载安装 -->
-            <t-button
-              v-else
               theme="primary"
               @click="handleUpdateInstall"
             >
@@ -238,11 +222,16 @@ const handleAboutClick = (e: MouseEvent) => {
         <!-- 下载完成 -->
         <div v-if="updateStatus === 'downloaded'" class="update-card downloaded">
           <div class="update-header">
-            <span class="update-icon">✓</span>
-            <span>{{ t('settings.about.updateDownloaded') }}</span>
+              <span class="update-icon" aria-hidden="true">✓</span>
+              <div class="update-title">
+                <span>{{ t('settings.about.updateDownloaded') }}</span>
+                <span v-if="newVersion" class="version-badge success">{{ t('settings.about.versionBadge', { version: newVersion }) }}</span>
+              </div>
           </div>
-          <div v-if="newVersion" class="downloaded-version">{{ t('settings.about.readyVersion') }} v{{ newVersion }}</div>
-          <t-button theme="primary" @click="restartNow">{{ t('settings.about.restartNow') }}</t-button>
+          <p class="downloaded-hint">{{ t('settings.about.restartHint') }}</p>
+          <t-button class="restart-button" theme="primary" @click="restartNow">
+            {{ t('settings.about.restartNow') }}
+          </t-button>
         </div>
 
         <!-- 错误 -->
@@ -282,15 +271,25 @@ const handleAboutClick = (e: MouseEvent) => {
           </figure>
         </div>
 
-        <div class="sponsor-card">
-          <p class="sponsor-text">{{ t('settings.about.sponsorText') }} ☕</p>
-          <div class="sponsor-qr">
+        <div class="support-card original-author">
+          <div class="support-copy">
+            <div class="support-title">
+              <span class="support-icon warm" aria-hidden="true">☕</span>
+              {{ t('settings.about.originalAuthorTitle') }}
+            </div>
+            <p class="support-text">{{ t('settings.about.sponsorText') }}</p>
+            <ul class="support-points warm">
+              <li>{{ t('settings.about.originalAuthorPoint') }}</li>
+              <li>{{ t('settings.about.sponsorHint') }}</li>
+            </ul>
+          </div>
+          <figure class="support-qr">
             <img
               src="https://oss.shiqianjiang.cn/storage/default/20250907/image-2025082711173bb1bba3608ef15d0e1fb485f80f29c728186.png"
               :alt="t('settings.about.sponsorImageAlt')"
             />
-          </div>
-          <p class="sponsor-hint">{{ t('settings.about.sponsorHint') }}</p>
+            <figcaption>{{ t('settings.about.sponsorQrCaption') }}</figcaption>
+          </figure>
         </div>
       </div>
     </div>
@@ -408,12 +407,18 @@ const handleAboutClick = (e: MouseEvent) => {
     font-size: 0.75rem;
     font-weight: 700;
     line-height: 1.2;
+
+    &.success {
+      background: color-mix(in srgb, var(--td-success-color) 10%, transparent);
+      border-color: color-mix(in srgb, var(--td-success-color) 35%, transparent);
+      color: var(--td-success-color);
+    }
   }
 }
 
 .release-notes {
   position: relative;
-  margin: 0.25rem 0 0.25rem 1.75rem;
+  margin: 0;
   border: 1px solid var(--td-border-level-1-color);
   border-radius: 0.6rem;
   background: var(--td-bg-color-container);
@@ -520,7 +525,7 @@ const handleAboutClick = (e: MouseEvent) => {
 
 .notes-toggle {
   align-self: flex-start;
-  margin: -0.15rem 0 0 1.75rem;
+  margin: -0.15rem 0 0;
   padding: 0.2rem 0;
   border: 0;
   background: transparent;
@@ -530,14 +535,19 @@ const handleAboutClick = (e: MouseEvent) => {
   cursor: pointer;
 }
 
-.downloaded-version {
+.downloaded-hint {
+  margin: 0;
   color: var(--td-text-color-secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-top: -0.15rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.restart-button {
+  align-self: flex-start;
+  min-width: 132px;
 }
 .update-actions-row {
-  display: flex; gap: 0.5rem; margin-top: 0.25rem; padding-left: 1.75rem;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.25rem;
 }
 .progress-detail {
   font-size: 0.75rem; color: var(--td-text-color-secondary); margin-top: 0.25rem;
@@ -572,6 +582,15 @@ const handleAboutClick = (e: MouseEvent) => {
   align-items: center;
 }
 
+.support-card.original-author {
+  margin-bottom: 0;
+  border-color: color-mix(in srgb, var(--td-warning-color) 34%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--td-warning-color) 10%, transparent), transparent 58%),
+    var(--td-bg-color-container);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--td-warning-color) 8%, transparent);
+}
+
 .support-copy {
   min-width: 0;
 }
@@ -597,10 +616,15 @@ const handleAboutClick = (e: MouseEvent) => {
   background: color-mix(in srgb, var(--td-error-color) 16%, transparent);
   color: var(--td-error-color);
   font-size: 0.7rem;
+
+  &.warm {
+    background: color-mix(in srgb, var(--td-warning-color) 16%, transparent);
+    color: var(--td-warning-color);
+  }
 }
 
 .support-text,
-.sponsor-text {
+.support-copy .support-text {
   margin: 0 0 1rem;
   color: var(--td-text-color-secondary);
   font-size: 0.85rem;
@@ -616,6 +640,8 @@ const handleAboutClick = (e: MouseEvent) => {
   line-height: 1.65;
 
   li::marker { color: var(--td-brand-color); }
+
+  &.warm li::marker { color: var(--td-warning-color); }
 }
 
 .support-qr {
@@ -656,6 +682,16 @@ const handleAboutClick = (e: MouseEvent) => {
   }
 }
 
+.support-card.original-author {
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: left;
+
+    .support-qr { width: min(58vw, 180px); }
+  }
+}
+
 .about-us {
   margin-top: 0.5rem;
   .about-intro {
@@ -666,17 +702,6 @@ const handleAboutClick = (e: MouseEvent) => {
       text-underline-offset: 2px;
       &:hover { text-decoration-color: var(--td-brand-color); }
     }
-  }
-  .sponsor-card {
-    background: var(--td-bg-color-page); border: 1px solid var(--td-border-level-1-color);
-    border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; align-items: center;
-    .sponsor-text { margin: 0 0 1rem; color: var(--td-text-color-secondary); font-size: 0.85rem; line-height: 1.5; text-align: center; }
-    .sponsor-qr {
-      width: 180px; height: 180px; border-radius: 0.75rem; overflow: hidden;
-      border: 1px solid var(--td-border-level-1-color);
-      img { width: 100%; height: 100%; object-fit: cover; }
-    }
-    .sponsor-hint { margin: 0.75rem 0 0; font-size: 0.75rem; color: var(--td-text-color-disabled); }
   }
 }
 @media (max-width: 768px) {
@@ -739,8 +764,6 @@ const handleAboutClick = (e: MouseEvent) => {
   }
 
   .release-notes {
-    margin-left: 0;
-
     .markdown-content {
       max-height: min(46vh, 220px);
     }
@@ -780,15 +803,6 @@ const handleAboutClick = (e: MouseEvent) => {
     .about-intro {
       font-size: 13px;
       line-height: 1.6;
-    }
-
-    .sponsor-card {
-      padding: 14px;
-
-      .sponsor-qr {
-        width: min(58vw, 180px);
-        height: min(58vw, 180px);
-      }
     }
   }
 }
