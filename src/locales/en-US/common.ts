@@ -147,8 +147,6 @@ export default {
     appearanceCloseBehavior: { title: 'Close Button Behavior', description: 'Set behavior when clicking the window close button', keywords: ['close', 'tray', 'exit'] },
     appearanceLyricFont: { title: 'Lyric Font Settings', description: 'Configure lyric display font, size, and weight', keywords: ['lyric', 'font', 'size', 'weight'] },
     appearanceDesktopLyric: { title: 'Desktop Lyric Style', description: 'Configure desktop lyric window display style', keywords: ['desktop lyric', 'style', 'color', 'font'] },
-    aiApiConfig: { title: 'DeepSeek API Configuration', description: 'Configure DeepSeek API Key to use AI features', keywords: ['deepseek', 'api', 'key', 'ai', 'artificial intelligence'] },
-    aiFloatball: { title: 'AI Float Ball Settings', description: 'Control AI floating ball visibility', keywords: ['float ball', 'floating', 'ai'] },
     playbackPlaylist: { title: 'Playlist Management', description: 'Import, export, and clear playlists', keywords: ['playlist', 'import', 'export', 'clear'] },
     playbackAudioOutput: { title: 'Audio Output', description: 'Select audio output device and DLNA casting', keywords: ['audio', 'output', 'device', 'dlna', 'casting'] },
     playbackEqualizer: { title: 'Audio Equalizer', description: 'Adjust equalizer presets and frequency band gain', keywords: ['equalizer', 'eq', 'audio effect', 'frequency'] },

@@ -21,24 +21,6 @@ export default {
     directExit: '直接退出应用',
     checkUpdateFailed: '检查更新失败，请稍后重试'
   },
-  ai: {
-    title: 'DeepSeek API 配置',
-    description: '配置您的 DeepSeek API Key 以使用 AI 功能',
-    apiKeyLabel: 'API Key:',
-    placeholder: '请输入您的 DeepSeek API Key',
-    notConfigured: '未配置 API Key',
-    edit: '编辑',
-    configure: '配置',
-    configured: 'API Key 已配置',
-    notConfiguredStatus: 'API Key 未配置',
-    usageTitle: '使用说明：',
-    usageGetKey: '请前往 DeepSeek 官网 获取您的 API Key',
-    usageLocalStore: 'API Key 将安全存储在本地，不会上传到服务器',
-    usageEnableAi: '配置后即可使用 AI 相关功能',
-    floatBallTitle: 'AI 浮球设置',
-    showFloatBall: '显示 AI 悬浮球',
-    showFloatBallDesc: '在主界面显示 AI 助手悬浮球，方便快速调用 AI 功能'
-  },
   hotkey: {
     title: '快捷键设置',
     description: '配置系统级全局快捷键，来快速达到你的理想效果',
@@ -100,8 +82,6 @@ export default {
     // Navigation descriptions
     navAppearance: '外观设置',
     navAppearanceDesc: '主题、标题栏风格等外观配置',
-    navAi: 'AI 功能',
-    navAiDesc: 'DeepSeek API 配置和 AI 相关功能',
     navPlaylist: '播放设置',
     navPlaylistDesc: '播放列表、音频输出和播放显示设置',
     navEffects: '音效设置',

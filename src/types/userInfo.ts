@@ -27,6 +27,5 @@ export interface UserInfo {
   sourceQualityMap?: Record<string, string>
   subsonicConfig?: SubsonicConfig
   hasGuide?: boolean
-  deepseekAPIkey?: string
   [key: string]: any
 }

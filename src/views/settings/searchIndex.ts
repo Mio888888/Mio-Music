@@ -18,10 +18,6 @@ export function getSearchIndex(): SearchItem[] {
     { id: 'appearance-lyric-font', category: 'appearance', title: t('common.searchIndex.appearanceLyricFont.title'), description: t('common.searchIndex.appearanceLyricFont.description'), keywords: t('common.searchIndex.appearanceLyricFont.keywords') as unknown as string[] },
     { id: 'appearance-desktop-lyric', category: 'appearance', title: t('common.searchIndex.appearanceDesktopLyric.title'), description: t('common.searchIndex.appearanceDesktopLyric.description'), keywords: t('common.searchIndex.appearanceDesktopLyric.keywords') as unknown as string[] },
 
-    // AI 功能
-    { id: 'ai-api-config', category: 'ai', title: t('common.searchIndex.aiApiConfig.title'), description: t('common.searchIndex.aiApiConfig.description'), keywords: t('common.searchIndex.aiApiConfig.keywords') as unknown as string[] },
-    { id: 'ai-floatball', category: 'ai', title: t('common.searchIndex.aiFloatball.title'), description: t('common.searchIndex.aiFloatball.description'), keywords: t('common.searchIndex.aiFloatball.keywords') as unknown as string[] },
-
     // 播放设置
     { id: 'playback-playlist', category: 'playlist', title: t('common.searchIndex.playbackPlaylist.title'), description: t('common.searchIndex.playbackPlaylist.description'), keywords: t('common.searchIndex.playbackPlaylist.keywords') as unknown as string[] },
     { id: 'playback-audio-output', category: 'playlist', title: t('common.searchIndex.playbackAudioOutput.title'), description: t('common.searchIndex.playbackAudioOutput.description'), keywords: t('common.searchIndex.playbackAudioOutput.keywords') as unknown as string[] },

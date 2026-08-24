@@ -3,7 +3,6 @@
     <n-config-provider :theme-overrides="themeOverrides" :locale="naiveLocale" :date-locale="naiveDateLocale">
       <n-message-provider><n-dialog-provider><nglobal-style />
         <GlobalAudio />
-        <AIChat />
         <slot />
       </n-dialog-provider></n-message-provider>
     </n-config-provider>

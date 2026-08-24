@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 import TitleBarControls from '@/components/TitleBarControls.vue'
 import {
   PaletteIcon,
-  ApiIcon,
   PlayCircleIcon,
   AudioIcon,
   KeyboardIcon,
@@ -15,7 +14,6 @@ import {
 } from 'tdesign-icons-vue-next'
 
 import AppearanceSection from './sections/AppearanceSection.vue'
-const AISection = defineAsyncComponent(() => import('./sections/AISection.vue'))
 const PlaybackSection = defineAsyncComponent(() => import('./sections/PlaybackSection.vue'))
 const AudioEffectsSection = defineAsyncComponent(() => import('./sections/AudioEffectsSection.vue'))
 const HotkeySection = defineAsyncComponent(() => import('./sections/HotkeySection.vue'))
@@ -60,12 +58,6 @@ const settingsCategories = computed(() => [
     label: t('settings.musicSource.navAppearance'),
     icon: PaletteIcon,
     description: t('settings.musicSource.navAppearanceDesc')
-  },
-  {
-    key: 'ai',
-    label: t('settings.musicSource.navAi'),
-    icon: ApiIcon,
-    description: t('settings.musicSource.navAiDesc')
   },
   {
     key: 'playlist',
@@ -119,7 +111,6 @@ const visibleSettingsCategories = computed(() =>
 
 const sectionComponents: Record<string, any> = {
   appearance: AppearanceSection,
-  ai: AISection,
   playlist: PlaybackSection,
   effects: AudioEffectsSection,
   hotkeys: HotkeySection,

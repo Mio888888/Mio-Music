@@ -147,8 +147,6 @@ export default {
     appearanceCloseBehavior: { title: '关闭按钮行为', description: '设置点击窗口关闭按钮时的行为', keywords: ['关闭', '托盘', '退出', 'close', 'tray'] },
     appearanceLyricFont: { title: '歌词字体设置', description: '配置歌词显示字体、大小和字重', keywords: ['歌词', '字体', 'font', '大小', '字重'] },
     appearanceDesktopLyric: { title: '桌面歌词样式', description: '配置桌面歌词窗口的显示样式', keywords: ['桌面歌词', '样式', '颜色', '字体', 'desktop', 'lyric'] },
-    aiApiConfig: { title: 'DeepSeek API 配置', description: '配置 DeepSeek API Key 以使用 AI 功能', keywords: ['deepseek', 'api', 'key', 'ai', '人工智能'] },
-    aiFloatball: { title: 'AI 浮球设置', description: '控制 AI 悬浮球的显示与隐藏', keywords: ['浮球', '悬浮球', 'ai', 'float', 'ball'] },
     playbackPlaylist: { title: '播放列表管理', description: '导入、导出和清空播放列表', keywords: ['播放列表', '导入', '导出', '清空', 'playlist'] },
     playbackAudioOutput: { title: '音频输出', description: '选择音频输出设备和 DLNA 投屏', keywords: ['音频', '输出', '设备', 'dlna', '投屏', 'audio', 'output'] },
     playbackEqualizer: { title: '音频均衡器', description: '调节均衡器预设和频段增益', keywords: ['均衡器', 'eq', 'equalizer', '音效', '频段'] },

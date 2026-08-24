@@ -16,7 +16,6 @@ export interface TagWriteOptions {
 export type AppLocale = 'zh-CN' | 'en-US' | 'system'
 
 export interface SettingsState {
-  showFloatBall: boolean
   language?: AppLocale
   autoCacheMusic?: boolean
   cacheSizeLimit?: number
@@ -39,7 +38,6 @@ export interface SettingsState {
 
 export const useSettingsStore = defineStore('settings', () => {
   const defaultSettings: SettingsState = {
-    showFloatBall: true,
     language: 'system',
     autoCacheMusic: true,
     cacheSizeLimit: 1073741824,
@@ -120,11 +118,6 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
   }
 
-  const toggleFloatBall = () => {
-    settings.value.showFloatBall = !settings.value.showFloatBall
-    saveSettings()
-  }
-
   const resolveLocale = async (): Promise<string> => resolveAppLocale(settings.value.language)
 
   const currentLocale = computed(() => settings.value.language && settings.value.language !== 'system' ? settings.value.language : 'zh-CN')
@@ -137,7 +130,6 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     settings,
     updateSettings,
-    toggleFloatBall,
     saveSettings,
     resolveLocale,
     currentLocale,

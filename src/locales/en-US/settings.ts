@@ -21,24 +21,6 @@ export default {
     directExit: 'Exit Application Directly',
     checkUpdateFailed: 'Failed to check for updates. Please try again later'
   },
-  ai: {
-    title: 'DeepSeek API Configuration',
-    description: 'Configure your DeepSeek API Key to use AI features',
-    apiKeyLabel: 'API Key:',
-    placeholder: 'Enter your DeepSeek API Key',
-    notConfigured: 'API Key not configured',
-    edit: 'Edit',
-    configure: 'Configure',
-    configured: 'API Key configured',
-    notConfiguredStatus: 'API Key not configured',
-    usageTitle: 'Instructions:',
-    usageGetKey: 'Please visit the DeepSeek official website to get your API Key',
-    usageLocalStore: 'Your API Key will be stored locally and will not be uploaded to any server',
-    usageEnableAi: 'After configuration, you can use AI-related features',
-    floatBallTitle: 'AI Float Ball Settings',
-    showFloatBall: 'Show AI Float Ball',
-    showFloatBallDesc: 'Display AI assistant float ball on the main interface for quick access to AI features'
-  },
   hotkey: {
     title: 'Hotkey Settings',
     description: 'Configure system-level global hotkeys for quick access',
@@ -97,8 +79,6 @@ export default {
     title: 'Music Sources',
     navAppearance: 'Appearance',
     navAppearanceDesc: 'Theme, title bar style and appearance settings',
-    navAi: 'AI Features',
-    navAiDesc: 'DeepSeek API configuration and AI-related features',
     navPlaylist: 'Playback',
     navPlaylistDesc: 'Playlist, audio output, and playback display settings',
     navEffects: 'Audio Effects',
