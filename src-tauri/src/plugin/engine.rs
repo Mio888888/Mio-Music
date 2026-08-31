@@ -1,4 +1,5 @@
 use super::types::{PluginConfigField, PluginInfo, PluginSource};
+use std::collections::HashMap;
 use std::path::Path;
 
 /// Plugin code validator and metadata extractor.
@@ -267,31 +268,247 @@ impl PluginEngine {
     /// Extract source definitions from JS code.
     fn extract_sources(code: &str) -> Vec<PluginSource> {
         let mut sources = Vec::new();
+        let quality_map = Self::extract_music_quality_map(code);
 
-        let source_ids = ["kw", "kg", "tx", "wy", "mg", "mgt", "bd", "local"];
+        let default_source_ids = ["kw", "kg", "tx", "wy", "mg", "mgt", "bd", "local"];
         let source_names = [
-            "小蜗",
-            "小苟",
-            "小鹅",
-            "小芸",
-            "菇菇",
-            "菇菇",
-            "百度音乐",
-            "本地",
+            ("kw", "小蜗"),
+            ("kg", "小苟"),
+            ("tx", "小鹅"),
+            ("wy", "小芸"),
+            ("mg", "菇菇"),
+            ("mgt", "菇菇"),
+            ("bd", "百度音乐"),
+            ("local", "本地"),
         ];
+        let source_ids = if quality_map.is_empty() {
+            default_source_ids
+                .iter()
+                .copied()
+                .filter(|id| {
+                    code.contains(&format!("\"{}\"", id)) || code.contains(&format!("'{}'", id))
+                })
+                .collect::<Vec<_>>()
+        } else {
+            let mut ids = quality_map.keys().map(String::as_str).collect::<Vec<_>>();
+            ids.sort_unstable();
+            ids
+        };
 
-        for (id, default_name) in source_ids.iter().zip(source_names.iter()) {
-            if code.contains(&format!("\"{}\"", id)) || code.contains(&format!("'{}'", id)) {
-                let qualities = Self::extract_qualities_for_source(code, id);
-                sources.push(PluginSource {
-                    source_id: id.to_string(),
-                    name: default_name.to_string(),
-                    qualities,
-                });
-            }
+        for id in source_ids {
+            let name = source_names
+                .iter()
+                .find(|(source_id, _)| *source_id == id)
+                .map(|(_, name)| *name)
+                .unwrap_or(id);
+            let qualities = quality_map
+                .get(id)
+                .cloned()
+                .unwrap_or_else(|| Self::extract_qualities_for_source(code, id));
+            sources.push(PluginSource {
+                source_id: id.to_string(),
+                name: name.to_string(),
+                qualities,
+            });
         }
 
         sources
+    }
+
+    fn extract_music_quality_map(code: &str) -> HashMap<String, Vec<String>> {
+        if let Some(original_code) = Self::extract_embedded_original_code(code) {
+            let quality_map = Self::extract_music_quality_map(&original_code);
+            if !quality_map.is_empty() {
+                return quality_map;
+            }
+        }
+
+        let marker = "MUSIC_QUALITY";
+        let mut search_from = 0;
+        while let Some(relative_pos) = code[search_from..].find(marker) {
+            let marker_pos = search_from + relative_pos;
+            let rest = &code[marker_pos + marker.len()..];
+            let rest = rest.trim_start();
+            if let Some(rest) = rest.strip_prefix('=') {
+                let rest = rest.trim_start();
+                if let Some(rest) = rest.strip_prefix("JSON.parse") {
+                    let rest = rest.trim_start();
+                    if let Some(rest) = rest.strip_prefix('(') {
+                        let rest = rest.trim_start();
+                        if let Some(quote) = rest.chars().next().filter(|c| *c == '\'' || *c == '"')
+                        {
+                            let literal = &rest[quote.len_utf8()..];
+                            let mut escaped = false;
+                            let mut end = None;
+                            for (index, character) in literal.char_indices() {
+                                if escaped {
+                                    escaped = false;
+                                    continue;
+                                }
+                                if character == '\\' {
+                                    escaped = true;
+                                    continue;
+                                }
+                                if character == quote {
+                                    end = Some(index);
+                                    break;
+                                }
+                            }
+
+                            if let Some(end) = end {
+                                let raw_value = &literal[..end];
+                                let json_value = if quote == '\'' {
+                                    raw_value.to_string()
+                                } else {
+                                    let wrapped = format!("\"{}\"", raw_value);
+                                    match serde_json::from_str::<String>(&wrapped) {
+                                        Ok(value) => value,
+                                        Err(_) => String::new(),
+                                    }
+                                };
+                                if let Some(quality_map) = Self::parse_quality_map_json(&json_value)
+                                {
+                                    return quality_map;
+                                }
+                            }
+                        }
+                    }
+                } else if let Some(object) = Self::extract_braced_object(rest) {
+                    if let Some(quality_map) = Self::parse_quality_map_object(object) {
+                        return quality_map;
+                    }
+                }
+            }
+            search_from = marker_pos + marker.len();
+        }
+
+        HashMap::new()
+    }
+
+    fn extract_braced_object(code: &str) -> Option<&str> {
+        let start = code.find('{')?;
+        let mut depth = 0;
+        let mut quote = None;
+        let mut escaped = false;
+
+        for (offset, character) in code[start..].char_indices() {
+            if let Some(quote_character) = quote {
+                if escaped {
+                    escaped = false;
+                } else if character == '\\' {
+                    escaped = true;
+                } else if character == quote_character {
+                    quote = None;
+                }
+                continue;
+            }
+
+            match character {
+                '\'' | '"' | '`' => quote = Some(character),
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&code[start..=start + offset]);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    fn parse_quality_map_object(object: &str) -> Option<HashMap<String, Vec<String>>> {
+        let patterns = [
+            r#"['\"]([A-Za-z0-9_-]+)['\"]\s*:\s*\[([^\]]*)\]"#,
+            r#"([A-Za-z0-9_-]+)\s*:\s*\[([^\]]*)\]"#,
+        ];
+        let mut quality_map = HashMap::new();
+
+        for pattern in patterns {
+            let Ok(regex) = regex_lite::Regex::new(pattern) else {
+                continue;
+            };
+            for captures in regex.captures_iter(object) {
+                let Some(source_id) = captures.get(1).map(|value| value.as_str()) else {
+                    continue;
+                };
+                let Some(qualities) = captures.get(2).map(|value| value.as_str()) else {
+                    continue;
+                };
+                let qualities = qualities
+                    .split(',')
+                    .filter_map(|quality| {
+                        let quality = quality
+                            .trim()
+                            .trim_matches(|character| character == '\'' || character == '"');
+                        (!quality.is_empty()).then(|| quality.to_string())
+                    })
+                    .collect::<Vec<_>>();
+                if !qualities.is_empty() {
+                    quality_map.insert(source_id.to_string(), qualities);
+                }
+            }
+        }
+
+        if quality_map.is_empty() {
+            None
+        } else {
+            Some(quality_map)
+        }
+    }
+
+    fn extract_embedded_original_code(code: &str) -> Option<String> {
+        let marker = "const originalPluginCode";
+        let marker_pos = code.find(marker)?;
+        let rest = code[marker_pos + marker.len()..].trim_start();
+        let rest = rest.strip_prefix('=')?.trim_start();
+        let rest = rest.strip_prefix('"')?;
+
+        let mut escaped = false;
+        for (index, character) in rest.char_indices() {
+            if escaped {
+                escaped = false;
+                continue;
+            }
+            if character == '\\' {
+                escaped = true;
+                continue;
+            }
+            if character == '"' {
+                let literal = &rest[..index];
+                let wrapped = format!("\"{}\"", literal);
+                return serde_json::from_str::<String>(&wrapped).ok();
+            }
+        }
+
+        None
+    }
+
+    fn parse_quality_map_json(json: &str) -> Option<HashMap<String, Vec<String>>> {
+        let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
+        let object = value.as_object()?;
+        let mut quality_map = HashMap::new();
+
+        for (source_id, qualities) in object {
+            let Some(qualities) = qualities.as_array() else {
+                continue;
+            };
+            let qualities = qualities
+                .iter()
+                .filter_map(|quality| quality.as_str().map(str::to_string))
+                .collect::<Vec<_>>();
+            if !qualities.is_empty() {
+                quality_map.insert(source_id.clone(), qualities);
+            }
+        }
+
+        if quality_map.is_empty() {
+            None
+        } else {
+            Some(quality_map)
+        }
     }
 
     /// Extract quality list for a specific source.
@@ -350,6 +567,48 @@ impl PluginEngine {
 #[cfg(test)]
 mod tests {
     use super::PluginEngine;
+
+    #[test]
+    fn extracts_json_music_quality_map() {
+        let code = r#"const MUSIC_QUALITY = JSON.parse('{"kw":["128k","320k","flac"]}'); const sources = { kw: { qualitys: ['128k', '320k'] } };"#;
+        let sources = PluginEngine::extract_sources(code);
+
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].source_id, "kw");
+        assert_eq!(sources[0].qualities, vec!["128k", "320k", "flac"]);
+    }
+
+    #[test]
+    fn extracts_direct_music_quality_map() {
+        let code = r#"const MUSIC_QUALITY = { kw: ['128k', '320k', 'flac'], 'wy': ['128k', 'flac'] }; const sources = {};"#;
+        let sources = PluginEngine::extract_sources(code);
+
+        assert_eq!(sources.len(), 2);
+        assert_eq!(sources[0].source_id, "kw");
+        assert_eq!(sources[0].qualities, vec!["128k", "320k", "flac"]);
+        assert_eq!(sources[1].source_id, "wy");
+        assert_eq!(sources[1].qualities, vec!["128k", "flac"]);
+    }
+
+    #[test]
+    fn extracts_quality_map_from_converted_lx_plugin() {
+        let original = r#"/** @name ikun */
+const MUSIC_QUALITY = JSON.parse('{"kw":["128k","320k","flac","flac24bit"],"wy":["128k","320k","flac"]}');"#;
+        let converted = crate::plugin::converter::convert_lx_plugin(original);
+        let sources = PluginEngine::extract_sources(&converted);
+
+        assert_eq!(sources.len(), 2);
+        let kw = sources
+            .iter()
+            .find(|source| source.source_id == "kw")
+            .unwrap();
+        let wy = sources
+            .iter()
+            .find(|source| source.source_id == "wy")
+            .unwrap();
+        assert_eq!(kw.qualities, vec!["128k", "320k", "flac", "flac24bit"]);
+        assert_eq!(wy.qualities, vec!["128k", "320k", "flac"]);
+    }
 
     #[test]
     fn escaped_non_ascii_does_not_panic() {
