@@ -15,7 +15,6 @@ dist-ssr
 # AI & workflow
 .claude
 .trellis
-AGENTS.md
 # Editor directories and files
 .vscode
 .idea
