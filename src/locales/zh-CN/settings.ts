@@ -366,6 +366,8 @@ export default {
     description: '一款简洁优雅的跨平台音乐播放器，支持基于合规插件获取公开音乐信息与播放功能。',
     versionInfo: '版本信息',
     checkUpdateOnStart: '应用启动时检查更新',
+    mobileUpdateHint: '当前平台暂不支持应用内更新，请前往 GitHub 发布页下载最新安装包。',
+    downloadMobileUpdate: '前往发布页下载',
     checking: '检查中...',
     checkUpdate: '检查更新',
     upToDate: '当前已是最新版本',

@@ -2,6 +2,8 @@ import { computed, ref } from 'vue'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { getVersion } from '@tauri-apps/api/app'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { platform } from '@tauri-apps/plugin-os'
+import { isDesktopUpdatePlatform } from '@/utils/updatePlatform'
 
 export type AppUpdateStatus =
   | 'idle'
@@ -22,6 +24,14 @@ const downloadedBytes = ref(0)
 const totalBytes = ref(0)
 const error = ref('')
 
+const isUpdateSupported = computed(() => {
+  try {
+    return isDesktopUpdatePlatform(platform())
+  } catch {
+    return false
+  }
+})
+
 const downloadedMb = computed(() => (downloadedBytes.value / 1024 / 1024).toFixed(1))
 const totalMb = computed(() => (totalBytes.value / 1024 / 1024).toFixed(1))
 
@@ -38,11 +48,20 @@ function reset() {
 
 async function loadCurrentVersion() {
   if (!currentVersion.value) {
-    currentVersion.value = await getVersion()
+    try {
+      currentVersion.value = await getVersion()
+    } catch (cause) {
+      console.warn('读取应用版本失败:', cause)
+    }
   }
 }
 
 async function checkForUpdate() {
+  if (!isUpdateSupported.value) {
+    reset()
+    return false
+  }
+
   await loadCurrentVersion()
   reset()
   status.value = 'checking'
@@ -67,6 +86,11 @@ async function checkForUpdate() {
 }
 
 async function downloadAndInstall() {
+  if (!isUpdateSupported.value) {
+    reset()
+    return
+  }
+
   await loadCurrentVersion()
   status.value = 'downloading'
   error.value = ''
@@ -101,12 +125,14 @@ async function downloadAndInstall() {
 }
 
 async function restartToInstall() {
+  if (!isUpdateSupported.value) return
   await relaunch()
 }
 
 export function useAppUpdater() {
   return {
     status,
+    isUpdateSupported,
     currentVersion,
     newVersion,
     releaseNotes,
@@ -115,6 +141,7 @@ export function useAppUpdater() {
     downloadedMb,
     totalMb,
     error,
+    loadCurrentVersion,
     checkForUpdate,
     downloadAndInstall,
     restartToInstall,

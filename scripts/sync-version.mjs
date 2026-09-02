@@ -41,26 +41,34 @@ function syncFile(path, replacements) {
     content = nextContent
   }
 
-  if (!changed && !check) return
+  if (!changed) return
 
   if (!check) writeFileSync(path, content)
   updates.push(path)
 }
 
-function jsonReplacement(_whole, prefix) {
-  return prefix + version + String.fromCharCode(34)
+function quotedVersionReplacement(_whole, prefix, _oldVersion, suffix) {
+  return prefix + version + suffix
 }
 
-syncFile('package.json', [[/("version":\s*")([^"]+)(")/, jsonReplacement]])
-syncFile('src-tauri/tauri.conf.json', [[/("version":\s*")([^"]+)(")/, jsonReplacement]])
-syncFile('src-tauri/Cargo.toml', [[/^version = "([^"]+)"/m, version]])
+function versionReplacement(_whole, prefix) {
+  return prefix + version
+}
+
+function versionCodeReplacement(_whole, prefix) {
+  return prefix + versionCode
+}
+
+syncFile('package.json', [[/("version":\s*")([^"]+)(")/, quotedVersionReplacement]])
+syncFile('src-tauri/tauri.conf.json', [[/("version":\s*")([^"]+)(")/, quotedVersionReplacement]])
+syncFile('src-tauri/Cargo.toml', [[/^(version = ")([^"]+)(")/m, quotedVersionReplacement]])
 syncFile(
   'src-tauri/gen/android/app/src/main/assets/tauri.conf.json',
-  [[/("version":\s*")([^"]+)(")/, jsonReplacement]]
+  [[/("version":\s*")([^"]+)(")/, quotedVersionReplacement]]
 )
 syncFile('src-tauri/gen/android/app/tauri.properties', [
-  [/^(tauri\.android\.versionName=)(.+)$/m, version],
-  [/^(tauri\.android\.versionCode=)(\d+)$/m, versionCode]
+  [/^(tauri\.android\.versionName=)(.+)$/m, versionReplacement],
+  [/^(tauri\.android\.versionCode=)(\d+)$/m, versionCodeReplacement]
 ])
 
 // Re-read the canonical version after syncing so check mode validates the final state.

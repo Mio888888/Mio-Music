@@ -357,6 +357,8 @@ export default {
     description: 'An elegant cross-platform music player that supports obtaining public music information and playback through compliant plugins.',
     versionInfo: 'Version Information',
     checkUpdateOnStart: 'Check for updates on startup',
+    mobileUpdateHint: 'In-app updates are not supported on this platform. Download the latest package from the GitHub releases page.',
+    downloadMobileUpdate: 'Download from Releases',
     checking: 'Checking...',
     checkUpdate: 'Check for Updates',
     upToDate: 'Already up to date',

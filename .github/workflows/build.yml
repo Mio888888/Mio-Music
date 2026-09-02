@@ -319,7 +319,7 @@ jobs:
             android-signed-apks/**/*.apk
 
   publish-release:
-    needs: [check-version, build-windows, build-macos, build-linux]
+    needs: [check-version, build-windows, build-macos, build-linux, build-android]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:

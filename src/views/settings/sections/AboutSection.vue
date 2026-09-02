@@ -8,6 +8,8 @@ import { MessagePlugin } from 'tdesign-vue-next'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import currentAuthorSponsorQr from '@/assets/images/current-author-sponsor-qr.jpg'
 
+const MOBILE_RELEASE_URL = 'https://github.com/Mio888888/Mio-Music/releases/latest'
+
 const { t } = useI18n()
 
 const settingsStore = useSettingsStore()
@@ -20,6 +22,7 @@ const updateAutoUpdate = () => {
 
 const {
   status: updateStatus,
+  isUpdateSupported,
   currentVersion: appVersion,
   newVersion,
   releaseNotes: updateBody,
@@ -28,6 +31,7 @@ const {
   downloadedMb,
   totalMb,
   error: errorMsg,
+  loadCurrentVersion,
   checkForUpdate,
   downloadAndInstall,
   restartToInstall,
@@ -72,6 +76,7 @@ watch(updateBody, () => {
 watch(notesExpanded, measureNotesOverflow)
 
 onMounted(() => {
+  void loadCurrentVersion()
   renderUpdateNotes().then(measureNotesOverflow)
 })
 
@@ -141,103 +146,115 @@ const handleAboutClick = (e: MouseEvent) => {
     <div id="about-version" class="setting-group">
       <h3>{{ t('settings.about.versionInfo') }}</h3>
       <div class="version-section">
-        <div class="update-actions">
-          <div class="update-option">
-            <t-switch v-model:value="autoUpdate" @change="updateAutoUpdate"></t-switch>
-            <div>{{ t('settings.about.checkUpdateOnStart') }}</div>
+        <div v-if="!isUpdateSupported" class="update-card unsupported">
+          <div class="update-header">
+            <span class="update-icon new" aria-hidden="true">↓</span>
+            <span>{{ t('settings.about.mobileUpdateHint') }}</span>
           </div>
-          <t-button
-            class="update-check-button"
-            theme="primary"
-            :disabled="updateStatus === 'checking' || updateStatus === 'downloading'"
-            :aria-busy="updateStatus === 'checking'"
-            @click="handleCheckUpdate"
-          >
-            <span class="update-check-content">
-              <span v-if="updateStatus === 'checking'" class="update-check-spinner" aria-hidden="true" />
-              {{ updateStatus === 'checking' ? t('settings.about.checking') : t('settings.about.checkUpdate') }}
-            </span>
+          <t-button theme="primary" @click="openLink(MOBILE_RELEASE_URL)">
+            {{ t('settings.about.downloadMobileUpdate') }}
           </t-button>
         </div>
 
-        <!-- 已是最新版本 -->
-        <div v-if="updateStatus === 'up-to-date'" class="update-card success">
-          <span class="update-icon">✓</span> {{ t('settings.about.upToDate') }}
-        </div>
+        <template v-else>
+          <div class="update-actions">
+            <div class="update-option">
+              <t-switch v-model:value="autoUpdate" @change="updateAutoUpdate"></t-switch>
+              <div>{{ t('settings.about.checkUpdateOnStart') }}</div>
+            </div>
+            <t-button
+              class="update-check-button"
+              theme="primary"
+              :disabled="updateStatus === 'checking' || updateStatus === 'downloading'"
+              :aria-busy="updateStatus === 'checking'"
+              @click="handleCheckUpdate"
+            >
+              <span class="update-check-content">
+                <span v-if="updateStatus === 'checking'" class="update-check-spinner" aria-hidden="true" />
+                {{ updateStatus === 'checking' ? t('settings.about.checking') : t('settings.about.checkUpdate') }}
+              </span>
+            </t-button>
+          </div>
 
-        <!-- 发现新版本 -->
-        <div v-if="updateStatus === 'available'" class="update-card">
-          <div class="update-header">
-            <div class="update-title">
-              <span class="update-icon new" aria-hidden="true">↑</span>
-              <span>{{ t('settings.about.newVersionFound') }}</span>
-              <span class="version-badge">{{ t('settings.about.versionBadge', { version: newVersion }) }}</span>
+          <!-- 已是最新版本 -->
+          <div v-if="updateStatus === 'up-to-date'" class="update-card success">
+            <span class="update-icon">✓</span> {{ t('settings.about.upToDate') }}
+          </div>
+
+          <!-- 发现新版本 -->
+          <div v-if="updateStatus === 'available'" class="update-card">
+            <div class="update-header">
+              <div class="update-title">
+                <span class="update-icon new" aria-hidden="true">↑</span>
+                <span>{{ t('settings.about.newVersionFound') }}</span>
+                <span class="version-badge">{{ t('settings.about.versionBadge', { version: newVersion }) }}</span>
+              </div>
+            </div>
+
+            <div v-if="updateNotesHtml" class="release-notes">
+              <div class="release-notes-heading">{{ t('settings.about.releaseNotes') }}</div>
+              <div
+                ref="notesContentRef"
+                class="markdown-content"
+                :class="{ collapsed: !notesExpanded && notesOverflowing }"
+                v-html="updateNotesHtml"
+                @click="handleNotesClick"
+              ></div>
+              <div v-if="!notesExpanded && notesOverflowing" class="release-notes-fade" aria-hidden="true"></div>
+            </div>
+
+            <button
+              v-if="notesOverflowing || notesExpanded"
+              type="button"
+              class="notes-toggle"
+              @click="notesExpanded = !notesExpanded"
+            >
+              {{ notesExpanded ? t('settings.about.hideFullNotes') : t('settings.about.showFullNotes') }}
+            </button>
+
+            <div class="update-actions-row">
+              <t-button
+                theme="primary"
+                @click="handleUpdateInstall"
+              >
+                {{ t('settings.about.downloadAndInstall') }}
+              </t-button>
+              <t-button variant="text" @click="dismissUpdate">{{ t('settings.about.remindLater') }}</t-button>
             </div>
           </div>
 
-          <div v-if="updateNotesHtml" class="release-notes">
-            <div class="release-notes-heading">{{ t('settings.about.releaseNotes') }}</div>
-            <div
-              ref="notesContentRef"
-              class="markdown-content"
-              :class="{ collapsed: !notesExpanded && notesOverflowing }"
-              v-html="updateNotesHtml"
-              @click="handleNotesClick"
-            ></div>
-            <div v-if="!notesExpanded && notesOverflowing" class="release-notes-fade" aria-hidden="true"></div>
+          <!-- 下载中 -->
+          <div v-if="updateStatus === 'downloading'" class="update-card">
+            <div class="update-header">
+              <span class="update-icon downloading">↓</span>
+              <span>{{ t('settings.about.downloading') }} v{{ newVersion }}...</span>
+            </div>
+            <t-progress :percentage="downloadPercent" theme="plump" :label="`${downloadPercent}%`" />
+            <div v-if="totalBytes > 0" class="progress-detail">
+              {{ downloadedMb }} MB / {{ totalMb }} MB
+            </div>
           </div>
 
-          <button
-            v-if="notesOverflowing || notesExpanded"
-            type="button"
-            class="notes-toggle"
-            @click="notesExpanded = !notesExpanded"
-          >
-            {{ notesExpanded ? t('settings.about.hideFullNotes') : t('settings.about.showFullNotes') }}
-          </button>
-
-          <div class="update-actions-row">
-            <t-button
-              theme="primary"
-              @click="handleUpdateInstall"
-            >
-              {{ t('settings.about.downloadAndInstall') }}
-            </t-button>
-            <t-button variant="text" @click="dismissUpdate">{{ t('settings.about.remindLater') }}</t-button>
-          </div>
-        </div>
-
-        <!-- 下载中 -->
-        <div v-if="updateStatus === 'downloading'" class="update-card">
-          <div class="update-header">
-            <span class="update-icon downloading">↓</span>
-            <span>{{ t('settings.about.downloading') }} v{{ newVersion }}...</span>
-          </div>
-          <t-progress :percentage="downloadPercent" theme="plump" :label="`${downloadPercent}%`" />
-          <div v-if="totalBytes > 0" class="progress-detail">
-            {{ downloadedMb }} MB / {{ totalMb }} MB
-          </div>
-        </div>
-
-        <!-- 下载完成 -->
-        <div v-if="updateStatus === 'downloaded'" class="update-card downloaded">
-          <div class="update-header">
+          <!-- 下载完成 -->
+          <div v-if="updateStatus === 'downloaded'" class="update-card downloaded">
+            <div class="update-header">
               <span class="update-icon" aria-hidden="true">✓</span>
               <div class="update-title">
                 <span>{{ t('settings.about.updateDownloaded') }}</span>
                 <span v-if="newVersion" class="version-badge success">{{ t('settings.about.versionBadge', { version: newVersion }) }}</span>
               </div>
+            </div>
+            <p class="downloaded-hint">{{ t('settings.about.restartHint') }}</p>
+            <t-button class="restart-button" theme="primary" @click="restartNow">
+              {{ t('settings.about.restartNow') }}
+            </t-button>
           </div>
-          <p class="downloaded-hint">{{ t('settings.about.restartHint') }}</p>
-          <t-button class="restart-button" theme="primary" @click="restartNow">
-            {{ t('settings.about.restartNow') }}
-          </t-button>
-        </div>
 
-        <!-- 错误 -->
-        <div v-if="updateStatus === 'error'" class="update-card error">
-          <span class="update-icon err">!</span> {{ errorMsg }}
-        </div>
+          <!-- 错误 -->
+          <div v-if="updateStatus === 'error'" class="update-card error">
+            <span class="update-icon err">!</span> {{ errorMsg }}
+          </div>
+        </template>
       </div>
     </div>
 
@@ -371,6 +388,9 @@ const handleAboutClick = (e: MouseEvent) => {
 
   &.downloaded {
     border-color: var(--td-success-color);
+  }
+  &.unsupported {
+    border-color: var(--td-brand-color-3);
   }
   &.error {
     border-color: var(--td-error-color);

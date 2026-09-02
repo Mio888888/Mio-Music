@@ -1,6 +1,6 @@
 [package]
 name = "mio-music"
-version = "0.3.3"
+version = "0.3.4"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -27,7 +27,6 @@ tauri = { version = "2", features = ["protocol-asset", "macos-private-api", "dev
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-updater = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
@@ -80,6 +79,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "logg
 ndk-context = "0.1"
 jni = "0.21"
 libc = "0.2"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-updater = "2"
 
 [target.'cfg(all(unix, not(target_os = "android")))'.dependencies]
 libc = "0.2"
