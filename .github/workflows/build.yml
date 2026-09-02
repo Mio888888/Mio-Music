@@ -34,8 +34,53 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-  build-windows:
+  create-release:
     needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Create or reuse draft release
+        id: release
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = '${{ needs.check-version.outputs.version }}'
+            const tag = `v${version}`
+            const { owner, repo } = context.repo
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              { owner, repo, per_page: 100 },
+            )
+            const matching = releases.filter((item) => item.tag_name === tag)
+            const drafts = matching.filter((item) => item.draft)
+
+            if (drafts.length > 1) {
+              core.setFailed(`Multiple draft releases found for ${tag}`)
+              return
+            }
+            if (matching.some((item) => !item.draft)) {
+              core.setFailed(`A published release already exists for ${tag}`)
+              return
+            }
+
+            const release = drafts[0] ?? (await github.rest.repos.createRelease({
+              owner,
+              repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `Mio Music ${tag}`,
+              body: 'See the assets to download this version.',
+              draft: true,
+              prerelease: false,
+            })).data
+
+            core.setOutput('release_id', String(release.id))
+
+  build-windows:
+    needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: windows-latest
     steps:
@@ -57,8 +102,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'Mio Music v__VERSION__'
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: v${{ needs.check-version.outputs.version }}
+          releaseName: 'Mio Music v${{ needs.check-version.outputs.version }}'
           releaseBody: 'See the assets to download this version.'
           releaseDraft: true
           prerelease: false
@@ -72,7 +118,7 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
 
   build-macos:
-    needs: check-version
+    needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: macos-latest
     steps:
@@ -94,8 +140,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'Mio Music v__VERSION__'
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: v${{ needs.check-version.outputs.version }}
+          releaseName: 'Mio Music v${{ needs.check-version.outputs.version }}'
           releaseBody: 'See the assets to download this version.'
           releaseDraft: true
           prerelease: false
@@ -109,7 +156,7 @@ jobs:
             src-tauri/target/release/bundle/macos/*.app.tar.gz*
 
   build-linux:
-    needs: check-version
+    needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -136,8 +183,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'Mio Music v__VERSION__'
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: v${{ needs.check-version.outputs.version }}
+          releaseName: 'Mio Music v${{ needs.check-version.outputs.version }}'
           releaseBody: 'See the assets to download this version.'
           releaseDraft: true
           prerelease: false
@@ -151,7 +199,7 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage.*
 
   build-android:
-    needs: check-version
+    needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -295,15 +343,37 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="v${{ needs.check-version.outputs.version }}"
+          RELEASE_ID="${{ needs.create-release.outputs.release_id }}"
           while IFS= read -r -d '' apk; do
-            echo "Uploading $apk to release $TAG"
+            asset_name="$(basename "$apk")"
+            echo "Uploading $apk to release $RELEASE_ID"
             for i in $(seq 1 20); do
-              if gh release upload "$TAG" "$apk" --clobber; then
+              existing_asset_id="$(
+                curl --fail-with-body --silent --show-error \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?per_page=100" |
+                  jq -r --arg name "$asset_name" 'first(.[] | select(.name == $name) | .id) // empty'
+              )"
+              if [ -n "$existing_asset_id" ]; then
+                curl --fail-with-body --silent --show-error \
+                  -X DELETE \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "Accept: application/vnd.github+json" \
+                  "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_asset_id}"
+              fi
+              if curl --fail-with-body --silent --show-error \
+                --retry 3 --retry-delay 5 \
+                -X POST \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "Content-Type: application/vnd.android.package-archive" \
+                --data-binary "@$apk" \
+                "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}/assets?name=${asset_name}"; then
                 break
               fi
               if [ "$i" -eq 20 ]; then
-                echo "::error::Failed to upload $apk to release $TAG"
+                echo "::error::Failed to upload $apk to release $RELEASE_ID"
                 exit 1
               fi
               echo "Retrying in 30s... ($i/20)"
@@ -319,7 +389,7 @@ jobs:
             android-signed-apks/**/*.apk
 
   publish-release:
-    needs: [check-version, build-windows, build-macos, build-linux, build-android]
+    needs: [check-version, create-release, build-windows, build-macos, build-linux, build-android]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -330,16 +400,32 @@ jobs:
             const version = '${{ needs.check-version.outputs.version }}'
             const tag = `v${version}`
             const { owner, repo } = context.repo
-            const releases = await github.paginate(github.rest.repos.listReleases, { owner, repo, per_page: 100 })
-            const release = releases.find((item) => item.tag_name === tag)
-            if (!release) {
-              core.setFailed(`Release ${tag} was not created`)
+            const releaseId = Number('${{ needs.create-release.outputs.release_id }}')
+            if (!Number.isInteger(releaseId) || releaseId <= 0) {
+              core.setFailed(`Invalid release ID for ${tag}`)
+              return
+            }
+            const release = (await github.rest.repos.getRelease({
+              owner,
+              repo,
+              release_id: releaseId,
+            })).data
+            if (release.tag_name !== tag || !release.draft) {
+              core.setFailed(`Release ${releaseId} does not match draft ${tag}`)
+              return
+            }
+            const assets = await github.paginate(
+              github.rest.repos.listReleaseAssets,
+              { owner, repo, release_id: releaseId, per_page: 100 },
+            )
+            if (!assets.some((asset) => asset.name.endsWith('.apk'))) {
+              core.setFailed(`Release ${tag} has no Android APK asset`)
               return
             }
             await github.rest.repos.updateRelease({
               owner,
               repo,
-              release_id: release.id,
+              release_id: releaseId,
               draft: false,
               prerelease: false,
             })
