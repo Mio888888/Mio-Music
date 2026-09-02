@@ -15,3 +15,8 @@
   ```bash
   git diff --exit-code -- src-tauri/gen ':!src-tauri/gen/android/tauri.settings.gradle'
   ```
+
+## Android 生成文件格式
+
+- `src-tauri/gen/android/app/src/main/assets/tauri.conf.json` 和 `src-tauri/gen/android/app/tauri.properties` 是 Tauri 生成文件；当前 CI 的生成结果不带文件末尾换行。编辑器、脚本或格式化工具不得自动补回 EOF 换行。
+- 重新生成或升级 Tauri CLI 后，必须以 CI 的实际生成结果为准按字节核对这两个文件；不要只检查可见文本或版本号是否一致。
