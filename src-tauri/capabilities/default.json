@@ -14,7 +14,6 @@
     "opener:default",
     "dialog:default",
     "global-shortcut:default",
-    "updater:default",
     "process:allow-restart"
   ]
 }
