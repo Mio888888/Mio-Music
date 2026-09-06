@@ -525,11 +525,11 @@ impl PluginEngine {
 
         let patterns = [
             // Converted LX format: source_id: { ..., qualitys: [...] }
-            format!(r#"{sid}\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            format!(r#"{sid}\s*:\s*\{{[^}}]*?["']?qualitys["']?\s*:\s*\[([^\]]*)\]"#),
             // Quoted key: 'source_id': { ..., qualitys: [...] }
-            format!(r#"'{sid}'\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            format!(r#"'{sid}'\s*:\s*\{{[^}}]*?["']?qualitys["']?\s*:\s*\[([^\]]*)\]"#),
             // Double-quoted key: "source_id": { ..., qualitys: [...] }
-            format!(r#""{sid}"\s*:\s*\{{[^}}]*?qualitys\s*:\s*\[([^\]]*)\]"#),
+            format!(r#""{sid}"\s*:\s*\{{[^}}]*?["']?qualitys["']?\s*:\s*\[([^\]]*)\]"#),
             // Direct array: 'source_id': [...]
             format!(r#"'{sid}'\s*:\s*\[([^\]]*)\]"#),
             // Direct array: "source_id": [...]
@@ -567,6 +567,16 @@ impl PluginEngine {
 #[cfg(test)]
 mod tests {
     use super::PluginEngine;
+
+    #[test]
+    fn extracts_quoted_ceru_quality_fields_without_inventing_qualities() {
+        let code = r#"const sources = {"kg":{"name":"KG","qualitys":["128k","320k","flac","hires","atmos","master"]},"kw":{"name":"KW","qualitys":["128k","320k","flac","hires"]},"tx":{"qualitys":["128k","320k"]}};"#;
+        let sources = PluginEngine::extract_sources(code);
+        let qualities = |id: &str| sources.iter().find(|s| s.source_id == id).unwrap().qualities.clone();
+        assert_eq!(qualities("kg"), vec!["128k", "320k", "flac", "hires", "atmos", "master"]);
+        assert_eq!(qualities("kw"), vec!["128k", "320k", "flac", "hires"]);
+        assert_eq!(qualities("tx"), vec!["128k", "320k"]);
+    }
 
     #[test]
     fn extracts_json_music_quality_map() {

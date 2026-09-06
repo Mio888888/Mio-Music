@@ -7,6 +7,7 @@
  */
 
 import i18n from '@/locales'
+import type { PluginSources } from './PluginRunner'
 
 function getT() { return i18n.global.t }
 
@@ -469,7 +470,7 @@ function isCrPlugin(code: string): boolean {
 
 interface PluginExports {
   pluginInfo?: { name: string; version: string; author: string; description: string }
-  sources?: Record<string, { name: string; type: string; qualitys: string[] }>
+  sources?: PluginSources
   musicUrl?: (source: string, musicInfo: any, quality: string) => Promise<string | { error?: string }>
   [key: string]: any
 }
@@ -655,6 +656,7 @@ interface LoadedPlugin {
 }
 
 const pluginCache = new Map<string, LoadedPlugin>()
+const pluginLoads = new Map<string, Promise<LoadedPlugin>>()
 
 async function getPluginCode(pluginId: string): Promise<string> {
   const res = await ipcCall('plugins.getCode', { pluginId })
@@ -665,13 +667,21 @@ async function getPluginCode(pluginId: string): Promise<string> {
 async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
   const cached = pluginCache.get(pluginId)
   if (cached) return cached
+  const pending = pluginLoads.get(pluginId)
+  if (pending) return pending
 
-  const code = await getPluginCode(pluginId)
-  const exports = executePluginCode(code)
-
-  const plugin: LoadedPlugin = { exports, code }
-  pluginCache.set(pluginId, plugin)
-  return plugin
+  const loading = getPluginCode(pluginId).then(code => {
+    const plugin: LoadedPlugin = { exports: executePluginCode(code), code }
+    // A replacement may have invalidated this load while its IPC request was pending.
+    if (pluginLoads.get(pluginId) === loading) pluginCache.set(pluginId, plugin)
+    return plugin
+  })
+  pluginLoads.set(pluginId, loading)
+  try {
+    return await loading
+  } finally {
+    if (pluginLoads.get(pluginId) === loading) pluginLoads.delete(pluginId)
+  }
 }
 
 /**
@@ -679,14 +689,29 @@ async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
  * 删除缓存后重新获取代码并执行，使插件顶层的 checkUpdate() 等逻辑重新运行。
  */
 async function reloadPlugin(pluginId: string): Promise<LoadedPlugin> {
-  pluginCache.delete(pluginId)
+  clearCache(pluginId)
+  return loadPlugin(pluginId)
+}
 
-  const code = await getPluginCode(pluginId)
-  const exports = executePluginCode(code)
+async function getSources(pluginId: string): Promise<PluginSources> {
+  const plugin = await loadPlugin(pluginId)
+  const raw = plugin.exports.sources
+  const sources: PluginSources = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return sources
 
-  const plugin: LoadedPlugin = { exports, code }
-  pluginCache.set(pluginId, plugin)
-  return plugin
+  // Only send validated, cloneable metadata across the worker boundary.
+  for (const [id, source] of Object.entries(raw)) {
+    if (!id || ['__proto__', 'constructor', 'prototype'].includes(id)) continue
+    if (!source || typeof source !== 'object' || !Array.isArray(source.qualitys)) continue
+    const qualitys = [...new Set(source.qualitys.filter(q => typeof q === 'string' && q.trim()))]
+    if (!qualitys.length) continue
+    sources[id] = {
+      name: typeof source.name === 'string' && source.name ? source.name : id,
+      type: typeof source.type === 'string' && source.type ? source.type : 'music',
+      qualitys,
+    }
+  }
+  return sources
 }
 
 function normalizeMusicUrlResult(_source: string, result: any): string {
@@ -865,8 +890,10 @@ async function testConnection(pluginId: string): Promise<{ success: boolean; mes
 function clearCache(pluginId?: string) {
   if (pluginId) {
     pluginCache.delete(pluginId)
+    pluginLoads.delete(pluginId)
   } else {
     pluginCache.clear()
+    pluginLoads.clear()
   }
 }
 
@@ -898,6 +925,9 @@ self.onmessage = async (e: MessageEvent) => {
     try {
       let result: any
       switch (msg.method) {
+        case 'getSources':
+          result = await getSources(msg.args[0])
+          break
         case 'getMusicUrl':
           result = await getMusicUrl(msg.args[0], msg.args[1], msg.args[2], msg.args[3])
           break

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { LocalUserDetailStore } from './LocalUserDetail'
 import { ControlAudioStore } from './ControlAudio'
 import { useGlobalPlayStatusStore } from './GlobalPlayStatus'
-import PluginRunner from '@/utils/plugin/PluginRunner'
+import PluginRunner, { type PluginSources } from '@/utils/plugin/PluginRunner'
 import i18n from '@/locales'
 
 export interface PluginInfo {
@@ -42,6 +42,65 @@ export const usePluginStore = defineStore('plugin', () => {
   const loading = ref(false)
   const currentPluginId = ref('')
   const currentPluginName = ref('')
+  let sourceSyncGeneration = 0
+
+  function applySources(plugin: LoadedPlugin, sources: PluginSources) {
+    const userStore = LocalUserDetailStore()
+    const info = userStore.userInfo
+    const available = userStore.mergeBuiltInSources(info, sources)
+    info.pluginId = plugin.plugin_id
+    info.pluginName = plugin.plugin_info.name
+    info.supportedSources = available
+    if (!available[info.selectSources as string]) {
+      info.selectSources = Object.keys(available)[0] || ''
+    }
+    const qualities = available[info.selectSources as string]?.qualitys || []
+    if (!qualities.includes(info.selectQuality as string)) {
+      info.selectQuality = qualities[qualities.length - 1] || ''
+    }
+    for (const [id, quality] of Object.entries(info.sourceQualityMap || {})) {
+      if (!available[id]?.qualitys.includes(quality)) delete info.sourceQualityMap![id]
+    }
+  }
+
+  function applyStaticSources(plugin: LoadedPlugin) {
+    const sources: PluginSources = {}
+    for (const source of plugin.supported_sources || []) {
+      const id = source.source_id || source.name
+      if (!id || ['__proto__', 'constructor', 'prototype'].includes(id)) continue
+      sources[id] = { name: source.name, type: 'music', qualitys: source.qualities }
+    }
+    applySources(plugin, sources)
+  }
+
+  async function syncRuntimeSources() {
+    const generation = ++sourceSyncGeneration
+    const pluginId = currentPluginId.value
+    const plugin = plugins.value.find(p => p.plugin_id === pluginId)
+    if (!plugin) return
+    if (plugin.plugin_type === 'service') {
+      applyStaticSources(plugin)
+      return
+    }
+    try {
+      const sources = await PluginRunner.getSources(pluginId)
+      if (generation !== sourceSyncGeneration || currentPluginId.value !== pluginId) return
+      if (!Object.keys(sources).length) {
+        applyStaticSources(plugin)
+        return
+      }
+      plugin.supported_sources = Object.entries(sources).map(([id, source]) => ({
+        source_id: id, name: source.name, qualities: source.qualitys,
+      }))
+
+      applySources(plugin, sources)
+    } catch (e) {
+      console.warn('[PluginStore] runtime sources unavailable; keeping static metadata:', e)
+      if (generation === sourceSyncGeneration && currentPluginId.value === pluginId) {
+        applyStaticSources(plugin)
+      }
+    }
+  }
 
   function _loadPersistedSelection() {
     const saved = localStorage.getItem('pluginId')
@@ -74,45 +133,8 @@ export const usePluginStore = defineStore('plugin', () => {
       const userStore = LocalUserDetailStore()
       if (currentPluginId.value) {
         const plugin = plugins.value.find(p => p.plugin_id === currentPluginId.value)
-        if (plugin && plugin.supported_sources && plugin.supported_sources.length > 0) {
-          const supportedSourcesForStore: Record<string, any> = {}
-          for (const src of plugin.supported_sources) {
-            const key = src.source_id || src.name
-            supportedSourcesForStore[key] = {
-              name: src.name,
-              type: i18n.global.t('plugin.source'),
-              qualitys: src.qualities,
-            }
-          }
-
-          if (!userStore.userInfo.pluginId) {
-            // Full restore: no plugin data exists yet
-            const selectSources = Object.keys(supportedSourcesForStore)[0]
-            const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
-            const selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
-            userStore.userInfo.pluginId = plugin.plugin_id
-            userStore.userInfo.pluginName = plugin.plugin_info.name
-            userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
-            userStore.userInfo.selectSources = selectSources
-            userStore.userInfo.selectQuality = selectQuality
-          } else {
-            // Sync: update supportedSources with latest plugin data, preserve user selections
-            const prevSources = userStore.userInfo.supportedSources || {}
-            userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
-            userStore.userInfo.pluginName = plugin.plugin_info.name
-
-            // Validate current selections still exist in new data
-            const currentSource = userStore.userInfo.selectSources as string
-            const availableSources = userStore.userInfo.supportedSources || {}
-            if (currentSource && !availableSources[currentSource]) {
-              userStore.userInfo.selectSources = Object.keys(availableSources)[0]
-            }
-            const currentQuality = userStore.userInfo.selectQuality as string
-            const sourceQualities = availableSources[userStore.userInfo.selectSources as string]?.qualitys || []
-            if (currentQuality && !sourceQualities.includes(currentQuality)) {
-              userStore.userInfo.selectQuality = sourceQualities.length > 0 ? sourceQualities[sourceQualities.length - 1] : ''
-            }
-          }
+        if (plugin) {
+          await syncRuntimeSources()
         } else {
           // Plugin was uninstalled — clear stale plugin data, keep built-in sources
           userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, {})
@@ -139,11 +161,13 @@ export const usePluginStore = defineStore('plugin', () => {
   }
 
   async function refresh() {
+    ++sourceSyncGeneration
     loading.value = true
     try {
       const res = await (window as any).api.plugins.getList()
       if (res?.success) {
         plugins.value = res.data || []
+        await syncRuntimeSources()
       }
     } catch (e) {
       console.error('[PluginStore] refresh failed:', e)
@@ -152,13 +176,15 @@ export const usePluginStore = defineStore('plugin', () => {
     }
   }
 
-  function selectPlugin(plugin: LoadedPlugin) {
+  async function selectPlugin(plugin: LoadedPlugin) {
     currentPluginId.value = plugin.plugin_id
     currentPluginName.value = plugin.plugin_info.name
     _persistSelection()
+    await syncRuntimeSources()
   }
 
   function clearSelection() {
+    ++sourceSyncGeneration
     currentPluginId.value = ''
     currentPluginName.value = ''
     _persistSelection()
@@ -260,6 +286,7 @@ export const usePluginStore = defineStore('plugin', () => {
   async function downloadAndAdd(url: string, pluginType: string, targetPluginId?: string) {
     const res = await (window as any).api.plugins.downloadAndAdd(url, pluginType, targetPluginId)
     if (res?.success) {
+      if (res.data?.plugin_id) PluginRunner.clearCache(res.data.plugin_id)
       await refresh()
       return res.data as LoadedPlugin
     }
@@ -270,6 +297,7 @@ export const usePluginStore = defineStore('plugin', () => {
     const res = await (window as any).api.plugins.selectAndAdd(pluginType)
     if (res?.data?.canceled) return null
     if (res?.success) {
+      if (res.data?.plugin_id) PluginRunner.clearCache(res.data.plugin_id)
       await refresh()
       return res.data as LoadedPlugin
     }

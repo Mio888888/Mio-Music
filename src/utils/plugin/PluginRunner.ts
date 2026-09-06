@@ -8,6 +8,8 @@
 
 import i18n from '@/locales'
 
+export type PluginSources = Record<string, { name: string; type: string; qualitys: string[] }>
+
 let worker: Worker | null = null
 const pendingCalls = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>()
 let callSeq = 0
@@ -132,6 +134,10 @@ async function loadPlugin(pluginId: string): Promise<void> {
   return callWorker('loadPlugin', [pluginId])
 }
 
+async function getSources(pluginId: string): Promise<PluginSources> {
+  return callWorker('getSources', [pluginId])
+}
+
 async function reloadPlugin(pluginId: string): Promise<void> {
   return callWorker('reloadPlugin', [pluginId])
 }
@@ -147,4 +153,4 @@ function terminate() {
   }
 }
 
-export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, terminate, onUpdateNotice, loadPlugin, reloadPlugin }
+export default { getMusicUrl, getPic, getLyric, callMethod, testConnection, clearCache, terminate, onUpdateNotice, loadPlugin, reloadPlugin, getSources }

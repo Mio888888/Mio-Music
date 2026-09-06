@@ -364,58 +364,10 @@ async function doImport() {
 
 // ==================== Select / Uninstall ====================
 
-function doSelect(plugin: LoadedPlugin) {
-  store.selectPlugin(plugin)
-
-  const { plugin_id, plugin_info, supported_sources } = plugin
-
-  if (!supported_sources || supported_sources.length === 0) {
-    userStore.userInfo.pluginId = plugin_id
-    userStore.userInfo.pluginName = plugin_info.name
-    userStore.userInfo.supportedSources = {}
-    userStore.userInfo.selectSources = ''
-    userStore.userInfo.selectQuality = ''
-    MessagePlugin.success(t('settings.plugin.selectPluginNoSource', { name: plugin_info.name }))
-    return
-  }
-
-  // Convert supported_sources array to object keyed by source_id
-  const supportedSourcesForStore: Record<string, any> = {}
-  for (const src of supported_sources) {
-    const key = src.source_id || src.name
-    supportedSourcesForStore[key] = {
-      name: src.name,
-      type: t('settings.plugin.sourceType'),
-      qualitys: src.qualities,
-    }
-  }
-
-  // Preserve previous source selection or use first available
-  let selectSources: string
-  const prevSource = userStore.userInfo.selectSources as string
-  if (prevSource && supportedSourcesForStore[prevSource]) {
-    selectSources = prevSource
-  } else {
-    selectSources = Object.keys(supportedSourcesForStore)[0]
-  }
-
-  // Preserve previous quality or use highest available
-  let selectQuality: string
-  const qualitys: string[] = supportedSourcesForStore[selectSources]?.qualitys || []
-  const prevQuality = userStore.userInfo.selectQuality as string
-  if (prevQuality && qualitys.includes(prevQuality)) {
-    selectQuality = prevQuality
-  } else {
-    selectQuality = qualitys.length > 0 ? qualitys[qualitys.length - 1] : ''
-  }
-
-  userStore.userInfo.pluginId = plugin_id
-  userStore.userInfo.pluginName = plugin_info.name
-  userStore.userInfo.supportedSources = userStore.mergeBuiltInSources(userStore.userInfo, supportedSourcesForStore)
-  userStore.userInfo.selectSources = selectSources
-  userStore.userInfo.selectQuality = selectQuality
-
-  MessagePlugin.success(t('settings.plugin.selectPlugin', { name: plugin_info.name }))
+async function doSelect(plugin: LoadedPlugin) {
+  await store.selectPlugin(plugin)
+  if (store.currentPluginId !== plugin.plugin_id) return
+  MessagePlugin.success(t('settings.plugin.selectPlugin', { name: plugin.plugin_info.name }))
 }
 
 function confirmUninstall(plugin: LoadedPlugin) {

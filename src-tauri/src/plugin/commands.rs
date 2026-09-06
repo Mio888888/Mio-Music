@@ -218,6 +218,7 @@ pub async fn plugin__select_and_add(
     args: Value,
 ) -> ApiResult {
     use tauri_plugin_dialog::DialogExt;
+    use tauri_plugin_fs::FsExt;
 
     let p = payload(&args);
     let plugin_type = require_str(&p, "pluginType")?;
@@ -233,10 +234,7 @@ pub async fn plugin__select_and_add(
         None => return ok(serde_json::json!({ "canceled": true })),
     };
 
-    let path_str = path.as_path().ok_or_else(|| "无效文件路径".to_string())?;
-
-    let plugin_code =
-        std::fs::read_to_string(path_str).map_err(|e| format!("读取文件失败: {}", e))?;
+    let (plugin_code, file_name) = read_selected_plugin(path, |path| app.fs().read_to_string(path))?;
 
     if plugin_type == "cr" && !plugin_code.to_lowercase().contains("cerumusic") {
         return Err("澜音插件格式校验失败".into());
@@ -251,12 +249,47 @@ pub async fn plugin__select_and_add(
         plugin_code
     };
 
-    let file_name = path_str
-        .file_stem()
-        .and_then(|s: &std::ffi::OsStr| s.to_str())
-        .unwrap_or("imported_plugin")
-        .to_string();
-
     let result = pm.add_plugin(&plugin_code, &file_name, None).await?;
     ok(serde_json::to_value(result).unwrap_or_default())
+}
+
+fn read_selected_plugin(
+    path: tauri_plugin_fs::FilePath,
+    read: impl FnOnce(tauri_plugin_fs::FilePath) -> std::io::Result<String>,
+) -> Result<(String, String), String> {
+    // Android's picker returns content:// URIs, which must stay intact for ContentResolver.
+    let file_name = path.as_path()
+        .and_then(|p| p.file_stem())
+        .and_then(|s| s.to_str())
+        .unwrap_or("imported_plugin")
+        .to_string();
+    let plugin_code = read(path)
+        .map_err(|e| format!("读取文件失败: {}", e))?;
+    Ok((plugin_code, file_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_selected_plugin;
+    use tauri_plugin_fs::FilePath;
+
+    #[test]
+    fn selected_content_uri_is_passed_intact_to_native_reader() {
+        let uri = "content://com.android.providers.downloads.documents/document/42";
+        let selected = FilePath::Url(uri.parse().unwrap());
+        let (code, name) = read_selected_plugin(selected, |path| {
+            assert!(matches!(path, FilePath::Url(url) if url.as_str() == uri));
+            Ok("// cerumusic".into())
+        }).unwrap();
+        assert_eq!(code, "// cerumusic");
+        assert_eq!(name, "imported_plugin");
+    }
+
+    #[test]
+    fn desktop_selection_keeps_filename_and_read_errors() {
+        let path = FilePath::Path("example.js".into());
+        let (_, name) = read_selected_plugin(path.clone(), |_| Ok("// lx".into())).unwrap();
+        assert_eq!(name, "example");
+        assert!(read_selected_plugin(path, |_| Err(std::io::ErrorKind::PermissionDenied.into())).is_err());
+    }
 }
