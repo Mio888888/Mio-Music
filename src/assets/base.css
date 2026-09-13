@@ -1,8 +1,9 @@
 @import './icon_font/iconfont.css';
 :root {
-  --play-bottom-height: max(min(10vh, 80px), 70px);
-  --mobile-safe-top: env(safe-area-inset-top, 0px);
-  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-viewport-height: 100vh;
+  --play-bottom-height: 70px;
+  --mobile-safe-top: 0px;
+  --mobile-safe-bottom: 0px;
   --mobile-nav-height: 64px;
   --mobile-nav-bottom-gap: 10px;
   --mobile-nav-total-height: calc(
@@ -13,9 +14,27 @@
   --mobile-content-bottom-inset: calc(
     var(--mobile-player-height) + var(--mobile-nav-total-height)
   );
-  --mobile-page-gutter: clamp(16px, 4vw, 24px);
-  --mobile-page-top-gutter: clamp(14px, 3.5vw, 22px);
+  --mobile-page-gutter: 16px;
+  --mobile-page-top-gutter: 14px;
   --mobile-touch-target: 44px;
+}
+/* Unsupported functions in custom properties invalidate the consuming declaration.
+   Keep usable defaults and only opt into syntax supported by this WebView. */
+@supports (height: 100dvh) {
+  :root { --app-viewport-height: 100dvh; }
+}
+@supports (padding: env(safe-area-inset-top)) {
+  :root {
+    --mobile-safe-top: env(safe-area-inset-top, 0px);
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+@supports (width: clamp(1px, 2vw, 3px)) {
+  :root {
+    --play-bottom-height: clamp(70px, 10vh, 80px);
+    --mobile-page-gutter: clamp(16px, 4vw, 24px);
+    --mobile-page-top-gutter: clamp(14px, 3.5vw, 22px);
+  }
 }
 @font-face {
   font-family: 'lyricfont';
@@ -34,6 +53,7 @@ ul {
 }
 
 html {
+  font-size: 16px;
   font-size: min(max(1.4vw, 15px), 18px);
   background: transparent;
   overflow: hidden;
@@ -74,16 +94,16 @@ body:has(#app .desktop-lyric),
 
   body {
     min-width: 0;
-    height: 100dvh;
-    min-height: 100dvh;
+    height: var(--app-viewport-height);
+    min-height: var(--app-viewport-height);
     overflow: hidden;
     overscroll-behavior: none;
     touch-action: manipulation;
   }
 
   #app {
-    height: 100dvh;
-    min-height: 100dvh;
+    height: var(--app-viewport-height);
+    min-height: var(--app-viewport-height);
     border-radius: 0;
     overflow: hidden;
   }
@@ -169,7 +189,7 @@ body {
   }
 
   .t-dialog__ctx .t-dialog__position {
-    min-height: 100dvh;
+    min-height: var(--app-viewport-height);
     padding: calc(var(--mobile-safe-top) + 12px) var(--mobile-page-gutter) calc(var(--mobile-safe-bottom) + 12px) !important;
     justify-content: flex-end !important;
     align-items: center !important;
@@ -179,9 +199,9 @@ body {
 
   .t-dialog__ctx .t-dialog:not(.t-dialog__fullscreen),
   .t-drawer__content-wrapper {
-    width: min(420px, calc(100dvw - var(--mobile-page-gutter) * 2)) !important;
-    max-width: none !important;
-    max-height: min(76dvh, 620px);
+    width: calc(100vw - var(--mobile-page-gutter) * 2) !important;
+    max-width: 420px !important;
+    max-height: 76vh;
     margin: 0 !important;
     border: 1px solid var(--mobile-glass-border) !important;
     border-radius: var(--mobile-card-radius) !important;
@@ -238,7 +258,7 @@ body {
   .t-dialog__body,
   .t-drawer__body {
     flex: 1 1 auto;
-    max-height: calc(76dvh - var(--mobile-safe-bottom) - 144px);
+    max-height: calc(var(--app-viewport-height) * 0.76 - var(--mobile-safe-bottom) - 144px);
     padding: 14px 0;
     overflow-x: hidden;
     overflow-y: auto;

@@ -1544,8 +1544,8 @@ onUnmounted(() => {
   }
 
   .full-play {
-    --height: 100dvh;
-    height: 100dvh;
+    --height: var(--app-viewport-height);
+    height: var(--app-viewport-height);
     max-width: 100vw;
     overflow: hidden;
   }
@@ -1576,24 +1576,27 @@ onUnmounted(() => {
   }
 
   .playbox {
-    --mobile-art-size: min(74vw, 330px, 40dvh);
+    --mobile-art-size: 64vw;
+    @supports (width: min(1vw, 1vh)) {
+      --mobile-art-size: min(74vw, 330px, 40vh);
+    }
     width: 100%;
-    height: 100dvh;
+    height: var(--app-viewport-height);
     max-width: 100vw;
     min-width: 0;
     padding: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter) + var(--mobile-touch-target) + 12px) var(--mobile-page-gutter) calc(var(--play-bottom-height) + var(--mobile-safe-bottom) + 18px) !important;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: clamp(1.1rem, 3dvh, 1.8rem);
+    gap: clamp(1.1rem, 3vh, 1.8rem);
     overflow: hidden;
     background-color: rgba(0, 0, 0, 0.34);
     box-sizing: border-box;
     --cd-width-auto: var(--mobile-art-size);
 
     .left {
-      width: 100dvw !important;
-      max-width: 100dvw;
+      width: 100vw !important;
+      max-width: 100vw;
       min-width: 0;
       min-height: 0;
       margin: 0;
@@ -1602,7 +1605,7 @@ onUnmounted(() => {
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: clamp(1rem, 2.6dvh, 1.5rem);
+      gap: clamp(1rem, 2.6vh, 1.5rem);
       opacity: 1;
       transform: none;
       pointer-events: auto;
@@ -1640,8 +1643,8 @@ onUnmounted(() => {
 
     &.single-column {
       .left {
-        width: 100dvw !important;
-        max-width: 100dvw;
+        width: 100vw !important;
+        max-width: 100vw;
         padding: 0 !important;
         margin: 0 !important;
         opacity: 1;
@@ -1657,8 +1660,8 @@ onUnmounted(() => {
 
     &.mode-cover {
       .left {
-        width: 100dvw !important;
-        max-width: 100dvw;
+        width: 100vw !important;
+        max-width: 100vw;
       }
 
       .right {
@@ -1670,7 +1673,7 @@ onUnmounted(() => {
     .cover-layout-container {
       width: 100%;
       min-width: 0;
-      gap: clamp(0.7rem, 1.6dvh, 0.85rem);
+      gap: clamp(0.7rem, 1.6vh, 0.85rem);
       margin-top: 0;
       max-height: none;
       align-items: center;
@@ -1784,14 +1787,14 @@ onUnmounted(() => {
     }
 
     .right {
-      width: 100dvw;
-      max-width: 100dvw;
+      width: 100vw;
+      max-width: 100vw;
       min-width: 0;
-      min-height: min(62dvh, 520px);
-      max-height: min(68dvh, 560px);
+      min-height: min(62vh, 520px);
+      max-height: min(68vh, 560px);
       margin: 0;
       padding: 0;
-      flex: 0 1 min(68dvh, 560px);
+      flex: 0 1 min(68vh, 560px);
       overflow: hidden;
       border-radius: 0;
       background: rgba(0, 0, 0, 0.1);
@@ -1812,7 +1815,7 @@ onUnmounted(() => {
 
       .lyric-empty {
         height: 100%;
-        min-height: min(62dvh, 520px);
+        min-height: min(62vh, 520px);
         transform: none;
 
         span {
@@ -1823,7 +1826,7 @@ onUnmounted(() => {
       :deep(.lyric-player) {
         width: 100%;
         height: 100%;
-        min-height: min(62dvh, 520px);
+        min-height: min(62vh, 520px);
         transform: none;
         --amll-lyric-player-font-size: clamp(24px, 7vw, 34px);
         --amll-lp-font-size: clamp(24px, 7vw, 34px);
@@ -1838,8 +1841,8 @@ onUnmounted(() => {
       }
 
       .right {
-        width: 100dvw !important;
-        max-width: 100dvw;
+        width: 100vw !important;
+        max-width: 100vw;
         left: 0;
         right: auto;
         opacity: 1;
@@ -1870,7 +1873,7 @@ onUnmounted(() => {
 
     .settings-panel {
       width: calc(100vw - var(--mobile-page-gutter) * 2);
-      max-height: calc(100dvh - var(--play-bottom-height) - var(--mobile-safe-bottom) - 120px);
+      max-height: calc(100vh - var(--play-bottom-height) - var(--mobile-safe-bottom) - 120px);
       right: 0;
       bottom: calc(var(--mobile-touch-target) + 10px);
       padding: 16px;
@@ -1888,7 +1891,10 @@ onUnmounted(() => {
 
   @media (max-height: 700px) {
     .playbox {
-      --mobile-art-size: min(70vw, 300px, 36dvh);
+      --mobile-art-size: 58vw;
+      @supports (width: min(1vw, 1vh)) {
+        --mobile-art-size: min(70vw, 300px, 36vh);
+      }
       gap: 0.65rem;
       padding-top: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter) + var(--mobile-touch-target) + 8px) !important;
 
@@ -1906,15 +1912,15 @@ onUnmounted(() => {
       }
 
       .right {
-        min-height: min(58dvh, 460px);
+        min-height: min(58vh, 460px);
         max-height: none;
-        flex-basis: min(64dvh, 500px);
+        flex-basis: min(64vh, 500px);
         top: calc(var(--mobile-safe-top) + var(--mobile-page-top-gutter) + var(--mobile-touch-target) + 18px);
         bottom: calc(var(--play-bottom-height) + var(--mobile-safe-bottom) + 16px);
 
         .lyric-empty,
         :deep(.lyric-player) {
-          min-height: min(58dvh, 460px);
+          min-height: min(58vh, 460px);
         }
       }
     }

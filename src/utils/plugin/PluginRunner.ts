@@ -7,6 +7,7 @@
  */
 
 import i18n from '@/locales'
+import { platform } from '@tauri-apps/plugin-os'
 
 export type PluginSources = Record<string, { name: string; type: string; qualitys: string[] }>
 
@@ -28,6 +29,8 @@ export interface PluginUpdateNotice {
 function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./pluginWorker.ts', import.meta.url), { type: 'module' })
+    const os = platform()
+    worker.postMessage({ type: 'init', platform: os === 'android' || os === 'ios' ? 'mobile' : 'desktop' })
     worker.onmessage = (e) => {
       const msg = e.data
 

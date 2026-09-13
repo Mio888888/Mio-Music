@@ -1803,7 +1803,7 @@ onBeforeUnmount(() => {
   }
 
   .player-content {
-    padding: 0 max(10px, calc(var(--mobile-page-gutter) - 6px));
+    padding: 0 calc(var(--mobile-page-gutter) - 6px);
     gap: 0;
   }
 

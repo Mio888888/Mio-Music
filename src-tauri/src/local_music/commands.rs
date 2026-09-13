@@ -4,8 +4,57 @@ use crate::db::music_db;
 use crate::local_music::{scanner, cover_cache};
 use crate::AppDb;
 use tauri::State;
-#[cfg(desktop)]
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_fs::FsExt;
+
+/// Opens the native picker; no caller-supplied paths are accepted.
+/// Cancellation is success with cancelled=true; individual failures are counted.
+#[tauri::command]
+pub async fn local_music__import_files(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let files = app.dialog().file().set_title("导入音乐")
+            .add_filter("音频", &["mp3", "flac", "wav", "ogg", "m4a", "aac", "opus", "ape"])
+            .blocking_pick_files();
+        let Some(files) = files.filter(|files| !files.is_empty()) else {
+            return Ok(serde_json::json!({ "success": true, "data": { "cancelled": true, "imported": 0, "failed": 0 } }));
+        };
+        let root = crate::db::get_app_data_dir().join("imported-music");
+        std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+        let state = app.state::<AppDb>();
+        // Register the persistent library first so a later refresh can recover indexing.
+        {
+            let conn = state.music.lock().map_err(|e| e.to_string())?;
+            let mut dirs = music_db::get_dirs(&conn).map_err(|e| e.to_string())?;
+            let directory = root.to_string_lossy().into_owned();
+            if !dirs.contains(&directory) {
+                dirs.push(directory);
+                music_db::set_dirs(&conn, &dirs).map_err(|e| e.to_string())?;
+            }
+        }
+        let mut imported = 0;
+        let mut failed = 0;
+        let mut last_error = None;
+        for file in files {
+            let raw_name = file.to_string();
+            let name = urlencoding::decode(&raw_name).unwrap_or_else(|_| raw_name.clone().into());
+            let mut options = tauri_plugin_fs::OpenOptions::new();
+            options.read(true);
+            let result = app.fs().open(file, options).map_err(|e| e.to_string())
+                .and_then(|input| super::importer::import_audio(input, &name, &root));
+            match result {
+                Ok(_) => imported += 1,
+                Err(error) => { failed += 1; last_error = Some(error); }
+            }
+        }
+        let conn = state.music.lock().map_err(|e| e.to_string())?;
+        let scan = scanner::scan_directories(&conn, &[root.to_string_lossy().into_owned()], false);
+        Ok(serde_json::json!({ "success": true, "data": {
+            "cancelled": false, "imported": imported, "failed": failed,
+            "indexErrors": scan.errors, "error": last_error
+        } }))
+    }).await.map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 pub fn local_music__scan(state: State<'_, AppDb>, dirs: Vec<String>, skip_hidden: Option<bool>) -> Result<serde_json::Value, String> {

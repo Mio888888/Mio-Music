@@ -4,6 +4,8 @@
 
 ## 版本发布
 
+- 版本更新必须一起核对 `package.json`、`package-lock.json` 的根版本与 `packages[""].version`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 中的应用包版本、`src-tauri/tauri.conf.json` 和 Android 的两份生成配置，并在 `CHANGELOG.md` 新增对应版本的更新内容。保留历史版本记录，不替换依赖包的同名版本号。
+- 当前 `scripts/sync-version.mjs --check` 只覆盖五个配置文件，不检查锁文件和更新日志；不能仅凭该命令通过就声称所有版本文件已同步。
 - 更新应用版本时，必须同步更新 Android 生成工程中的 `src-tauri/gen/android/app/tauri.properties`。
 - Tauri 默认按语义化版本计算 `tauri.android.versionCode`：
   ```
@@ -35,3 +37,12 @@
 - 插件切换及同 ID 替换必须使过期的元数据请求和执行缓存失效；取消/失败的导入不得丢弃正在进行的有效选择。
 - 全局音质是所有音源的交集，单音源音质是该音源自己的列表。不同格式的同名插件可能声明不同音质，不能假定 Ceru 与 LX 列表相同。
 - 含密钥的插件样本仅用于本地验证，不得将访问链接、密钥或原始样本提交到仓库或 Issue。
+
+## LX 初始化与 Android 兼容
+
+- LX 的 `env` 必须是 `desktop` 或 `mobile`；它与 Ceru 的 `env: browser` 是不同接口，不能混用。
+- 等待 LX `inited` 和请求处理器就绪后再读取运行时音质、调用播放；初始化必须有超时并保留可捕获的原始错误。LX `send` 返回 Promise，受限全局需保留音源加密使用的 `BigInt`。
+- 修复 LX 转换器时也要覆盖已安装的旧包装脚本：只解析本项目生成包装内的原始 JSON，在内存中重新转换，不执行原文来提取代码，不覆盖用户文件。
+- Android 本地音乐通过系统文件选择器多选后，用原始 `FilePath` 流式复制到持久目录并验证音频内容；不得把 `content://` URI 交给目录扫描器，同名文件不得覆盖，失败须清理本次副本。
+- 页面高度不能仅依赖 `dvh/dvw`；自定义属性里的现代 CSS 函数须用 `@supports` 保护回退值。生产 CSS 须转换原生嵌套规则。Android 系统栏安全区域由原生 Insets 处理时，应消费 Insets，避免 CSS 重复留白。
+- 浏览器尺寸/旧 CSS 能力模拟不等于 Android 真机验证；缺少真机结果时不要声称旧手机问题已经全面验证。

@@ -196,7 +196,7 @@ const handleKeyDown = () => {
       </div>
     </t-aside>
 
-    <t-layout style="flex: 1">
+    <t-layout style="flex: 1; min-width: 0; min-height: 0">
       <t-content>
         <div class="content">
           <div class="header" :class="{ 'detail-page': isDetailPage }" data-tauri-drag-region>
@@ -341,7 +341,7 @@ const handleKeyDown = () => {
 }
 
 .home-container {
-  height: calc(100dvh - var(--play-bottom-height, 70px));
+  height: calc(var(--app-viewport-height) - var(--play-bottom-height, 70px));
   overflow: hidden;
   position: relative;
 }
@@ -481,6 +481,7 @@ const handleKeyDown = () => {
 }
 
 .search-container {
+  min-width: 0;
   display: flex;
   flex: 1;
   position: relative;
@@ -646,12 +647,12 @@ const handleKeyDown = () => {
   }
 
   .home-container {
-    height: calc(100dvh - var(--mobile-content-bottom-inset));
+    height: calc(var(--app-viewport-height) - var(--mobile-content-bottom-inset));
     min-height: 0;
   }
 
   .home-container:has(.header.detail-page) {
-    height: calc(100dvh - var(--mobile-content-bottom-inset));
+    height: calc(var(--app-viewport-height) - var(--mobile-content-bottom-inset));
   }
 
   .content {
@@ -712,9 +713,9 @@ const handleKeyDown = () => {
   .home-container .mobile-bottom-nav-glass {
     display: flex;
     position: fixed;
-    right: max(14px, var(--mobile-page-gutter));
+    right: var(--mobile-page-gutter);
     bottom: calc(var(--mobile-safe-bottom) + var(--mobile-nav-bottom-gap));
-    left: max(14px, var(--mobile-page-gutter));
+    left: var(--mobile-page-gutter);
     z-index: var(--mobile-bottom-layer-z);
     max-width: 520px;
     height: var(--mobile-nav-height);

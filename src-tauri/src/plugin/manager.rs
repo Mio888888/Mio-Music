@@ -315,7 +315,7 @@ impl PluginManager {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.starts_with(&format!("{}-", plugin_id)) && !name.ends_with(".config.json") {
-                    return fs::read_to_string(entry.path()).ok();
+                    return fs::read_to_string(entry.path()).ok().map(super::converter::refresh_lx_conversion);
                 }
             }
         }

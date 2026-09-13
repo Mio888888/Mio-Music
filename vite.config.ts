@@ -82,6 +82,8 @@ export default defineConfig(async () => ({
     }
   },
   build: {
+    // Flatten native CSS nesting for older Android System WebViews.
+    cssTarget: ['chrome87', 'safari14'],
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {

@@ -376,9 +376,12 @@ function rsaEncrypt(data: string, pemKey: string): string {
 
 // ==================== cerumusic API 工厂（Worker 版：通过 IPC 桥接 HTTP） ====================
 
+let runtimePlatform: 'desktop' | 'mobile' = 'desktop'
+
 function createCerumusicApi() {
   return {
     env: 'browser',
+    platform: runtimePlatform,
     version: '1.0.3',
     utils: {
       buffer: {
@@ -438,7 +441,7 @@ function createCerumusicApi() {
       })
 
       if (callback) {
-        doFetch().then((r: any) => callback!(null, r)).catch((e: any) => callback!(e, { statusCode: 0, headers: {}, body: '' }))
+        doFetch().then((r: any) => callback!(null, r), (e: any) => callback!(e, { statusCode: 0, headers: {}, body: '' }))
         return
       }
       return doFetch()
@@ -469,6 +472,7 @@ function isCrPlugin(code: string): boolean {
 // ==================== 插件执行引擎 ====================
 
 interface PluginExports {
+  ready?: Promise<void>
   pluginInfo?: { name: string; version: string; author: string; description: string }
   sources?: PluginSources
   musicUrl?: (source: string, musicInfo: any, quality: string) => Promise<string | { error?: string }>
@@ -520,11 +524,7 @@ function executePluginCode(code: string): PluginExports {
     var module = { exports: {} };
     var exports = module.exports;
     var global = globalThis;
-    try {
-      ${code}
-    } catch(e) {
-      console.warn('[PluginRunner] ' + getT()('plugin.pluginError'), e.message);
-    }
+    ${code}
     return module.exports;
     `
   )
@@ -621,7 +621,7 @@ function executePluginCode(code: string): PluginExports {
       Object.assign(mockModule.exports, pluginExports)
     }
   } catch (e) {
-    console.warn('[PluginWorker] ' + getT()('plugin.pluginInitFailed'), e)
+    throw e
   }
 
   const result = mockModule.exports
@@ -670,8 +670,9 @@ async function loadPlugin(pluginId: string): Promise<LoadedPlugin> {
   const pending = pluginLoads.get(pluginId)
   if (pending) return pending
 
-  const loading = getPluginCode(pluginId).then(code => {
+  const loading = getPluginCode(pluginId).then(async code => {
     const plugin: LoadedPlugin = { exports: executePluginCode(code), code }
+    await plugin.exports.ready
     // A replacement may have invalidated this load while its IPC request was pending.
     if (pluginLoads.get(pluginId) === loading) pluginCache.set(pluginId, plugin)
     return plugin
@@ -901,6 +902,11 @@ function clearCache(pluginId?: string) {
 
 self.onmessage = async (e: MessageEvent) => {
   const msg = e.data
+
+  if (msg.type === 'init') {
+    runtimePlatform = msg.platform === 'mobile' ? 'mobile' : 'desktop'
+    return
+  }
 
   // IPC 响应
   if (msg.type === 'ipc-resolve') {

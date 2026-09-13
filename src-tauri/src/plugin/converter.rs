@@ -1,5 +1,41 @@
 use regex_lite::Regex;
 
+/// Refresh only our generated LX wrapper in memory, preserving the installed file.
+pub fn refresh_lx_conversion(code: String) -> String {
+    if !code.starts_with("/**\n * 由 CeruMusic 插件转换器转换") {
+        return code;
+    }
+    let Some((_, embedded)) = code.split_once("\nconst originalPluginCode = ") else {
+        return code;
+    };
+    let mut values = serde_json::Deserializer::from_str(embedded).into_iter::<String>();
+    match values.next() {
+        Some(Ok(original)) if embedded[values.byte_offset()..].starts_with(';') => {
+            convert_lx_plugin(&original)
+        }
+        _ => code,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refreshes_embedded_lx_without_evaluating_javascript() {
+        let original = "// @name fixture\nconst tricky = '\";\\n';\nlx.send('inited', {});";
+        let legacy = format!("/**\n * 由 CeruMusic 插件转换器转换\n */\nconst originalPluginCode = {};\noldWrapper();", serde_json::to_string(original).unwrap());
+        assert_eq!(refresh_lx_conversion(legacy), convert_lx_plugin(original));
+    }
+
+    #[test]
+    fn leaves_regular_and_malformed_plugins_unchanged() {
+        for code in ["module.exports = {};", "/**\n * 由 CeruMusic 插件转换器转换\nconst originalPluginCode = malicious();"] {
+            assert_eq!(refresh_lx_conversion(code.to_owned()), code);
+        }
+    }
+}
+
 /// Extract metadata from lx event-driven plugin comments.
 struct PluginMeta {
     name: String,
@@ -137,18 +173,44 @@ function extractDefaultSources() {{
 // 初始化默认音源
 sources = extractDefaultSources();
 
-// 插件状态
-let isInitialized = false;
-let pluginSources = {{}};
+// LX 必须发送 inited 后才能读取音源和处理播放请求。
+let didSendInited = false;
 let requestHandler = null;
+let settled = false;
+let resolveReady;
+let rejectReady;
+const ready = new Promise((resolve, reject) => {{ resolveReady = resolve; rejectReady = reject; }});
+const initTimer = setTimeout(() => failInit(new Error('洛雪音源初始化超时，请检查网络或音源服务')), 15000);
+function failInit(error) {{
+  if (settled) return;
+  settled = true;
+  clearTimeout(initTimer);
+  rejectReady(error instanceof Error ? error : new Error(String(error)));
+}}
+function finishInit() {{
+  if (settled || !didSendInited || !requestHandler) return;
+  settled = true;
+  clearTimeout(initTimer);
+  resolveReady();
+}}
+function guard(callback) {{
+  return (...args) => {{
+    try {{
+      const result = callback(...args);
+      if (result && typeof result.then === 'function') return result.catch(error => {{ failInit(error); }});
+      return result;
+    }} catch (error) {{
+      if (settled) throw error;
+      failInit(error);
+    }}
+  }};
+}}
 
 // 从 cerumusic 获取网络请求和工具函数
 const {{ request, utils }} = cerumusic;
 
 initializePlugin();
 function initializePlugin() {{
-  if (isInitialized) return;
-
   const mockLx = {{
     EVENT_NAMES: {{
       request: 'request',
@@ -158,23 +220,36 @@ function initializePlugin() {{
     on: (event, handler) => {{
       if (event === 'request') {{
         requestHandler = handler;
+        finishInit();
       }}
     }},
     send: (event, data) => {{
-      if (event === 'inited' && data.sources) {{
-        pluginSources = data.sources;
-        Object.keys(pluginSources).forEach(sourceId => {{
-          const sourceInfo = pluginSources[sourceId];
-          const originalQualitys = sources[sourceId] && sources[sourceId].qualitys;
+      if (event === 'inited' && !settled) {{
+        if (!data || !data.sources || typeof data.sources !== 'object') {{
+          failInit(new Error('洛雪音源初始化返回了无效的音源信息'));
+          return Promise.resolve();
+        }}
+        // 原位更新 exports.sources，并移除插件未声明的默认音源。
+        Object.keys(sources).forEach(key => delete sources[key]);
+        Object.keys(data.sources).forEach(sourceId => {{
+          if (['__proto__', 'constructor', 'prototype'].includes(sourceId)) return;
+          const sourceInfo = data.sources[sourceId];
+          if (!sourceInfo || typeof sourceInfo !== 'object') return;
           sources[sourceId] = {{
             name: getSourceName(sourceId),
             type: sourceInfo.type || 'music',
-            qualitys: sourceInfo.qualitys || originalQualitys || ['128k', '320k']
+            qualitys: sourceInfo.qualitys || []
           }};
         }});
+        didSendInited = true;
+        finishInit();
       }}
+      return Promise.resolve();
     }},
-    request: request,
+    request: (url, options, callback) => {{
+      if (typeof options === 'function') return request(url, guard(options));
+      return request(url, options, typeof callback === 'function' ? guard(callback) : undefined);
+    }},
     utils: {{
       buffer: utils.buffer,
       crypto: {{
@@ -202,7 +277,7 @@ function initializePlugin() {{
       description: '{description}',
       homepage: '{homepage}'
     }},
-    env: 'nodejs'
+    env: cerumusic.platform === 'mobile' ? 'mobile' : 'desktop'
   }};
 
   try {{
@@ -213,20 +288,19 @@ function initializePlugin() {{
       originalPluginCode
     );
 
+    const pluginGlobal = {{ lx: mockLx, BigInt, Buffer, JSON }};
     pluginFunction(
-      {{ lx: mockLx }}, mockLx, console, setTimeout, clearTimeout,
-      setInterval, clearInterval, Buffer, JSON, () => ({{}}),
-      {{ exports: {{}} }}, {{}}, {{ env: {{ NODE_ENV: 'production' }} }}, {{ lx: mockLx }}
+      pluginGlobal, mockLx, console, (callback, delay, ...args) => setTimeout(guard(callback), delay, ...args), clearTimeout,
+      (callback, delay, ...args) => setInterval(guard(callback), delay, ...args), clearInterval, Buffer, JSON, () => ({{}}),
+      {{ exports: {{}} }}, {{}}, {{ env: {{ NODE_ENV: 'production' }} }}, pluginGlobal
     );
-
-    isInitialized = true;
   }} catch (error) {{
-    isInitialized = true;
+    failInit(error);
   }}
 }}
 
 async function musicUrl(source, musicInfo, quality) {{
-  initializePlugin();
+  await ready;
 
   if (!requestHandler) {{
     throw new Error('插件请求处理器未初始化');
@@ -261,7 +335,7 @@ async function musicUrl(source, musicInfo, quality) {{
 }}
 
 async function getPic(source, musicInfo) {{
-  initializePlugin();
+  await ready;
 
   if (!requestHandler) {{
     throw new Error('插件请求处理器未初始化');
@@ -290,7 +364,7 @@ async function getPic(source, musicInfo) {{
 }}
 
 async function getLyric(source, musicInfo) {{
-  initializePlugin();
+  await ready;
 
   if (!requestHandler) {{
     throw new Error('插件请求处理器未初始化');
@@ -329,6 +403,7 @@ async function getLyric(source, musicInfo) {{
 }}
 
 module.exports = {{
+  ready,
   pluginInfo,
   sources,
   musicUrl,

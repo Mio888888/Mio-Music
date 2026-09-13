@@ -20,7 +20,7 @@ const dynamicPlugin = `
   };
 `
 
-export function createWorker(pluginCode, httpProxy) {
+export function createWorker(pluginCode, httpProxy, { platform = 'desktop' } = {}) {
   let callId = 0
   const responses = new Map()
   const worker = {
@@ -50,6 +50,7 @@ export function createWorker(pluginCode, httpProxy) {
     TextEncoder, TextDecoder, atob, btoa,
     fetch() { throw new Error('Unexpected network request') }
   }, { filename: 'pluginWorker.js' })
+  worker.onmessage({ data: { type: 'init', platform } })
 
   return async (method, ...args) => {
     const id = ++callId

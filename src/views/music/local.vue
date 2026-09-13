@@ -15,6 +15,7 @@ import {
   FolderIcon
 } from 'tdesign-icons-vue-next'
 import AddToPlaylistDialog from '@/components/Playlist/AddToPlaylistDialog.vue'
+import { platform } from '@tauri-apps/plugin-os'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -24,6 +25,8 @@ const settingsStore = useSettingsStore()
 
 const loading = ref(false)
 const scanning = ref(false)
+const importing = ref(false)
+const isAndroid = platform() === 'android'
 const tracks = shallowRef<any[]>([])
 const searchQuery = ref('')
 const coverCache = ref<Record<string, string>>({})
@@ -119,6 +122,27 @@ const fetchDirs = async () => {
   } catch {}
 }
 
+const openMusicPicker = async () => {
+  if (!isAndroid) { showDirModal.value = true; return }
+  if (importing.value) return
+  importing.value = true
+  try {
+    const res = await window.api.localMusic.importFiles()
+    if (!res?.success) throw new Error(t('music.local.importFailed'))
+    const data = res.data
+    if (data.cancelled) return
+    await fetchDirs()
+    await fetchTracks()
+    const message = t('music.local.importComplete', { imported: data.imported, failed: data.failed })
+    if (data.indexErrors) MessagePlugin.warning(t('music.local.importIndexFailed'))
+    else if (!data.imported) MessagePlugin.error(data.error || t('music.local.importFailed'))
+    else if (data.failed) MessagePlugin.warning(message)
+    else MessagePlugin.success(message)
+  } catch (error) {
+    MessagePlugin.error(t('music.local.importFailed') + ': ' + String(error))
+  } finally { importing.value = false }
+}
+
 const selectDirs = async () => {
   try {
     const res = await (window as any).api?.localMusic?.selectDirs?.()
@@ -146,6 +170,7 @@ const saveDirs = async () => {
 // 扫描
 const scanLibrary = async () => {
   if (scanDirs.value.length === 0) {
+    if (isAndroid) { await openMusicPicker(); return }
     MessagePlugin.warning(t('music.local.selectScanDir'))
     return
   }
@@ -372,14 +397,16 @@ onBeforeUnmount(() => {
           theme="primary"
           variant="base"
           class="select-dir-trigger"
-          @click="showDirModal = true"
+          :loading="importing"
+          @click="openMusicPicker"
         >
           <template #icon><FolderIcon size="16px" /></template>
-          {{ t('music.local.selectDir') }}
+          {{ t(isAndroid ? 'music.local.importFiles' : 'music.local.selectDir') }}
         </t-button>
       </div>
     </div>
 
+    <p v-if="isAndroid && tracks.length" class="import-copy-hint">{{ t('music.local.importCopyHint') }}</p>
     <!-- 控制栏 -->
     <div class="controls">
       <t-button theme="primary" class="local-btn play-all" @click="playAll" :disabled="tracks.length === 0">
@@ -515,14 +542,14 @@ onBeforeUnmount(() => {
         </div>
         <div class="empty-copy">
           <h3>{{ searchQuery ? t('music.local.noMatchMusic') : t('music.local.emptyTitle') }}</h3>
-          <p>{{ searchQuery ? t('music.local.emptySearchHint') : t('music.local.noMusicDir') }}</p>
+          <p>{{ searchQuery ? t('music.local.emptySearchHint') : t(isAndroid ? 'music.local.importHint' : 'music.local.noMusicDir') }}</p>
         </div>
         <div v-if="!searchQuery" class="empty-actions">
-          <t-button theme="primary" size="large" class="empty-action" @click="showDirModal = true">
+          <t-button theme="primary" size="large" class="empty-action" :loading="importing" @click="openMusicPicker">
             <template #icon><FolderIcon /></template>
-            {{ t('music.local.selectDir') }}
+            {{ t(isAndroid ? 'music.local.importFiles' : 'music.local.selectDir') }}
           </t-button>
-          <span class="empty-tip">{{ t('music.local.emptyScanTip') }}</span>
+          <span class="empty-tip">{{ t(isAndroid ? 'music.local.importCopyHint' : 'music.local.emptyScanTip') }}</span>
         </div>
       </div>
     </div>
@@ -587,6 +614,13 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.import-copy-hint {
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--td-text-color-secondary);
+}
+
 .local-container {
   padding: 0 2rem;
   padding-top: 1rem;
