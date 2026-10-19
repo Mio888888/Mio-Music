@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>快速开始 - Mio Music 文档</title>
+<meta name="description" content="准备 Rust 与系统依赖，克隆含插件子模块的仓库，运行 Mio Music，或生成 macOS 开发包。">
+<meta property="og:title" content="快速开始 - Mio Music 文档">
+<meta property="og:description" content="准备 Rust 与系统依赖，克隆含插件子模块的仓库，运行 Mio Music，或生成 macOS 开发包。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/getting-started.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/getting-started.html">
+<link rel="icon" href="../assets/app-icon.png">
+<script src="../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../" data-page="getting-started.html">
+<article class="doc" data-title="快速开始" data-desc="准备 Rust 与系统依赖，克隆含插件子模块的仓库，运行 Mio Music，或生成 macOS 开发包。">
+<div class="doc-eyebrow">// Getting Started</div>
+<h1>快速开始</h1>
+<p class="doc-lead">从源码把 Mio Music 跑起来：准备环境、克隆仓库、运行，以及生成 macOS 开发包。</p>
+
+<div class="callout warn">
+<strong>平台状态</strong>
+目前只有 macOS 上有开发包与实机运行记录。Windows 与 Linux 的检查工作流已经配置，但还没有它们的运行证据；此前这两个目标只做过类型检查，切换到 gpui-fast 后也需要重新验证。遇到问题请提交 Issue。
+</div>
+
+<h2>环境要求</h2>
+<ul>
+  <li><strong>Rust stable</strong>：工作区使用 edition 2024，需要 Rust 1.85 或更新版本。</li>
+  <li><strong>Git</strong>：内置的列表插件放在子模块里，克隆时需要带上子模块。</li>
+  <li><strong>系统依赖</strong>：原生构建依赖遵循 <a href="https://gpui-kit.com/docs/" target="_blank" rel="noreferrer">GPUI Kit 官方文档</a>。下面是项目 CI 实际使用的安装方式。</li>
+</ul>
+
+<h3>macOS</h3>
+<pre class="language-bash"><code>brew install dav1d pkgconf</code></pre>
+
+<h3>Linux（Ubuntu 24.04）</h3>
+<pre class="language-bash"><code>sudo apt-get update && sudo apt-get install -y \
+  gcc g++ clang cmake pkg-config libfontconfig-dev libwayland-dev \
+  libwebkit2gtk-4.1-dev libxkbcommon-x11-dev libx11-xcb-dev \
+  libssl-dev libzstd-dev libasound2-dev libvulkan1 libdav1d-dev</code></pre>
+
+<h3>Windows</h3>
+<p>CI 使用 Chocolatey 安装 <code>pkgconfiglite</code>，并用 vcpkg 安装 <code>dav1d:x64-windows</code>，再把 vcpkg 的 <code>lib\pkgconfig</code> 加入 <code>PKG_CONFIG_PATH</code>，把 <code>bin</code> 加入 <code>PATH</code>：</p>
+<pre class="language-bash"><code>choco install pkgconfiglite -y --no-progress
+vcpkg install dav1d:x64-windows</code></pre>
+<div class="callout note">
+<strong>为什么需要 dav1d</strong>
+GPUI 内部用于 AVIF / MP4 解码的 <code>dav1d-sys</code> 通过 pkg-config 链接系统里的 dav1d。
+</div>
+
+<h2>获取源码</h2>
+<p>内置的列表插件在子模块 <code>plugins/</code> 中（仓库 <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a>），应用用 <code>include_str!</code> 把它们嵌入二进制，所以克隆时一定要带上子模块：</p>
+<pre class="language-bash"><code>git clone --recurse-submodules https://github.com/Mio888888/Mio-Music.git
+cd Mio-Music</code></pre>
+<p>已经克隆过的仓库，补拉子模块：</p>
+<pre class="language-bash"><code>git submodule update --init</code></pre>
+
+<h2>运行</h2>
+<pre class="language-bash"><code>cargo run --locked -p mio-app</code></pre>
+<p>开发构建会把依赖也按优化级别编译，所以首次编译比较久，之后的增量编译很快。默认窗口大小为 1200 × 800。</p>
+
+<h2>macOS 开发包</h2>
+<p>需要在 Finder 里双击打开、或测试托盘与系统集成时，生成 <code>.app</code>：</p>
+<pre class="language-bash"><code>sh tools/bundle-macos.sh</code></pre>
+<p>产物位于 <code>target/debug/Mio Music GPUI.app</code>。开发包使用本地 ad-hoc 签名，没有发布证书与公证，所以首次打开可能需要在「系统设置 → 隐私与安全性」中放行。资源与字体在 Debug 与 Release 中都嵌入二进制。</p>
+
+<h2>首次启动之后</h2>
+<p>应用本身不再内置任何在线音乐来源。搜索、歌单、专辑、发现与歌手数据都来自你安装并启用的 <strong>外部插件</strong>。应用内置了 Subsonic、Navidrome、Jellyfin、Emby、Plex、Songloft 插件，启动时自动安装，无需手动操作。进入 <strong>设置 → 插件</strong>，在「音乐列表插件」的插件卡片上点「配置」填入服务器地址与账号即可。详细步骤见 <a href="user-guide.html#plugins">使用指南</a>。</p>
+<p>也可以本地音乐为主：在本地音乐里添加目录即可扫描播放，不依赖任何插件。</p>
+
+<h2>检查与测试</h2>
+<p>提交代码之前，与 CI 保持一致：</p>
+<pre class="language-bash"><code>cargo fmt --all -- --check
+cargo test --workspace --locked
+cargo check --workspace --locked</code></pre>
+<p>仓库里还有几个维护工具：</p>
+<pre class="language-bash"><code>python3 tools/test-extract-source.py
+node --check tools/spec-extract/capture.js</code></pre>
+<p>需要更新相邻源仓库（Mio-Music）的静态快照时，使用 <code>python3 tools/extract-source.py --source ../Mio-Music</code>。提取器只写目标工程，需要 Python 3 与 Node.js。</p>
+
+<h2>预览本官网</h2>
+<p>官网与文档位于仓库的 <code>website/</code>，是不需要构建的纯静态文件：</p>
+<pre class="language-bash"><code>cd website
+python3 -m http.server 4173</code></pre>
+<p>然后打开 <code>http://localhost:4173</code>。这个目录不属于 Cargo 工作区，不会进入任何安装包。</p>
+</article>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

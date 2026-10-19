@@ -1,0 +1,1 @@
+{"sidebar":".sidebar","brand":".logo-section","header":".header","search":".search-input","guide":".setup-guide","orb":".setup-orb","copy":".setup-copy","title":".setup-copy h3","description":".setup-copy p","cards":".setup-actions","primary":".primary-card","card":".setup-action-card:not(.primary-card)","player":".player-container","mobileNav":".mobile-bottom-nav"}

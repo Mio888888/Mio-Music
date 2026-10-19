@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>架构概览 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 工作区里各个 crate 的职责、数据流向，以及插件宿主与列表契约如何协作。">
+<meta property="og:title" content="架构概览 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 工作区里各个 crate 的职责、数据流向，以及插件宿主与列表契约如何协作。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/architecture.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/architecture.html">
+<link rel="icon" href="../assets/app-icon.png">
+<script src="../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../" data-page="architecture.html">
+<article class="doc" data-title="架构概览" data-desc="Mio Music 工作区里各个 crate 的职责、数据流向，以及插件宿主与列表契约如何协作。">
+<div class="doc-eyebrow">// Architecture</div>
+<h1>架构概览</h1>
+<p class="doc-lead">Mio Music 是一个 Cargo 工作区：界面、核心规则、列表契约与插件宿主分别放在不同的 crate 里，桌面端与移动端共享同一套核心。</p>
+
+<h2>工作区</h2>
+<table>
+  <thead><tr><th>位置</th><th>职责</th></tr></thead>
+  <tbody>
+    <tr><td><code>crates/mio-app</code></td><td>桌面应用本体。基于 GPUI Kit 的界面、窗口与托盘、快捷键与媒体键、桌面歌词、DLNA、更新器、旧版数据导入等平台相关部分。</td></tr>
+    <tr><td><code>crates/mio-core</code></td><td>共享的应用规则。播放引擎与音效、音乐库（SQLite）、下载、备份与恢复、歌词与封面、已安装列表插件的管理。桌面与移动端只负责展示和平台集成，业务规则在这里。</td></tr>
+    <tr><td><code>crates/mio-music-sdk</code></td><td>音乐列表契约与路由：<code>MusicListProvider</code> trait、能力声明、歌曲 / 歌单 / 歌手 / 发现等数据类型，以及歌词、评论、封面的解码与校验。</td></tr>
+    <tr><td><code>crates/mio-plugin</code></td><td>插件宿主。基于 QuickJS（rquickjs）的受限运行时、列表插件加载与适配、音源插件与洛雪脚本的转换器。</td></tr>
+    <tr><td><code>crates/mio-tokens</code></td><td>界面 token（明暗模式配色等），由提取器从源项目生成。</td></tr>
+    <tr><td><code>crates/mio-mobile-bridge</code></td><td>面向移动端的 flutter_rust_bridge 接口，复用 mio-core。</td></tr>
+    <tr><td><code>apps/mobile</code></td><td>Flutter 移动端工程（Android / iOS 共用）。GPUI 只用于桌面端。</td></tr>
+    <tr><td><code>plugins/</code></td><td>子模块 <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a>，内置列表插件的脚本。</td></tr>
+    <tr><td><code>tools/</code></td><td>打包脚本、源项目静态快照提取器、黄金图对照工具与 Subsonic 测试夹具。</td></tr>
+    <tr><td><code>docs/parity/</code></td><td>与源项目的对照清单与实施进度。</td></tr>
+    <tr><td><code>website/</code></td><td>本官网与文档，纯静态，不参与软件打包。</td></tr>
+  </tbody>
+</table>
+
+<h2>在线内容的数据流</h2>
+<p>应用本身不带任何在线来源。每一个来源都是某个已启用的列表插件注册进来的 provider：</p>
+<pre data-title="一次搜索的路径">界面 (mio-app)
+  └─ mio_music_sdk::search_source(source, keyword, page, limit)
+       ├─ 校验参数（关键词 ≤1024 字节，page ≥ 1，limit 1..=30）
+       ├─ 按来源 ID 找到已注册的 provider，并检查其 search 能力
+       └─ ListProvider::search            (mio-plugin)
+            └─ 新建 QuickJS 运行时 → 执行脚本 → 调用 listPlugin.search(source, {...})
+                 └─ 脚本通过 cerumusic.request 发起受限的 HTTP 请求
+            ← JSON 返回值反序列化为 SearchResult，宿主覆盖 source、截断到 500 条</pre>
+<p>几个有意为之的设计：</p>
+<ul>
+  <li><strong>没有回退</strong>：来源缺失或能力缺失时直接报错，从不退回到内置适配器。</li>
+  <li><strong>宿主盖章</strong>：宿主会把每首歌、每个结果的 <code>source</code> 改写成本次调用的来源，插件无法冒充别的来源。</li>
+  <li><strong>无状态运行时</strong>：每次调用都新建 JS 运行时与上下文，脚本顶层变量不会在调用之间保留；需要保留的状态通过 <code>cerumusic.storage</code> 持久化。</li>
+  <li><strong>有界</strong>：单次调用 30 秒、请求次数、响应体大小、内存与脚本体积都有上限，详见 <a href="plugins/runtime-api.html#limits">运行时 API</a>。</li>
+</ul>
+
+<h2>播放</h2>
+<p>播放地址有两条来路：来源所属的列表插件<strong>自己提供</strong>（<code>musicUrl</code>），或交给当前启用的<strong>音源插件</strong>按来源与音质解析。选择哪条由插件卡片上「由本插件提供播放」开关决定。解析出的地址只允许不含用户信息的 HTTP / HTTPS。随后由 <code>mio-core</code> 里基于 Rodio、cpal 与 Symphonia 的引擎解码和输出，并提供 Gapless、Crossfade、EQ 与 FFT 频谱。</p>
+
+<h2>检查</h2>
+<pre class="language-bash"><code>cargo fmt --all -- --check
+cargo test --workspace --locked
+cargo check --workspace --locked</code></pre>
+<p>CI 在 macOS、Windows 与 Linux 上执行同样的三条命令，见 <code>.github/workflows/check.yml</code>。官网与文档位于 <code>website/</code>，不在工作区内，也不属于 Rust 构建。</p>
+
+<h2>延伸阅读</h2>
+<ul>
+  <li><a href="plugins/index.html">插件开发者文档</a>：宿主对插件的全部约定。</li>
+</ul>
+</article>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

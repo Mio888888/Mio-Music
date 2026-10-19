@@ -1,0 +1,5 @@
+rust_input: crate::api
+rust_root: ../../crates/mio-mobile-bridge/
+dart_output: lib/src/rust
+web: false
+type_64bit_int: true

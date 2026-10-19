@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>使用指南 - Mio Music 文档</title>
+<meta name="description" content="安装与配置列表插件和音源插件，接入 Subsonic、Navidrome 等自托管服务器，以及播放、歌词、下载与备份。">
+<meta property="og:title" content="使用指南 - Mio Music 文档">
+<meta property="og:description" content="安装与配置列表插件和音源插件，接入 Subsonic、Navidrome 等自托管服务器，以及播放、歌词、下载与备份。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/user-guide.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/user-guide.html">
+<link rel="icon" href="../assets/app-icon.png">
+<script src="../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../" data-page="user-guide.html">
+<article class="doc" data-title="使用指南" data-desc="安装与配置列表插件和音源插件，接入 Subsonic、Navidrome 等自托管服务器，以及播放、歌词、下载与备份。">
+<div class="doc-eyebrow">// User Guide</div>
+<h1>使用指南</h1>
+<p class="doc-lead">Mio Music 把「在线内容从哪里来」交给插件，把「怎么播、怎么看、怎么存」留给应用。本页按使用顺序介绍这两部分。</p>
+
+<h2 id="plugins">在线来源与插件</h2>
+<p>搜索、歌单、专辑、发现与歌手数据必须安装并启用外部的 <strong>音乐列表插件</strong>。应用不再提供内置的列表 SDK，也不会在能力缺失时自动回退到别的来源：</p>
+<ul>
+  <li>来源菜单只显示两类来源：已启用的列表插件<strong>自己提供播放</strong>的来源，或与当前已启用的音源插件<strong>共同支持</strong>的来源。</li>
+  <li>停用或卸载插件后，对应来源立即消失，进行中的旧搜索结果会被取消。</li>
+  <li>歌词、TTML、评论与缺失封面的补查，也按插件声明的 <code>lyrics</code> / <code>comments</code> / <code>cover</code> 能力调用；应用只保留解码与显示，不会自行请求来源的 HTTP 接口。</li>
+</ul>
+
+<h3>插件的两种类型</h3>
+<table>
+  <thead><tr><th>类型</th><th>作用</th><th>入口</th></tr></thead>
+  <tbody>
+    <tr><td>音乐列表插件</td><td>搜索、歌单、专辑、发现、歌手、歌词，并可自己提供播放与下载地址。可同时启用多个。</td><td>设置 → 插件 → 音乐列表插件</td></tr>
+    <tr><td>音源插件</td><td>为歌曲解析播放地址（兼容澜音脚本，洛雪脚本会自动转换）。需要显式切换使用哪一个。</td><td>设置 → 插件</td></tr>
+  </tbody>
+</table>
+
+<h3>安装列表插件</h3>
+<ol class="doc-steps">
+  <li><strong>打开插件页</strong>
+    <p>进入 <strong>设置 → 插件</strong>，找到「音乐列表插件」。</p></li>
+  <li><strong>内置插件</strong>
+    <p>Subsonic、Navidrome、Jellyfin、Emby、Plex、Songloft 随应用内置，启动时自动安装与更新，卡片上标有「内置」；它们不能卸载，不用时可以停用。其他插件点右上角的「<strong>安装列表插件</strong>」，从本地文件或 URL 安装。</p></li>
+  <li><strong>配置</strong>
+    <p>点插件卡片上的「配置」，按表单填入服务器地址、用户名与密码，保存后生效。</p></li>
+  <li><strong>测试连接</strong>
+    <p>声明了连接验证的插件，配置页会有「测试连接」。它使用<em>当前表单里的值</em>、每次实际请求一次服务器，保存之后才真正应用这些值。</p></li>
+</ol>
+<p>更新一个已安装的插件，只需重新安装同名脚本，<strong>配置会保留</strong>。内置的插件有：</p>
+<table>
+  <thead><tr><th>插件</th><th>来源 ID</th><th>能力</th></tr></thead>
+  <tbody>
+    <tr><td>Songloft</td><td><code>songloft</code></td><td>搜索、专辑 / 歌手 / 流派与歌单、歌词、播放与下载</td></tr>
+    <tr><td>Subsonic</td><td><code>subsonic</code></td><td>搜索、专辑与歌单、发现、播放与下载</td></tr>
+    <tr><td>Navidrome</td><td><code>navidrome</code></td><td>搜索、专辑与歌单、发现、歌手、歌词、播放与下载</td></tr>
+    <tr><td>Jellyfin</td><td><code>jellyfin</code></td><td>搜索、专辑与歌单、发现、歌手、歌词、播放与下载</td></tr>
+    <tr><td>Emby</td><td><code>emby</code></td><td>搜索、专辑与歌单、发现、歌手、播放与下载</td></tr>
+    <tr><td>Plex</td><td><code>plex</code></td><td>搜索、专辑与歌单、发现、歌手、播放与下载</td></tr>
+  </tbody>
+</table>
+<div class="callout note">
+<strong>验证状态</strong>
+Navidrome 与 Jellyfin 已对官方公开演示服务器实际调用；Songloft、Plex、Emby 只按其文档用本地模拟服务跑通了流程，未对真实服务器验证；Jellyfin 的下载地址因演示账号无权限而未验证。
+</div>
+
+<h3>由插件提供播放与下载</h3>
+<p>列表插件可以自己解析播放与下载地址。启用后，该来源的歌曲不再走音源插件，所以<strong>没有安装任何音源插件时也能搜索与播放</strong>。关闭后，该来源的歌曲会继续交给当前的音源插件解析。插件卡片上有「由本插件提供播放」与「由本插件提供下载」两个开关，分别控制播放与下载。</p>
+
+<h2 id="subsonic">接入 Subsonic / Navidrome</h2>
+<ol class="doc-steps">
+  <li><strong>找到插件</strong>
+    <p>Subsonic 与 Navidrome 插件已内置，在「音乐列表插件」中找到对应卡片。</p></li>
+  <li><strong>填写服务器</strong>
+    <p>服务器地址、用户名、密码。密码只以令牌（随机盐 + MD5）的形式发送，不会明文出现在请求里。</p></li>
+  <li><strong>HTTP 服务器</strong>
+    <p>非回环地址的 <code>http://</code> 服务器需要勾选「允许 HTTP（不加密）」；<code>localhost</code> 等回环地址无需勾选。</p></li>
+  <li><strong>导入歌单</strong>
+    <p>Subsonic 插件 1.1.0 起提供「导入歌单」：读取服务器歌单与完整的歌曲分页，再用一个事务创建本地歌单，并显示实际保存的数量。读取失败或超限时不会留下半个歌单；重复歌曲按本地约束保留首次出现。</p></li>
+</ol>
+<div class="callout tip">
+<strong>本地联调</strong>
+仓库的 <code>tools/golden/subsonic_fixture.py</code> 是只监听回环地址、数据全部合成的 Subsonic 夹具（用户名 <code>fixture</code>，密码 <code>fixture-password</code>），可在插件配置里直接联调，不需要真实服务器。
+</div>
+
+<h3>旧版 Mio 服务脚本</h3>
+<p>旧的 Mio 服务 CommonJS 脚本也可从「安装列表插件」安装，支持 <code>pluginInfo</code> / 注释元数据、<code>configSchema</code>、<code>testConnection(config)</code> 或 <code>ping(config)</code>、<code>getPlaylists()</code>、<code>getPlaylistSongs(id)</code>，以及可选的 <code>musicUrl(source, song, quality)</code>，同步、Promise 与 Node 风格回调都可以。兼容层经过全目标编译和独立源码复核，但目前还没有真实旧脚本的实测，不保证任意浏览器 / Node API、闭包状态或额外的服务方法都兼容。</p>
+
+<h2 id="playback">播放与音效</h2>
+<ul>
+  <li><strong>在线与本地播放</strong>：支持无缝播放（Gapless）与可配置的交叉淡入淡出（Crossfade）。</li>
+  <li><strong>均衡器</strong>：10 段参数均衡器，另有环绕声等音效，在设置中调节。</li>
+  <li><strong>频谱</strong>：播放器内有实时音频频谱，本地与在线音频都支持。</li>
+  <li><strong>系统集成</strong>：媒体键、托盘与快捷键。</li>
+</ul>
+
+<h2 id="lyrics">歌词</h2>
+<p>在线歌词支持逐字与 TTML，歌词页采用 Apple Music 风格（AMLL）的连续遮罩、弹簧、缩放 / 长音、模糊 / 沉浸色，以及音译、伴唱 / 对唱。macOS 上还有桌面歌词。本地歌曲可使用本地歌词文件。</p>
+<p>歌词内容由插件的 <code>lyrics</code> 能力提供；插件的开发者可以返回普通 LRC，也可以直接返回带逐字时间的 TTML，见 <a href="plugins/list-plugin.html#lyrics-comments">列表插件参考</a>。</p>
+
+<h2 id="library">本地音乐与歌单</h2>
+<ul>
+  <li>扫描本地目录，读取标签与封面。</li>
+  <li>收藏、本地歌单、批量操作；播放队列管理。</li>
+  <li>在线歌单内搜索，以及歌手、专辑、发现等页面（数据来自插件）。</li>
+  <li>标签编辑与写入。</li>
+</ul>
+
+<h2 id="downloads">下载</h2>
+<p>下载管理支持暂停与断点续传、重试、速度显示、运行时调整并发，并在下载完成后写入标签。当某个来源由列表插件提供下载时，下载地址取自插件的 <code>downloadUrl</code>，插件没有实现它则使用 <code>musicUrl</code>。</p>
+
+<h2 id="backup">备份、导入与更新</h2>
+<ul>
+  <li><strong>S3 备份与恢复</strong>：备份到 S3 兼容存储，数据加密并受密码保护，密钥由你自己保管。</li>
+  <li><strong>旧版导入</strong>：支持部分旧版数据的导入。</li>
+  <li><strong>更新</strong>：带签名的自动更新器，在设置中检查。</li>
+  <li><strong>DLNA</strong>：设备发现与投屏。</li>
+</ul>
+
+<h2 id="logs">遇到问题</h2>
+<ul>
+  <li><strong>来源菜单里没有我的来源</strong>：确认插件已启用，并且该来源要么由插件提供播放，要么也被当前音源插件支持。</li>
+  <li><strong>想知道插件为什么失败</strong>：打开插件卡片上的「插件日志」。插件通过 <code>console.log</code> 输出的内容，以及宿主记录的失败原因（被拒绝的地址、超限、返回值格式错误等）都在这里。</li>
+  <li><strong>想了解还缺什么</strong>：项目仍在开发，部分功能与平台尚未完成验收，详见仓库 <a href="https://github.com/Mio888888/Mio-Music#readme" target="_blank" rel="noreferrer">README</a>；遇到缺失或异常请提交 Issue。</li>
+</ul>
+</article>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

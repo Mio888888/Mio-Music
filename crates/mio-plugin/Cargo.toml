@@ -1,0 +1,23 @@
+[package]
+name = "mio-plugin"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "gzip", "brotli"] }
+serde.workspace = true
+base64 = "=0.22.1"
+md-5 = "0.10"
+regex-lite = "0.1"
+sha1_smol = "=1.0.1"
+aes = "=0.8.4"
+mio-music-sdk = { path = "../mio-music-sdk" }
+serde_json.workspace = true
+
+rquickjs = "=0.14.0"
+
+# QuickJS does not ship pregenerated bindings for the mobile target triples.
+# Generate them using each target's SDK, while preserving the desktop build.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+rquickjs = { version = "=0.14.0", features = ["bindgen"] }

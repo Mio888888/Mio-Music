@@ -1,0 +1,1 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><radialGradient id="shine" gradientUnits="userSpaceOnUse" cx="100" cy="100" r="424.264"><stop stop-color="white" stop-opacity="0.1"/><stop offset="0.5" stop-color="white" stop-opacity="0"/></radialGradient></defs><circle cx="200" cy="200" r="200" fill="url(#shine)"/></svg>

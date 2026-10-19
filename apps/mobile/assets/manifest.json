@@ -1,0 +1,842 @@
+{
+  "background-LICENSES.txt": {
+    "source": "crates/mio-app/src/shell/background-LICENSES.txt",
+    "sha256": "d34ea73401b61f124f5977c15a61e29e7f321b92568a5ea96f53fe318ce226a1"
+  },
+  "tokens.json": {
+    "source": "crates/mio-tokens/tokens.json",
+    "sha256": "919fb1c560919bd89f7d9cd5721d97b9d23d69a2cb59c6bb9c340b22dc3fb3ff"
+  },
+  "locales/zh-CN.json": {
+    "source": "crates/mio-core/locales/zh-CN.json",
+    "sha256": "44808911def9f742933ff5de0ed1bdd72e5c3aa177f5aa749df3e5bbcf2fe241"
+  },
+  "locales/en-US.json": {
+    "source": "crates/mio-core/locales/en-US.json",
+    "sha256": "78b4d84e7d9d9134490b0cf6efec5231c22a963322c6e6bac37a76303c150049"
+  },
+  "icons/Add.svg": {
+    "source": "crates/mio-app/assets/icons/Add.svg",
+    "sha256": "bc943cb9ced537bebc51115e7d19e0e7f2b4a0893dfc12c1a19de47417505220"
+  },
+  "icons/AddList.svg": {
+    "source": "crates/mio-app/assets/icons/AddList.svg",
+    "sha256": "e5be293906fd3b97b18289ff008013658a4cebc940bf69db867782532fc8cd71"
+  },
+  "icons/Album.svg": {
+    "source": "crates/mio-app/assets/icons/Album.svg",
+    "sha256": "7b4651f72f943ea42b08207178233cf88cc1c74d0157b40ff988cdbfe33cad17"
+  },
+  "icons/Artist.svg": {
+    "source": "crates/mio-app/assets/icons/Artist.svg",
+    "sha256": "a09c534c0a3405d8add70f6a12029e5929f41bd1baeb5de7836d116f554402c7"
+  },
+  "icons/AutoFix.svg": {
+    "source": "crates/mio-app/assets/icons/AutoFix.svg",
+    "sha256": "dac419de36c2792c6fcd0f7ecf7333b938568c2c7567ebaec6d04bbc1d4cecce"
+  },
+  "icons/AutoTheme.svg": {
+    "source": "crates/mio-app/assets/icons/AutoTheme.svg",
+    "sha256": "54dc5bb08700518f116def1e65ef7ae32c5dc0ffa6cfffb0e39091d9a7b31d50"
+  },
+  "icons/BackupCloud.svg": {
+    "source": "crates/mio-app/assets/icons/BackupCloud.svg",
+    "sha256": "30193c614d96404126af43c3e5ea6eeb33566026a3b9fb4588d44fc547d7a1f2"
+  },
+  "icons/Batch.svg": {
+    "source": "crates/mio-app/assets/icons/Batch.svg",
+    "sha256": "3f8894fab9d7b525ea095d0f77d4bb15ffb5e4e1bf52be6ed77e8282ccb77db1"
+  },
+  "icons/Calendar-Empty.svg": {
+    "source": "crates/mio-app/assets/icons/Calendar-Empty.svg",
+    "sha256": "bee3947d8e97c33745e942a52af4ae05b6e0628b8fa02f607d3bdd98daea7cf6"
+  },
+  "icons/Chat.svg": {
+    "source": "crates/mio-app/assets/icons/Chat.svg",
+    "sha256": "d0b52f34dd13f8a84129cf102aabd00413eff21bd81312587751a1a6700167ea"
+  },
+  "icons/Cloud.svg": {
+    "source": "crates/mio-app/assets/icons/Cloud.svg",
+    "sha256": "458b436a3307d3035d013fab747ca850383e7dfb42b86f016e5a2b3f43b30bdf"
+  },
+  "icons/CloudLockOpen.svg": {
+    "source": "crates/mio-app/assets/icons/CloudLockOpen.svg",
+    "sha256": "a737ba3e4a6bceedfda308e2b9656c7c15fdbe32eba90591cb65cb8015797b38"
+  },
+  "icons/Code.svg": {
+    "source": "crates/mio-app/assets/icons/Code.svg",
+    "sha256": "2bc883ce1b179d592357603f5572fa4ed6cca2e527542add8b8d9c62d230f458"
+  },
+  "icons/Copy.svg": {
+    "source": "crates/mio-app/assets/icons/Copy.svg",
+    "sha256": "f44e00ae3a3b24c2d3ce8dac9cde322c625d844878abfa2c1087ed84ebe729da"
+  },
+  "icons/DarkTheme.svg": {
+    "source": "crates/mio-app/assets/icons/DarkTheme.svg",
+    "sha256": "a7f4494fe86b597a3d2f03768c7dbb6f3c6c068ae38bb65bc37b9cd938f8d366"
+  },
+  "icons/Delete.svg": {
+    "source": "crates/mio-app/assets/icons/Delete.svg",
+    "sha256": "2003cd8945fa46f3dfee8cae028d1b075b3c9daab02b5ef150ca1063887b48df"
+  },
+  "icons/DeleteSweep.svg": {
+    "source": "crates/mio-app/assets/icons/DeleteSweep.svg",
+    "sha256": "24fbc217d4ccc457e59796a8dadb3c0790968489ddcc227daa120c4b4c7ada3c"
+  },
+  "icons/DesktopLyric.svg": {
+    "source": "crates/mio-app/assets/icons/DesktopLyric.svg",
+    "sha256": "06c94534ec7c41f09616e80366f53d26606e3b6959f27689de25a3d93625edac"
+  },
+  "icons/Discover.svg": {
+    "source": "crates/mio-app/assets/icons/Discover.svg",
+    "sha256": "02e773f7b7800c25a9cfd06f982a197cf52884b9da2e3c4da799f4fb56c4fe91"
+  },
+  "icons/Down.svg": {
+    "source": "crates/mio-app/assets/icons/Down.svg",
+    "sha256": "882bac1769b5d92e3c713f5869f97577bdd32470de7dacd2a8b884bb5a40a370"
+  },
+  "icons/Download.svg": {
+    "source": "crates/mio-app/assets/icons/Download.svg",
+    "sha256": "ed782df4dfd33b08e0ceb705d603d16a71cad04dcae9390745449d1edc14fd0f"
+  },
+  "icons/DropDown.svg": {
+    "source": "crates/mio-app/assets/icons/DropDown.svg",
+    "sha256": "45d7785e6ca0a2cab05e33285fcdbb283401d8353dd03741d7ed4a551946f2e6"
+  },
+  "icons/Earth.svg": {
+    "source": "crates/mio-app/assets/icons/Earth.svg",
+    "sha256": "a644c66891dee7ab1597b3f0e99b3c9bebf1d4a9dc6983acefc833ab5bd9c53e"
+  },
+  "icons/EditNote.svg": {
+    "source": "crates/mio-app/assets/icons/EditNote.svg",
+    "sha256": "9cf2e0832a6c0c19bffce44e51380a33871b710478ccd02e6b9536c9a345f559"
+  },
+  "icons/ExitToApp.svg": {
+    "source": "crates/mio-app/assets/icons/ExitToApp.svg",
+    "sha256": "0bc1acc36d43c18433fad251f021a14860fe23b0553e855464b1232157187b8b"
+  },
+  "icons/Eye.svg": {
+    "source": "crates/mio-app/assets/icons/Eye.svg",
+    "sha256": "9863e1b7af9b74a9c1784d8e89ed79120b472bb31369db87a45fd864229cb24e"
+  },
+  "icons/EyeLock.svg": {
+    "source": "crates/mio-app/assets/icons/EyeLock.svg",
+    "sha256": "8ae4e4370ea2e07a3b1a6e4f60724329086aeaa9019b0d8917369d0194bfeab4"
+  },
+  "icons/Favorite.svg": {
+    "source": "crates/mio-app/assets/icons/Favorite.svg",
+    "sha256": "0e82e74fdcdf2e87c0c1395656b06f05389754aff061fec76a52a40a5a6e5ec5"
+  },
+  "icons/FavoriteBorder.svg": {
+    "source": "crates/mio-app/assets/icons/FavoriteBorder.svg",
+    "sha256": "3ba2c46589fa260e1e0170d126aa2c1bcebb28780cb82c2b3c7562c8136c9c26"
+  },
+  "icons/Fire.svg": {
+    "source": "crates/mio-app/assets/icons/Fire.svg",
+    "sha256": "7e36b4548165c8f06b68109a7acb9637945f39c8e4bb492c56cd2aaa274aecaf"
+  },
+  "icons/Folder.svg": {
+    "source": "crates/mio-app/assets/icons/Folder.svg",
+    "sha256": "86f4b17cb6d92f098706d0777ae2912d48a88e1279bc10ea4dd3b4e787a7c763"
+  },
+  "icons/FolderCog.svg": {
+    "source": "crates/mio-app/assets/icons/FolderCog.svg",
+    "sha256": "3b60857e29149786261824591800bda3bc0b37a0ce0883d13958963f190add1f"
+  },
+  "icons/FolderMusic.svg": {
+    "source": "crates/mio-app/assets/icons/FolderMusic.svg",
+    "sha256": "e74fdaca234043490464886ed29b4ebd0453528c09a8599450b9789a0c14ce6e"
+  },
+  "icons/FolderPlus.svg": {
+    "source": "crates/mio-app/assets/icons/FolderPlus.svg",
+    "sha256": "5aa4535159a0e5ada1dfa3f5d15b1fdd95ed9ac01bce491d4e177690ad7d132b"
+  },
+  "icons/FormatList.svg": {
+    "source": "crates/mio-app/assets/icons/FormatList.svg",
+    "sha256": "a0f53cb4a53186587f4c33313bf7ff2d7cab4d18bc74ccc2d9e7a5be6496bb46"
+  },
+  "icons/Forward5.svg": {
+    "source": "crates/mio-app/assets/icons/Forward5.svg",
+    "sha256": "c67db816338c7d392371b30bbf9ea412d4cf85d379734aa3198cf90264412f7c"
+  },
+  "icons/Fullscreen.svg": {
+    "source": "crates/mio-app/assets/icons/Fullscreen.svg",
+    "sha256": "471ecaa6a60160600df8e43f37ad58e980d9049c5beadaff4ae42cabe94e6ae4"
+  },
+  "icons/FullscreenExit.svg": {
+    "source": "crates/mio-app/assets/icons/FullscreenExit.svg",
+    "sha256": "29fc888f7dd09ef1903ad73e8e6e1be655628189ecf5842fad0373047047c961"
+  },
+  "icons/Github.svg": {
+    "source": "crates/mio-app/assets/icons/Github.svg",
+    "sha256": "80fa64974fd82fd368e1287860d0b59787180f563e75beda036e43f973786674"
+  },
+  "icons/HeartBit.svg": {
+    "source": "crates/mio-app/assets/icons/HeartBit.svg",
+    "sha256": "acd21c3cd2efbfb3412f0e402816e61419b06234fab415d7a18675058b5547d6"
+  },
+  "icons/Help.svg": {
+    "source": "crates/mio-app/assets/icons/Help.svg",
+    "sha256": "dc7b4aa446d830daa4aec175c7b2ff9c59dc557204d39e442568fd1b15661e14"
+  },
+  "icons/HiRes.svg": {
+    "source": "crates/mio-app/assets/icons/HiRes.svg",
+    "sha256": "6e60de81564b0b271e2edcc80ec17a046dac56624b7c3858c5786267fd21ab00"
+  },
+  "icons/History.svg": {
+    "source": "crates/mio-app/assets/icons/History.svg",
+    "sha256": "c39e87c7571fdf157033bf29f8947bb8eb015666b5c3239fb74de4e9967791f6"
+  },
+  "icons/Home.svg": {
+    "source": "crates/mio-app/assets/icons/Home.svg",
+    "sha256": "ef985d2c7188ef960f6e6a5a264485b275125a8a09a6a4fe917a51e5da45e386"
+  },
+  "icons/IP.svg": {
+    "source": "crates/mio-app/assets/icons/IP.svg",
+    "sha256": "131fcf2b300636c465aa2a8a7d943cd378b57b689b497b9089741ee20a27afd7"
+  },
+  "icons/Info.svg": {
+    "source": "crates/mio-app/assets/icons/Info.svg",
+    "sha256": "45f845eda718255413e5dbdb6954d6e5aa0c1ea23108f1e4293ef2620023ffe2"
+  },
+  "icons/Keyboard.svg": {
+    "source": "crates/mio-app/assets/icons/Keyboard.svg",
+    "sha256": "5bb772ac4b42d3390c7a0fc7433bec37e405012551ef9f6deef92779003f4b8f"
+  },
+  "icons/LightTheme.svg": {
+    "source": "crates/mio-app/assets/icons/LightTheme.svg",
+    "sha256": "1e236f7cac75b49800ca7dcc9759b3929ba67e83ab65d87f214196dc07b31d94"
+  },
+  "icons/Link.svg": {
+    "source": "crates/mio-app/assets/icons/Link.svg",
+    "sha256": "f5fd0c81acb0b99280ae4b6693c053a9da37cc2364eeb6fca7f8615ec9445ea8"
+  },
+  "icons/List.svg": {
+    "source": "crates/mio-app/assets/icons/List.svg",
+    "sha256": "a0f53cb4a53186587f4c33313bf7ff2d7cab4d18bc74ccc2d9e7a5be6496bb46"
+  },
+  "icons/ListLockOpen.svg": {
+    "source": "crates/mio-app/assets/icons/ListLockOpen.svg",
+    "sha256": "19702e9168727101b7c827dfe02708d278e1725cd06ce4ab0b509d03593de47d"
+  },
+  "icons/Location.svg": {
+    "source": "crates/mio-app/assets/icons/Location.svg",
+    "sha256": "1c67423484bbd9f82960bf9bfad4525b66e316f46c279cb5cc147dab21046849"
+  },
+  "icons/Lyrics.svg": {
+    "source": "crates/mio-app/assets/icons/Lyrics.svg",
+    "sha256": "3fc151d5a4ef5d2eef6a86dc05fddc5cab147e9e5107f961c9467c16ac86e929"
+  },
+  "icons/Menu.svg": {
+    "source": "crates/mio-app/assets/icons/Menu.svg",
+    "sha256": "5fe623856f36b1ff80a9f2ab5dcebf9dbe6c6c6af1f64b623196b5b9ecf51b98"
+  },
+  "icons/Message.svg": {
+    "source": "crates/mio-app/assets/icons/Message.svg",
+    "sha256": "e08168e3dd82fb27c109050392b454ef69fc192e8c6247e7399db1496bb53aed"
+  },
+  "icons/Music.svg": {
+    "source": "crates/mio-app/assets/icons/Music.svg",
+    "sha256": "24628fdb2d4205534cd6f1a4e30ea2d7a13624f95a5798d19157b20a6d6f7f03"
+  },
+  "icons/MusicList.svg": {
+    "source": "crates/mio-app/assets/icons/MusicList.svg",
+    "sha256": "be6a75d30c68affcb23571d86332870fcaac2b4a2971ce1838c33a8077b24a77"
+  },
+  "icons/NavigateBefore.svg": {
+    "source": "crates/mio-app/assets/icons/NavigateBefore.svg",
+    "sha256": "c6af2e2ea2441d9d98655679711f8757223f76cfc4e6ee83d337edb222ebc2a9"
+  },
+  "icons/NavigateNext.svg": {
+    "source": "crates/mio-app/assets/icons/NavigateNext.svg",
+    "sha256": "b1b194febbba9ca300cf1e3652181148d5ea35b0d440f304f4ba4addd961da88"
+  },
+  "icons/Password.svg": {
+    "source": "crates/mio-app/assets/icons/Password.svg",
+    "sha256": "416b7d153b4b6c1a3933e48aa7de2b57c24852c018936f2dcf50198dc9424d15"
+  },
+  "icons/Paste.svg": {
+    "source": "crates/mio-app/assets/icons/Paste.svg",
+    "sha256": "20827b2fb04fcc8b0e2838fdec91c8d314cc88f1a6a3ebf6b937080b6d9c5554"
+  },
+  "icons/Pause.svg": {
+    "source": "crates/mio-app/assets/icons/Pause.svg",
+    "sha256": "a26b0a210921116e43d7cbf7683eaa57c814ad087dc66debdf46d413b480f787"
+  },
+  "icons/PauseCircle.svg": {
+    "source": "crates/mio-app/assets/icons/PauseCircle.svg",
+    "sha256": "01ecf012379fd160403beab0e046de9b0119989d41e921c4ce8229a9a1570337"
+  },
+  "icons/PenBall.svg": {
+    "source": "crates/mio-app/assets/icons/PenBall.svg",
+    "sha256": "46ff75886dad165935c74da7f80b3d7427aa26db0073382aa2ce972a2564aa97"
+  },
+  "icons/Person.svg": {
+    "source": "crates/mio-app/assets/icons/Person.svg",
+    "sha256": "0c5090dbf71055f6e4b59812552ba077bbfee6ca19c709085ff9450907f4781c"
+  },
+  "icons/Phone.svg": {
+    "source": "crates/mio-app/assets/icons/Phone.svg",
+    "sha256": "938b69e5879f821b37acd514dd75573fff9d6eef46675f5a3685885554da6a5f"
+  },
+  "icons/Play.svg": {
+    "source": "crates/mio-app/assets/icons/Play.svg",
+    "sha256": "e36532297acf5d3afce2d7fbd29cb1fd8e5d51419e1c2748bf871e93bf692c89"
+  },
+  "icons/PlayCircle.svg": {
+    "source": "crates/mio-app/assets/icons/PlayCircle.svg",
+    "sha256": "94021f7fdde91333caef550a90f64f7b7c39929eb1a01ac1c5eee366ad805ec1"
+  },
+  "icons/PlayFilled.svg": {
+    "source": "crates/mio-app/assets/icons/PlayFilled.svg",
+    "sha256": "a094f2ea904cdc363da51c74c93b019c9109f6441508ca6a9fa03b0ddc7d9146"
+  },
+  "icons/PlayList.svg": {
+    "source": "crates/mio-app/assets/icons/PlayList.svg",
+    "sha256": "be6a75d30c68affcb23571d86332870fcaac2b4a2971ce1838c33a8077b24a77"
+  },
+  "icons/PlayNext.svg": {
+    "source": "crates/mio-app/assets/icons/PlayNext.svg",
+    "sha256": "8a59ea466cd372e7467e8d2dde806e6569ee8b1830610a15f2036a1ce8bbebdc"
+  },
+  "icons/Playlist-Edit-Cover.svg": {
+    "source": "crates/mio-app/assets/icons/Playlist-Edit-Cover.svg",
+    "sha256": "710fb710ba8d3d2f26f1cb292476775ac6d0538a59b635e2b759c0746dc7911a"
+  },
+  "icons/PlaylistAdd.svg": {
+    "source": "crates/mio-app/assets/icons/PlaylistAdd.svg",
+    "sha256": "d075b8c2c53308eed62f2ba0840a509c0fdc34a885624b2650f3cf16352f2458"
+  },
+  "icons/PlaylistAddCheck.svg": {
+    "source": "crates/mio-app/assets/icons/PlaylistAddCheck.svg",
+    "sha256": "8374602651eb6afa1d2ba6fa768a1d876a6f34e2408f826d12df09eadefaa252"
+  },
+  "icons/PlaylistAddCover.svg": {
+    "source": "crates/mio-app/assets/icons/PlaylistAddCover.svg",
+    "sha256": "a08b315b7e6b073232c35ec460615e56084dd5e49a067eae3fbae6438ad54ada"
+  },
+  "icons/PlaylistCreate.svg": {
+    "source": "crates/mio-app/assets/icons/PlaylistCreate.svg",
+    "sha256": "dd08740badb95e0a98895c88a32228e631b28c89321f9d84191f6a06e4bab96d"
+  },
+  "icons/PlaylistImport.svg": {
+    "source": "crates/mio-app/assets/icons/PlaylistImport.svg",
+    "sha256": "621a7aa35cb9114d1220a5af639818b651d8a0a693e936c2c8ee6a35da1f0ae7"
+  },
+  "icons/Podcast.svg": {
+    "source": "crates/mio-app/assets/icons/Podcast.svg",
+    "sha256": "2ebfd814597fa4654d877dc553a5544182187e30c56f40d9e90a9bc415ee1850"
+  },
+  "icons/Power.svg": {
+    "source": "crates/mio-app/assets/icons/Power.svg",
+    "sha256": "0b1a6a065e1a6a8dd4ed6224b9bf813363710bb6c9fde56bab51c9ff9b193a97"
+  },
+  "icons/Radio.svg": {
+    "source": "crates/mio-app/assets/icons/Radio.svg",
+    "sha256": "6c899bd96eca2a53560c727712ca2e978fcaad89b613600dde0f52e1c35073dd"
+  },
+  "icons/Record.svg": {
+    "source": "crates/mio-app/assets/icons/Record.svg",
+    "sha256": "c42cd416afdd854e302b8ab0d6abd65a1ba22b1175d15f06129188a70d6d3249"
+  },
+  "icons/Refresh.svg": {
+    "source": "crates/mio-app/assets/icons/Refresh.svg",
+    "sha256": "8091700dd58105251810785ca9f516df3192e37363228a0048c9db0c5d2b5b97"
+  },
+  "icons/Repeat.svg": {
+    "source": "crates/mio-app/assets/icons/Repeat.svg",
+    "sha256": "6b6f0c0a89f28bd68d2ccf2b28b88681ab6c3482684ee1016742fa98c208653e"
+  },
+  "icons/RepeatSong.svg": {
+    "source": "crates/mio-app/assets/icons/RepeatSong.svg",
+    "sha256": "4662d79892d73e00fe2f85307bdf6d32373b9077fe0b4b8dbf8ce112ba9a205f"
+  },
+  "icons/Replay5.svg": {
+    "source": "crates/mio-app/assets/icons/Replay5.svg",
+    "sha256": "e9cbbb655eee5e04a88b0a1c54c07b1f97c8a3748773bbef36ef1ef2b7805c4d"
+  },
+  "icons/Restart.svg": {
+    "source": "crates/mio-app/assets/icons/Restart.svg",
+    "sha256": "9692865bbffde864879ca252f3be342df2a4a08c0b406faa005650a274c37a23"
+  },
+  "icons/Right.svg": {
+    "source": "crates/mio-app/assets/icons/Right.svg",
+    "sha256": "4da1fd7da83f589bfd0bffd5265b339661debd860aa71c43f825b4b797539678"
+  },
+  "icons/RssFeed.svg": {
+    "source": "crates/mio-app/assets/icons/RssFeed.svg",
+    "sha256": "1e63304f026dd93f5703bf88a57c9765e0ad054540fefcb7e90265b4150b8908"
+  },
+  "icons/SPlayer.svg": {
+    "source": "crates/mio-app/assets/icons/SPlayer.svg",
+    "sha256": "a3c8eebd1d47204a47899cadcab3d63cb18c781107afdaca678d7424e9763b8b"
+  },
+  "icons/Search.svg": {
+    "source": "crates/mio-app/assets/icons/Search.svg",
+    "sha256": "77a845adf264472e05b3b68daf191a5d73773db420419826d40464af6bdadd2b"
+  },
+  "icons/SearchOff.svg": {
+    "source": "crates/mio-app/assets/icons/SearchOff.svg",
+    "sha256": "ce57bd1b4b45f26e771950157af058d658f86e5a4738d21f48447c94d04fcab4"
+  },
+  "icons/Settings.svg": {
+    "source": "crates/mio-app/assets/icons/Settings.svg",
+    "sha256": "5a64bcae449585987cfcd440568e54970a3d939a52efaa5f303e4bf6ddb2f6f7"
+  },
+  "icons/SettingsLine.svg": {
+    "source": "crates/mio-app/assets/icons/SettingsLine.svg",
+    "sha256": "8c89c063f901ea3aa18bfa3f7ef841b4e8cbff4763bb14fbad018b9c8094a66b"
+  },
+  "icons/SettingsOther.svg": {
+    "source": "crates/mio-app/assets/icons/SettingsOther.svg",
+    "sha256": "042721f99eadf6bc9a9a72f2d3e0ddbc583df6df0f1e35145624f89c992e66df"
+  },
+  "icons/Share.svg": {
+    "source": "crates/mio-app/assets/icons/Share.svg",
+    "sha256": "261fc8abded46454fa68bf97f9df171543046885b7c7ceb4ba55a107de80a428"
+  },
+  "icons/Shuffle.svg": {
+    "source": "crates/mio-app/assets/icons/Shuffle.svg",
+    "sha256": "ff9f1f04f4291700abf3bb187c60985718203e6b1320decaef412a38f7b29a69"
+  },
+  "icons/SkipNext.svg": {
+    "source": "crates/mio-app/assets/icons/SkipNext.svg",
+    "sha256": "53c527e0e573e5a4b8af1aeacad674195e03434e525676718373b673313897b8"
+  },
+  "icons/SkipPrev.svg": {
+    "source": "crates/mio-app/assets/icons/SkipPrev.svg",
+    "sha256": "052a29756f1c107c8a21c3c27f96f0e53b45753327147b116988584f701345c8"
+  },
+  "icons/SnippetFolder.svg": {
+    "source": "crates/mio-app/assets/icons/SnippetFolder.svg",
+    "sha256": "18b2e02f91d300534645a04cd11d2cc26d2eab9dd776c54d066bc82ad26404f6"
+  },
+  "icons/Sort.svg": {
+    "source": "crates/mio-app/assets/icons/Sort.svg",
+    "sha256": "5216faa42e444a566e630458617e71b6d1ada88bd63891b490c8cd5a71bdb5ee"
+  },
+  "icons/SortAZ.svg": {
+    "source": "crates/mio-app/assets/icons/SortAZ.svg",
+    "sha256": "d9111fed0755e1a22f704fd847492f7fe43c67d2c2100939fc447d445b132ec2"
+  },
+  "icons/SortClockDown.svg": {
+    "source": "crates/mio-app/assets/icons/SortClockDown.svg",
+    "sha256": "82960e0df764e2b98b73fbe9683505038fe7385cf5f943b1033a703da6c8b837"
+  },
+  "icons/SortClockUp.svg": {
+    "source": "crates/mio-app/assets/icons/SortClockUp.svg",
+    "sha256": "02b604b62ed4dabccf570c3f74313554c893120bf1eb2386f72f1dd06b2c3b8f"
+  },
+  "icons/SortDateDown.svg": {
+    "source": "crates/mio-app/assets/icons/SortDateDown.svg",
+    "sha256": "820cee00acbc427ad5389d2cfcc5303d519bfcce2d89e7f6a8bcdd70da0aad9e"
+  },
+  "icons/SortDateUp.svg": {
+    "source": "crates/mio-app/assets/icons/SortDateUp.svg",
+    "sha256": "0991e0f1bcad71c656be53fcf75450ae16a243810e261a8a0752e10407f6281f"
+  },
+  "icons/SortDown.svg": {
+    "source": "crates/mio-app/assets/icons/SortDown.svg",
+    "sha256": "fe6ac960962a3b684794d310e9b0d5dd71d28f6e000240230dab966585374291"
+  },
+  "icons/SortUp.svg": {
+    "source": "crates/mio-app/assets/icons/SortUp.svg",
+    "sha256": "0393229b2a5feacb43708b30b4e747ea990d118ad2e65553cada9cb36817d40c"
+  },
+  "icons/SortZA.svg": {
+    "source": "crates/mio-app/assets/icons/SortZA.svg",
+    "sha256": "0af59a8415945979c0c6a6d4832d481d1140a232cde7bd4b9135317205ace2d0"
+  },
+  "icons/Star.svg": {
+    "source": "crates/mio-app/assets/icons/Star.svg",
+    "sha256": "bc43b2dd7bdbbffa1f7070abfc36d78bf9099ddc0044f770dc873245639cb7eb"
+  },
+  "icons/Storage.svg": {
+    "source": "crates/mio-app/assets/icons/Storage.svg",
+    "sha256": "b3088cf89f726a97bb86db9a85f4a82c9bab9af65a2214a3f42b5862b6e37060"
+  },
+  "icons/TD-Arrow-Down.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Arrow-Down.svg",
+    "sha256": "bc210a659ce2dbbd4b80703692ebe0d8b73ea995fde12ee7e90df6388509bd2a"
+  },
+  "icons/TD-Arrow-Up.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Arrow-Up.svg",
+    "sha256": "dccd2e22c5645787dc2e5a3ff31b66c37e1aa347f9745b8397d928955b2b6125"
+  },
+  "icons/TD-Audio.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Audio.svg; view-box normalized to viewBox",
+    "sha256": "ea5196e55ffa121c097e3a2bbd96a5d1208776c634e25f8b42b393b4edebfe57"
+  },
+  "icons/TD-Check.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Check.svg",
+    "sha256": "e5894ef15b03b6d497ac7d32d3e47e0e8132f728fb548af715f15d3a42d977ed"
+  },
+  "icons/TD-Close.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Close.svg",
+    "sha256": "c4bf33a9f80a9fa763fc6bccc5ed52e665293a138f707aaf7410fed834d6e414"
+  },
+  "icons/TD-Delete.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Delete.svg",
+    "sha256": "11cc6757fb98d78e0e4446eb26e4602ee369aa32216d97d0e9bace346f305cc8"
+  },
+  "icons/TD-Down.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Down.svg",
+    "sha256": "3b77c7b0cec394f1b766d555421a449892903f21535751324a761041a416b461"
+  },
+  "icons/TD-Download.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Download.svg",
+    "sha256": "fec06d3af5724db2b23c9dda4d9d29a3bbc56b5395ff1e0da7c690c6cc7f1fb5"
+  },
+  "icons/TD-Edit2.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Edit2.svg",
+    "sha256": "c58907537c296677ff20cd2b047e06981d69daab240b7fd0f8a2e17d5171b035"
+  },
+  "icons/TD-Ellipsis.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Ellipsis.svg",
+    "sha256": "8447da5d9a95349b59bdab8cf1876c3cac6742d82aedab03c82d5ccc11cd5596"
+  },
+  "icons/TD-ErrorCircle-Filled.svg": {
+    "source": "crates/mio-app/assets/icons/TD-ErrorCircle-Filled.svg",
+    "sha256": "3d6526f8a631b500612394be2addeeb502994dec6e65b24ad49b57e6d07844e1"
+  },
+  "icons/TD-Fullscreen.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Fullscreen.svg",
+    "sha256": "f4f25df97446f6142f1d45b8724adb8f706896ae1c3e51e19dea174c34912349"
+  },
+  "icons/TD-FullscreenExit.svg": {
+    "source": "crates/mio-app/assets/icons/TD-FullscreenExit.svg",
+    "sha256": "1847c02e0ef2d72d8ae0383e63bc64bfeca1ac69bad5acd1214d16748ad49153"
+  },
+  "icons/TD-Heart-Filled.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Heart-Filled.svg",
+    "sha256": "e0c2f9307c074f0b994811432bab45df8e0fa94bf2a00adcb241a5e63a66adff"
+  },
+  "icons/TD-Heart.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Heart.svg",
+    "sha256": "f3bf14fedcf37405bacaaa2d58fe38932c78c496558c87d81597f28e8417bf52"
+  },
+  "icons/TD-InfoCircle.svg": {
+    "source": "crates/mio-app/assets/icons/TD-InfoCircle.svg; view-box normalized to viewBox",
+    "sha256": "b05e939fea7c088271c06d36eb63a102cff3bccb208c0de99f40a5edb0a03d48"
+  },
+  "icons/TD-Keyboard.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Keyboard.svg; view-box normalized to viewBox",
+    "sha256": "8b3c4500b8762c0c5c8544a44d34f3116ba94b87354383bb3d11fcb3930a2e89"
+  },
+  "icons/TD-Microphone.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Microphone.svg; view-box normalized to viewBox",
+    "sha256": "9fd313c0aa5f1e06c3ea2297f98d9a9db0f1657d4805284ccc5e80a3202b0338"
+  },
+  "icons/TD-Music.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Music.svg; view-box normalized to viewBox",
+    "sha256": "23c6cf9a9658b2cc32352cd68814f416382b3b0ef952c1d77ddf950fb74ef208"
+  },
+  "icons/TD-Palette.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Palette.svg; view-box normalized to viewBox",
+    "sha256": "0c5895507083bae6428692effa570b376761e2f8f8882c46da49309eb25f94f1"
+  },
+  "icons/TD-PlayCircle.svg": {
+    "source": "crates/mio-app/assets/icons/TD-PlayCircle.svg; view-box normalized to viewBox",
+    "sha256": "330c53fcad2f688ae94d605cc6419e15c1e08a03f9d82989c246c9bbfa39fb4b"
+  },
+  "icons/TD-Save.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Save.svg; view-box normalized to viewBox",
+    "sha256": "2074a60b417e6d2895be85eeded9f8004618b2a77c570f698b61c83348cde3f0"
+  },
+  "icons/TD-StopCircle.svg": {
+    "source": "crates/mio-app/assets/icons/TD-StopCircle.svg; view-box normalized to viewBox",
+    "sha256": "ba158e904c74c4b81b136905f56185f2fdb8063d871159d1ce44fd2962f6d5c3"
+  },
+  "icons/TD-Swap.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Swap.svg",
+    "sha256": "670d50eacaaaaf2d83d099be07b5ae3d38bde630510a2938dd54bd205fdccd6c"
+  },
+  "icons/TD-Time.svg": {
+    "source": "crates/mio-app/assets/icons/TD-Time.svg",
+    "sha256": "fb2cfaa4a2bfdfe52345383e1825974bfc386849c46a1ab106262e856bf2a1f4"
+  },
+  "icons/TD-TreeRoundDot.svg": {
+    "source": "crates/mio-app/assets/icons/TD-TreeRoundDot.svg; view-box normalized to viewBox",
+    "sha256": "a1dd738f5db3911a7a6bdc5721ec7dd6038b32ed32485576a9cdf5eeb6173e0f"
+  },
+  "icons/TD-ViewList.svg": {
+    "source": "crates/mio-app/assets/icons/TD-ViewList.svg",
+    "sha256": "e547aaf4d508de26a84206c6318cae86893909f047db76c2d640676b89ae2c6d"
+  },
+  "icons/TDesign-LICENSE.txt": {
+    "source": "crates/mio-app/assets/icons/TDesign-LICENSE.txt",
+    "sha256": "b3dbcb89dcf4a11abf1b70d043795a3da0c458af16fefd2ff315d9ff5875312f"
+  },
+  "icons/Tag.svg": {
+    "source": "crates/mio-app/assets/icons/Tag.svg",
+    "sha256": "c93f3db98aa4729e4e86a52735ebbda2da72f381fa02521a1f722713a431c3ef"
+  },
+  "icons/TextPlay.svg": {
+    "source": "crates/mio-app/assets/icons/TextPlay.svg",
+    "sha256": "4a2e2b889bdbfeb41f6a89702aa334624325c8f27796273265e5a9dd489c86c5"
+  },
+  "icons/ThumbDown.svg": {
+    "source": "crates/mio-app/assets/icons/ThumbDown.svg",
+    "sha256": "2bec61bffb4c1dad8720b64950b28cccaec3832bf6cc73150c63fedf8ede5bb3"
+  },
+  "icons/ThumbUp.svg": {
+    "source": "crates/mio-app/assets/icons/ThumbUp.svg",
+    "sha256": "dda20334ee5f85f333b303b2f8e92e789271f6505de8433e2c4086cee35b9ad2"
+  },
+  "icons/ThumbUpOff.svg": {
+    "source": "crates/mio-app/assets/icons/ThumbUpOff.svg",
+    "sha256": "cd649d0e5f2173d475352302fead5bde216f6e6cdfcee462a7da4c5a5e436e43"
+  },
+  "icons/Time.svg": {
+    "source": "crates/mio-app/assets/icons/Time.svg",
+    "sha256": "6a6a9f5882e9dddcf713d1c9a63ad36e52e8243aa73e9c4cf4bf149d4235ef97"
+  },
+  "icons/Up.svg": {
+    "source": "crates/mio-app/assets/icons/Up.svg",
+    "sha256": "f768663520c9caa98ab564d008d196b7729b11d5b7b0d559b4361d36823dadee"
+  },
+  "icons/Update.svg": {
+    "source": "crates/mio-app/assets/icons/Update.svg",
+    "sha256": "4ca11a19a212eec8515d9492a90378888946da135549b41c8bd0f65d5ef886a3"
+  },
+  "icons/Video.svg": {
+    "source": "crates/mio-app/assets/icons/Video.svg",
+    "sha256": "160a709f08e4d25f3e498eeb0bb254dde7e10f5a7db7e4ea775b9167e76cd8fa"
+  },
+  "icons/VolumeDown.svg": {
+    "source": "crates/mio-app/assets/icons/VolumeDown.svg",
+    "sha256": "2f0e25578260dd73e5dabbf6588c0009a919b4d14fb353b4fe65227120da1c8c"
+  },
+  "icons/VolumeMute.svg": {
+    "source": "crates/mio-app/assets/icons/VolumeMute.svg",
+    "sha256": "5f347ce51e401e7356bfc2d8db481fea45591da55e52d217d723e448a6c7fb62"
+  },
+  "icons/VolumeOff.svg": {
+    "source": "crates/mio-app/assets/icons/VolumeOff.svg",
+    "sha256": "26e2abdd8a653d5f461bd41eab3babbf6a9ce5394856de427dfe205490c18703"
+  },
+  "icons/VolumeUp.svg": {
+    "source": "crates/mio-app/assets/icons/VolumeUp.svg",
+    "sha256": "c474d126aed495a4f00aa1b44d2229172b858072859e872e402d2a70da7aa510"
+  },
+  "icons/WindowClose.svg": {
+    "source": "crates/mio-app/assets/icons/WindowClose.svg",
+    "sha256": "8d86d9d646b4b9d0528916b035014bf56e1747211be890be7d8b7481954a080a"
+  },
+  "icons/WindowHide.svg": {
+    "source": "crates/mio-app/assets/icons/WindowHide.svg",
+    "sha256": "c89e385f411d38eda0ee2209e1845bffbf9b31c845c9589767e3971ba2b86468"
+  },
+  "icons/WindowMaximize.svg": {
+    "source": "crates/mio-app/assets/icons/WindowMaximize.svg",
+    "sha256": "196bb0b8566f6bc707344ce7760ac49c8d67ee6ee5167c879714502e2e5e90a2"
+  },
+  "icons/WindowMinimize.svg": {
+    "source": "crates/mio-app/assets/icons/WindowMinimize.svg",
+    "sha256": "e85497a629c3cf0a8d8ec91a66b9cf38cdb4b9d175bd41f0641411bfe985a591"
+  },
+  "icons/WindowRestore.svg": {
+    "source": "crates/mio-app/assets/icons/WindowRestore.svg",
+    "sha256": "242d8a90f6633ac8670026db3046d6d83ffa2d0e3f50da81cc1f259b7ccbb517"
+  },
+  "icons/Zoom.svg": {
+    "source": "crates/mio-app/assets/icons/Zoom.svg",
+    "sha256": "46566d9466c15368817582585174f7e66f4db7b452ff7467795504047d52d6a6"
+  },
+  "icons/dl-close.svg": {
+    "source": "crates/mio-app/assets/icons/dl-close.svg",
+    "sha256": "d68fdcc104e1801ac4ea55a7551337213d493cd51d2443f56b92f395c0ae46ce"
+  },
+  "icons/dl-lock.svg": {
+    "source": "crates/mio-app/assets/icons/dl-lock.svg",
+    "sha256": "b4ddebdf4e21212be9691c498095c52cadbe3cd66dc6f0f8e58e9a243cbb0fee"
+  },
+  "icons/dl-next.svg": {
+    "source": "crates/mio-app/assets/icons/dl-next.svg",
+    "sha256": "2ce0a3693ffaa61dc33b6003d3f256cc600412087fa3e5e5be73883285beddfa"
+  },
+  "icons/dl-pause.svg": {
+    "source": "crates/mio-app/assets/icons/dl-pause.svg",
+    "sha256": "fac60e7d536030dbcac7a2a179211641d30d8af95b4092a9e70980dd1de4a2dc"
+  },
+  "icons/dl-play.svg": {
+    "source": "crates/mio-app/assets/icons/dl-play.svg",
+    "sha256": "6a633afbb8254f71a23839b2140038c962620cc66c80d6be9c3d53da32d1d905"
+  },
+  "icons/dl-prev.svg": {
+    "source": "crates/mio-app/assets/icons/dl-prev.svg",
+    "sha256": "6e5cc74dc58f228d20b304f14aff56b8878a8e06e8efa94206af5cf4699c466f"
+  },
+  "icons/dl-unlock.svg": {
+    "source": "crates/mio-app/assets/icons/dl-unlock.svg",
+    "sha256": "3e09bd5cefc38d953b912207776eaad407b97f846b517ddb3ed4e051972bffa1"
+  },
+  "icons/iconfont.json": {
+    "source": "crates/mio-app/assets/icons/iconfont.json",
+    "sha256": "79864476cc60f07de84e942cd1f63a70ec4aa4eab6fb3109ca31738d302d7cae"
+  },
+  "icons/lyricOpen.svg": {
+    "source": "crates/mio-app/assets/icons/lyricOpen.svg",
+    "sha256": "e1844bd5846e9ebab78af8f63a5f324dfd8b22f9b35c858e4b93271e241e9352"
+  },
+  "icons/nav-a-quxiaoguanbi.svg": {
+    "source": "crates/mio-app/assets/icons/nav-a-quxiaoguanbi.svg",
+    "sha256": "c2aaf3e477461436ab758455019b0931ac81198354fd967294046febf5a33238"
+  },
+  "icons/nav-a-tingzhiwukuang.svg": {
+    "source": "crates/mio-app/assets/icons/nav-a-tingzhiwukuang.svg",
+    "sha256": "2412f30fe36c1e4eb77e11cff18e1be75f030717f9f160ac680fc2b335253070"
+  },
+  "icons/nav-bofang-xunhuanbofang.svg": {
+    "source": "crates/mio-app/assets/icons/nav-bofang-xunhuanbofang.svg",
+    "sha256": "ee7388c2b04e47ce55efb04ddadacadc7454dbe1fd97d4b1f1aeef27dbb26cd6"
+  },
+  "icons/nav-bofang.svg": {
+    "source": "crates/mio-app/assets/icons/nav-bofang.svg",
+    "sha256": "d83f98ecc5e0ab38511192d1981a928ca5b92b7f0f20f86fd213f3893602dc7c"
+  },
+  "icons/nav-faxian.svg": {
+    "source": "crates/mio-app/assets/icons/nav-faxian.svg",
+    "sha256": "6d94fa72fd0018b0afb0a39a82558996fc428a6cef149634322186c033430eba"
+  },
+  "icons/nav-guanbi.svg": {
+    "source": "crates/mio-app/assets/icons/nav-guanbi.svg",
+    "sha256": "aa5d09919d7e893daa872f9949a40821bce0dfdad533040eb5d93a90696f5a1f"
+  },
+  "icons/nav-liebiao.svg": {
+    "source": "crates/mio-app/assets/icons/nav-liebiao.svg",
+    "sha256": "ff44887f3e32de25022a87a8b072eca85a2407294b16c9bc689fe9f4c5bf2546"
+  },
+  "icons/nav-shanchu.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shanchu.svg",
+    "sha256": "2179800d8b7ea5c29fb3598c74d2be2e230ab439dbb5f5550c5725baebc60a22"
+  },
+  "icons/nav-shangyishou.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shangyishou.svg",
+    "sha256": "7ab50b413df3ddc57a65e247981f1f1593e779e7f5d5495b50f5df97674a57ef"
+  },
+  "icons/nav-shengyin.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shengyin.svg",
+    "sha256": "bab05a63a83f005949314ac1a4189fdfd2d1d5366ccd01f0f406e3e77fbbb348"
+  },
+  "icons/nav-shezhi.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shezhi.svg",
+    "sha256": "f3bed09ea2a582bc6891405c1ce8bcfb6fd1706fac2ac7031ba3ed303dc5abe6"
+  },
+  "icons/nav-shouye.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shouye.svg",
+    "sha256": "2667bd592cf270efa13f83d65e84727193e0968be2db86b956d48e51c297c4c0"
+  },
+  "icons/nav-shunxubofangtubiao.svg": {
+    "source": "crates/mio-app/assets/icons/nav-shunxubofangtubiao.svg",
+    "sha256": "12c77c5cf55bf66d302e6358de2455709da798ead9d8a08469d2d300ecf3f653"
+  },
+  "icons/nav-suijibofang.svg": {
+    "source": "crates/mio-app/assets/icons/nav-suijibofang.svg",
+    "sha256": "17d968d85606b7864e9f2ea6b68d6118067ff9ea5f2409351965e11dae4ec400"
+  },
+  "icons/nav-xiangyou.svg": {
+    "source": "crates/mio-app/assets/icons/nav-xiangyou.svg",
+    "sha256": "adda0b471f53c44bcd373b3ec313fbc956a2728d72f831df73c73a9bfded670f"
+  },
+  "icons/nav-xiangzuo.svg": {
+    "source": "crates/mio-app/assets/icons/nav-xiangzuo.svg",
+    "sha256": "d9dcd7c9f2a4d213f8803ea7f5f07d9336e1874806e939e370c617f6afd72aeb"
+  },
+  "icons/nav-xiayishou.svg": {
+    "source": "crates/mio-app/assets/icons/nav-xiayishou.svg",
+    "sha256": "21350bb2170379e9f26747dd0eb2e555b846b4ebf9865b2fd154ecba17aa4f3e"
+  },
+  "icons/nav-xiazai.svg": {
+    "source": "crates/mio-app/assets/icons/nav-xiazai.svg",
+    "sha256": "48e18810c94d2d31ebe03dca674887bfee6f9c1bcb9bc127f006f85c57bdc57f"
+  },
+  "icons/nav-xuanxiangshanchu.svg": {
+    "source": "crates/mio-app/assets/icons/nav-xuanxiangshanchu.svg",
+    "sha256": "02b95bdd78e4ac2b5abbf8c0a9a6cab7b128f029b50571d05ecda89c448e7829"
+  },
+  "icons/nav-yanchu.svg": {
+    "source": "crates/mio-app/assets/icons/nav-yanchu.svg",
+    "sha256": "19f6c7231ab07c276d34a272b351de5da763a273387f6586cb37579b0723ee51"
+  },
+  "icons/nav-zanting.svg": {
+    "source": "crates/mio-app/assets/icons/nav-zanting.svg",
+    "sha256": "99821cf1364a6663236a536f3678973588a019049d14f1e538362dd4700343e3"
+  },
+  "icons/nav-zengjia.svg": {
+    "source": "crates/mio-app/assets/icons/nav-zengjia.svg",
+    "sha256": "bbfd421808e096ddc4791ff636cbed3e2802b8dec2aec8cfd9049e6208ef872e"
+  },
+  "icons/nav-zuixiaohua.svg": {
+    "source": "crates/mio-app/assets/icons/nav-zuixiaohua.svg",
+    "sha256": "2b36eba4cd71dcf0d6d2a278ac07208896ad7f208ee106be4dff52c4f7aa4bf8"
+  },
+  "images/cd.png": {
+    "source": "crates/mio-app/assets/images/cd.png",
+    "sha256": "01809f2184c5b4256d9e7b6879e8db491ec7fc19569494442089abbb6975baf3"
+  },
+  "images/cover-play.png": {
+    "source": "crates/mio-app/assets/images/cover-play.png",
+    "sha256": "9c81a57565464a48f5dd68d7abfa28dfd030e5d66842757e584d293de6ae7be6"
+  },
+  "images/current-author-sponsor-qr.jpg": {
+    "source": "crates/mio-app/assets/images/current-author-sponsor-qr.jpg",
+    "sha256": "6032560b20269a4c7f193ffef396a4b913e42b9f35593617a1712a7f83a48456"
+  },
+  "images/default-cover.png": {
+    "source": "crates/mio-app/assets/images/default-cover.png",
+    "sha256": "96fcb9afdad7e0d30d297c90a5c8f5bc88e0f9367dfd9c1c33832fc97df3544e"
+  },
+  "images/icon.png": {
+    "source": "crates/mio-app/assets/images/icon.png",
+    "sha256": "d1471c551617a7a02761a293098805dc058f6edb7a07f9112e3a770e1da0623e"
+  },
+  "images/label-shine.svg": {
+    "source": "crates/mio-app/assets/images/label-shine.svg",
+    "sha256": "39876b12aaca696b86123bc368fb510b4f99b07288c0d86454a029294b9e8f70"
+  },
+  "images/pointer.png": {
+    "source": "crates/mio-app/assets/images/pointer.png",
+    "sha256": "63009d3f3edfe2acfc75ba6c97352996bdc719fbd16a0b4afd7811dd5c34da5d"
+  },
+  "images/record-shine.svg": {
+    "source": "crates/mio-app/assets/images/record-shine.svg",
+    "sha256": "07bf325bdc65fceb75d476c78c0645b96fef73332e5b2d171ab8f6e02a2c8fec"
+  },
+  "images/tray.png": {
+    "source": "crates/mio-app/assets/images/tray.png",
+    "sha256": "01be34276383f2cba9b933b64055f7ee21400f1f86fec1cdb49681da82142c16"
+  },
+  "images/vinyl-hole.svg": {
+    "source": "crates/mio-app/assets/images/vinyl-hole.svg",
+    "sha256": "19a18a7d8bcb84fe35fa86c415bbb2dbf81908e1baa00286457053b6f6550421"
+  },
+  "images/vinyl-label.svg": {
+    "source": "crates/mio-app/assets/images/vinyl-label.svg",
+    "sha256": "1e0d14358cc2908d3258b883697b1eac13b4b437076ab0ed48a0d11915b99c2b"
+  },
+  "images/vinyl-texture.svg": {
+    "source": "crates/mio-app/assets/images/vinyl-texture.svg",
+    "sha256": "36ca08cf20796e57049dc166e94abc1c7f2149e23bb0c41a6dbd5747a6b4b13c"
+  },
+  "images/vinyl.svg": {
+    "source": "crates/mio-app/assets/images/vinyl.svg",
+    "sha256": "44c9cc0ea7ae97962fc2066138b4c8951815166313dd9e635e92297266151b86"
+  },
+  "fonts/iconfont.ttf": {
+    "source": "crates/mio-app/assets/fonts/iconfont.ttf",
+    "sha256": "e17abaf3e462c04f88a027069985a96d0ecd9ddaede58346e2a702c9a47bbfe3"
+  },
+  "fonts/lyricfont.ttf": {
+    "source": "crates/mio-app/assets/fonts/lyricfont.ttf",
+    "sha256": "b0b8c4c057af7dbc6ccb52a3ad00138fed41d1ad37d4f4a666b6cd431c913d94"
+  },
+  "welcome/mio-mask.png": {
+    "source": "crates/mio-app/assets/welcome/mio-mask.png",
+    "sha256": "f699bf259252b1619154aa6abd9d6e3486fef6737ea0973d914749423e201da4"
+  },
+  "welcome/points.json": {
+    "source": "crates/mio-app/assets/welcome/mio-mask.png; welcome_page.rs sampling",
+    "sha256": "9dbc1af6286cc685a479f0d81d04774d73c2e0610f349b72405ed8a6d054c4f9"
+  }
+}
