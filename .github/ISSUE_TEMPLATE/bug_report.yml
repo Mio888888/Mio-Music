@@ -1,0 +1,78 @@
+name: Bug report / 问题反馈
+description: Something does not work as expected. / 有功能不符合预期。
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search the existing issues first. **Do not paste passwords, tokens, access keys or private server addresses.**
+        请先搜索已有的 issue。**不要贴出密码、令牌、访问密钥或私有服务器地址。**
+  - type: input
+    id: version
+    attributes:
+      label: App version / 应用版本
+      description: Settings → About, for example 1.0.0. / 设置 → 关于，例如 1.0.0。
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform / 平台
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Android phone / 手机
+        - Android tablet / 平板
+        - Android TV
+        - iPhone
+        - iPad
+        - HarmonyOS (experimental branch / 实验分支)
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System and device / 系统与设备
+      description: For example macOS 15.1, Windows 11 23H2, Pixel 8 Android 15. / 例如 macOS 15.1、Windows 11、Pixel 8 Android 15。
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened? / 发生了什么？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect? / 你期望的结果
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin involved / 相关插件
+      description: Name and version, if the problem involves a plugin. / 问题和插件有关时，填写名称与版本。
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots or recordings / 日志、截图或录屏
+      description: Plugin logs are under the plugin card. Remove anything private. / 插件日志在插件卡片上；请先去掉隐私信息。
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit / 提交前
+      options:
+        - label: I searched the existing issues. / 我搜索过已有的 issue。
+          required: true
+        - label: This report contains no passwords, tokens or private addresses. / 本反馈不含密码、令牌或私有地址。
+          required: true

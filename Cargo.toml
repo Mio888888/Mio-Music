@@ -7,6 +7,8 @@ exclude = ["vendor/gpui-fast", "vendor/gpui-fast-apple", "vendor/gpui-component"
 version = "1.0.0"
 edition = "2024"
 publish = false
+license = "AGPL-3.0-only"
+repository = "https://github.com/Mio888888/Mio-Music"
 
 [workspace.dependencies]
 gpui-kit = { version = "=0.7.2", features = ["gpui-fast"] }
