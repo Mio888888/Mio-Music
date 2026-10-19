@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "mio_music"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "Records up to 15 seconds of sound to identify the song playing."
+    }
+  ]
+}

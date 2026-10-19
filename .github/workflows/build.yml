@@ -1,0 +1,505 @@
+name: Build
+
+# Builds every supported target (Windows, macOS, Linux, Android, iOS) and publishes a GitHub
+# release whenever the version in Cargo.toml has no tag yet. Mirrors Mio-Music's build.yml: the
+# same job layout, secrets and asset names (tauri-action style), so this repository can be moved
+# into Mio-Music and installed copies of that app keep updating through the same `latest.json`.
+#
+# Moving to Mio-Music: copy .github/, tools/ci/, tools/package-*, packaging/ along with the code,
+# raise the version above Mio-Music's latest (0.3.6 at the time of writing) with
+# `tools/ci/version.py --write` after editing Cargo.toml, and keep the secrets it already has.
+# Run it with "build_only" first to see the whole matrix compile without publishing anything.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_only:
+        description: Build every target and keep the files as workflow artifacts; no tag, no release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # One identity for every platform. These are Mio-Music's values: the Windows install folder and
+  # registry keys, the macOS bundle name and id and the Android application id must match the
+  # Tauri app for in-place updates.
+  MIO_PRODUCT_NAME: Mio Music
+  MIO_BUNDLE_ID: com.vant.Mio.Music
+  MIO_PUBLISHER: vant
+  # Compiled into the desktop app: where it looks for updates. The repository that builds the
+  # release is the one that serves it, so this follows the project when it moves.
+  MIO_GPUI_UPDATE_URL: https://github.com/${{ github.repository }}/releases/latest/download/latest.json
+  # Test builds are allowed to go without the signing secrets.
+  MIO_SIGN_OPTIONAL: ${{ inputs.build_only && '1' || '' }}
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      release: ${{ steps.check.outputs.release }}
+      version: ${{ steps.check.outputs.version }}
+      notes: ${{ steps.notes.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check version change
+        id: check
+        run: |
+          VERSION=$(python3 -I tools/ci/version.py)
+          python3 -I tools/ci/version.py --check
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          TAG="v${VERSION}"
+          if [ "${{ inputs.build_only }}" = "true" ]; then
+            echo "Build only: compiling $VERSION without a release"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          elif git tag -l "$TAG" | grep -q .; then
+            echo "Tag $TAG already exists, skipping build"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG not found, will build and release"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # What changed since the previous release, for the release body and latest.json.
+      - name: Release notes
+        id: notes
+        if: steps.check.outputs.release == 'true'
+        run: |
+          NOTES="$(python3 -I tools/ci/release-notes.py "${{ steps.check.outputs.version }}")"
+          printf '%s\n' "$NOTES"
+          DELIMITER="MIO_NOTES_$(openssl rand -hex 16)"
+          {
+            echo "notes<<$DELIMITER"
+            printf '%s\n' "$NOTES"
+            echo "$DELIMITER"
+          } >> "$GITHUB_OUTPUT"
+
+  create-release:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Create or reuse draft release
+        id: release
+        if: needs.check-version.outputs.release == 'true'
+        uses: actions/github-script@v8
+        env:
+          NOTES: ${{ needs.check-version.outputs.notes }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const version = '${{ needs.check-version.outputs.version }}'
+            const tag = `v${version}`
+            const { owner, repo } = context.repo
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              { owner, repo, per_page: 100 },
+            )
+            const matching = releases.filter((item) => item.tag_name === tag)
+            const drafts = matching.filter((item) => item.draft)
+
+            if (drafts.length > 1) {
+              core.setFailed(`Multiple draft releases found for ${tag}`)
+              return
+            }
+            if (matching.some((item) => !item.draft)) {
+              core.setFailed(`A published release already exists for ${tag}`)
+              return
+            }
+
+            const body = process.env.NOTES
+            // A draft left by an earlier failed run is reused, but the tag it creates on
+            // publishing must point at the commit this run builds, with this run's notes.
+            const release = drafts[0]
+              ? (await github.rest.repos.updateRelease({
+                  owner,
+                  repo,
+                  release_id: drafts[0].id,
+                  // Without tag_name a draft loses it and is no longer found by the publish job.
+                  tag_name: tag,
+                  target_commitish: context.sha,
+                  body,
+                })).data
+              : (await github.rest.repos.createRelease({
+                  owner,
+                  repo,
+                  tag_name: tag,
+                  target_commitish: context.sha,
+                  name: `Mio Music ${tag}`,
+                  body,
+                  draft: true,
+                  prerelease: false,
+                })).data
+
+            core.setOutput('release_id', String(release.id))
+
+  build-windows:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # `dav1d-sys` (AVIF/MP4 decoding in gpui) links dav1d through pkg-config; the DLL ships in the installer.
+      - name: Install native dependencies
+        shell: pwsh
+        run: |
+          choco install pkgconfiglite nsis -y --no-progress
+          vcpkg install dav1d:x64-windows
+          $root = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows"
+          "PKG_CONFIG_PATH=$root\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$root\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Build installer
+        shell: pwsh
+        run: tools/package-windows.ps1
+
+      - name: Sign updater package
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: tools/ci/sign.sh dist/*-setup.exe
+
+      - name: Upload to release
+        if: needs.check-version.outputs.release == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" dist/*-setup.exe*
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-windows
+          path: dist/*-setup.exe*
+
+  build-macos:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install native dependencies
+        run: brew install dav1d pkgconf
+
+      - name: Build app bundle
+        run: tools/package-macos.sh
+
+      - name: Sign updater package
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: tools/ci/sign.sh dist/*.app.tar.gz
+
+      - name: Upload to release
+        if: needs.check-version.outputs.release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" dist/*.dmg dist/*.app.tar.gz*
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-macos
+          path: |
+            dist/*.dmg
+            dist/*.app.tar.gz*
+
+  build-linux:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          gcc g++ clang cmake pkg-config libfontconfig-dev libwayland-dev
+          libwebkit2gtk-4.1-dev libxkbcommon-x11-dev libx11-xcb-dev
+          libssl-dev libzstd-dev libasound2-dev libvulkan1 libdav1d-dev
+          desktop-file-utils
+
+      - name: Build AppImage and deb
+        run: tools/package-linux.sh
+
+      - name: Sign updater package
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: tools/ci/sign.sh dist/*.AppImage
+
+      - name: Upload to release
+        if: needs.check-version.outputs.release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" dist/*.deb dist/*.AppImage*
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage*
+
+  build-android:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Same application id as the Tauri app, so the APK installs over it.
+      ORG_GRADLE_PROJECT_mioApplicationId: com.vant.Mio.Music
+      NDK_VERSION: 28.2.13676358
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install NDK
+        run: |
+          sdkmanager --install "ndk;${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+          cache: true
+
+      - name: Configure Android release signing
+        shell: bash
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ANDROID_KEY_BASE64:-}" ] && [ -n "${MIO_SIGN_OPTIONAL:-}" ]; then
+            echo "::warning::Android signing secrets are not set; the APKs are signed with the debug key"
+            exit 0
+          fi
+          for name in ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_KEY_BASE64; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::${name} secret is required for signed Android releases"
+              exit 1
+            fi
+          done
+
+          KEYSTORE_PATH="$RUNNER_TEMP/keystore.jks"
+          KEYSTORE_PROPERTIES="$RUNNER_TEMP/keystore.properties"
+
+          printf '%s' "$ANDROID_KEY_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          chmod 600 "$KEYSTORE_PATH"
+
+          {
+            printf '%s\n' "keyAlias=${ANDROID_KEY_ALIAS}"
+            printf '%s\n' "password=${ANDROID_KEY_PASSWORD}"
+            printf '%s\n' "storeFile=${KEYSTORE_PATH}"
+          } > "$KEYSTORE_PROPERTIES"
+          chmod 600 "$KEYSTORE_PROPERTIES"
+          echo "ANDROID_KEYSTORE_PROPERTIES=$KEYSTORE_PROPERTIES" >> "$GITHUB_ENV"
+
+      - name: Build APKs
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          flutter build apk --release --split-per-abi \
+            --target-platform android-arm,android-arm64 \
+            --build-name "${{ needs.check-version.outputs.version }}" \
+            --build-number "$(python3 -I ../../tools/ci/version.py --code)"
+
+      - name: Verify and name the APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          VERSION="${{ needs.check-version.outputs.version }}"
+          STEM="${MIO_PRODUCT_NAME// /.}"
+          mkdir -p dist
+
+          for abi in arm64-v8a armeabi-v7a; do
+            apk="apps/mobile/build/app/outputs/flutter-apk/app-${abi}-release.apk"
+            test -f "$apk"
+            echo "Verifying release APK: $apk"
+            "$APKSIGNER" verify -v --print-certs "$apk"
+            cp "$apk" "dist/${STEM}_${VERSION}_android_${abi}.apk"
+          done
+
+      - name: Upload APKs to release
+        if: needs.check-version.outputs.release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" dist/*.apk
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-android
+          path: dist/*.apk
+
+  build-ios:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+          cache: true
+
+      # Unsigned: there is no Apple developer account behind the project, so the .ipa is for
+      # sideloading tools that sign it themselves.
+      - name: Build iOS app
+        working-directory: apps/mobile
+        run: |
+          flutter pub get
+          flutter build ios --release --no-codesign \
+            --build-name "${{ needs.check-version.outputs.version }}" \
+            --build-number "$(python3 -I ../../tools/ci/version.py --code)"
+
+      - name: Package .ipa
+        run: |
+          STEM="${MIO_PRODUCT_NAME// /.}"
+          mkdir -p dist ipa/Payload
+          cp -R apps/mobile/build/ios/iphoneos/Runner.app ipa/Payload/
+          (cd ipa && zip -qry "../dist/${STEM}_${{ needs.check-version.outputs.version }}_ios_unsigned.ipa" Payload)
+
+      - name: Upload to release
+        if: needs.check-version.outputs.release == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" dist/*.ipa
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: mio-ios
+          path: dist/*.ipa
+
+  publish-release:
+    needs: [check-version, create-release, build-windows, build-macos, build-linux, build-android, build-ios]
+    if: needs.check-version.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: mio-*
+          path: assets
+          merge-multiple: true
+
+      # The manifest both updaters read: Mio-Music's Tauri app and this app's own updater.
+      - name: Build latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ needs.check-version.outputs.notes }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          python3 -I tools/ci/make-latest-json.py assets "$VERSION" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}" \
+            "$NOTES" > latest.json
+          cat latest.json
+          tools/ci/release-upload.sh "${{ needs.create-release.outputs.release_id }}" latest.json
+
+      - name: Publish release
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const version = '${{ needs.check-version.outputs.version }}'
+            const tag = `v${version}`
+            const { owner, repo } = context.repo
+            const releaseId = Number('${{ needs.create-release.outputs.release_id }}')
+            if (!Number.isInteger(releaseId) || releaseId <= 0) {
+              core.setFailed(`Invalid release ID for ${tag}`)
+              return
+            }
+            const release = (await github.rest.repos.getRelease({
+              owner,
+              repo,
+              release_id: releaseId,
+            })).data
+            if (release.tag_name !== tag || !release.draft) {
+              core.setFailed(`Release ${releaseId} does not match draft ${tag}`)
+              return
+            }
+            const assets = await github.paginate(
+              github.rest.repos.listReleaseAssets,
+              { owner, repo, release_id: releaseId, per_page: 100 },
+            )
+            const required = [/\.apk$/, /\.ipa$/, /\.dmg$/, /\.app\.tar\.gz$/, /-setup\.exe$/, /\.AppImage$/, /\.deb$/, /^latest\.json$/]
+            const missing = required.filter((pattern) => !assets.some((asset) => pattern.test(asset.name)))
+            if (missing.length > 0) {
+              core.setFailed(`Release ${tag} is missing assets matching ${missing.join(', ')}`)
+              return
+            }
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: releaseId,
+              draft: false,
+              prerelease: false,
+            })

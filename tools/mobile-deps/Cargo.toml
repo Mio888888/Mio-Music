@@ -1,0 +1,24 @@
+[package]
+name = "mio-mobile-deps"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# P0 dependency qualification only; this is not the application bridge.
+[workspace]
+
+[lib]
+path = "lib.rs"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+mio-core = { path = "../../crates/mio-core" }
+mio-plugin = { path = "../../crates/mio-plugin" }
+mio-music-sdk = { path = "../../crates/mio-music-sdk" }
+rodio = { version = "=0.21.1", default-features = false, features = ["playback", "symphonia-all"] }
+cpal = "=0.16.0"
+rusqlite = { version = "=0.31.0", features = ["bundled"] }
+lofty = "=0.21.1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+wasmi = "=0.40.0"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }

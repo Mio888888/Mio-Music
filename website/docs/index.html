@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>文档 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 文档：安装与从源码构建、使用指南、内部架构，以及面向插件开发者的列表插件与音源插件参考。">
+<meta property="og:title" content="文档 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 文档：安装与从源码构建、使用指南、内部架构，以及面向插件开发者的列表插件与音源插件参考。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/">
+<link rel="icon" href="../assets/app-icon.png">
+<script src="../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../" data-page="index.html">
+<article class="doc" data-title="文档" data-desc="Mio Music 文档：安装与从源码构建、使用指南、内部架构，以及面向插件开发者的列表插件与音源插件参考。">
+<div class="doc-eyebrow">// Documentation</div>
+<h1>Mio Music 文档</h1>
+<p class="doc-lead">Mio Music 是使用 Rust 与 GPUI 原生构建的跨平台桌面音乐播放器。这里收录安装与构建、日常使用、内部架构，以及面向插件开发者的完整参考。</p>
+
+<div class="callout note">
+<strong>开发阶段</strong>
+项目仍在持续开发。macOS 已有开发包；Windows 与 Linux 的检查工作流已配置，但尚未完成实机验收。具体进度与已知缺口以仓库 <a href="https://github.com/Mio888888/Mio-Music#readme" target="_blank" rel="noreferrer">README</a> 为准。
+</div>
+
+<div class="doc-cards">
+  <a class="doc-card" href="getting-started.html">
+    <h3><iconify-icon icon="solar:play-linear" width="18"></iconify-icon>快速开始</h3>
+    <p>准备环境、克隆仓库（含插件子模块）、运行应用与生成 macOS 开发包。</p>
+  </a>
+  <a class="doc-card" href="user-guide.html">
+    <h3><iconify-icon icon="solar:document-text-linear" width="18"></iconify-icon>使用指南</h3>
+    <p>安装并配置插件、接入 Subsonic 等自托管服务器，以及播放、歌词、下载与备份。</p>
+  </a>
+  <a class="doc-card" href="architecture.html">
+    <h3><iconify-icon icon="solar:atom-linear" width="18"></iconify-icon>架构概览</h3>
+    <p>工作区里的各个 crate、数据流向，以及插件宿主与列表契约如何协作。</p>
+  </a>
+  <a class="doc-card" href="plugins/index.html">
+    <h3><iconify-icon icon="solar:widget-5-linear" width="18"></iconify-icon>插件开发者文档</h3>
+    <p>用 JavaScript 编写音乐列表插件与音源插件：契约、数据结构、运行时 API 与发布流程。</p>
+  </a>
+</div>
+
+<h2>从哪里开始</h2>
+<ul>
+  <li><strong>想把应用跑起来</strong>：先读 <a href="getting-started.html">快速开始</a>，然后按 <a href="user-guide.html#plugins">使用指南</a> 安装第一个插件。在线来源完全由插件提供，没有插件就没有在线内容。</li>
+  <li><strong>想写一个插件</strong>：从 <a href="plugins/index.html">开发概览</a> 看清两类插件的区别，再跟着 <a href="plugins/quickstart.html">快速上手</a> 写出第一个可运行的插件。</li>
+  <li><strong>想参与开发</strong>：读 <a href="architecture.html">架构概览</a>，了解各 crate 的职责与检查命令。</li>
+</ul>
+
+<h2>关于这些文档</h2>
+<p>文档与官网一起放在仓库的 <code>website/</code> 目录，是纯静态页面，不参与软件打包。内容以代码和仓库中的说明为准；如果发现与实际行为不一致，欢迎直接提交 Issue 或 Pull Request，每页底部都有「在 GitHub 上编辑此页」的入口。</p>
+<p>当前文档仅提供中文版本。</p>
+</article>
+
+<script src="../assets/docs.js"></script>
+</body>
+</html>

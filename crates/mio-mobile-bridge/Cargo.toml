@@ -1,0 +1,24 @@
+[package]
+name = "mio-mobile-bridge"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+mio-core = { path = "../mio-core" }
+mio-music-sdk = { path = "../mio-music-sdk" }
+flutter_rust_bridge = "=2.13.0"
+serde_json.workspace = true
+
+[target.'cfg(target_env = "ohos")'.dependencies]
+cpal = "=0.16.0"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1.1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

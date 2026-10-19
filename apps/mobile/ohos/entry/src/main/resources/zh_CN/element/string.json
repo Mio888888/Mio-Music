@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "模块描述"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "mio_music"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "听歌识曲需要录制最多 15 秒的麦克风声音，用于生成音乐指纹。"
+    }
+  ]
+}

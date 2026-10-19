@@ -1,0 +1,42 @@
+[package]
+name = "mio-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+icu_collator = "=2.3.1"
+icu_locale_core = "=2.3.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+serde.workspace = true
+serde_json.workspace = true
+semver = "1"
+mio-music-sdk = { path = "../mio-music-sdk" }
+regex = "=1.13.1"
+rodio = { version = "=0.21.1", default-features = false, features = ["playback", "symphonia-all"] }
+rustfft = "6"
+# Native input and the unchanged AFP interpreter, shared with the desktop host.
+cpal = "=0.16.0"
+wasmi = "=0.40.0"
+lofty = "=0.21.1"
+mio-plugin = { path = "../mio-plugin" }
+base64 = "=0.22.1"
+aes = "=0.8.4"
+aes-gcm = "=0.10.3"
+pbkdf2 = "=0.12.2"
+hmac = "=0.12.1"
+cbc = { version = "=0.1.2", features = ["alloc"] }
+md-5 = "=0.10.6"
+flate2 = "=1.1.10"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+rusqlite = { version = "=0.31.0", features = ["bundled"] }
+tempfile = "3"
+uuid = { version = "1", features = ["v4"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "fs", "macros", "io-util"] }
+sha2 = "0.10"
+hex = "0.4"
+roxmltree = "=0.21.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

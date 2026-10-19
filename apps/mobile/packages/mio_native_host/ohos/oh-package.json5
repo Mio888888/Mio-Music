@@ -1,0 +1,8 @@
+{
+  "name": "mio_native_host",
+  "version": "0.1.0",
+  "description": "Mio HarmonyOS host: system media session, background playback and app paths.",
+  "main": "index.ets",
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

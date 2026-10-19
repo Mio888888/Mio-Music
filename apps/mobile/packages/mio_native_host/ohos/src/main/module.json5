@@ -1,0 +1,10 @@
+{
+  "module": {
+    "name": "mio_native_host",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet"
+    ]
+  }
+}

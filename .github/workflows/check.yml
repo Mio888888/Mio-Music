@@ -1,0 +1,43 @@
+name: Desktop checks
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          gcc g++ clang cmake pkg-config libfontconfig-dev libwayland-dev
+          libwebkit2gtk-4.1-dev libxkbcommon-x11-dev libx11-xcb-dev
+          libssl-dev libzstd-dev libasound2-dev libvulkan1 libdav1d-dev
+      # `dav1d-sys` (AVIF/MP4 decoding in gpui) links the system dav1d through pkg-config.
+      - name: macOS native dependencies
+        if: runner.os == 'macOS'
+        run: brew install dav1d pkgconf
+      - name: Windows native dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install pkgconfiglite -y --no-progress
+          vcpkg install dav1d:x64-windows
+          $root = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows"
+          "PKG_CONFIG_PATH=$root\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "$root\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      # The Flutter app's version follows Cargo.toml; the release workflow needs them to agree.
+      - if: runner.os == 'Linux'
+        run: python3 -I tools/ci/version.py --check
+      - run: cargo fmt --all -- --check
+      - run: cargo test --workspace --locked
+      - run: cargo check --workspace --locked
