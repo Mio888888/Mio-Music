@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>音源插件 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 音源插件：澜音脚本的 pluginInfo / sources / musicUrl 契约、洛雪脚本的兼容方式、返回值与限制，以及调试方法。">
+<meta property="og:title" content="音源插件 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 音源插件：澜音脚本的 pluginInfo / sources / musicUrl 契约、洛雪脚本的兼容方式、返回值与限制，以及调试方法。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/playback-plugin.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/playback-plugin.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/playback-plugin.html">
+<article class="doc" data-title="音源插件" data-desc="Mio Music 音源插件：澜音脚本的 pluginInfo / sources / musicUrl 契约、洛雪脚本的兼容方式、返回值与限制，以及调试方法。">
+<div class="doc-eyebrow">// Source Plugin</div>
+<h1>音源插件</h1>
+<p class="doc-lead">音源插件只做一件事：给定来源、歌曲和音质，返回一个能播放的地址。如果你的需求是接入一台服务器，或者要提供搜索与歌单，请写 <a href="list-plugin.html">列表插件</a>，那里同样可以实现 <code>musicUrl</code>。</p>
+
+<h2 id="when">何时需要音源插件</h2>
+<ul>
+  <li>你已经有一份根据歌曲信息解析地址的脚本（澜音或洛雪格式），想直接使用。</li>
+  <li>某个来源由列表插件提供了搜索和歌单，但<strong>不</strong>由它自己提供播放；播放地址交给一个独立的音源插件解析。</li>
+</ul>
+<p>音源插件需要在 <strong>设置 → 插件</strong> 里显式选择当前使用哪一个；列表插件则可以同时启用多个。音源插件<strong>没有配置表单，也没有持久化存储</strong>。</p>
+
+<h2 id="contract">澜音（CeruMusic）契约</h2>
+<pre class="language-js" data-title="my-source.js"><code>/**
+ * @name 我的音源
+ * @version 1.0.0
+ * @author you
+ * @description 演示用音源插件
+ */
+module.exports = {
+  pluginInfo: {
+    name: '我的音源',
+    version: '1.0.0',
+    author: 'you',
+    description: '演示用音源插件',
+  },
+  sources: {
+    git: { name: '示例来源', qualitys: ['128k', '320k', 'flac'] },
+  },
+  async musicUrl(source, musicInfo, quality) {
+    const res = await cerumusic.request(
+      `https://example.com/resolve?src=${source}&id=${musicInfo.songmid}&q=${quality}`,
+      { timeout: 10000 },
+    );
+    if (res.statusCode !== 200) throw new Error('解析失败：HTTP ' + res.statusCode);
+    const body = typeof res.body === 'string' ? JSON.parse(res.body) : res.body;
+    return body.url;
+  },
+};</code></pre>
+
+<h3>字段</h3>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>pluginInfo.name</code></td><td>必填，最多 256 个字符。<code>version</code>、<code>author</code>、<code>description</code> 缺失时会回退读取脚本头部注释里的 <code>@version</code>、<code>@author</code>、<code>@description</code>。</td></tr>
+    <tr><td><code>sources</code></td><td>必填。键是来源 ID，<strong>只能是宿主为兼容旧版音源格式保留的 ID</strong>（如 <code>git</code>）；音源插件不支持自定义 ID，那是列表插件的能力。</td></tr>
+    <tr><td><code>sources.&lt;id&gt;.qualitys</code></td><td>该来源支持的音质数组，也可以拼作 <code>qualities</code>。只认 <a href="list-plugin.html#sources">已知的音质名称</a>，没有任何有效音质的来源会被丢弃。至少要有一个有效来源，否则安装失败。</td></tr>
+    <tr><td><code>sources.&lt;id&gt;.name</code></td><td>显示名，最多 128 字符。</td></tr>
+    <tr><td><code>musicUrl(source, musicInfo, quality)</code></td><td>必填。返回播放地址。</td></tr>
+  </tbody>
+</table>
+
+<h3>musicUrl</h3>
+<ul>
+  <li><code>source</code>：来源 ID。<code>musicInfo</code>：歌曲，即 <a href="data-types.html#musicitem">MusicItem</a> 的 JSON。<code>quality</code>：音质名称。</li>
+  <li>宿主在调用之前，会先检查这个来源与音质是否在你的声明里；不在声明里的组合不会到达你的函数。</li>
+  <li>返回值可以是字符串，也可以是 <code>{ url }</code> 或 <code>{ musicUrl }</code>。地址必须是不含用户名密码的 <code>http(s)</code> URL，长度不超过 8192。</li>
+  <li>抛出异常或 Promise reject 表示解析失败。</li>
+</ul>
+
+<h2 id="lx">洛雪（LX）脚本</h2>
+<p>洛雪的事件式脚本（用 <code>lx.on('request', …)</code> 响应、用 <code>lx.send('inited', …)</code> 声明来源）可以直接安装，安装时会被转换成宿主能执行的形式。宿主提供了一个精简的 <code>lx</code> 对象：</p>
+<pre class="language-js"><code>const { EVENT_NAMES, request, on, send } = globalThis.lx;
+
+on(EVENT_NAMES.request, ({ source, action, info }) =&gt; {
+  if (action !== 'musicUrl') return Promise.reject(new Error('不支持的操作'));
+  const song = info.musicInfo;       // 歌曲
+  const quality = info.type;         // 音质
+  return resolveUrl(source, song, quality);   // Promise&lt;string&gt;
+});
+
+send(EVENT_NAMES.inited, {
+  sources: {
+    git: { name: '示例来源', type: 'music', actions: ['musicUrl'], qualitys: ['128k', '320k'] },
+  },
+});</code></pre>
+<ul>
+  <li><code>lx.request</code> 与 <code>cerumusic.request</code> 相同，也支持 <code>request(url, options, callback)</code> 的回调写法。</li>
+  <li><code>lx.utils</code> 就是 <code>cerumusic.utils</code>（<code>crypto.md5</code> 等）。</li>
+  <li><code>lx.env</code> 为 <code>'desktop'</code>（移动端为 <code>'mobile'</code>），<code>lx.version</code> 为 <code>'2.0.0'</code>。</li>
+  <li>宿主只处理 <code>musicUrl</code> 一个动作。脚本里依赖 <code>require</code>、Node 内置模块、DOM 或文件系统的洛雪脚本无法运行。</li>
+  <li>脚本必须发出 <code>inited</code>，且已注册 <code>request</code> 处理函数，宿主才会开始调用它。</li>
+</ul>
+
+<h2 id="limits">限制</h2>
+<p>音源插件使用比列表插件更小的预算：每次调用最多 <strong>16</strong> 个请求，单个响应体最大 <strong>4 MiB</strong>，内存 <strong>32 MiB</strong>，总时限同样是 30 秒，脚本不超过 1 MiB。其它与列表插件相同，见 <a href="runtime-api.html#limits">限制一览</a>。</p>
+
+<h2 id="debug">调试</h2>
+<div class="callout warn">
+<strong>音源插件的错误信息被有意隐藏</strong>
+为防止签名地址或凭据通过异常泄露，音源插件的失败只会显示固定文案：网络层失败是「插件网络请求失败或超时」，其它是「插件初始化或播放解析失败」。要定位原因，请在脚本里用 <code>console.log</code> 输出关键步骤，再到插件日志里看。
+</div>
+<ul>
+  <li>日志里的 <code>[error] 解析 &lt;来源&gt; 失败：…</code> 是宿主记录的失败行。</li>
+  <li>被拒绝的地址、请求超限、响应过大都会以固定文案出现在这里。</li>
+  <li>更多排错步骤见 <a href="publishing.html#troubleshooting">调试与发布</a>。</li>
+</ul>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

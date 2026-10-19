@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>列表插件参考 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 音乐列表插件契约：元数据、来源与能力、配置表单、默认开关，以及搜索、歌单、发现、歌手、歌词、评论、播放等每个方法的参数与返回值。">
+<meta property="og:title" content="列表插件参考 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 音乐列表插件契约：元数据、来源与能力、配置表单、默认开关，以及搜索、歌单、发现、歌手、歌词、评论、播放等每个方法的参数与返回值。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/list-plugin.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/list-plugin.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/list-plugin.html">
+<article class="doc" data-title="列表插件参考" data-desc="Mio Music 音乐列表插件契约：元数据、来源与能力、配置表单、默认开关，以及搜索、歌单、发现、歌手、歌词、评论、播放等每个方法的参数与返回值。">
+<div class="doc-eyebrow">// List Plugin Reference</div>
+<h1>列表插件参考</h1>
+<p class="doc-lead">音乐列表插件是一个导出 <code>listPlugin</code> 对象的 CommonJS 脚本。本页是它的完整契约：对象长什么样、宿主如何调用、返回值要满足什么。</p>
+
+<h2 id="structure">脚本结构</h2>
+<pre class="language-js"><code>module.exports = {
+  listPlugin: {
+    // 元数据
+    name, version, author, description, icon,
+    // 配置表单与默认开关
+    config: [ /* … */ ],
+    defaults: { play: true, download: true },
+    // 来源及其能力
+    sources: { myid: { name, icon, capabilities: [ /* … */ ], qualities: [ /* … */ ] } },
+    // 方法：名字与能力一一对应
+    async search(source, { keyword, page, limit }) { /* … */ },
+    // …
+  },
+};</code></pre>
+<p>宿主按下面的顺序对待脚本：</p>
+<ol>
+  <li>安装时执行一次脚本，只读取元数据、<code>sources</code>、<code>config</code> 与 <code>defaults</code>，检查合法性。</li>
+  <li>之后每次调用某个方法，都<strong>重新执行整个脚本</strong>，再调用对应方法（见 <a href="index.html#runtime">每次调用都是全新的上下文</a>）。所以不要在模块顶层做网络请求或其它耗时的事。</li>
+  <li>如果模块导出了 <code>ready</code>（一个 Promise），宿主会先 <code>await</code> 它再继续。</li>
+</ol>
+<p>脚本需要是合法的 UTF-8 文本，不能为空，体积不得超过 <strong>1 MiB</strong>。</p>
+
+<h2 id="metadata">元数据</h2>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>name</code></td><td>string，必填</td><td>插件名，最多 256 个字符。缺失则安装失败。</td></tr>
+    <tr><td><code>version</code></td><td>string</td><td>版本号，最多 64 个字符。更新时用它判断新旧。</td></tr>
+    <tr><td><code>author</code></td><td>string</td><td>作者，最多 256 个字符。</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>简介，最多 1000 个字符。</td></tr>
+    <tr><td><code>icon</code></td><td>string</td><td>可选图标（emoji 或 data URI），最多 65536 个字符。来源没有自己的 <code>icon</code> 时使用它。</td></tr>
+    <tr><td><code>config</code></td><td>array</td><td>配置表单，见 <a href="#config">配置表单</a>。</td></tr>
+    <tr><td><code>defaults</code></td><td>object</td><td><code>{ play, download }</code>，两个布尔值，见 <a href="#defaults">默认开关</a>。</td></tr>
+    <tr><td><code>sources</code></td><td>object，必填</td><td>来源声明，见 <a href="#sources">来源与能力</a>。</td></tr>
+  </tbody>
+</table>
+<p>除了对象字段，脚本顶部的文档注释也建议带上 <code>@name</code>、<code>@version</code>、<code>@author</code>、<code>@description</code>：内置插件按 <code>@name</code> 识别、按 <code>@version</code> 决定启动时是否更新。</p>
+<pre class="language-js"><code>/**
+ * @name Navidrome（列表）
+ * @version 1.0.0
+ * @author Mio Music
+ * @description Navidrome 音乐服务器：搜索、专辑与歌单、歌手、歌词，并提供播放与下载。
+ */</code></pre>
+
+<h2 id="sources">来源与能力</h2>
+<p><code>sources</code> 是一个对象，键是<strong>来源 ID</strong>，值描述这个来源。一个插件可以声明多个来源，宿主为每个来源分别注册一个 provider。</p>
+
+<h3>来源 ID</h3>
+<p>来源 ID 同时是歌曲的 <code>source</code> 字段，界面、音质名称与缓存都用它区分歌曲，所以一经发布不要再改。请使用自定义 ID：<strong>2–16 个小写字母、数字或下划线，且以小写字母开头</strong>，如 <code>navidrome</code>、<code>my_server</code>。宿主另外保留了少量兼容旧版音源格式的 ID，供音源插件使用。</p>
+<p>不合法的 ID 会被静默忽略。同一个 ID 被后注册的插件覆盖，所以请选一个能代表你的服务、足够具体的 ID，避免与其他插件或保留 ID 冲突。</p>
+
+<h3>来源字段</h3>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>name</code></td><td>显示名，最多 128 个字符；缺失或过长时退回使用 ID。</td></tr>
+    <tr><td><code>icon</code></td><td>可选图标，最多 65536 个字符。</td></tr>
+    <tr><td><code>capabilities</code></td><td>能力数组。未知的能力名会被丢弃；如果一个来源一个有效能力都没有，这个来源整体被丢弃；如果所有来源都被丢弃，安装失败。</td></tr>
+    <tr><td><code>qualities</code></td><td>该来源可以播放的音质，<strong>由差到好</strong>排列。声明了 <code>play</code> 时需要。</td></tr>
+  </tbody>
+</table>
+
+<h3>能力一览</h3>
+<table>
+  <thead><tr><th>能力</th><th>对应方法</th><th>界面里启用的功能</th></tr></thead>
+  <tbody>
+    <tr><td><code>search</code></td><td><code>search</code></td><td>歌曲搜索</td></tr>
+    <tr><td><code>searchPlaylist</code></td><td><code>searchPlaylist</code></td><td>歌单搜索</td></tr>
+    <tr><td><code>playlistDetail</code></td><td><code>playlistDetail</code></td><td>歌单详情</td></tr>
+    <tr><td><code>albumDetail</code></td><td><code>albumDetail</code></td><td>专辑详情</td></tr>
+    <tr><td><code>discovery</code></td><td><code>discoveryCategories</code>、<code>discoveryPlaylists</code>、<code>discoveryCharts</code>、<code>chartDetail</code></td><td>发现页的分类、歌单与榜单</td></tr>
+    <tr><td><code>singer</code></td><td><code>singerInfo</code>、<code>singerSongs</code>、<code>singerAlbums</code></td><td>歌手页</td></tr>
+    <tr><td><code>lyrics</code></td><td><code>lyrics</code></td><td>歌词</td></tr>
+    <tr><td><code>comments</code></td><td><code>comments</code></td><td>播放器评论</td></tr>
+    <tr><td><code>cover</code></td><td><code>cover</code></td><td>补查缺失的封面</td></tr>
+    <tr><td><code>play</code></td><td><code>musicUrl</code></td><td>由本插件解析播放地址</td></tr>
+    <tr><td><code>download</code></td><td><code>downloadUrl</code>（缺省用 <code>musicUrl</code>）</td><td>由本插件解析下载地址</td></tr>
+    <tr><td><code>testConnection</code></td><td><code>testConnection</code></td><td>配置页的「测试连接」</td></tr>
+    <tr><td><code>userPlaylists</code></td><td><code>getPlaylists</code></td><td>「导入歌单」：列出服务器上用户自己的歌单</td></tr>
+  </tbody>
+</table>
+<p>宿主<strong>只会调用已声明能力对应的方法</strong>。声明了能力却没有实现对应方法，调用时会得到「插件缺少 xxx」的错误；调用了未声明的能力，则得到「插件未声明该能力」。<code>play</code> 与 <code>download</code> 还需要用户在插件卡片上打开「由本插件提供播放 / 下载」才会生效。</p>
+
+<h3>音质</h3>
+<p><code>qualities</code> 与歌曲的 <code>types</code> 只能使用下列名称，其它值会被丢弃：</p>
+<p><code>128k</code>、<code>320k</code>、<code>flac</code>、<code>flac24bit</code>、<code>hires</code>、<code>atmos</code>、<code>atmos_plus</code>、<code>master</code>。名称由低到高大致从有损过渡到无损与更高规格。</p>
+
+<h2 id="config">配置表单</h2>
+<p>需要服务器地址、账号这类用户输入时，在 <code>config</code> 里声明表单，应用会在插件卡片的「配置」里渲染它。脚本里通过 <code>cerumusic.config.&lt;key&gt;</code> 读取（见 <a href="runtime-api.html#config">运行时 API</a>）。</p>
+<pre class="language-js"><code>config: [
+  { key: 'baseUrl', label: '服务器地址', type: 'text', required: true,
+    placeholder: 'https://music.example.com', description: '服务器根地址，不含 /rest' },
+  { key: 'password', label: '密码', type: 'password', required: true },
+  { key: 'quality', label: '默认音质', type: 'select', default: '320k',
+    options: [{ label: '标准', value: '128k' }, { label: '高品质', value: '320k' }] },
+  { key: 'allowHttp', label: '允许 HTTP', type: 'switch', default: false },
+],</code></pre>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>key</code></td><td>必填。最多 64 个字符，只能包含字母、数字、<code>_</code>、<code>-</code>、<code>.</code>，且不能重复；不合法或重复的字段会被丢弃。</td></tr>
+    <tr><td><code>label</code></td><td>显示名，最多 64 个字符，缺省用 <code>key</code>。</td></tr>
+    <tr><td><code>type</code></td><td><code>text</code>、<code>password</code>、<code>number</code>、<code>switch</code>、<code>select</code>、<code>textarea</code>。未知类型按 <code>text</code> 处理。</td></tr>
+    <tr><td><code>default</code></td><td>默认值。</td></tr>
+    <tr><td><code>required</code></td><td>是否必填。</td></tr>
+    <tr><td><code>placeholder</code></td><td>占位提示，最多 128 个字符。</td></tr>
+    <tr><td><code>description</code></td><td>说明文字，最多 256 个字符。</td></tr>
+    <tr><td><code>options</code></td><td><code>select</code> 的选项 <code>[{ label, value }]</code>，最多 32 项，<code>value</code> 为字符串或数字。</td></tr>
+  </tbody>
+</table>
+<p>一个插件最多 <strong>32</strong> 个表单字段，超出的会被忽略。</p>
+<div class="callout warn">
+<strong>密码并不是加密保存的</strong>
+插件配置（包括 <code>password</code> 类型字段）保存在应用数据目录下的 <code>list-plugins.json</code> 中，不使用系统钥匙串。<code>password</code> 类型只是在界面上遮盖输入。请尽量让协议本身不暴露明文（例如 Subsonic 的令牌认证），并把登录得到的会话令牌放进 <code>cerumusic.storage</code>，而不是反复发送密码。
+</div>
+
+<h3 id="defaults">默认开关</h3>
+<p><code>defaults: { play: true, download: true }</code> 决定安装之后「由本插件提供播放」「由本插件提供下载」两个开关的初始状态。用户随时可以在插件卡片上改变它们。当开关关闭时，即便你声明了 <code>play</code> / <code>download</code>，该来源的歌曲仍交给当前的音源插件解析。</p>
+
+<h2 id="methods">方法参考</h2>
+<p>所有方法都是 <code>async</code>（返回 Promise 亦可），签名统一为 <code>method(source, params)</code>：<code>source</code> 是被调用的来源 ID（字符串），<code>params</code> 是一个对象。<code>this</code> 指向 <code>listPlugin</code> 对象本身。宿主在调用前会校验参数，下面列出的范围都已由宿主保证。</p>
+
+<table>
+  <thead><tr><th>方法</th><th><code>params</code></th><th>返回</th></tr></thead>
+  <tbody>
+    <tr><td><code>search</code></td><td><code>{ keyword, page, limit }</code></td><td><a href="data-types.html#searchresult">SearchResult</a></td></tr>
+    <tr><td><code>searchPlaylist</code></td><td><code>{ keyword, page, limit }</code></td><td><a href="data-types.html#playlistresult">PlaylistResult</a></td></tr>
+    <tr><td><code>playlistDetail</code></td><td><code>{ id, page, limit }</code></td><td><a href="data-types.html#playlistdetail">PlaylistDetail</a></td></tr>
+    <tr><td><code>albumDetail</code></td><td><code>{ id, page, limit }</code></td><td><a href="data-types.html#playlistdetail">PlaylistDetail</a></td></tr>
+    <tr><td><code>discoveryCategories</code></td><td><code>{}</code></td><td><a href="data-types.html#discovery">DiscoveryCategories</a></td></tr>
+    <tr><td><code>discoveryPlaylists</code></td><td><code>{ category, page }</code></td><td><a href="data-types.html#discovery">DiscoveryPlaylistPage</a></td></tr>
+    <tr><td><code>discoveryCharts</code></td><td><code>{}</code></td><td><a href="data-types.html#discovery">DiscoveryChart[]</a></td></tr>
+    <tr><td><code>chartDetail</code></td><td><code>{ id, page }</code></td><td><a href="data-types.html#playlistdetail">PlaylistDetail</a></td></tr>
+    <tr><td><code>singerInfo</code></td><td><code>{ id }</code></td><td><a href="data-types.html#singer">SingerInfo</a> 或 <code>null</code></td></tr>
+    <tr><td><code>singerSongs</code></td><td><code>{ id, page, limit }</code></td><td><a href="data-types.html#searchresult">SearchResult</a></td></tr>
+    <tr><td><code>singerAlbums</code></td><td><code>{ id, page, limit }</code></td><td><a href="data-types.html#singer">SingerAlbumPage</a></td></tr>
+    <tr><td><code>lyrics</code></td><td><code>{ song }</code></td><td><a href="data-types.html#lyric">Lyric</a></td></tr>
+    <tr><td><code>comments</code></td><td><code>{ song, page, limit, hot, cursor }</code></td><td><a href="data-types.html#comments">Comments</a></td></tr>
+    <tr><td><code>cover</code></td><td><code>{ song }</code></td><td>封面 URL 字符串</td></tr>
+    <tr><td><code>musicUrl</code></td><td><code>{ song, quality }</code></td><td>URL 字符串，或 <code>{ url }</code></td></tr>
+    <tr><td><code>downloadUrl</code></td><td><code>{ song, quality }</code></td><td>URL 字符串，或 <code>{ url }</code></td></tr>
+    <tr><td><code>testConnection</code></td><td><code>{}</code></td><td><code>true</code> 或 <code>{success: true}</code></td></tr>
+    <tr><td><code>getPlaylists</code></td><td><code>{ page, limit }</code></td><td><a href="data-types.html#playlistresult">PlaylistResult</a></td></tr>
+  </tbody>
+</table>
+
+<h3 id="paging">分页约定</h3>
+<ul>
+  <li><code>page</code> 从 <strong>1</strong> 开始，宿主保证它不会为 0。</li>
+  <li><code>search</code>、<code>searchPlaylist</code>、<code>singerSongs</code>、<code>singerAlbums</code> 的 <code>limit</code> 在 1–30 之间；<code>playlistDetail</code>、<code>albumDetail</code> 的 <code>limit</code> 固定为 30；<code>getPlaylists</code> 的 <code>limit</code> 固定为 100。你可以返回少于 <code>limit</code> 的条数，但<strong>每页最多取前 500 条</strong>，多出的被截断。</li>
+  <li>返回值里的 <code>allPage</code> 是总页数，<code>total</code> 是总条数，<code>limit</code> 是本页大小。服务器给不出总数时，请按已知信息给出合理的值，并让最后一页的 <code>page</code> 与 <code>allPage</code> 对得上。</li>
+</ul>
+
+<h3>search / searchPlaylist</h3>
+<p><code>keyword</code> 非空且不超过 1024 字节。搜索结果里的每首歌都要带足够的信息：之后它会作为 <code>song</code> 传回 <code>musicUrl</code>、<code>lyrics</code> 等方法。注意它会经过 <a href="data-types.html#musicitem">MusicItem</a> 结构往返，结构里没有的字段不会保留，详见数据结构一页。</p>
+
+<h3>playlistDetail / albumDetail</h3>
+<p><code>id</code> 就是你在 <code>searchPlaylist</code> 或 <code>discoveryPlaylists</code> 里返回的 <code>PlaylistItem.id</code>（或歌手页里 <code>SingerAlbum.id</code>）。专辑与歌单用不同的方法，如果你的服务器里两者 ID 会冲突，可以像内置插件那样给 ID 加前缀（<code>pl-123</code>、<code>al-123</code>），再在方法里去掉。</p>
+
+<h3>discovery 系列</h3>
+<ul>
+  <li><code>discoveryCategories</code> 返回分类，由「热门」与若干分组组成。</li>
+  <li><code>discoveryPlaylists</code> 的 <code>category</code> 是分类 ID（最多 128 字符），<strong>空字符串表示全部 / 默认</strong>。<code>page</code> 范围 1–100000。</li>
+  <li><code>discoveryCharts</code> 返回榜单列表，<code>chartDetail</code> 返回某个榜单的歌曲。榜单 ID 不能超过 <strong>40 个字符</strong>。</li>
+  <li>这四个方法共用 <code>discovery</code> 这一个能力。</li>
+</ul>
+
+<h3>singer 系列</h3>
+<p>歌手 <code>id</code> 是字符串，非空、不超过 128 个字符，且不为 <code>"0"</code>。服务器没有「歌手资料」接口时，<code>singerInfo</code> 可以返回 <code>null</code>，歌手页会退回使用打开它的那首歌的歌手名。</p>
+
+<h3 id="lyrics-comments">lyrics / comments / cover</h3>
+<p><code>params.song</code> 是 <a href="data-types.html#musicitem">MusicItem</a> 的 JSON 对象。</p>
+<ul>
+  <li><strong>lyrics</strong> 返回 <a href="data-types.html#lyric">Lyric</a>。若要提供逐字歌词，可额外返回 <code>ttml</code> 字符串；宿主会优先解析它。</li>
+  <li><strong>comments</strong> 返回 <a href="data-types.html#comments">Comments</a>。<code>hot</code> 为 <code>true</code> 表示取热门，否则取最新；<code>cursor</code> 是上一页返回的游标（首页为空串）。一页最多 300 条，整体不超过 4 MB。</li>
+  <li><strong>cover</strong> 返回一个 <code>http(s)</code> 图片 URL，可以是空串。</li>
+</ul>
+
+<h3 id="play">musicUrl / downloadUrl</h3>
+<p><code>quality</code> 是用户当前选择的音质，来自你为该来源声明的 <code>qualities</code>。返回一个可直接请求的 <code>http</code> / <code>https</code> 地址（字符串，或 <code>{ url }</code>）：</p>
+<ul>
+  <li>地址不能含用户名密码（<code>https://user:pass@host</code> 会被拒绝），长度不超过 8192 字符。</li>
+  <li>下载时调用 <code>downloadUrl</code>，没有实现则使用 <code>musicUrl</code>。</li>
+  <li>地址里可以携带令牌或签名，但请注意它会被播放器与下载器直接使用，且可能出现在日志里。</li>
+</ul>
+
+<h3 id="test-playlists">testConnection / getPlaylists</h3>
+<ul>
+  <li><code>testConnection</code> 要求至少有一个来源声明了 <code>testConnection</code> 能力。返回 <code>true</code> 或 <code>{success: true}</code> 视为成功，其余视为失败；失败时请 <code>throw</code> 带原因的 <code>Error</code>，比如「用户名或密码错误」。应用的「测试连接」使用<strong>当前表单里的值</strong>（保存之前），并且每次都应实际请求一次服务器，所以请从 <code>cerumusic.config</code> 读取参数，不要只依赖 <code>cerumusic.storage</code> 里缓存的会话。</li>
+  <li><code>getPlaylists</code> 返回用户在服务器上的歌单（区别于公开歌单的搜索与发现）。声明 <code>userPlaylists</code> 与 <code>playlistDetail</code> 后，应用就可以「导入歌单」：先列出歌单，再分页读取完整的歌曲，最后事务性地创建本地歌单。</li>
+</ul>
+
+<h2 id="host">宿主替你做的事</h2>
+<p>理解宿主的保证，可以省掉很多防御性代码，也能解释一些「为什么我的数据被改了」。</p>
+<ul>
+  <li><strong>盖章 <code>source</code></strong>：返回的每首歌、每个结果、每个歌单、每个榜单的 <code>source</code> 都会被改写为本次调用的来源 ID。</li>
+  <li><strong>截断</strong>：歌曲、歌单、榜单列表每页最多保留 500 项。</li>
+  <li><strong>反序列化校验</strong>：返回值必须能解析为对应的数据结构（字段名是 camelCase，见 <a href="data-types.html">数据结构</a>）。解析失败时用户只会看到「插件返回的数据格式无效」，具体字段错误写在插件日志里。</li>
+  <li><strong>地址校验</strong>：播放、下载与封面地址必须是合法的 <code>http(s)</code> URL。</li>
+</ul>
+
+<h2 id="errors">错误处理</h2>
+<p>在方法里 <code>throw new Error('…')</code>（或让 Promise reject）就会让这次调用失败，错误信息<strong>前 300 个字符</strong>会展示给用户并写入日志。因此：</p>
+<ul>
+  <li>写面向用户的、可操作的信息，例如「请先在插件“配置”中填写服务器地址」「用户名或密码错误」。</li>
+  <li>不要把密码、令牌或带签名的 URL 拼进错误信息。</li>
+  <li>网络层的失败（超时、拒绝连接）会让 <code>cerumusic.request</code> 的 Promise reject，直接让它抛出去通常就够了，也可以捕获后换成更友好的提示。</li>
+  <li>HTTP 状态码不是 2xx 时 <code>cerumusic.request</code> <em>不会</em>抛错，请自己检查 <code>statusCode</code>。</li>
+</ul>
+
+<h2 id="legacy">旧版 Mio 服务脚本</h2>
+<p>没有导出 <code>listPlugin</code>、但导出了 <code>configSchema</code>，或同时有 <code>getPlaylists()</code> 与 <code>getPlaylistSongs(id)</code> 的 CommonJS 脚本，会被适配层包装成一个列表插件：它只具备 <code>userPlaylists</code>、<code>playlistDetail</code>、<code>testConnection</code>（有 <code>testConnection</code> 或 <code>ping</code> 时）以及 <code>play</code> / <code>download</code>（有 <code>musicUrl</code> 时）能力，来源 ID 取 <code>sources</code> 的键，缺省则由插件名派生。新插件请直接使用 <code>listPlugin</code> 契约。</p>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>快速上手 - Mio Music 文档</title>
+<meta name="description" content="十分钟写出并安装第一个 Mio Music 列表插件：完整的示例脚本、安装步骤、配置表单、持久化存储与日志。">
+<meta property="og:title" content="快速上手 - Mio Music 文档">
+<meta property="og:description" content="十分钟写出并安装第一个 Mio Music 列表插件：完整的示例脚本、安装步骤、配置表单、持久化存储与日志。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/quickstart.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/quickstart.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/quickstart.html">
+<article class="doc" data-title="快速上手" data-desc="十分钟写出并安装第一个 Mio Music 列表插件：完整的示例脚本、安装步骤、配置表单、持久化存储与日志。">
+<div class="doc-eyebrow">// Quickstart</div>
+<h1>快速上手</h1>
+<p class="doc-lead">写一个只有两首模拟歌曲的列表插件，把它装进应用，在搜索页里找到它并播放。整个过程只需要一个文本编辑器。</p>
+
+<h2>准备</h2>
+<ul>
+  <li>已经按 <a href="../getting-started.html">快速开始</a> 运行了 Mio Music。</li>
+  <li>一个可以直接访问的音频文件地址（<code>http</code> 或 <code>https</code>），用于测试播放。任何公开的 MP3 或 FLAC 链接都可以，下面的示例会把它放在配置里，所以不必写死在脚本中。</li>
+</ul>
+
+<h2>第一步：写脚本</h2>
+<p>新建 <code>hello.list.js</code>：</p>
+<pre class="language-js" data-title="hello.list.js"><code>/**
+ * @name Hello（列表）
+ * @version 1.0.0
+ * @author you
+ * @description 演示用的最小列表插件
+ */
+const SOURCE = 'hello';
+
+const SONGS = [
+  { id: '1', name: 'Hello World', singer: 'Mio', seconds: 180 },
+  { id: '2', name: 'Second Song', singer: 'Mio', seconds: 205 },
+];
+
+const mmss = (s) =>
+  String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+
+function toSong(v) {
+  return {
+    songmid: v.id,            // 歌曲在来源里的唯一 ID，之后会原样传回 musicUrl / lyrics
+    name: v.name,
+    singer: v.singer,
+    albumName: 'Hello Album',
+    albumId: 'album-1',
+    source: SOURCE,
+    interval: mmss(v.seconds), // 时长，格式 mm:ss
+    img: '',
+    types: ['128k'],           // 这首歌可用的音质
+    typeUrl: {},
+  };
+}
+
+async function search(_source, { keyword, page, limit }) {
+  const term = keyword.toLowerCase();
+  const hits = SONGS.filter((s) =&gt; (s.name + s.singer).toLowerCase().includes(term));
+  return {
+    list: hits.slice((page - 1) * limit, page * limit).map(toSong),
+    allPage: Math.max(1, Math.ceil(hits.length / limit)),
+    limit,
+    total: hits.length,
+    source: SOURCE,
+  };
+}
+
+async function musicUrl(_source, { song, quality }) {
+  const url = String((cerumusic.config || {}).audioUrl || '').trim();
+  if (!url) throw new Error('请先在插件“配置”中填写测试音频地址');
+  console.log('musicUrl', song.songmid, quality);
+  return url;
+}
+
+async function lyrics(_source, { song }) {
+  return {
+    lyric: '[00:00.00]Hello\n[00:05.00]World',
+    tlyric: '', rlyric: '', crlyric: '',
+    source: SOURCE,
+  };
+}
+
+async function testConnection() {
+  return true;
+}
+
+module.exports = {
+  listPlugin: {
+    name: 'Hello（列表）',
+    version: '1.0.0',
+    author: 'you',
+    description: '演示用的最小列表插件',
+    config: [
+      {
+        key: 'audioUrl', label: '测试音频地址', type: 'text', required: true,
+        placeholder: 'https://example.com/test.mp3',
+        description: '所有歌曲都会播放这个地址',
+      },
+    ],
+    defaults: { play: true },
+    sources: {
+      hello: {
+        name: 'Hello', icon: '👋',
+        capabilities: ['search', 'play', 'lyrics', 'testConnection'],
+        qualities: ['128k'],
+      },
+    },
+    search, musicUrl, lyrics, testConnection,
+  },
+};</code></pre>
+
+<div class="callout note">
+<strong>几点说明</strong>
+<ul>
+  <li><code>capabilities</code> 声明了「这个来源能做什么」，宿主只会调用已声明的能力对应的方法。这里声明了 <code>play</code>，所以必须有 <code>musicUrl</code>。</li>
+  <li>方法的第一个参数永远是来源 ID，第二个参数是一个对象，字段名见 <a href="list-plugin.html#methods">方法参考</a>。</li>
+  <li>返回值必须是 <a href="data-types.html">数据结构</a> 里的形状，<code>SearchResult</code> 的 <code>allPage</code>、<code>limit</code>、<code>total</code>、<code>source</code> 都是必填。</li>
+  <li><code>source</code> 无论你填什么，宿主都会改写成本次调用的来源 ID。</li>
+</ul>
+</div>
+
+<h2>第二步：安装</h2>
+<ol class="doc-steps">
+  <li><strong>打开插件页</strong>
+    <p>设置 → 插件 → 音乐列表插件。</p></li>
+  <li><strong>安装列表插件</strong>
+    <p>点「安装列表插件」，选择 <code>hello.list.js</code>。也可以把文件放到任意可访问的地址，输入 URL 安装。</p></li>
+  <li><strong>配置</strong>
+    <p>安装后点插件卡片上的「配置」，会看到刚才声明的「测试音频地址」表单，填入音频链接并保存。</p></li>
+  <li><strong>测试连接</strong>
+    <p>点「测试连接」。这会调用你的 <code>testConnection</code>，返回 <code>true</code>（或 <code>{success: true}</code>）即为成功。</p></li>
+</ol>
+
+<h2>第三步：使用</h2>
+<p>进入搜索页，在来源菜单中选择 <strong>Hello</strong>，搜索 <code>hello</code>，点击结果即可播放。因为 <code>defaults.play</code> 为 <code>true</code>，安装后「由本插件提供播放」默认是打开的，所以不需要安装音源插件。</p>
+<div class="callout warn">
+<strong>来源菜单里找不到？</strong>
+来源菜单只显示两类来源：由列表插件自己提供播放的来源，或与当前启用的音源插件共同支持的来源。只声明了 <code>search</code> 而没有 <code>play</code>、并且音源插件也不支持这个来源 ID 时，它不会出现在菜单里。
+</div>
+
+<h2>第四步：看日志</h2>
+<p>播放时，脚本里的 <code>console.log('musicUrl', …)</code> 会出现在插件卡片的「插件日志」里，每行以 <code>[log]</code> 开头。出错时，宿主也会在这里写入失败原因。把 <code>audioUrl</code> 清空再播放一次，就能看到「解析 hello 失败」以及你抛出的错误信息。</p>
+
+<h2>进阶：保存状态</h2>
+<p>因为<a href="index.html#runtime">每次调用都是全新的上下文</a>，需要跨调用保留的东西要放进 <code>cerumusic.storage</code>。例如记录搜索次数：</p>
+<pre class="language-js"><code>async function search(_source, { keyword, page, limit }) {
+  const count = (cerumusic.storage.get('searches') || 0) + 1;
+  cerumusic.storage.set('searches', count);
+  console.log('第', count, '次搜索');
+  // …
+}</code></pre>
+<p>存储是每个插件私有的键值对，值会被序列化为 JSON，整体上限 256 KiB。典型用途是缓存登录会话，避免每次调用都重新登录，参考内置的 <code>navidrome.list.js</code> 里的 <code>ready()</code> 函数。</p>
+
+<h2>下一步</h2>
+<ul>
+  <li>在 <a href="list-plugin.html">列表插件参考</a> 里添加歌单、专辑、发现和歌手页。</li>
+  <li>阅读内置插件的源码：<a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a> 里每一个脚本都是完整的实现范例。</li>
+  <li>准备发布前，过一遍 <a href="publishing.html">调试与发布</a> 的检查清单。</li>
+</ul>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

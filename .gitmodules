@@ -1,0 +1,4 @@
+[submodule "plugins"]
+	path = plugins
+	url = https://github.com/Mio888888/mio-music-plugins.git
+	branch = main

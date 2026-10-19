@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The platform owns this short stage; Flutter draws the existing particles
+         as soon as its engine is ready. Avoid the default launcher/Flutter icon. -->
+    <style name="LaunchTheme" parent="LaunchThemeBase">
+        <item name="android:windowSplashScreenBackground">@color/mio_launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/launch_empty_icon</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+</resources>

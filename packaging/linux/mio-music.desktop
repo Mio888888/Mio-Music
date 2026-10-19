@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Mio Music
+Name[zh_CN]=Mio Music
+Comment=Desktop music player
+Comment[zh_CN]=桌面音乐播放器
+Exec=mio-music %U
+Icon=mio-music
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+StartupWMClass=com.vant.Mio.Music.GPUI

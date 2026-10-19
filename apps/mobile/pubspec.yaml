@@ -1,0 +1,47 @@
+name: mio_music
+description: "Mio Music mobile application"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_rust_bridge: 2.13.0
+  path_provider: ^2.1.6
+  audio_service: 0.18.19
+  mio_native_host:
+    path: packages/mio_native_host
+  flutter_rust_bridge_hooks: 2.13.0
+  code_assets: ^1.2.1
+  flutter_svg: ^2.3.0
+  qr_flutter: 4.1.0
+  flutter_lyric:
+    path: vendor/flutter_lyric
+  liquid_glass_easy: 5.0.0
+
+dev_dependencies:
+  flutter_lints: 6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/background-LICENSES.txt
+    - assets/tokens.json
+    - assets/manifest.json
+    - assets/locales/
+    - assets/icons/
+    - assets/images/
+    - assets/welcome/
+  shaders:
+    - shaders/background_compose.frag
+    - shaders/background_filter.frag
+  fonts:
+    - family: mioicon
+      fonts:
+        - asset: assets/fonts/iconfont.ttf
+    - family: miolyrics
+      fonts:
+        - asset: assets/fonts/lyricfont.ttf

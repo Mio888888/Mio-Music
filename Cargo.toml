@@ -1,0 +1,32 @@
+[workspace]
+members = ["crates/mio-app", "crates/mio-core", "crates/mio-tokens", "crates/mio-plugin", "crates/mio-music-sdk", "crates/mio-mobile-bridge"]
+resolver = "2"
+exclude = ["vendor/gpui-fast", "vendor/gpui-fast-apple", "vendor/gpui-component"]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+gpui-kit = { version = "=0.7.2", features = ["gpui-fast"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.dev]
+debug = 1
+
+# Dependencies (GPUI Fast, the audio decoders, the spectrum FFT) are optimised in
+# development builds too, so the app stays smooth when run from `cargo run`.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[patch.crates-io]
+gpui-fast = { path = "vendor/gpui-fast" }
+gpui-fast-apple = { path = "vendor/gpui-fast-apple" }
+gpui-component = { path = "vendor/gpui-component" }

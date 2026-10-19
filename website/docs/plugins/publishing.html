@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>调试与发布 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 插件的本地调试方法、插件日志、常见错误速查表、发布前检查清单，以及向 mio-music-plugins 提交插件的约定。">
+<meta property="og:title" content="调试与发布 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 插件的本地调试方法、插件日志、常见错误速查表、发布前检查清单，以及向 mio-music-plugins 提交插件的约定。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/publishing.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/publishing.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/publishing.html">
+<article class="doc" data-title="调试与发布" data-desc="Mio Music 插件的本地调试方法、插件日志、常见错误速查表、发布前检查清单，以及向 mio-music-plugins 提交插件的约定。">
+<div class="doc-eyebrow">// Debug &amp; Publish</div>
+<h1>调试与发布</h1>
+<p class="doc-lead">在应用里看日志、用 Node.js 在应用外跑通插件、对照错误速查表排错，然后按约定把它分享出去。</p>
+
+<h2 id="logs">插件日志</h2>
+<p>插件卡片上的「<strong>插件日志</strong>」显示这个插件最近的 500 行日志（每行最多 2000 个字符）。里面有两类内容：</p>
+<ul>
+  <li>你的 <code>console.log / info / debug / warn / error</code> 输出，前缀为 <code>[log]</code>、<code>[info]</code>、<code>[warn]</code> 等；多个参数会用空格拼接，对象会被 <code>JSON.stringify</code>。</li>
+  <li>宿主的记录，前缀为 <code>[info]</code> 或 <code>[error]</code>，例如 <code>[info] 列表插件已加载：…，来源 hello</code>、<code>[error] search 失败：…</code>、<code>[error] search 返回值无效：missing field `allPage`</code>。</li>
+</ul>
+<div class="callout tip">
+<strong>最有用的一行</strong>
+「返回值无效」之后跟着的是 Rust 反序列化器指出的具体问题：缺失的字段名、类型不匹配的位置。大多数「插件返回的数据格式无效」都能凭它一眼定位，对照 <a href="data-types.html">数据结构</a> 修正即可。
+</div>
+
+<h2 id="local">在应用外调试</h2>
+<p>每次改动都重装再点界面会很慢。因为插件是普通的 CommonJS，你可以在 Node.js 里提供一个模拟的 <code>cerumusic</code>，直接调用方法并打印结果。下面的脚本（Node 18+）把 <code>cerumusic.request</code> 接到 <code>fetch</code>，<code>storage</code> 接到内存 <code>Map</code>：</p>
+<pre class="language-js" data-title="harness.js">// harness.js — run a list plugin outside the app: node harness.js plugin.list.js search '{"keyword":"hello","page":1,"limit":10}'
+const fs = require('fs');
+const path = require('path');
+const [file, method, argJson = '{}', configJson = '{}'] = process.argv.slice(2);
+
+const store = new Map();
+globalThis.cerumusic = {
+  config: JSON.parse(configJson),
+  storage: {
+    get: (k) =&gt; store.get(k),
+    set: (k, v) =&gt; store.set(k, JSON.parse(JSON.stringify(v ?? null))),
+    remove: (k) =&gt; store.delete(k),
+  },
+  async request(url, opts = {}) {
+    const res = await fetch(url, {
+      method: opts.method || 'GET',
+      headers: opts.headers,
+      body: opts.body &amp;&amp; typeof opts.body !== 'string' ? JSON.stringify(opts.body) : opts.body,
+    });
+    const text = await res.text();
+    let body = text;
+    try { body = JSON.parse(text); } catch (_) {}
+    return { statusCode: res.status, headers: Object.fromEntries(res.headers), body };
+  },
+  utils: { crypto: { md5: (s) =&gt; require('crypto').createHash('md5').update(s).digest('hex') } },
+};
+
+const plugin = require(path.resolve(file)).listPlugin;
+const source = Object.keys(plugin.sources)[0];
+plugin[method](source, JSON.parse(argJson))
+  .then((r) =&gt; console.log(JSON.stringify(r, null, 2)))
+  .catch((e) =&gt; { console.error('ERROR:', e.message); process.exit(1); });
+</pre>
+<p>用法：</p>
+<pre class="language-bash"><code># 搜索
+node harness.js hello.list.js search '{"keyword":"hello","page":1,"limit":10}'
+
+# 带配置调用 musicUrl（第 4 个参数是 cerumusic.config）
+node harness.js hello.list.js musicUrl '{"song":{"songmid":"1"},"quality":"128k"}' '{"audioUrl":"https://example.com/a.mp3"}'</code></pre>
+<div class="callout warn">
+<strong>Node 比宿主宽松</strong>
+Node 里能跑通不代表在宿主里一定能跑通：Node 没有 24 次请求、15 秒超时与 16 MiB 响应的限制，不会检查返回值的字段类型，也有 <code>require</code>、<code>process</code>。把它当作逻辑自检，最终仍要在应用里验证。同时要注意，宿主会重新执行整个脚本来处理每次调用，harness 不会模拟这一点，所以把状态写在模块顶层的变量里在 Node 里能跑、在应用里却不行。
+</div>
+
+<h2 id="troubleshooting">错误速查表</h2>
+<table>
+  <thead><tr><th>你看到的信息</th><th>可能的原因与处理</th></tr></thead>
+  <tbody>
+    <tr><td>插件文件为空或超过 1MiB</td><td>文件为空，或压缩前体积超过 1 MiB。去掉内嵌的大块数据。</td></tr>
+    <tr><td>插件初始化失败或不兼容当前宿主</td><td>脚本有语法错误，或使用了宿主没有的语法 / 全局对象：<code>import</code> / <code>export</code>、顶层 <code>await</code>、<code>require</code> 在加载时就会失败。改用 <code>module.exports</code>，把异步初始化放进 <code>ready</code> Promise 或方法里。</td></tr>
+    <tr><td>缺少 listPlugin / Not a list or legacy service plugin</td><td><code>module.exports.listPlugin</code> 不存在或不是对象。检查导出的写法。</td></tr>
+    <tr><td>列表插件缺少名称</td><td><code>listPlugin.name</code> 为空。</td></tr>
+    <tr><td>列表插件未声明来源 / 没有声明有效来源及能力</td><td><code>sources</code> 缺失；来源 ID 不合法（须 2–16 位小写字母、数字、下划线，且以字母开头）；<code>capabilities</code> 为空，或全是拼错的能力名。</td></tr>
+    <tr><td>插件缺少 xxx</td><td>声明了能力，却没有实现对应方法，或方法被写在了 <code>listPlugin</code> 之外。</td></tr>
+    <tr><td>插件未声明该能力</td><td>界面调用了你没有声明的能力；在 <code>capabilities</code> 里补上，或在界面里避免该入口。</td></tr>
+    <tr><td>插件返回的数据格式无效</td><td>返回值与数据结构不符。看日志里的 <code>[error] … 返回值无效</code> 那一行，常见原因：必填字段缺失、字符串字段给了数字、<code>NaN</code>、发现页用了 camelCase。</td></tr>
+    <tr><td>插件请求已取消或次数超限</td><td>单次调用的请求超过 24 次（音源插件 16 次）。合并请求，或用 <code>requestAll</code> 并减少每页展开的数量。</td></tr>
+    <tr><td>插件网络请求失败或超时</td><td>目标服务器不可达、证书无效或响应太慢。单个请求最多等 15 秒。</td></tr>
+    <tr><td>地址只支持无用户信息的 HTTP/HTTPS</td><td>URL 里带了 <code>user:pass@</code>，或协议不是 http / https。把账号放进请求头。</td></tr>
+    <tr><td>插件响应过大</td><td>单个响应超过 16 MiB（音源插件 4 MiB）。换分页接口。</td></tr>
+    <tr><td>插件执行超时或取消</td><td>整次调用超过 30 秒。减少串行请求。</td></tr>
+    <tr><td>插件没有返回播放地址</td><td><code>musicUrl</code> 返回的既不是字符串，也不是带 <code>url</code> 字段的对象。</td></tr>
+    <tr><td>来源在菜单里看不到</td><td>来源只有在「由本插件提供播放」打开（或当前音源插件也支持该来源 ID）时才会出现；同时确认插件处于启用状态。</td></tr>
+    <tr><td>改了脚本但行为没变</td><td>需要重新安装同名脚本才会生效。配置会保留。</td></tr>
+  </tbody>
+</table>
+
+<h2 id="checklist">发布前检查清单</h2>
+<ul>
+  <li>脚本头部注释有 <code>@name</code>、<code>@version</code>、<code>@author</code>、<code>@description</code>，且与对象字段一致。</li>
+  <li>每个声明的能力都有对应方法；每个方法都能处理「用户没填配置」「服务器返回错误」「列表为空」三种情况。</li>
+  <li>所有返回值都对照 <a href="data-types.html">数据结构</a> 检查过，数字字段是有限整数，字符串字段是字符串。</li>
+  <li>没有在模块顶层发请求；登录会话放在 <code>cerumusic.storage</code>，并随配置变化失效。</li>
+  <li>错误信息对用户友好，且不含密码、令牌或带签名的 URL。</li>
+  <li>对 <code>http://</code> 服务器，参考内置插件的做法：要求用户显式勾选「允许 HTTP（不加密）」（回环地址除外），不要静默降级到明文传输。</li>
+  <li>在真实服务器上试过搜索、播放、歌词与（如有）导入歌单；没有条件验证的能力，在说明里如实标注。</li>
+  <li>脚本里没有任何属于你自己的密钥或凭据。</li>
+</ul>
+
+<h2 id="versioning">版本与更新</h2>
+<ul>
+  <li>每次修改脚本都递增 <code>version</code>（注释里的 <code>@version</code> 与对象里的 <code>version</code> 同步）。目录靠它判断「可更新」。</li>
+  <li>用户重装同名脚本即为更新，<strong>配置保留</strong>。因此配置项的 <code>key</code> 不要随意改名，需要改时在代码里兼容旧 key。</li>
+  <li><strong>来源 ID 一经发布不要改变</strong>：用户收藏、歌单与下载记录里的歌曲通过它找回你的插件。</li>
+</ul>
+
+<h2 id="submit">提交到内置插件仓库</h2>
+<p>应用内置的列表插件放在独立仓库 <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a>，在主仓库里以子模块挂载到 <code>plugins/</code>，通过 <code>include_str!</code> 嵌入应用。向它提交时请遵守：</p>
+<ul>
+  <li>脚本放在仓库<strong>根目录</strong>，命名为 <code>&lt;名称&gt;.list.js</code>。因为嵌入路径是固定的，<strong>文件名提交后不要再改</strong>。</li>
+  <li>脚本是自包含的单文件，不依赖任何打包或外部资源。</li>
+  <li>在仓库的 README 表格里补一行：文件、来源 ID、能力；并在「验证状态」里如实写明对哪些真实服务器验证过、哪些只在模拟服务上跑通。</li>
+  <li>修改已有脚本时同步递增版本号。</li>
+</ul>
+<div class="callout note">
+<strong>要随应用内置</strong>
+内置插件由主仓库的 <code>crates/mio-core/src/plugin_catalog.rs</code> 登记，应用启动时自动安装并按 <code>@version</code> 更新，还需要更新子模块指针。这一步会改动应用本身，请先在主仓库开一个 Issue 说明你的插件，再一起推进。
+</div>
+<p>不随应用内置也完全可以：把 <code>.js</code> 文件放在任何地方，用户通过「安装列表插件」选择文件或输入 URL 就能安装。</p>
+
+<h2 id="legal">合规</h2>
+<p>Mio Music 只提供插件运行框架，不托管、不获取、不传输任何音乐数据。你的插件所访问的服务与内容是否合法、是否有权使用，由你与使用者自行负责。请不要发布以绕过付费、版权或访问控制为目的的插件。</p>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

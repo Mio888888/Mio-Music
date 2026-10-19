@@ -1,0 +1,86 @@
+[package]
+name = "mio-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[features]
+parity = ["gpui-kit/test-support"]
+
+[dependencies]
+gpui-kit.workspace = true
+mio-core = { path = "../mio-core" }
+mio-tokens = { path = "../mio-tokens" }
+rust-embed = { version = "8", features = ["debug-embed"] }
+serde_json.workspace = true
+serde.workspace = true
+anyhow = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+base64 = "=0.22.1"
+rusqlite = { version = "=0.31.0", features = ["bundled"] }
+mio-plugin = { path = "../mio-plugin" }
+mio-music-sdk = { path = "../mio-music-sdk" }
+tempfile = "3"
+uuid = { version = "1", features = ["v4"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+rodio = { version = "=0.21.1", default-features = false, features = ["playback", "symphonia-all"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "fs", "macros", "io-util"] }
+# Tag writing for downloaded files; same version as the original app.
+# Lyric line parsing.
+regex = "=1.13.1"
+# Playlist export/import files: CryptoJS-compatible AES passphrase encryption plus gzip.
+flate2 = "=1.1.10"
+hex = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Application updates: signature check of the package, its archive and the version comparison.
+minisign-verify = "=0.2.5"
+tar = "=0.4.45"
+semver = "1"
+# DLNA: renderer description and SOAP documents.
+# Spectrum analyser of the equalizer page (the original uses the same crate).
+
+# System tray icon (the original uses Tauri's `tray-icon` feature, which wraps this crate).
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+tray-icon = { version = "=0.23.1", default-features = false }
+
+# OS-level shortcuts (the original uses Tauri's global-shortcut plugin, which wraps this crate).
+[target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
+global-hotkey = "=0.7.0"
+
+# DLNA discovery pins its multicast sockets to each local interface.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Hiding, restoring and click-through of the main/desktop lyric windows (`platform.rs`).
+[target.'cfg(target_os = "windows")'.dependencies]
+raw-window-handle = "0.6"
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+
+# System media keys and "now playing": SMTC on Windows, MPRIS (D-Bus) on Linux.
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+souvlaki = { version = "=0.8.3", default-features = false, features = ["use_zbus"] }
+
+# Linux: the tray is a StatusNotifierItem on D-Bus; click-through is an X11 input shape.
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = { version = "=0.3.4", default-features = false, features = ["async-io", "blocking"] }
+raw-window-handle = "0.6"
+x11rb = { version = "=0.13.2", features = ["shape"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+raw-window-handle = "0.6"
+cocoa = "0.25"
+objc = "0.2"
+metal = "=0.33.0"
+core-video = { version = "=0.5.2", features = ["metal"] }
+core-foundation = "=0.10.1"
+block = "=0.1.6"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
+
+[build-dependencies]
+# Embeds the application icon into the Windows executable (`build.rs`).
+winresource = { version = "=0.1.19", default-features = false }
+
+[dev-dependencies]
+gpui-kit = { version = "=0.7.2", features = ["test-support"] }

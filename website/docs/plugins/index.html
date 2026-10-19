@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>插件开发概览 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 的两类插件、QuickJS 沙箱运行环境、开发流程与阅读路线：写一个音乐列表插件或音源插件需要知道的一切。">
+<meta property="og:title" content="插件开发概览 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 的两类插件、QuickJS 沙箱运行环境、开发流程与阅读路线：写一个音乐列表插件或音源插件需要知道的一切。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/index.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/index.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/index.html">
+<article class="doc" data-title="插件开发概览" data-desc="Mio Music 的两类插件、QuickJS 沙箱运行环境、开发流程与阅读路线：写一个音乐列表插件或音源插件需要知道的一切。">
+<div class="doc-eyebrow">// Plugin Developer Guide</div>
+<h1>插件开发概览</h1>
+<p class="doc-lead">Mio Music 的在线内容全部来自插件。插件是一个自包含的 JavaScript 文件，在应用内的受限沙箱里运行，不需要编译，也不需要任何构建工具。</p>
+
+<div class="doc-cards">
+  <a class="doc-card" href="quickstart.html">
+    <h3><iconify-icon icon="solar:bolt-linear" width="18"></iconify-icon>快速上手</h3>
+    <p>十分钟写出并安装第一个列表插件，看到它出现在来源菜单里。</p>
+  </a>
+  <a class="doc-card" href="list-plugin.html">
+    <h3><iconify-icon icon="solar:widget-5-linear" width="18"></iconify-icon>列表插件参考</h3>
+    <p>元数据、来源与能力、配置表单，以及每个方法的参数与返回值。</p>
+  </a>
+  <a class="doc-card" href="runtime-api.html">
+    <h3><iconify-icon icon="solar:command-linear" width="18"></iconify-icon>运行时 API</h3>
+    <p><code>cerumusic.request</code>、存储、配置、加密工具与全部限制。</p>
+  </a>
+  <a class="doc-card" href="publishing.html">
+    <h3><iconify-icon icon="solar:file-send-linear" width="18"></iconify-icon>调试与发布</h3>
+    <p>读日志、排错清单，以及把插件提交到内置插件仓库的约定。</p>
+  </a>
+</div>
+
+<h2>两类插件</h2>
+<table>
+  <thead><tr><th></th><th>音乐列表插件</th><th>音源插件</th></tr></thead>
+  <tbody>
+    <tr><td>解决什么问题</td><td>「有什么歌」：搜索、歌单、专辑、发现、歌手、歌词、评论、封面。还可以自己提供播放与下载地址。</td><td>「怎么播」：给定来源、歌曲与音质，返回一个可播放的地址。</td></tr>
+    <tr><td>入口</td><td><code>module.exports = { listPlugin: {…} }</code></td><td><code>pluginInfo</code> + <code>sources</code> + <code>musicUrl</code>（澜音），或洛雪脚本（自动转换）</td></tr>
+    <tr><td>文件名</td><td>通常 <code>*.list.js</code></td><td>任意 <code>.js</code></td></tr>
+    <tr><td>能否多个同时启用</td><td>可以</td><td>同一时间使用一个，需显式切换</td></tr>
+    <tr><td>配置表单</td><td>支持（<code>config</code>）</td><td>不支持</td></tr>
+    <tr><td>持久化存储</td><td><code>cerumusic.storage</code></td><td>无</td></tr>
+    <tr><td>参考</td><td><a href="list-plugin.html">列表插件参考</a></td><td><a href="playback-plugin.html">音源插件</a></td></tr>
+  </tbody>
+</table>
+<div class="callout tip">
+<strong>该写哪一种？</strong>
+要对接一个自托管服务器（Subsonic、Jellyfin、你自己的服务……），或者想提供搜索、歌单、歌手页，写<strong>列表插件</strong>，并在其中同时实现 <code>musicUrl</code>，一个文件就够了。只有当你已经有一份「根据歌曲 ID 解析地址」的脚本（例如洛雪脚本）时，才需要音源插件。
+</div>
+
+<h2 id="runtime">运行环境</h2>
+<p>插件由宿主内嵌的 <strong>QuickJS</strong>（通过 rquickjs）执行。它是一个标准的 ECMAScript 引擎，<code>async</code> / <code>await</code>、<code>Promise</code>、解构、模板字符串、<code>Map</code> / <code>Set</code> 都可以直接使用。与浏览器和 Node.js 的差别需要特别注意：</p>
+<ul>
+  <li><strong>没有</strong>文件系统、进程、<code>require</code>、<code>import</code>、DOM。调用 <code>require()</code> 会直接抛错。</li>
+  <li>网络只能通过 <code>cerumusic.request</code>（或 <code>fetch</code> 的最小实现），且只允许 <code>http</code> / <code>https</code>、不带用户名密码的地址。</li>
+  <li>有 <code>setTimeout</code>，没有 <code>setInterval</code>（调用会抛错）。</li>
+  <li>每次调用执行 <strong>30 秒</strong>就会被中断；请求次数、响应体、内存、脚本体积都有上限，见 <a href="runtime-api.html#limits">限制一览</a>。</li>
+</ul>
+<div class="callout warn">
+<strong>每次调用都是全新的上下文</strong>
+宿主为每一次方法调用新建一个 JS 运行时，再执行你的整个脚本。模块顶层的变量（缓存、登录态）<em>不会</em>在两次调用之间保留。需要保留的东西——会话令牌、缓存——写进 <code>cerumusic.storage</code>。这是写插件时最常见的误区。
+</div>
+
+<h2>开发流程</h2>
+<ol class="doc-steps">
+  <li><strong>写脚本</strong>
+    <p>按 <a href="quickstart.html">快速上手</a> 搭好骨架，对照 <a href="list-plugin.html">列表插件参考</a> 与 <a href="data-types.html">数据结构</a> 实现方法。</p></li>
+  <li><strong>安装</strong>
+    <p>设置 → 插件 → 音乐列表插件 → 安装列表插件，选择本地文件或输入 URL。同名重装即更新，配置保留。</p></li>
+  <li><strong>配置并测试</strong>
+    <p>在插件卡片上填写配置、点「测试连接」（如果声明了），然后到搜索页实际使用。</p></li>
+  <li><strong>看日志</strong>
+    <p>插件卡片上的「插件日志」会显示你的 <code>console.*</code> 输出和宿主记录的失败原因。</p></li>
+  <li><strong>发布</strong>
+    <p>分享一个 <code>.js</code> 文件即可；想随应用内置，向 <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a> 提交，见 <a href="publishing.html">调试与发布</a>。</p></li>
+</ol>
+
+<h2>最小的例子</h2>
+<pre class="language-js" data-title="hello.list.js"><code>module.exports = {
+  listPlugin: {
+    name: 'Hello',
+    version: '1.0.0',
+    author: 'you',
+    sources: {
+      hello: { name: 'Hello', capabilities: ['search'] },
+    },
+    async search(source, { keyword, page, limit }) {
+      return {
+        list: [{ songmid: '1', name: keyword, singer: 'Mio', albumName: '', img: '', interval: '03:00' }],
+        allPage: 1, limit, total: 1, source,
+      };
+    },
+  },
+};</code></pre>
+
+<h2>安全与合规</h2>
+<ul>
+  <li>宿主只提供运行框架，<strong>本项目不直接获取、存储或传输任何音乐数据</strong>。通过插件取得的数据是否合法，由插件的提供者与使用者自行负责。</li>
+  <li>插件可以访问它被允许的任意 HTTP(S) 地址并读写自己的存储，请只安装你信任来源的插件。宿主对地址形式、响应体大小与执行时间做限制，但<strong>不</strong>提供按域名的权限隔离。</li>
+  <li>不要在插件里内置自己的密钥或第三方服务的凭据，并避免把令牌写入日志与错误信息。</li>
+</ul>
+
+<h2>阅读路线</h2>
+<ol>
+  <li><a href="quickstart.html">快速上手</a>：先让一个插件跑起来。</li>
+  <li><a href="list-plugin.html">列表插件参考</a>：要实现哪些方法、各自接收什么。</li>
+  <li><a href="data-types.html">数据结构</a>：返回值的字段与类型，以及常见的类型陷阱。</li>
+  <li><a href="runtime-api.html">运行时 API</a>：能用什么、不能用什么。</li>
+  <li><a href="playback-plugin.html">音源插件</a>：只需要解析播放地址时。</li>
+  <li><a href="publishing.html">调试与发布</a>：排错与提交。</li>
+</ol>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

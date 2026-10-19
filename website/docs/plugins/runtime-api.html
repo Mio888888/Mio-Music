@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>运行时 API - Mio Music 文档</title>
+<meta name="description" content="Mio Music 插件运行时提供的全局对象：cerumusic.request、requestAll、storage、config、加密与编码工具、定时器，以及全部资源限制。">
+<meta property="og:title" content="运行时 API - Mio Music 文档">
+<meta property="og:description" content="Mio Music 插件运行时提供的全局对象：cerumusic.request、requestAll、storage、config、加密与编码工具、定时器，以及全部资源限制。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/runtime-api.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/runtime-api.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/runtime-api.html">
+<article class="doc" data-title="运行时 API" data-desc="Mio Music 插件运行时提供的全局对象：cerumusic.request、requestAll、storage、config、加密与编码工具、定时器，以及全部资源限制。">
+<div class="doc-eyebrow">// Runtime API</div>
+<h1>运行时 API</h1>
+<p class="doc-lead">插件运行在 QuickJS 里，宿主在脚本之前注入一小组全局对象。这一页列出能用的全部东西，以及每一项的限制。</p>
+
+<h2 id="overview">全局对象一览</h2>
+<table>
+  <thead><tr><th>名称</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>cerumusic</code></td><td>宿主 API：网络、存储、配置、工具函数。本页的主角。</td></tr>
+    <tr><td><code>console</code></td><td><code>log</code>、<code>info</code>、<code>debug</code>、<code>warn</code>、<code>error</code> 写入插件日志；<code>group</code> 系列是空操作。</td></tr>
+    <tr><td><code>fetch</code></td><td>基于 <code>cerumusic.request</code> 的最小实现：返回 <code>{ ok, status, headers, json(), text() }</code>。</td></tr>
+    <tr><td><code>setTimeout</code> / <code>clearTimeout</code></td><td>可用，同时最多 128 个待触发的定时器。<code>setInterval</code> 调用会直接抛错。</td></tr>
+    <tr><td><code>atob</code> / <code>btoa</code></td><td>Base64 编解码。<code>btoa</code> 只接受 Latin-1 字符。</td></tr>
+    <tr><td><code>Buffer.from</code></td><td>精简版：<code>Buffer.from(string | array, 'base64' | 'hex')</code>，返回带 <code>toString('hex' | 'base64')</code> 的 <code>Uint8Array</code>。</td></tr>
+    <tr><td><code>window</code>、<code>global</code>、<code>globalThis</code></td><td>都指向全局对象。</td></tr>
+    <tr><td><code>module</code>、<code>exports</code></td><td>CommonJS 导出入口。</td></tr>
+    <tr><td><code>require</code></td><td><strong>不可用</strong>，调用即抛错「当前宿主不支持 require」。</td></tr>
+  </tbody>
+</table>
+<p>标准的 ECMAScript 内建对象（<code>Promise</code>、<code>JSON</code>、<code>Math</code>、<code>Date</code>、<code>Map</code>、<code>RegExp</code>、<code>encodeURIComponent</code> 等）由 QuickJS 提供。没有 DOM、<code>XMLHttpRequest</code>、<code>localStorage</code>、文件与进程接口。</p>
+
+<h2 id="request">cerumusic.request</h2>
+<pre class="language-js"><code>const res = await cerumusic.request(url, options);
+// res = { statusCode, headers, body }</code></pre>
+<p>发起一次 HTTP(S) 请求，返回 Promise。也支持回调写法：<code>cerumusic.request(url, options, (err, res) =&gt; {})</code>。</p>
+
+<h3>options</h3>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>method</code></td><td>默认 <code>GET</code>。</td></tr>
+    <tr><td><code>headers</code></td><td>对象，值必须是字符串，最多 64 个。</td></tr>
+    <tr><td><code>body</code></td><td>字符串；传对象时会被序列化为 JSON 字符串，但<strong>不会</strong>自动设置 <code>Content-Type</code>，请自己加。最大 1 MiB。</td></tr>
+    <tr><td><code>timeout</code></td><td>毫秒，默认并且最大为 15000。同时受单次调用 30 秒总时限约束。</td></tr>
+    <tr><td><code>responseType</code></td><td>设为 <code>'base64'</code> 时，<code>body</code> 是响应字节的 Base64 字符串（用于二进制内容）。</td></tr>
+  </tbody>
+</table>
+
+<h3>返回值</h3>
+<table>
+  <thead><tr><th>字段</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>statusCode</code></td><td>HTTP 状态码。<strong>非 2xx 不会抛错</strong>，请自己检查。</td></tr>
+    <tr><td><code>headers</code></td><td>响应头，键为小写。</td></tr>
+    <tr><td><code>body</code></td><td>响应体。<strong>如果内容是合法的 JSON，已被解析成对象 / 数组 / 数字，否则是字符串。</strong></td></tr>
+  </tbody>
+</table>
+<div class="callout warn">
+<strong>body 可能已经被解析过</strong>
+因为 <code>body</code> 会被自动 <code>JSON.parse</code>，一个内容恰好是 <code>123</code> 或 <code>"abc"</code> 的响应会变成数字或字符串。写一个小工具来统一处理，内置插件里都有类似的写法：
+<pre class="language-js"><code>function json(res) {
+  let body = res.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { throw new Error('服务器返回的不是 JSON'); }
+  }
+  return body;
+}</code></pre>
+</div>
+
+<h3>地址与失败</h3>
+<ul>
+  <li>只允许 <code>http</code> / <code>https</code>，地址长度不超过 8192 字符，<strong>不能包含用户名密码</strong>（<code>https://user:pass@host</code>）。不合法的地址让 Promise reject，错误是「地址只支持无用户信息的 HTTP/HTTPS」。</li>
+  <li>最多跟随 5 次重定向；响应自动解压 gzip 与 brotli。</li>
+  <li>网络失败、超时、响应过大、请求次数超限，都会让 Promise reject（错误信息是宿主的固定文案，不含 URL）。</li>
+</ul>
+
+<h2 id="requestall">cerumusic.requestAll</h2>
+<pre class="language-js"><code>const replies = await cerumusic.requestAll([
+  { url: urlA, options: {} },
+  { url: urlB, options: { headers: { Accept: 'application/json' } } },
+]);
+for (const r of replies) {
+  if (r.error) { /* 这一个失败了 */ continue; }
+  const { statusCode, body } = r.response;
+}</code></pre>
+<p>并发发出多个请求（同时最多 8 个），结果<strong>按输入顺序</strong>返回，每一项是 <code>{ response }</code> 或 <code>{ error }</code>，Promise 本身不会因单个请求失败而 reject。一次最多 24 项，并且每一项都计入这次调用的请求次数上限。适合「先取列表，再并发取每一项的详情」这类场景，比串行 <code>await</code> 快得多。</p>
+
+<h2 id="storage">cerumusic.storage</h2>
+<pre class="language-js"><code>cerumusic.storage.set('session', { token, expires: Date.now() + 3600e3 });
+const s = cerumusic.storage.get('session');   // 没有时是 undefined
+cerumusic.storage.remove('session');</code></pre>
+<p>每个插件私有的持久化键值存储，同步调用。典型用途是缓存登录会话。</p>
+<ul>
+  <li>值会被序列化为 JSON，读取时还原；<code>undefined</code> 存为 <code>null</code>。</li>
+  <li>键不能为空，最长 128 个字符。整个存储序列化后不得超过 <strong>256 KiB</strong>，超过时 <code>set</code> 抛错。</li>
+  <li><code>set</code> 会立即交给宿主持久化；它跨调用、跨应用重启保留。</li>
+  <li>存储同样不是加密的。过期的令牌记得清理，缓存键里最好带上能让缓存失效的信息（例如服务器地址与密码的哈希），这样用户改了配置就不会读到旧会话。</li>
+</ul>
+
+<h2 id="config">cerumusic.config</h2>
+<p>用户在「配置」表单里填的值，一个普通对象，键就是 <code>config</code> 里声明的 <code>key</code>。没有声明表单时是 <code>{}</code>。始终防御性地读取：</p>
+<pre class="language-js"><code>const c = cerumusic.config || {};
+const baseUrl = String(c.baseUrl || '').trim();
+if (!baseUrl) throw new Error('请先在插件“配置”中填写服务器地址');</code></pre>
+<p>用户可能还没填，也可能填了带空格或尾部斜杠的值。校验并规范化它们是你的责任。</p>
+
+<h2 id="utils">cerumusic.utils</h2>
+<h3>crypto</h3>
+<table>
+  <thead><tr><th>函数</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>md5(text)</code></td><td>返回 32 位小写十六进制。Subsonic 令牌认证用它。</td></tr>
+    <tr><td><code>sha1(text)</code></td><td>返回 40 位小写十六进制。</td></tr>
+    <tr><td><code>aes128EcbHex(text, key)</code></td><td>AES-128-ECB、PKCS7，<code>key</code> 是 16 个字符的文本，返回大写十六进制。</td></tr>
+    <tr><td><code>aes128EcbBase64(op, data, keyHex)</code></td><td>AES-128-ECB、PKCS7。<code>op</code> 为 <code>'encrypt'</code>（<code>data</code> 是文本，返回 Base64）或 <code>'decrypt'</code>（<code>data</code> 是 Base64，返回文本）；<code>keyHex</code> 是 32 位十六进制。输入非法时抛错。</td></tr>
+    <tr><td><code>aesEncrypt</code>、<code>rsaEncrypt</code>、<code>randomBytes</code></td><td><strong>未实现</strong>，调用会抛错。需要随机数请用 <code>Math.random()</code>。</td></tr>
+  </tbody>
+</table>
+<h3>buffer</h3>
+<p><code>cerumusic.utils.buffer.from(data, encoding)</code> 与 <code>bufToString(buffer, encoding)</code>，与全局 <code>Buffer.from</code> 同源，<code>encoding</code> 可为 <code>'base64'</code> 或 <code>'hex'</code>。</p>
+<h3 id="lyric-utils">lyric</h3>
+<table>
+  <thead><tr><th>函数</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>validTtml(text)</code></td><td>判断一段文本是不是可解析且至少包含一行有内容的 TTML（不超过 2 MB）。在返回 <code>ttml</code> 之前用它自检。</td></tr>
+  </tbody>
+</table>
+
+<h2 id="meta">环境信息</h2>
+<table>
+  <thead><tr><th>字段</th><th>值</th></tr></thead>
+  <tbody>
+    <tr><td><code>cerumusic.env</code></td><td><code>'browser'</code></td></tr>
+    <tr><td><code>cerumusic.platform</code></td><td>桌面端为 <code>'desktop'</code>，移动端为 <code>'mobile'</code></td></tr>
+    <tr><td><code>cerumusic.version</code></td><td>当前为 <code>'1.0.3'</code>。这是兼容澜音插件接口的版本号，不是应用版本</td></tr>
+  </tbody>
+</table>
+
+<h2 id="limits">限制一览</h2>
+<p>所有限制都是为了保证一个失控的脚本不会拖垮应用。超过任何一项都会让这次调用失败。</p>
+<table>
+  <thead><tr><th>项目</th><th>列表插件</th><th>音源插件</th></tr></thead>
+  <tbody>
+    <tr><td>单次调用总时限</td><td colspan="2">30 秒（超时后脚本被中断）</td></tr>
+    <tr><td>单次调用的请求数</td><td>24</td><td>16</td></tr>
+    <tr><td>单个请求的超时</td><td colspan="2">15 秒，且不超过剩余的总时限</td></tr>
+    <tr><td>响应体大小</td><td>16 MiB</td><td>4 MiB</td></tr>
+    <tr><td>请求体大小</td><td colspan="2">1 MiB</td></tr>
+    <tr><td>请求头数量</td><td colspan="2">64</td></tr>
+    <tr><td>重定向</td><td colspan="2">最多 5 次</td></tr>
+    <tr><td>内存</td><td>96 MiB</td><td>32 MiB</td></tr>
+    <tr><td>栈</td><td colspan="2">512 KiB</td></tr>
+    <tr><td>脚本体积</td><td colspan="2">1 MiB</td></tr>
+    <tr><td>定时器</td><td colspan="2">同时 128 个，无 <code>setInterval</code></td></tr>
+    <tr><td>存储</td><td>256 KiB，键 ≤128 字符</td><td>无存储</td></tr>
+    <tr><td>日志</td><td colspan="2">保留最近 500 行，每行最多 2000 个字符</td></tr>
+    <tr><td>单页结果</td><td>每页最多 500 项</td><td>—</td></tr>
+  </tbody>
+</table>
+<div class="callout tip">
+<strong>在 24 次请求内做完一次调用</strong>
+列表插件常见的坑是为每首歌各发一次请求。能一次取回的就一次取回；必须逐个取时，用 <code>requestAll</code> 并发，并且按需分页——歌手页的 <code>singerSongs</code> 一次只展开几张专辑（内置的 Navidrome 插件每页只取 10 张）而不是整个曲库。
+</div>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>

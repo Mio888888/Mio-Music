@@ -1,0 +1,15 @@
+name: mio_native_host
+description: Mio Android host lifecycle shared by the UI and audio_service engine.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ^3.13.5
+dependencies:
+  flutter:
+    sdk: flutter
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.vant.mio_music
+        pluginClass: MioNativeHostPlugin

@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-CN" class="antialiased scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0B0F19">
+<title>数据结构 - Mio Music 文档</title>
+<meta name="description" content="Mio Music 列表插件返回值的完整字段说明：MusicItem、SearchResult、PlaylistDetail、SingerInfo、发现页、歌词与评论，以及常见的类型陷阱。">
+<meta property="og:title" content="数据结构 - Mio Music 文档">
+<meta property="og:description" content="Mio Music 列表插件返回值的完整字段说明：MusicItem、SearchResult、PlaylistDetail、SingerInfo、发现页、歌词与评论，以及常见的类型陷阱。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mio888888.github.io/Mio-Music/docs/plugins/data-types.html">
+<meta property="og:image" content="https://mio888888.github.io/Mio-Music/assets/app-icon.png">
+<meta property="og:locale" content="zh_CN">
+<link rel="canonical" href="https://mio888888.github.io/Mio-Music/docs/plugins/data-types.html">
+<link rel="icon" href="../../assets/app-icon.png">
+<script src="../../assets/vendor/tailwind/tailwindcss.js"></script>
+<script src="../../assets/vendor/iconify/local-icons.js"></script>
+<link rel="stylesheet" href="../../assets/site.css">
+<link rel="stylesheet" href="../../assets/docs.css">
+</head>
+<body class="docs-page" data-root="../../" data-page="plugins/data-types.html">
+<article class="doc" data-title="数据结构" data-desc="Mio Music 列表插件返回值的完整字段说明：MusicItem、SearchResult、PlaylistDetail、SingerInfo、发现页、歌词与评论，以及常见的类型陷阱。">
+<div class="doc-eyebrow">// Data Types</div>
+<h1>数据结构</h1>
+<p class="doc-lead">插件返回的 JSON 会被反序列化为 <code>mio-music-sdk</code> 里的 Rust 类型。字段名与类型必须对得上，否则整次调用会失败。本页列出每一种结构。</p>
+
+<div class="callout warn">
+<strong>先记住这三条</strong>
+<ul>
+  <li>大多数结构的字段名是 <strong>camelCase</strong>（<code>albumName</code>、<code>allPage</code>）。<strong>发现页</strong>的结构例外，用的是 snake_case（<code>has_more</code>、<code>update_frequency</code>），见 <a href="#discovery">发现页</a>。</li>
+  <li>类型要严格：该是字符串的字段给了数字（或相反）就会失败。整数字段必须是有限的整数，<code>NaN</code>、<code>Infinity</code> 与 <code>3.5</code> 都不行（<code>JSON.stringify</code> 会把 <code>NaN</code> 变成 <code>null</code>）。</li>
+  <li>失败时用户只会看到「插件返回的数据格式无效」，具体是哪个字段错了，在 <a href="publishing.html#logs">插件日志</a> 里。</li>
+</ul>
+</div>
+
+<p>下面表格的「必填」列表示：缺少该字段时反序列化是否失败。「可选」字段缺失时取默认值（空串、<code>null</code> 或 0）。</p>
+
+<h2 id="musicitem">MusicItem（歌曲）</h2>
+<p>歌曲在列表里出现、被收藏、加入歌单、下载，最后又作为 <code>song</code> 参数传回你的 <code>musicUrl</code> / <code>lyrics</code> 等方法，都是这个结构。所有字段都是可选的，但实际上请至少填写前面几项。</p>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>songmid</code></td><td>string | number</td><td><strong>歌曲在来源里的唯一 ID。</strong>建议用字符串。</td></tr>
+    <tr><td><code>name</code></td><td>string</td><td>歌名。</td></tr>
+    <tr><td><code>singer</code></td><td>string</td><td>歌手名，多个歌手自行拼接。</td></tr>
+    <tr><td><code>albumName</code></td><td>string</td><td>专辑名。</td></tr>
+    <tr><td><code>albumId</code></td><td>string | number</td><td>专辑 ID，之后可用于 <code>albumDetail</code>。</td></tr>
+    <tr><td><code>singerId</code></td><td>string</td><td>歌手 ID，用于跳转到歌手页。</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>来源 ID。宿主会改写成本次调用的来源，但仍建议填写。</td></tr>
+    <tr><td><code>interval</code></td><td>string</td><td>时长，格式 <code>mm:ss</code>（或 <code>hh:mm:ss</code>）。</td></tr>
+    <tr><td><code>img</code></td><td>string</td><td>封面 URL，没有则空串。</td></tr>
+    <tr><td><code>types</code></td><td>string[]</td><td>这首歌可用的音质名称（<code>128k</code>、<code>320k</code>、<code>flac</code> …），由差到好。</td></tr>
+    <tr><td><code>_types</code></td><td>object</td><td>各音质的补充信息：<code>{ "320k": { size: "9.8MB", hash?: "…" } }</code>。<code>size</code> 是字符串。</td></tr>
+    <tr><td><code>typeUrl</code></td><td>object</td><td><strong>私有数据的容器</strong>，见下文。</td></tr>
+    <tr><td><code>lrc</code></td><td>string | null</td><td>已经附带的歌词文本，通常为 <code>null</code>。</td></tr>
+    <tr><td><code>hash</code>、<code>songId</code>、<code>strMediaMid</code>、<code>albumMid</code>、<code>copyrightId</code>、<code>lrcUrl</code>、<code>mrcUrl</code>、<code>trcUrl</code></td><td>各异</td><td>原版若干来源用到的额外字段，自建来源一般不需要。</td></tr>
+  </tbody>
+</table>
+<p>字符串类型的字段（<code>name</code>、<code>singer</code>、<code>albumName</code>、<code>interval</code>、<code>img</code> 等）如果传了数字，整个结果都会被拒绝。服务器返回数字的时候，用 <code>String(v)</code> 转换一下。</p>
+
+<h3 id="stash">私有数据放在哪里</h3>
+<p>歌曲会被缓存、写入收藏与歌单、交给下载器，再在播放时传回你的方法。这个过程通过 <code>MusicItem</code> 结构往返，所以<strong>结构里没有的字段会丢失</strong>——你自己加的 <code>serverPath</code>、<code>token</code> 之类的顶层字段，到 <code>musicUrl</code> 时已经不在了。两个办法：</p>
+<ul>
+  <li>把定位歌曲所需的一切编进 <code>songmid</code>（例如 <code>"srv1:12345"</code>），在方法里再拆开；</li>
+  <li>或把私有字段放进 <code>typeUrl</code> 对象。<code>typeUrl</code> 是自由结构，会随歌曲完整保留，旧版服务适配层也用它保存原始来源。</li>
+</ul>
+<pre class="language-js"><code>function toSong(v) {
+  return {
+    songmid: String(v.id),
+    name: String(v.title || ''),
+    singer: String(v.artist || ''),
+    albumName: String(v.album || ''),
+    source: 'myid',
+    interval: mmss(Math.trunc(v.duration) || 0),
+    img: coverUrl(v),
+    types: ['128k', '320k'],
+    typeUrl: { path: v.path },   // 私有数据：播放时从 song.typeUrl.path 读回
+  };
+}</code></pre>
+
+<h2 id="searchresult">SearchResult</h2>
+<p><code>search</code>、<code>singerSongs</code> 的返回值。</p>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td>MusicItem[]</td><td>是</td><td>本页歌曲。</td></tr>
+    <tr><td><code>allPage</code></td><td>integer</td><td>是</td><td>总页数。</td></tr>
+    <tr><td><code>limit</code></td><td>integer</td><td>是</td><td>本页大小，通常原样返回参数里的 <code>limit</code>。</td></tr>
+    <tr><td><code>total</code></td><td>integer</td><td>是</td><td>总条数。</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td><td>来源 ID（宿主会改写，但字段本身必须存在）。</td></tr>
+  </tbody>
+</table>
+
+<h2 id="playlistresult">PlaylistResult 与 PlaylistItem</h2>
+<p><code>searchPlaylist</code>、<code>getPlaylists</code> 的返回值，以及发现页里歌单列表的元素。</p>
+<table>
+  <thead><tr><th>PlaylistResult</th><th>类型</th><th>必填</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td>PlaylistItem[]</td><td>是</td></tr>
+    <tr><td><code>allPage</code>、<code>limit</code>、<code>total</code></td><td>integer</td><td>是</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>PlaylistItem</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td>string | number</td><td>是</td><td>之后作为 <code>playlistDetail</code> 的 <code>id</code> 传回。</td></tr>
+    <tr><td><code>name</code></td><td>string</td><td>是</td><td></td></tr>
+    <tr><td><code>img</code></td><td>string</td><td>是</td><td>封面 URL，可为空串。</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td><td></td></tr>
+    <tr><td><code>desc</code></td><td>string</td><td>否</td><td>简介。</td></tr>
+    <tr><td><code>author</code></td><td>string</td><td>否</td><td>创建者。</td></tr>
+    <tr><td><code>playCount</code></td><td>number | string | null</td><td>否</td><td>播放量。</td></tr>
+    <tr><td><code>total</code></td><td>number | string | null</td><td>否</td><td>歌曲数。</td></tr>
+  </tbody>
+</table>
+
+<h2 id="playlistdetail">PlaylistDetail</h2>
+<p><code>playlistDetail</code>、<code>albumDetail</code>、<code>chartDetail</code> 的返回值：一页歌曲，加上歌单自身的信息。</p>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td>MusicItem[]</td><td>是</td><td>本页歌曲。</td></tr>
+    <tr><td><code>info</code></td><td>object</td><td>是</td><td><code>{ name, img, desc, author }</code>，四项均为可选字符串，没有就给 <code>{}</code>。</td></tr>
+    <tr><td><code>allPage</code>、<code>limit</code>、<code>total</code></td><td>integer</td><td>是</td><td></td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td><td></td></tr>
+  </tbody>
+</table>
+
+<h2 id="singer">歌手</h2>
+<h3>SingerInfo</h3>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>必填</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code>、<code>source</code>、<code>name</code>、<code>desc</code>、<code>avatar</code></td><td>string</td><td>是</td></tr>
+    <tr><td><code>gender</code></td><td>string | null</td><td>否</td></tr>
+    <tr><td><code>musicCount</code>、<code>albumCount</code></td><td>integer</td><td>是</td></tr>
+  </tbody>
+</table>
+<h3>SingerAlbumPage</h3>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>必填</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td>SingerAlbum[]</td><td>是</td></tr>
+    <tr><td><code>allPage</code>、<code>limit</code>、<code>total</code></td><td>integer</td><td>是</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td></tr>
+  </tbody>
+</table>
+<p>其中 <code>SingerAlbum</code> 为 <code>{ id, count, name, author, img, desc }</code>：<code>id</code>、<code>name</code>、<code>author</code>、<code>img</code> 是字符串（<strong>ID 不能是数字</strong>），<code>count</code> 是整数，<code>desc</code> 是字符串或 <code>null</code>。<code>id</code> 之后会作为 <code>albumDetail</code> 的 <code>id</code> 传回。</p>
+
+<h2 id="discovery">发现页</h2>
+<div class="callout warn">
+<strong>这里的字段是 snake_case</strong>
+发现页的结构沿用了原版的序列化格式：用 <code>has_more</code> 和 <code>update_frequency</code>，不是 <code>hasMore</code> 和 <code>updateFrequency</code>。写成 camelCase 会得到「字段缺失」的错误。其中嵌套的 <code>PlaylistItem</code>、<code>MusicItem</code> 仍然是 camelCase。
+</div>
+<h3>DiscoveryCategories（<code>discoveryCategories</code>）</h3>
+<pre class="language-js"><code>{
+  groups: [
+    { name: '专辑', list: [{ id: 'newest', name: '最新添加', source }] },
+  ],
+  hot: [{ id: 'newest', name: '最新添加', source }],
+  source,
+}</code></pre>
+<p><code>groups</code> 与 <code>hot</code> 都是必填；分类里的 <code>id</code> 是字符串，会作为 <code>discoveryPlaylists</code> 的 <code>category</code> 传回。</p>
+<h3>DiscoveryPlaylistPage（<code>discoveryPlaylists</code>）</h3>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>list</code></td><td>PlaylistItem[]</td><td>是</td><td></td></tr>
+    <tr><td><code>page</code></td><td>integer</td><td>是</td><td>当前页码。</td></tr>
+    <tr><td><code>total</code></td><td>integer | null</td><td>否</td><td>来源不提供总数时给 <code>null</code>，<strong>不要估算</strong>。</td></tr>
+    <tr><td><code>has_more</code></td><td>boolean</td><td>是</td><td>是否还有下一页。</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>是</td><td></td></tr>
+  </tbody>
+</table>
+<h3>DiscoveryChart（<code>discoveryCharts</code> 的数组元素）</h3>
+<pre class="language-js"><code>{ id: 'random', name: '随机歌曲', img: '', source, update_frequency: '' }</code></pre>
+<p>全部字段必填且都是字符串，<code>id</code> 最长 40 个字符，会作为 <code>chartDetail</code> 的 <code>id</code> 传回。</p>
+
+<h2 id="lyric">Lyric（歌词）</h2>
+<table>
+  <thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>lyric</code></td><td>string</td><td>逐行 LRC 文本，每行形如 <code>[mm:ss.xx]歌词</code>。<strong>既没有 <code>lyric</code> 也没有可解析的 <code>ttml</code>，就视为没有歌词。</strong></td></tr>
+    <tr><td><code>tlyric</code></td><td>string</td><td>翻译 LRC，时间轴与 <code>lyric</code> 对应，没有就留空。</td></tr>
+    <tr><td><code>rlyric</code></td><td>string</td><td>音译（罗马音）LRC，没有就留空。</td></tr>
+    <tr><td><code>crlyric</code></td><td>string</td><td>来源特有的逐字歌词文本，一般留空。</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>来源 ID。</td></tr>
+    <tr><td><code>ttml</code></td><td>string</td><td>可选。<strong>带逐字时间的 TTML 文档</strong>。提供它，歌词页就能做逐字高亮。可用 <a href="runtime-api.html#utils">cerumusic.utils.lyric.validTtml</a> 事先校验。</td></tr>
+  </tbody>
+</table>
+<p>整个返回值序列化后不得超过 4 MB。服务器没有歌词时，<code>throw new Error('没有找到歌词')</code>，而不是返回空对象。</p>
+
+<h2 id="comments">Comments（评论）</h2>
+<pre class="language-js"><code>{
+  comments: [
+    {
+      id: '123',               // 用于去重，必须唯一
+      userName: 'Mio',
+      avatar: 'https://…',
+      timeStr: '2026-10-01',
+      text: '好听！',
+      likedCount: 42,
+      images: ['https://…'],   // 可选
+      reply: [ /* 同结构的回复，可选 */ ],
+    },
+  ],
+  total: 1280,        // 总评论数
+  maxPage: 43,        // 总页数
+  cursor: '',         // 下一页游标，没有就空串或省略
+}</code></pre>
+<ul>
+  <li>一页最多 <strong>300</strong> 条，整体序列化后不超过 <strong>4 MB</strong>，否则整次调用被拒绝。</li>
+  <li><code>text</code> 按纯文本展示，宿主会对其中的 HTML 做转义，所以不必也不应当自己转义。</li>
+  <li><code>avatar</code> 与 <code>images</code> 只接受不含用户名密码的 <code>http(s)</code> 地址，不合法的会被忽略。</li>
+  <li><code>cursor</code> 只允许字母、数字与下划线，最长 256 个字符。如果连续两次返回的内容相同（<code>id</code> 全部重复），应用会认为已经到底并停止翻页。</li>
+</ul>
+</article>
+
+<script src="../../assets/docs.js"></script>
+</body>
+</html>
