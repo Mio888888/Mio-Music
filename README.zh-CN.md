@@ -111,11 +111,11 @@ Rust 库需要单独构建并放进工程（见 [构建鸿蒙版](#构建鸿蒙�
 安装包由 `Build` 工作流发布到 [GitHub Releases](https://github.com/Mio888888/Mio-Music/releases)：只要 `Cargo.toml` 的版本号还没有对应的 `v<版本>` tag，就会编译全部平台、上传安装包与 `latest.json`，然后发布。
 
 - **当前状态：** 重写版尚未发布正式版本。GitHub Releases 上仍是旧 Tauri 版的 `v0.3.x`，其用户继续从那里获取更新。
-- **更新内容：** 每次发布都附带自上个版本以来的改动，由提交信息生成（也可以手写 `docs/release-notes/v<版本>.md`），两端都会在更新对话框中显示。
+- **更新内容：** 每次发布都附带自上个版本以来的改动，由提交信息生成，两端都会在更新对话框中显示。
 - **鸿蒙：** `Build` 工作流没有鸿蒙任务，也没有发布 `.hap`。构建需要 DevEco 命令行工具（要用华为账号下载）和签名证书。
 - **自动更新：** 桌面端读取 `latest.json` 并校验 Ed25519 签名；格式与 Tauri 版一致，已安装的旧版可以直接覆盖更新。
 
-发布流程与安装包命名见 [`docs/release.md`](docs/release.md)。
+发布流程见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。
 
 ## 技术栈
 
@@ -219,9 +219,12 @@ cargo check --workspace --locked
 ├── vendor/cpal-ohos/        # 带 OHAudio 后端的 cpal，供鸿蒙使用
 ├── plugins/                 # 内置列表插件（子模块）
 ├── tools/                   # 打包、CI 脚本、发布说明、截图比对工具、Subsonic 测试服务
-├── docs/                    # 发布流程与开发说明
 └── website/                 # 静态网站与文档（GitHub Pages）
 ```
+
+## 参与贡献
+
+欢迎参与贡献。请先阅读 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md) 和[行为准则](CODE_OF_CONDUCT.zh-CN.md)；PR 与 issue 模板里列出了需要提供的内容。安全问题请按 [SECURITY.zh-CN.md](SECURITY.zh-CN.md) 私下报告。
 
 ## 致谢
 
@@ -246,8 +249,10 @@ Mio Music 的持续维护、跨平台适配与问题修复由当前项目作者�
 
 ## 免责声明
 
-本项目仅供学习与个人使用。它自身不获取、不存储、不传输任何音乐数据或受版权保护的内容，只提供插件运行框架。禁止用于任何商业用途或侵犯第三方权益。
+本项目仅供学习与个人使用。它自身不获取、不存储、不传输任何音乐数据或受版权保护的内容，只提供插件运行框架。你需要自行确保通过插件播放和下载的内容在你所在地区合法，并尊重第三方的权益。
 
 ## 许可证
 
-目前还没有许可证文件；本项目与依赖的许可证在重写版首次发布前完成审核。从原项目复用的资源与转换器沿用原仓库的许可条款。
+Mio Music 是自由软件，采用 [GNU Affero 通用公共许可证 v3.0](LICENSE)（`AGPL-3.0-only`）授权。你可以使用、研究、修改和分享它，包括商业使用；前提是基于它的衍生作品也要以相同许可证连同源代码一起发布，用户通过网络与之交互时同样适用。
+
+本项目经由 Tauri 版 Mio Music 衍生自 [CeruMusic](https://github.com/timeshiftsauce/CeruMusic)（版权所有 © 2026 时迁酱，`AGPL-3.0-only`）。第三方代码保留各自的许可证：`vendor/` 与 `apps/mobile/vendor/` 下的内置库为 Apache-2.0 或 MIT，其余依赖见 `Cargo.lock` 与 `apps/mobile/pubspec.lock`。贡献按相同许可证接受，见 [CONTRIBUTING.zh-CN.md](CONTRIBUTING.zh-CN.md)。

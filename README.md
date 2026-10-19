@@ -111,11 +111,11 @@ Mobile acceptance evidence is described in [`apps/mobile/README.md`](apps/mobile
 Builds are published on [GitHub Releases](https://github.com/Mio888888/Mio-Music/releases) by the `Build` workflow: whenever the version in `Cargo.toml` has no `v<version>` tag, it builds every platform, uploads the packages and `latest.json`, and publishes the release.
 
 - **Current state:** no release of this rewrite is published yet. GitHub Releases still lists the `v0.3.x` releases of the previous Tauri app, which its users keep updating from.
-- **Update notes:** every release carries the changes since the previous one, generated from commit messages (or a hand-written `docs/release-notes/v<version>.md`). Both apps show them in their update dialog.
+- **Update notes:** every release carries the changes since the previous one, generated from commit messages. Both apps show them in their update dialog.
 - **HarmonyOS:** the `Build` workflow has no HarmonyOS job and no `.hap` is published. Building one needs the DevEco command line tools, which are downloaded with a Huawei account, and a signing certificate.
 - **Updates:** the desktop updater reads `latest.json` and verifies Ed25519 signatures; the format matches the Tauri app, so its installs update in place.
 
-Release process and package names: [`docs/release.md`](docs/release.md).
+The release workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml).
 
 ## Tech Stack
 
@@ -219,9 +219,12 @@ The [plugin developer guide](https://mio888888.github.io/Mio-Music/docs/plugins/
 ├── vendor/cpal-ohos/        # cpal with an OHAudio host for HarmonyOS
 ├── plugins/                 # Submodule with the built-in list plugins
 ├── tools/                   # Packaging, CI helpers, release notes, golden-image tooling, Subsonic fixture
-├── docs/                    # Release process and development notes
 └── website/                 # Static site and docs (GitHub Pages)
 ```
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md) first; the pull request and issue templates list what to include. Report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Credits
 
@@ -246,8 +249,10 @@ Ongoing maintenance, cross-platform adaptation and issue fixes for Mio Music are
 
 ## Disclaimer
 
-This project is for educational and personal use only. It does not fetch, store or transmit any music data or copyrighted content by itself — it only provides a plugin runtime framework. Use for any commercial purpose or infringement of third-party rights is prohibited.
+This project is for educational and personal use. By itself it does not fetch, store or transmit any music data or copyrighted content; it only provides a plugin runtime framework. You are responsible for making sure that what you play and download through plugins is lawful where you live and respects the rights of third parties.
 
 ## License
 
-There is no license file yet; the project and dependency licenses are being reviewed before the first release of this rewrite. Assets and converters reused from the original project keep the original repository's license terms.
+Mio Music is free software, licensed under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`). You may use, study, change and share it, including commercially, as long as works derived from it are released under the same license with their source code, which also applies when users interact with them over a network.
+
+It is derived from [CeruMusic](https://github.com/timeshiftsauce/CeruMusic) (Copyright © 2026 时迁酱, `AGPL-3.0-only`) through the Tauri-based Mio Music. Third-party code keeps its own license: the libraries vendored under `vendor/` and `apps/mobile/vendor/` are Apache-2.0 or MIT, and every other dependency is resolved in `Cargo.lock` and `apps/mobile/pubspec.lock`. Contributions are accepted under the same license; see [CONTRIBUTING.md](CONTRIBUTING.md).

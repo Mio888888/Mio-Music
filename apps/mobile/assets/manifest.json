@@ -9,11 +9,11 @@
   },
   "locales/zh-CN.json": {
     "source": "crates/mio-core/locales/zh-CN.json",
-    "sha256": "44808911def9f742933ff5de0ed1bdd72e5c3aa177f5aa749df3e5bbcf2fe241"
+    "sha256": "d8b8842510fe08035e75a824a9cf37ba466b720794962988069417791ed4fab2"
   },
   "locales/en-US.json": {
     "source": "crates/mio-core/locales/en-US.json",
-    "sha256": "78b4d84e7d9d9134490b0cf6efec5231c22a963322c6e6bac37a76303c150049"
+    "sha256": "c6aabae3ba2ebf0759fe9458ac1debab924995cee8d9d8012d2a3957cdc2fa25"
   },
   "icons/Add.svg": {
     "source": "crates/mio-app/assets/icons/Add.svg",

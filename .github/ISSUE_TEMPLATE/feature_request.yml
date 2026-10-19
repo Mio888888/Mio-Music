@@ -1,0 +1,44 @@
+name: Feature request / 功能建议
+description: Suggest an improvement or a new feature. / 提出改进或新功能。
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Online music sources are provided by plugins and are not added to the app itself. 在线音源由插件提供，不会加入应用本体。
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve? / 它要解决什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you propose? / 你的方案
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered / 考虑过的其他方案
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Platforms / 涉及的平台
+      multiple: true
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Android
+        - iOS
+        - HarmonyOS (experimental branch / 实验分支)
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit / 提交前
+      options:
+        - label: I searched the existing issues. / 我搜索过已有的 issue。
+          required: true
+        - label: I would be willing to send a pull request. / 我愿意提交 PR。

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability / 报告安全漏洞
+    url: https://github.com/Mio888888/Mio-Music/security/advisories/new
+    about: Please report security problems privately, not as an issue. / 安全问题请私下报告，不要新建 issue。
+  - name: Plugin developer guide / 插件开发者指南
+    url: https://mio888888.github.io/Mio-Music/docs/plugins/
+    about: How to write and debug a music-list or source plugin. / 如何编写和调试音乐列表插件与音源插件。
+  - name: Bundled plugins / 内置插件
+    url: https://github.com/Mio888888/mio-music-plugins
+    about: Problems with a Songloft, Subsonic, Navidrome, Jellyfin, Emby or Plex plugin belong here. / 内置插件本身的问题请到这里提。
