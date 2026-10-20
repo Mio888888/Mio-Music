@@ -4,25 +4,75 @@
 
 <h1 align="center">Mio Music</h1>
 
-<p align="center">A native cross-platform music player: Rust + GPUI on the desktop, Flutter on mobile, one shared Rust core</p>
+<p align="center">One music player for your local files, personal music servers and plugin-powered online sources.</p>
 
 <p align="center">
   <b>English</b> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
+[Getting Started](#getting-started) · [Default Plugins](#default-plugins) · [Features](#features) · [Platform Support](#platform-support) · [Development](#development) · [Docs](https://mio888888.github.io/Mio-Music/)
+
 ---
 
 ## Introduction
 
-Mio Music is the native rewrite of the [Tauri-based Mio Music](https://github.com/Mio888888/Mio-Music/releases/tag/v0.3.6), itself rebuilt from [CeruMusic](https://github.com/timeshiftsauce/CeruMusic). The desktop app is written in Rust on [GPUI Kit](https://gpui-kit.com/) 0.7.2 (with `gpui-fast`) and re-implements the original feature for feature, layout for layout and data format for data format; the AI assistant is out of scope. Phones, tablets and TVs run a Flutter app that shares the same Rust core (`mio-core`). Online music comes only from plugins.
+**Mio Music is a local-first, cross-platform music player with plugin support.** Play your local files, connect to a personal music server you already use, or add compatible plugins for other online sources.
 
-> This project does not host, fetch or transmit any music data by itself. All online content comes from third-party services through plugins; whether that content may be used is the responsibility of plugin providers and users.
+- **Local music:** scan files and manage tags, covers, favorites and playlists. No online plugin setup is required.
+- **Personal libraries:** built-in connectors for Songloft, Subsonic, Navidrome, Jellyfin, Emby and Plex let you search and play your server's music in one player.
+- **Listening experience:** word-by-word and TTML lyrics, translations and romanization, animated backgrounds, an equalizer, gapless playback and crossfade.
+- **Multiple clients:** desktop apps for macOS, Windows and Linux; a Flutter client for Android phones, tablets and TVs, plus iPhone and iPad. See [Platform Support](#platform-support) for each platform's verification status.
 
-Docs and the plugin developer guide are published at <https://mio888888.github.io/Mio-Music/>.
+> **Mio Music is a player, not a music content service. It does not include a public music catalog or service accounts.** Local playback needs no server. Built-in connectors require your server address and the appropriate account or access token; available content and permissions depend on the server and plugin.
 
 <p align="center">
-  <img src="website/assets/screenshots/home.png" width="100%" alt="Mio Music" />
+  <img src="website/assets/screenshots/home.png" width="100%" alt="Mio Music main interface" />
 </p>
+
+## Getting Started
+
+Check [Platform Support](#platform-support) and [Releases](#releases) before choosing a package and version. To try the current source, follow [Development](#development).
+
+| What you want to do | Where to start |
+|---|---|
+| Play local music | Open the local music page and import or scan your music files; no online plugins are needed |
+| Connect a personal music server | Configure the matching built-in plugin under **Settings → Plugins → Music list plugins** |
+| Add other online sources | Install a compatible music-list plugin; if it does not supply playback URLs, pair it with a source plugin that supports the same source |
+
+See the [user guide](https://mio888888.github.io/Mio-Music/docs/user-guide.html) for detailed steps.
+
+## Default Plugins
+
+These **6 music-list plugins ship with the app; no separate script download is needed**. All provide song search, album and playlist browsing, discovery, and playback and download URL resolution. Extra features such as artist pages and lyrics vary by plugin.
+
+| Built-in plugin | Service and extra features | Connection settings |
+|---|---|---|
+| **Songloft** | Songloft personal music server; artists, genres and lyrics | Server URL, username and password |
+| **Subsonic** | Subsonic API-compatible music servers | Server URL, username and password |
+| **Navidrome** | Navidrome; adds artist pages and lyrics beyond the generic Subsonic plugin | Server URL, username and password |
+| **Jellyfin** | Jellyfin music library; artist pages and lyrics | Server URL and either a username login or access key; password as required by the account |
+| **Emby** | Emby music library; artist pages | Server URL and either a username login or access key; password as required by the account |
+| **Plex** | Plex Media Server music library; artist pages | Server URL and `X-Plex-Token`; optional library name, otherwise the first music library is used |
+
+### Set up a built-in plugin
+
+1. Open **Settings → Plugins → Music list plugins**, find your server's plugin and choose **Configure**.
+2. Enter the server URL and authentication details from the table. For a non-loopback `http://` server, also enable **Allow HTTP (unencrypted)**; loopback addresses such as `localhost` do not need this option.
+3. Use **Test connection** to check the current form, then save it and make sure the plugin is enabled.
+4. Select the source on the search or discovery page to browse your server's library. Built-in plugins supply playback and download URLs by default, so **no additional source plugin is needed**.
+
+At startup, the app installs any missing built-in plugins and upgrades older copies when it ships a newer version, preserving their settings and enabled state. Built-in plugins can be disabled but not uninstalled. Newly installed plugins that have not been configured do not offer selectable sources.
+
+Features also depend on server versions and account permissions. Scripts, configuration details and server verification coverage are documented in [mio-music-plugins](https://github.com/Mio888888/mio-music-plugins).
+
+### Other supported plugins
+
+| Plugin type | What it does | How it is supported |
+|---|---|---|
+| **Music-list plugin** | Supplies search, playlists, albums and discovery, and may resolve its own playback and download URLs | In addition to the built-in plugins, compatible scripts can be installed from a local file or URL; multiple plugins can be enabled together |
+| **Source plugin** | Resolves a playback URL from track information; does not supply search or playlists | Supports LanYin scripts; LuoXue / LX scripts are converted on installation. Explicitly select the plugin to use |
+
+Plugins run in a resource-limited QuickJS sandbox. To write your own connector, see the [plugin developer guide](https://mio888888.github.io/Mio-Music/docs/plugins/).
 
 ## Features
 
@@ -39,13 +89,6 @@ Docs and the plugin developer guide are published at <https://mio888888.github.i
 - Word-by-word and TTML lyrics rendered in the Apple Music style (AMLL)
 - Translation, romanization, background and duet vocals
 - Desktop lyrics window on macOS; custom lyric font
-
-### Music Sources & Plugins
-
-- Search, playlists, albums, discovery and artists come from *music-list plugins*; playback addresses come from the same plugins or from *source plugins* (LanYin scripts; LuoXue scripts are converted automatically)
-- **Built-in plugins for Songloft, Subsonic, Navidrome, Jellyfin, Emby and Plex** are installed and updated automatically — enter a server address in plugin management and they are ready
-- The source list, its order and its icons all come from the enabled plugins; an unconfigured plugin offers no sources
-- Plugins run in a bounded, sandboxed QuickJS runtime
 
 ### Interface
 
@@ -74,16 +117,6 @@ Docs and the plugin developer guide are published at <https://mio888888.github.i
 
 There is no Intel macOS or x86_64 Android build. macOS packages are ad-hoc signed and not notarized.
 
-## Testing
-
-| What | Where | When |
-|---|---|---|
-| `cargo fmt --check`, `cargo check`, `cargo test` for the whole workspace | macOS 15, Windows, Ubuntu 24.04 (`Desktop checks`) | Every push to `main` |
-| Release builds of all five platforms | `Build` workflow | When the version has no tag yet, or on demand with `build_only` |
-| Interactive acceptance | macOS app; Android emulators; iOS simulator | Manually, during development |
-
-Mobile acceptance evidence is described in [`apps/mobile/README.md`](apps/mobile/README.md). Real-device checks are explicit cases that the default offline tests skip.
-
 ## Releases
 
 Builds are published on [GitHub Releases](https://github.com/Mio888888/Mio-Music/releases) by the `Build` workflow: whenever the version in `Cargo.toml` has no `v<version>` tag, it builds every platform, uploads the packages and `latest.json`, and publishes the release.
@@ -95,6 +128,8 @@ Builds are published on [GitHub Releases](https://github.com/Mio888888/Mio-Music
 The release workflow is [`.github/workflows/build.yml`](.github/workflows/build.yml).
 
 ## Tech Stack
+
+This repository is the native rewrite of the [Tauri-based Mio Music](https://github.com/Mio888888/Mio-Music/releases/tag/v0.3.6), itself rebuilt from [CeruMusic](https://github.com/timeshiftsauce/CeruMusic). The desktop app uses Rust and [GPUI Kit](https://gpui-kit.com/), while the Flutter client shares its Rust core (`mio-core`). The rewrite follows the original features, layouts and data formats; the AI assistant is out of scope.
 
 | Layer | Technology |
 |-------|-----------|
@@ -139,6 +174,14 @@ cargo fmt --all -- --check
 cargo test --workspace --locked
 cargo check --workspace --locked
 ```
+
+| What | Where | When |
+|---|---|---|
+| `cargo fmt --check`, `cargo check`, `cargo test` for the whole workspace | macOS 15, Windows, Ubuntu 24.04 (`Desktop checks`) | Every push to `main` |
+| Release builds of all five platforms | `Build` workflow | When the version has no tag yet, or on demand with `build_only` |
+| Interactive acceptance | macOS app; Android emulators; iOS simulator | Manually, during development |
+
+Mobile acceptance evidence is described in [`apps/mobile/README.md`](apps/mobile/README.md). Real-device checks are explicit cases that the default offline tests skip.
 
 ### Data Locations
 
@@ -196,7 +239,7 @@ Ongoing maintenance, cross-platform adaptation and issue fixes for Mio Music are
 
 ## Disclaimer
 
-This project is for educational and personal use. By itself it does not fetch, store or transmit any music data or copyrighted content; it only provides a plugin runtime framework. You are responsible for making sure that what you play and download through plugins is lawful where you live and respects the rights of third parties.
+Mio Music provides playback, library management and a plugin runtime; it does not provide or host a public music catalog. Online playback and downloads access third-party services or personal servers through user-configured plugins. You are responsible for having permission to access, play and download the content, following local laws and service terms, and respecting third-party rights.
 
 ## License
 
