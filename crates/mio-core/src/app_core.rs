@@ -1594,11 +1594,10 @@ impl AppCore {
 
     fn prepare_next(&mut self) {
         let config = self.player.seamless;
-        let next = if config.enabled
-            && matches!(
-                self.player.status,
-                Status::Playing | Status::Paused | Status::Loading
-            ) {
+        let next = if matches!(
+            self.player.status,
+            Status::Playing | Status::Paused | Status::Loading
+        ) {
             self.player.next_index(true).and_then(|index| {
                 let song = self.player.queue.get(index)?.clone();
                 let input = if crate::online::is_online(&song) {

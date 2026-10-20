@@ -29,7 +29,7 @@ Mio Music 是 [Tauri 版 Mio Music](https://github.com/Mio888888/Mio-Music/relea
 ### 音乐播放
 
 - 基于 Rodio、cpal、Symphonia 的原生音频引擎，本地与在线歌曲通用
-- 无缝播放，可配置淡入淡出
+- 下一曲提前缓存，无缝播放与可配置淡入淡出；在线音频边下载边解码
 - 10 段均衡器，内置预设并可导入 AutoEq，另有音效与声道平衡
 - 实时 FFT 频谱
 - 桌面端支持系统媒体键、托盘和全局快捷键；移动端支持锁屏与通知栏控制

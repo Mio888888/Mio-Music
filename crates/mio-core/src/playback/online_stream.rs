@@ -57,9 +57,10 @@ pub(super) async fn transfer(
     load: OnlineLoad,
     tx: mpsc::Sender<Command>,
     slots: Arc<tokio::sync::Semaphore>,
-    staged: bool,
+    next: Option<&seamless::Request>,
     client: Option<&reqwest::Client>,
 ) -> Result<Arc<Track>, String> {
+    let staged = next.is_some();
     let cancelled = Arc::new(AtomicBool::new(false));
     let _cancel = Cancel(cancelled.clone());
     let source = load.source.clone();
@@ -67,7 +68,7 @@ pub(super) async fn transfer(
     // A song played before is served from the cache: no plugin call and no download.
     let cache_key = source.cache_key(&id);
     if let Some(path) = cache_key.as_deref().and_then(crate::audio_cache::lookup) {
-        if let Some(track) = serve_cached(&load, &tx, &path, staged).await {
+        if let Some(track) = serve_cached(&load, &tx, &path, next).await {
             return Ok(track);
         }
     }
@@ -272,10 +273,7 @@ pub(super) async fn transfer(
             load.generation
         );
     }
-    if !staged {
-        tx.send(Command::Prepared(load.generation, Ok(track.clone())))
-            .map_err(|_| "播放已关闭")?;
-    }
+    publish(&tx, load.generation, next, track.clone())?;
     let generation = load.generation;
     let mut size = if resumed { offset } else { 0 };
     let audio = async {
@@ -461,7 +459,7 @@ async fn serve_cached(
     load: &OnlineLoad,
     tx: &mpsc::Sender<Command>,
     cached: &std::path::Path,
-    staged: bool,
+    next: Option<&seamless::Request>,
 ) -> Option<Arc<Track>> {
     let Ok(track) = Track::new() else {
         return None;
@@ -476,16 +474,24 @@ async fn serve_cached(
     }
     track.progress(size);
     track.finish(false);
-    if !staged
-        && tx
-            .send(Command::Prepared(load.generation, Ok(track.clone())))
-            .is_err()
-    {
-        return None;
-    }
+    publish(tx, load.generation, next, track.clone()).ok()?;
     drop(guard);
     Some(track)
 }
+fn publish(
+    tx: &mpsc::Sender<Command>,
+    generation: u64,
+    next: Option<&seamless::Request>,
+    track: Arc<Track>,
+) -> Result<(), String> {
+    if let Some(next) = next {
+        next.publish(tx, track)
+    } else {
+        tx.send(Command::Prepared(generation, Ok(track)))
+            .map_err(|_| "播放已关闭".to_owned())
+    }
+}
+
 pub(super) async fn loader(
     mut requests: watch::Receiver<Option<OnlineLoad>>,
     tx: mpsc::Sender<Command>,
@@ -498,7 +504,7 @@ pub(super) async fn loader(
             let generation = load.generation;
             tokio::select! {biased;
                 changed=requests.changed()=>{if changed.is_err(){break;}}
-                result=tokio::time::timeout(Duration::from_secs(150),transfer(load,tx.clone(),slots.clone(),false,client.as_ref()))=>{
+                result=tokio::time::timeout(Duration::from_secs(150),transfer(load,tx.clone(),slots.clone(),None,client.as_ref()))=>{
                     if let Err(error)=result.unwrap_or_else(|_|Err("在线播放超时".into())){let _=tx.send(Command::TransferFailed(generation,error));}
                     if requests.changed().await.is_err(){break;}
                 }

@@ -24,6 +24,7 @@ pub(super) struct Track {
     state: Mutex<DownloadState>,
     changed: Condvar,
     duration_hint: AtomicU64,
+    transfer_failed: Arc<AtomicBool>,
 }
 enum TrackFile {
     Temporary(NamedTempFile),
@@ -36,6 +37,7 @@ impl Track {
             state: Mutex::default(),
             changed: Condvar::new(),
             duration_hint: AtomicU64::new(0),
+            transfer_failed: Arc::new(AtomicBool::new(false)),
         }))
     }
     pub fn local(path: std::path::PathBuf) -> io::Result<Arc<Self>> {
@@ -52,6 +54,7 @@ impl Track {
             }),
             changed: Condvar::new(),
             duration_hint: AtomicU64::new(0),
+            transfer_failed: Arc::new(AtomicBool::new(false)),
         }))
     }
     pub fn reopen(&self) -> io::Result<File> {
@@ -81,10 +84,11 @@ impl Track {
         let mut state = self.state.lock().unwrap();
         state.done = true;
         state.failed = failed;
+        self.transfer_failed.store(failed, Ordering::Release);
         self.changed.notify_all();
     }
     pub fn failed(&self) -> bool {
-        self.state.lock().unwrap().failed
+        self.transfer_failed.load(Ordering::Acquire)
     }
     fn truncated_wav(&self) -> bool {
         let state = self.state.lock().unwrap();
@@ -132,6 +136,7 @@ impl Drop for TransferGuard {
         if !state.done {
             state.done = true;
             state.failed = true;
+            self.0.transfer_failed.store(true, Ordering::Release);
         }
         self.0.changed.notify_all();
     }
@@ -225,6 +230,13 @@ pub(super) struct PcmStats {
     pub samples: AtomicU64,
     pub buffering: AtomicBool,
     pub failed: AtomicBool,
+    pub ready: AtomicBool,
+    pub transfer_failed: Arc<AtomicBool>,
+}
+impl PcmStats {
+    pub fn failed(&self) -> bool {
+        self.failed.load(Ordering::Relaxed) || self.transfer_failed.load(Ordering::Acquire)
+    }
 }
 pub(super) struct PcmSource {
     packets: mpsc::Receiver<Vec<f32>>,
@@ -263,17 +275,21 @@ pub(super) mod tests {
     use std::time::Instant;
 
     pub(in crate::playback) fn wav() -> Vec<u8> {
-        let samples = 128000u32;
+        wav_format(128000, 1, 16000)
+    }
+
+    fn wav_format(frames: u32, channels: u16, rate: u32) -> Vec<u8> {
+        let samples = frames * u32::from(channels);
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"RIFF");
         bytes.extend_from_slice(&(36 + samples * 2).to_le_bytes());
         bytes.extend_from_slice(b"WAVEfmt ");
         bytes.extend_from_slice(&16u32.to_le_bytes());
         bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&1u16.to_le_bytes());
-        bytes.extend_from_slice(&16000u32.to_le_bytes());
-        bytes.extend_from_slice(&32000u32.to_le_bytes());
-        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&channels.to_le_bytes());
+        bytes.extend_from_slice(&rate.to_le_bytes());
+        bytes.extend_from_slice(&(rate * u32::from(channels) * 2).to_le_bytes());
+        bytes.extend_from_slice(&(channels * 2).to_le_bytes());
         bytes.extend_from_slice(&16u16.to_le_bytes());
         bytes.extend_from_slice(b"data");
         bytes.extend_from_slice(&(samples * 2).to_le_bytes());
@@ -281,6 +297,169 @@ pub(super) mod tests {
             bytes.extend_from_slice(&1000i16.to_le_bytes());
         }
         bytes
+    }
+
+    pub(in crate::playback) fn pcm(samples: Vec<f32>, channels: u16, rate: u32) -> PcmSource {
+        let duration = samples.len() as f64 / f64::from(channels) / f64::from(rate);
+        let (tx, packets) = mpsc::sync_channel(1);
+        tx.send(samples).unwrap();
+        let (recycle, _) = mpsc::sync_channel(1);
+        PcmSource {
+            packets,
+            packet: Vec::new(),
+            cursor: 0,
+            recycle,
+            consumed: 0,
+            buffering: false,
+            channels,
+            rate,
+            silence: 0,
+            stats: Arc::new(PcmStats {
+                samples: AtomicU64::new(0),
+                buffering: AtomicBool::new(false),
+                failed: AtomicBool::new(false),
+                ready: AtomicBool::new(true),
+                transfer_failed: Arc::new(AtomicBool::new(false)),
+            }),
+            duration: Some(duration),
+            offset: 0.,
+        }
+    }
+
+    #[test]
+    fn pcm_warmup_is_time_based_and_a_full_lane_remains_cancellable() {
+        for (rate, channels) in [(8000, 1), (48000, 2), (192000, 2), (384000, 2)] {
+            let bytes = wav_format(rate, channels, rate);
+            let track = Track::new().unwrap();
+            track.reopen().unwrap().write_all(&bytes).unwrap();
+            track.progress(bytes.len() as u64);
+            track.finish(false);
+            let epoch = Arc::new(AtomicU64::new(1));
+            let (jobs, rx) = mpsc::channel();
+            let (commands, events) = mpsc::channel();
+            let worker_epoch = epoch.clone();
+            let worker = std::thread::spawn(move || decoder_worker(rx, worker_epoch, commands));
+            jobs.send(Decode {
+                generation: 1,
+                version: 1,
+                track: track.clone(),
+                seconds: 0.,
+            })
+            .unwrap();
+            let Command::Decoded(1, 1, Ok(source)) =
+                events.recv_timeout(Duration::from_secs(2)).unwrap()
+            else {
+                panic!("valid PCM");
+            };
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !source.stats.ready.load(Ordering::Acquire) {
+                assert!(
+                    Instant::now() < deadline,
+                    "warmup must fit in the bounded lane at {rate} Hz"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert_eq!(source.position(), 0.);
+            std::thread::sleep(Duration::from_millis(10));
+            epoch.store(2, Ordering::SeqCst);
+            jobs.send(Decode {
+                generation: 2,
+                version: 2,
+                track,
+                seconds: 0.,
+            })
+            .unwrap();
+            assert!(matches!(
+                events.recv_timeout(Duration::from_secs(2)).unwrap(),
+                Command::Decoded(2, 2, Ok(_))
+            ));
+            drop(source);
+            epoch.store(0, Ordering::SeqCst);
+            drop(jobs);
+            worker.join().unwrap();
+        }
+    }
+
+    #[test]
+    fn short_tracks_become_ready_at_eof_before_the_warmup_threshold() {
+        let bytes = wav_format(80, 1, 16000);
+        let track = Track::new().unwrap();
+        track.reopen().unwrap().write_all(&bytes).unwrap();
+        track.progress(bytes.len() as u64);
+        track.finish(false);
+        let epoch = Arc::new(AtomicU64::new(1));
+        let (jobs, rx) = mpsc::channel();
+        let (commands, events) = mpsc::channel();
+        let worker_epoch = epoch.clone();
+        let worker = std::thread::spawn(move || decoder_worker(rx, worker_epoch, commands));
+        jobs.send(Decode {
+            generation: 1,
+            version: 1,
+            track,
+            seconds: 0.,
+        })
+        .unwrap();
+        let Command::Decoded(1, 1, Ok(mut source)) =
+            events.recv_timeout(Duration::from_secs(2)).unwrap()
+        else {
+            panic!("short PCM must be playable");
+        };
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while !source.stats.ready.load(Ordering::Acquire) {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(source.by_ref().count(), 80);
+        assert!(!source.stats.failed.load(Ordering::Relaxed));
+        epoch.store(0, Ordering::SeqCst);
+        drop(jobs);
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn transfer_failure_reaches_buffered_pcm_without_waiting_for_decoder_eof() {
+        for abort in [false, true] {
+            let bytes = wav();
+            let track = Track::new().unwrap();
+            let guard = TransferGuard(track.clone());
+            track.reopen().unwrap().write_all(&bytes[..65536]).unwrap();
+            track.progress(65536);
+            let epoch = Arc::new(AtomicU64::new(1));
+            let (jobs, rx) = mpsc::channel();
+            let (commands, events) = mpsc::channel();
+            let worker_epoch = epoch.clone();
+            let worker = std::thread::spawn(move || decoder_worker(rx, worker_epoch, commands));
+            jobs.send(Decode {
+                generation: 1,
+                version: 1,
+                track: track.clone(),
+                seconds: 0.,
+            })
+            .unwrap();
+            let Command::Decoded(1, 1, Ok(source)) =
+                events.recv_timeout(Duration::from_secs(2)).unwrap()
+            else {
+                panic!("valid progressive PCM");
+            };
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !source.stats.ready.load(Ordering::Acquire) {
+                assert!(Instant::now() < deadline);
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert!(!source.stats.failed());
+            if !abort {
+                track.finish(true);
+            }
+            drop(guard);
+            assert!(
+                source.stats.failed(),
+                "queued PCM must expose a failed or aborted transfer immediately"
+            );
+            epoch.store(0, Ordering::SeqCst);
+            drop(source);
+            drop(jobs);
+            worker.join().unwrap();
+        }
     }
 
     #[test]
@@ -590,6 +769,8 @@ pub(super) fn decoder_worker(
             samples: AtomicU64::new(0),
             buffering: AtomicBool::new(false),
             failed: AtomicBool::new(false),
+            ready: AtomicBool::new(false),
+            transfer_failed: job.track.transfer_failed.clone(),
         });
         let (packets, receiver) = mpsc::sync_channel(8);
         let (recycle, recycled) = mpsc::sync_channel::<Vec<f32>>(16);
@@ -608,11 +789,13 @@ pub(super) fn decoder_worker(
             offset,
         };
         let mut source = Some(source);
+        let size = (rate as usize / 25).max(256) * usize::from(channels);
+        let warmup = u64::from(rate) * u64::from(channels) / 4;
+        let mut produced = 0_u64;
         'pump: loop {
             if job.version != epoch.load(Ordering::SeqCst) {
                 break;
             }
-            let size = 2048 * usize::from(channels);
             let mut packet = recycled
                 .try_recv()
                 .ok()
@@ -636,6 +819,7 @@ pub(super) fn decoder_worker(
                     job.track.failed() || job.track.truncated_wav(),
                     Ordering::Relaxed,
                 );
+                stats.ready.store(true, Ordering::Release);
                 if source.is_some() {
                     let _ = commands.send(Command::Decoded(
                         job.generation,
@@ -645,6 +829,7 @@ pub(super) fn decoder_worker(
                 }
                 break;
             }
+            let samples = packet.len() as u64;
             loop {
                 if job.version != epoch.load(Ordering::SeqCst) {
                     break 'pump;
@@ -657,6 +842,10 @@ pub(super) fn decoder_worker(
                         std::thread::sleep(Duration::from_millis(5));
                     }
                 }
+            }
+            produced += samples;
+            if produced >= warmup {
+                stats.ready.store(true, Ordering::Release);
             }
             if let Some(source) = source.take() {
                 if commands

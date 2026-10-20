@@ -95,7 +95,7 @@ Navidrome 与 Jellyfin 已对官方公开演示服务器实际调用；Songloft�
 
 <h2 id="playback">播放与音效</h2>
 <ul>
-  <li><strong>在线与本地播放</strong>：支持无缝播放（Gapless）与可配置的交叉淡入淡出（Crossfade）。</li>
+  <li><strong>在线与本地播放</strong>：提前准备队列中的下一曲，关闭无缝播放时也会预缓存。开启无缝播放（Gapless）或交叉淡入淡出（Crossfade）后，下一曲缓冲就绪即可在同一音频输出中交接；在线音频无需整首下载完成才开始预解码，切歌会复用已预取的文件。音频本身的静音不会被自动裁剪。</li>
   <li><strong>均衡器</strong>：10 段参数均衡器，另有环绕声等音效，在设置中调节。</li>
   <li><strong>频谱</strong>：播放器内有实时音频频谱，本地与在线音频都支持。</li>
   <li><strong>系统集成</strong>：媒体键、托盘与快捷键。</li>

@@ -529,8 +529,10 @@ enum Command {
     OutputFailed(u64),
     Shutdown,
 }
+type ActiveFile = Arc<std::sync::Mutex<Option<(u64, String, Option<Arc<Track>>)>>>;
+
 pub struct Engine {
-    active_file: Arc<std::sync::Mutex<Option<(u64, String, Option<Arc<Track>>)>>>,
+    active_file: ActiveFile,
     commands: mpsc::Sender<Command>,
     online_loads: watch::Sender<Option<online_stream::OnlineLoad>>,
     generation: Arc<AtomicU64>,
@@ -580,11 +582,12 @@ impl Engine {
             )
         });
         let ready_tx = commands.clone();
+        let download_active_file = active_file.clone();
         let download_worker = std::thread::spawn(move || {
             runtime.block_on(async move {
                 tokio::join!(
                     online_stream::loader(online_rx, ready_tx.clone()),
-                    seamless::loader(next_rx, ready_tx)
+                    seamless::loader(next_rx, ready_tx, download_active_file)
                 );
             })
         });
@@ -626,17 +629,17 @@ impl Engine {
             }
             return;
         };
-        if self.staged.as_ref().is_some_and(|(old, rev)| {
+        let cache_key = match &input {
+            seamless::Input::Online(source) => source.cache_key(&song.id),
+            seamless::Input::Local(_) => None,
+        };
+        if self.staged.as_ref().is_some_and(|(old, _)| {
             old.generation == generation
-                && *rev == revision
+                && old.cache_key == cache_key
                 && old.index == index
                 && old.song.id == song.id
                 && old.token == self.next_token.load(Ordering::SeqCst)
-                && match (&old.input, &input) {
-                    (seamless::Input::Local(a), seamless::Input::Local(b)) => a == b,
-                    (seamless::Input::Online(a), seamless::Input::Online(b)) => Arc::ptr_eq(a, b),
-                    _ => false,
-                }
+                && old.input.same_source(&input)
         }) {
             return;
         }
@@ -669,22 +672,63 @@ impl Engine {
             index,
             song,
             input,
+            cache_key,
             reuse,
+            prepared: Arc::new(std::sync::Mutex::new(None)),
         };
         self.staged = Some((request.clone(), revision));
         let _ = self.next_loads.send(Some(request));
     }
+    fn prefetched(
+        &self,
+        generation: u64,
+        input: &seamless::Input,
+        song: Option<&Song>,
+    ) -> Option<Arc<Track>> {
+        let (request, _) = self.staged.as_ref()?;
+        if request.generation + 1 != generation
+            || request.token != self.next_token.load(Ordering::SeqCst)
+            || !request.input.same_source(input)
+            || song.is_some_and(|song| song.id != request.song.id)
+            || match input {
+                seamless::Input::Online(source) => {
+                    request.cache_key != source.cache_key(&request.song.id)
+                }
+                seamless::Input::Local(_) => false,
+            }
+        {
+            return None;
+        }
+        request
+            .prepared
+            .lock()
+            .unwrap()
+            .as_ref()
+            .filter(|track| !track.failed())
+            .cloned()
+    }
+
     pub fn load_online(&self, generation: u64, source: Arc<crate::online::Online>, song: Song) {
-        *self.active_file.lock().unwrap() = Some((generation, song.id.clone(), None));
+        let prepared = self.prefetched(
+            generation,
+            &seamless::Input::Online(source.clone()),
+            Some(&song),
+        );
+        *self.active_file.lock().unwrap() = Some((generation, song.id.clone(), prepared.clone()));
         self.cancel_next();
         self.generation.store(generation, Ordering::SeqCst);
         let _ = self.commands.send(Command::Reset(generation));
-        let _ = self.online_loads.send(Some(online_stream::OnlineLoad {
-            generation,
-            source,
-            id: song.id,
-            duration: song.duration,
-        }));
+        if let Some(track) = prepared {
+            let _ = self.online_loads.send(None);
+            let _ = self.commands.send(Command::Prepared(generation, Ok(track)));
+        } else {
+            let _ = self.online_loads.send(Some(online_stream::OnlineLoad {
+                generation,
+                source,
+                id: song.id,
+                duration: song.duration,
+            }));
+        }
     }
     pub fn stop(&self, generation: u64) {
         *self.active_file.lock().unwrap() = None;
@@ -700,7 +744,8 @@ impl Engine {
         seconds: f64,
         paused: bool,
     ) {
-        *self.active_file.lock().unwrap() = Some((generation, String::new(), None));
+        let prepared = self.prefetched(generation, &seamless::Input::Local(path.clone()), None);
+        *self.active_file.lock().unwrap() = Some((generation, String::new(), prepared.clone()));
         self.cancel_next();
         let _ = self.online_loads.send(None);
         self.generation.store(generation, Ordering::SeqCst);
@@ -714,7 +759,11 @@ impl Engine {
                 .commands
                 .send(Command::Seek(self.control_generation(generation), seconds));
         }
-        let _ = self.commands.send(Command::Local(generation, path));
+        let command = prepared.map_or_else(
+            || Command::Local(generation, path),
+            |track| Command::Prepared(generation, Ok(track)),
+        );
+        let _ = self.commands.send(command);
     }
     fn control_generation(&self, generation: u64) -> u64 {
         let active = self.generation.load(Ordering::SeqCst);
@@ -785,7 +834,7 @@ fn audio_worker(
     next_token: Arc<AtomicU64>,
     transition_mode: Arc<AtomicU64>,
     transition_from: Arc<AtomicU64>,
-    active_file: Arc<std::sync::Mutex<Option<(u64, String, Option<Arc<Track>>)>>>,
+    active_file: ActiveFile,
 ) {
     // Opt-in event diagnostics on the worker, never the audio callback; no URLs/credentials.
     let trace = std::env::var_os("MIO_GPUI_PLAYBACK_TRACE").is_some();
@@ -1237,7 +1286,7 @@ fn audio_worker(
         }
         if let (Some(active), Some((state, channels, rate, offset))) = (&sink, &stats) {
             if active.empty() && !seeking {
-                if state.failed.load(Ordering::Relaxed) {
+                if state.failed() {
                     track_file = None;
                     emit(EventKind::Failed("音频下载或解码中断，请重新播放".into()));
                 } else {
@@ -1284,6 +1333,133 @@ fn audio_worker(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn engine() -> (
+        Engine,
+        mpsc::Receiver<Command>,
+        watch::Receiver<Option<online_stream::OnlineLoad>>,
+        watch::Receiver<Option<seamless::Request>>,
+    ) {
+        let (commands, rx) = mpsc::channel();
+        let (online_loads, online_rx) = watch::channel(None);
+        let (next_loads, next_rx) = watch::channel(None);
+        let (_, events) = mpsc::channel();
+        let (_, event_times) = mpsc::channel();
+        (
+            Engine {
+                active_file: Arc::new(std::sync::Mutex::new(None)),
+                commands,
+                online_loads,
+                generation: Arc::new(AtomicU64::new(0)),
+                events,
+                event_times,
+                workers: vec![],
+                next_loads,
+                next_token: Arc::new(AtomicU64::new(0)),
+                transition_mode: Arc::new(AtomicU64::new(0)),
+                transition_from: Arc::new(AtomicU64::new(u64::MAX)),
+                staged: None,
+            },
+            rx,
+            online_rx,
+            next_rx,
+        )
+    }
+
+    fn song(id: &str) -> Song {
+        Song {
+            id: id.into(),
+            title: "Song".into(),
+            artist: String::new(),
+            album: String::new(),
+            duration: 8,
+            cover_art: None,
+        }
+    }
+
+    #[test]
+    fn queue_metadata_changes_keep_prefetch_and_local_selection_reuses_the_file() {
+        let (mut engine, commands, _online, next) = engine();
+        let track = Track::new().unwrap();
+        let input = seamless::Input::Local(track.path().to_owned());
+        engine.prepare_next(0, 1, Some((1, song("local"), input.clone())));
+        let token = engine.next_token.load(Ordering::SeqCst);
+        engine.prepare_next(0, 2, Some((1, song("local"), input.clone())));
+        assert_eq!(engine.next_token.load(Ordering::SeqCst), token);
+        let request = next.borrow().clone().unwrap();
+        *request.prepared.lock().unwrap() = Some(track.clone());
+        assert!(engine.prefetched(2, &input, None).is_none());
+        assert!(
+            engine
+                .prefetched(1, &seamless::Input::Local("other".into()), None)
+                .is_none()
+        );
+        engine.load_local(1, track.path().to_owned(), 0., false);
+        assert!(next.borrow().is_none());
+        assert!(commands.try_iter().any(|command| match command {
+            Command::Prepared(1, Ok(file)) => Arc::ptr_eq(&file, &track),
+            _ => false,
+        }));
+        assert!(Arc::ptr_eq(
+            engine
+                .active_file
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .2
+                .as_ref()
+                .unwrap(),
+            &track,
+        ));
+    }
+
+    #[test]
+    fn online_selection_adopts_progressive_prefetch_without_another_download() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = crate::online::Online::virtual_client(
+            crate::storage::Storage::at(directory.path().to_owned()),
+            None,
+        )
+        .unwrap();
+        let (mut engine, commands, online, next) = engine();
+        let track = Track::new().unwrap();
+        let song = song("mio-online:fixture:next");
+        let input = seamless::Input::Online(source.clone());
+        engine.prepare_next(0, 1, Some((1, song.clone(), input.clone())));
+        *next.borrow().as_ref().unwrap().prepared.lock().unwrap() = Some(track.clone());
+        assert!(
+            engine
+                .prefetched(1, &input, Some(&self::song("other")))
+                .is_none()
+        );
+        engine.staged.as_mut().unwrap().0.cache_key = Some("old-quality".into());
+        assert!(engine.prefetched(1, &input, Some(&song)).is_none());
+        engine.staged.as_mut().unwrap().0.cache_key = None;
+        engine.load_online(1, source, song);
+        assert!(online.borrow().is_none());
+        assert!(!track.complete());
+        assert!(commands.try_iter().any(|command| match command {
+            Command::Prepared(1, Ok(file)) => Arc::ptr_eq(&file, &track),
+            _ => false,
+        }));
+    }
+
+    #[test]
+    fn failed_or_cancelled_prefetch_is_not_reused() {
+        let (mut engine, _commands, _online, next) = engine();
+        let track = Track::new().unwrap();
+        let input = seamless::Input::Local(track.path().to_owned());
+        engine.prepare_next(0, 1, Some((1, song("local"), input.clone())));
+        *next.borrow().as_ref().unwrap().prepared.lock().unwrap() = Some(track.clone());
+        engine.cancel_next();
+        assert!(engine.prefetched(1, &input, None).is_none());
+        engine.prepare_next(0, 1, Some((1, song("local"), input.clone())));
+        *next.borrow().as_ref().unwrap().prepared.lock().unwrap() = Some(track.clone());
+        track.finish(true);
+        assert!(engine.prefetched(1, &input, None).is_none());
+    }
+
     #[test]
     fn original_queue_boundaries_and_modes() {
         assert_eq!(PlayMode::List.index(2, 3, true), None);

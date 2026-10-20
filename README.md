@@ -29,7 +29,7 @@ Docs and the plugin developer guide are published at <https://mio888888.github.i
 ### Music Playback
 
 - Native audio engine on Rodio, cpal and Symphonia for local and online tracks
-- Gapless playback with configurable crossfade
+- Next-track prefetch, gapless playback with configurable crossfade; online tracks decode while downloading
 - 10-band equalizer with presets and AutoEq import, plus effects and stereo balance
 - Real-time FFT spectrum
 - System media keys, tray and global hotkeys on the desktop; lock-screen and notification controls on mobile

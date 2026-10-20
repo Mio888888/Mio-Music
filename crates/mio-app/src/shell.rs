@@ -2096,11 +2096,10 @@ impl Mio {
     }
     fn prepare_seamless_next(&mut self) {
         let config = self.player.seamless;
-        let index = if config.enabled
-            && matches!(
-                self.player.status,
-                Status::Playing | Status::Paused | Status::Loading
-            ) {
+        let index = if matches!(
+            self.player.status,
+            Status::Playing | Status::Paused | Status::Loading
+        ) {
             self.player.next_index(true)
         } else {
             None
