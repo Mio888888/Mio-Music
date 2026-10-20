@@ -526,27 +526,6 @@ impl Mio {
             }
         })
         .detach();
-        // Full-player lyrics animate at up to 60 Hz; inactive/hidden views do not redraw.
-        cx.spawn_in(window, async move |this, cx| {
-            // Only an open full player animates lyrics; while it is closed the loop idles at a
-            // slow tick, so the process is not woken 60 times a second for nothing.
-            let mut interval = 16;
-            loop {
-                cx.background_executor()
-                    .timer(std::time::Duration::from_millis(interval))
-                    .await;
-                match update_main(&this, cx, |this, window, cx| {
-                    if window.is_window_active() && this.lyrics_animating() {
-                        cx.notify();
-                    }
-                    this.full_player_open
-                }) {
-                    Ok(open) => interval = if open { 16 } else { 200 },
-                    Err(_) => break,
-                }
-            }
-        })
-        .detach();
         let (local_music, local_music_subscription) =
             local_music::LocalMusic::new(preferences.english(), window, cx);
         let mut this = Self {

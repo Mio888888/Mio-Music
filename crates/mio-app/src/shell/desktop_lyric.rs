@@ -15,8 +15,6 @@ const WIDTH: f32 = 600.;
 const HEIGHT: f32 = 180.;
 /// `y = screen height - window height - 100` for the first opening.
 const BOTTOM_MARGIN: f32 = 100.;
-/// While word-timed lyrics play, the window redraws at 25 Hz.
-const FRAME: Duration = Duration::from_millis(40);
 /// The main window's chrome opacity of lines other than the one being sung (`opacity: 0.5`).
 const OTHER_LINE: f32 = 0.5;
 
@@ -392,6 +390,7 @@ struct ShownKey {
     lyrics: (u64, Option<usize>),
     active: Option<usize>,
     playing: bool,
+    buffering: bool,
     locked: bool,
     option: LyricOption,
 }
@@ -416,32 +415,6 @@ impl DesktopLyric {
             );
             tracker.update(cx, |main, _| main.desktop_lyric_moved(x, y));
         });
-        // Word-timed lyrics move between the engine's position reports.
-        cx.spawn_in(window, async move |this, cx| {
-            // Frame rate only while words are sung; otherwise the observer redraws on change.
-            let mut wait = FRAME;
-            loop {
-                cx.background_executor().timer(wait).await;
-                let alive = this.update(cx, |this, cx| {
-                    let animating = this.main.read(cx).lyrics_playing_words();
-                    if animating {
-                        cx.notify();
-                    }
-                    animating
-                });
-                match alive {
-                    Ok(animating) => {
-                        wait = if animating {
-                            FRAME
-                        } else {
-                            Duration::from_millis(200)
-                        }
-                    }
-                    Err(_) => break,
-                }
-            }
-        })
-        .detach();
         Self {
             main,
             hovering: false,
@@ -511,6 +484,7 @@ impl Mio {
             ),
             active: self.desktop_lyric_active(self.lyric_position()),
             playing: self.player.status == Status::Playing,
+            buffering: self.player.buffering,
             locked: self.desktop_lyric_locked,
             option: self.desktop_lyric_option.clone(),
         }
@@ -526,10 +500,13 @@ impl Mio {
 }
 
 impl Render for DesktopLyric {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Everything the window shows, read from the main view in one go.
         let (option, locked, playing, position, title, show, active) = {
             let main = self.main.read(cx);
+            if main.lyrics_playing_words() && main.desktop_lyric_option.show_yrc {
+                window.request_animation_frame();
+            }
             let option = main.desktop_lyric_option.clone();
             let position = main.lyric_position();
             let song = main.player.song();
@@ -795,5 +772,83 @@ impl Render for DesktopLyric {
             )
             .child(body)
             .children(controls)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DesktopLyric, HEIGHT, Mio, Remote, Status, WIDTH};
+    use gpui_kit::{AppContext, TestAppContext, px, size};
+
+    #[gpui_kit::test]
+    fn desktop_lyrics_follow_display_frames_only_for_playing_word_highlights(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(gpui_kit::init);
+        let mut main = None;
+        let handle = cx.open_window(size(px(WIDTH), px(HEIGHT)), |window, cx| {
+            let view = cx.new(|cx| Mio::new_in(None, window, cx));
+            main = Some(view.clone());
+            DesktopLyric::new(view, window, cx)
+        });
+        let main = main.unwrap();
+        cx.run_until_parked();
+        main.update(cx, |this, cx| {
+            this.player.status = Status::Playing;
+            this.lyrics = Remote::Ready(vec![crate::lyrics::Lyrics {
+                synced: true,
+                offset: 0,
+                word_timed: true,
+                lines: vec![crate::lyrics::Line {
+                    start: Some(0),
+                    text: "Word".into(),
+                    words: vec![crate::lyrics::Word {
+                        start: 0,
+                        end: 2000,
+                        text: "Word".into(),
+                        romanization: String::new(),
+                    }],
+                    ..Default::default()
+                }],
+            }]);
+            cx.notify();
+        });
+        let next_frame = |cx: &mut TestAppContext| {
+            let count = cx
+                .update_window(handle.into(), |_, window, cx| {
+                    window.simulate_next_frame(cx)
+                })
+                .unwrap();
+            cx.run_until_parked();
+            count
+        };
+        for _ in 0..3 {
+            assert!(next_frame(cx) > 0);
+        }
+        for (status, buffering, show_yrc) in [
+            (Status::Paused, false, true),
+            (Status::Playing, true, true),
+            (Status::Playing, false, false),
+        ] {
+            main.update(cx, |main, cx| {
+                main.player.status = Status::Playing;
+                main.player.buffering = false;
+                main.desktop_lyric_option.show_yrc = true;
+                cx.notify();
+            });
+            assert!(next_frame(cx) > 0);
+            main.update(cx, |main, cx| {
+                main.player.status = status;
+                main.player.buffering = buffering;
+                main.desktop_lyric_option.show_yrc = show_yrc;
+                cx.notify();
+            });
+            assert!(next_frame(cx) > 0);
+            assert_eq!(next_frame(cx), 0);
+        }
+        cx.update_window(handle.into(), |_, window, _| window.remove_window())
+            .unwrap();
+        drop(main);
+        cx.run_until_parked();
     }
 }

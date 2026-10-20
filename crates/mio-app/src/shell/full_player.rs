@@ -382,12 +382,7 @@ impl Mio {
             self.lyric_motion
                 .prepare(&lyrics.lines, self.lyrics_revision);
             // A background vocal belongs to the preceding foreground row, never the scroll anchor.
-            let groups: Vec<usize> = lyrics
-                .lines
-                .iter()
-                .enumerate()
-                .filter_map(|(i, line)| (!line.background || i == 0).then_some(i))
-                .collect();
+            let groups = self.lyric_motion.groups.clone();
             let active = lyrics.active_line(position);
             if active != self.lyrics_active {
                 self.lyric_motion.previous = self.lyrics_active;
@@ -567,22 +562,13 @@ impl Mio {
                             .items_start()
                             .hover(|button| button.bg(white().opacity(0.05)).rounded(px(8.)))
                             .child(text);
-                    let has_word_roman = line.words.iter().any(|w| !w.romanization.is_empty());
-                    for (kind, sub) in [&line.translation, &line.romanization]
-                        .into_iter()
+                    for (kind, sub) in self.lyric_motion.sublines[i]
+                        .iter()
                         .enumerate()
-                        .filter_map(|(kind, value)| {
-                            value
-                                .as_ref()
-                                .filter(|_| kind == 0 || !has_word_roman)
-                                .map(|sub| (kind, sub))
-                        })
+                        .filter_map(|(kind, line)| line.as_ref().map(|line| (kind, line)))
                     {
                         button = button.child(player_lyrics::LyricText {
-                            line: Arc::new(crate::lyrics::Line {
-                                text: sub.clone(),
-                                ..Default::default()
-                            }),
+                            line: sub.clone(),
                             cache: self.lyric_motion.layouts[i][kind + 1].clone(),
                             font: font.clone(),
                             font_size: size * 0.5,
@@ -624,6 +610,7 @@ impl Mio {
             );
             let scroll = self.lyric_scroll.clone();
             let geometry = self.lyric_motion.geometry.clone();
+            let animating = self.lyrics_animating();
             return div()
                 .on_children_prepainted(move |_, window, _| {
                     let measured = (
@@ -633,7 +620,9 @@ impl Mio {
                     );
                     // A paused view still needs one fresh frame after wrapping/resizing changes
                     // the scroll geometry; the render phase only had the previous layout.
-                    if geometry.replace(Some(measured)) != Some(measured) {
+                    if geometry.replace(Some(measured)) != Some(measured)
+                        || (animating && window.is_window_active())
+                    {
                         window.request_animation_frame();
                     }
                 })
@@ -1581,4 +1570,94 @@ pub(super) fn word_highlight(
         }
     }
     StyledText::new(line.text.clone()).with_highlights(runs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Mio, Remote, Status};
+    use gpui_kit::{
+        AppContext, Context, Entity, IntoElement, Render, TestAppContext, Window, px, size,
+    };
+    use std::time::{Duration, Instant};
+
+    struct LyricFixture(Entity<Mio>);
+    impl Render for LyricFixture {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            self.0.update(cx, |main, cx| {
+                main.lyric_motion.visible = true;
+                main.lyric_view(32., 1200., cx)
+            })
+        }
+    }
+
+    #[gpui_kit::test]
+    fn lyrics_request_display_frames_and_stop_after_pause_or_close(cx: &mut TestAppContext) {
+        cx.update(gpui_kit::init);
+        let mut main = None;
+        let handle = cx.open_window(size(px(800.), px(600.)), |window, cx| {
+            let view = cx.new(|cx| Mio::new_in(None, window, cx));
+            main = Some(view.clone());
+            LyricFixture(view)
+        });
+        let main = main.unwrap();
+        cx.run_until_parked();
+        main.update(cx, |this, cx| {
+            this.full_player_open = true;
+            this.app_settings.jump_lyric = false;
+            this.player.status = Status::Playing;
+            this.lyrics = Remote::Ready(vec![crate::lyrics::Lyrics {
+                synced: true,
+                offset: 0,
+                word_timed: false,
+                lines: vec![crate::lyrics::Line {
+                    start: Some(0),
+                    text: "Lyric fixture".into(),
+                    ..Default::default()
+                }],
+            }]);
+            cx.notify();
+        });
+        cx.update_window(handle.into(), |_, window, _| {
+            window.activate_window();
+            window.refresh();
+        })
+        .unwrap();
+        cx.run_until_parked();
+        let next_frame = |cx: &mut TestAppContext| {
+            let count = cx
+                .update_window(handle.into(), |_, window, cx| {
+                    window.simulate_next_frame(cx)
+                })
+                .unwrap();
+            cx.run_until_parked();
+            count
+        };
+        for _ in 0..4 {
+            assert!(next_frame(cx) > 0);
+        }
+        main.update(cx, |main, cx| {
+            main.player.status = Status::Paused;
+            main.lyric_motion.changed = Instant::now() - Duration::from_secs(1);
+            cx.notify();
+        });
+        assert!(next_frame(cx) > 0);
+        assert_eq!(next_frame(cx), 0);
+        main.update(cx, |main, cx| {
+            main.player.status = Status::Playing;
+            cx.notify();
+        });
+        cx.update_window(handle.into(), |_, window, _| window.refresh())
+            .unwrap();
+        assert!(next_frame(cx) > 0);
+        main.update(cx, |main, cx| {
+            main.full_player_open = false;
+            cx.notify();
+        });
+        assert!(next_frame(cx) > 0);
+        assert_eq!(next_frame(cx), 0);
+        cx.update_window(handle.into(), |_, window, _| window.remove_window())
+            .unwrap();
+        drop(main);
+        cx.run_until_parked();
+    }
 }

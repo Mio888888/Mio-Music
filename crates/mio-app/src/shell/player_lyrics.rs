@@ -16,6 +16,8 @@ pub(super) struct Motion {
     trace: Option<(std::path::PathBuf, Instant, Vec<[f64; 7]>)>,
     pub geometry: Rc<Cell<Option<(Bounds<Pixels>, Option<Bounds<Pixels>>, Point<Pixels>)>>>,
     pub lines: Vec<Arc<Line>>,
+    pub groups: Rc<[usize]>,
+    pub sublines: Vec<[Option<Arc<Line>>; 2]>,
     pub layouts: Vec<[LayoutCache; 3]>,
     scales: Vec<(f32, f32)>,
     alphas: Vec<[f32; 2]>,
@@ -46,6 +48,8 @@ impl Default for Motion {
                 .map(|p| (p.into(), Instant::now(), Vec::new())),
             geometry: Default::default(),
             lines: Vec::new(),
+            groups: Rc::default(),
+            sublines: Vec::new(),
             layouts: Vec::new(),
             scales: Vec::new(),
             alphas: Vec::new(),
@@ -112,13 +116,40 @@ impl Motion {
         self.scale_frame = now;
         if self.cache_revision != revision || self.lines.len() != lines.len() {
             self.lines = lines.iter().cloned().map(Arc::new).collect();
+            self.groups = lines
+                .iter()
+                .enumerate()
+                .filter_map(|(i, line)| (!line.background || i == 0).then_some(i))
+                .collect();
+            self.sublines = lines
+                .iter()
+                .map(|line| {
+                    let has_word_roman =
+                        line.words.iter().any(|word| !word.romanization.is_empty());
+                    std::array::from_fn(|kind| {
+                        let text = if kind == 0 {
+                            line.translation.as_ref()
+                        } else {
+                            line.romanization.as_ref().filter(|_| !has_word_roman)
+                        };
+                        text.map(|text| {
+                            Arc::new(Line {
+                                text: text.clone(),
+                                ..Line::default()
+                            })
+                        })
+                    })
+                })
+                .collect();
             self.layouts = (0..lines.len())
                 .map(|_| std::array::from_fn(|_| LayoutCache::default()))
                 .collect();
             self.cache_revision = revision;
             self.scales = vec![(1., 0.); lines.len()];
             self.alphas = vec![[0.4, 1.]; lines.len()];
-            self.rows = (0..lines.len()).map(|_| RowMotion::default()).collect();
+            self.rows = (0..self.groups.len())
+                .map(|_| RowMotion::default())
+                .collect();
         }
     }
     pub fn scale(&mut self, index: usize, current: bool, enabled: bool, playing: bool) -> f32 {
@@ -131,6 +162,9 @@ impl Motion {
         if self.snap || !enabled {
             *value = target;
             *velocity = 0.;
+            return target;
+        }
+        if *value == target && *velocity == 0. {
             return target;
         }
         // AMLL foreground scale spring: mass 2, damping 25, stiffness 100.
@@ -316,6 +350,9 @@ fn spring_step(
     damping: f32,
     dt: f32,
 ) {
+    if *value == target && *velocity == 0. {
+        return;
+    }
     let omega = (stiffness / 0.9).sqrt();
     let delta = target - *value;
     if damping / (2. * (stiffness * 0.9).sqrt()) >= 1. {
@@ -357,6 +394,7 @@ pub(super) struct LyricText {
 struct Piece {
     line: ShapedLine,
     characters: Vec<(ShapedLine, f32, f32)>,
+    scaled: RefCell<Vec<Option<ShapedLine>>>,
     roman: Option<ShapedLine>,
     x: f32,
     y: f32,
@@ -507,6 +545,7 @@ impl LyricText {
                     && (part.chars().any(|c| ('\u{3400}'..='\u{9fff}').contains(&c))
                         || (2..=7).contains(&part.trim().chars().count()));
                 pieces.push(Piece {
+                    scaled: RefCell::default(),
                     characters,
                     emphasize,
                     line: shaped,
@@ -541,6 +580,7 @@ impl LyricText {
                 pieces.push(Piece {
                     line: shaped,
                     characters: Vec::new(),
+                    scaled: RefCell::default(),
                     roman: None,
                     x,
                     y,
@@ -639,7 +679,7 @@ impl IntoElement for LyricText {
 }
 impl Element for LyricText {
     type RequestLayoutState = ();
-    type PrepaintState = Rc<Layout>;
+    type PrepaintState = Option<Rc<Layout>>;
     fn id(&self) -> Option<ElementId> {
         None
     }
@@ -677,14 +717,10 @@ impl Element for LyricText {
         _: &mut (),
         window: &mut Window,
         _: &mut App,
-    ) -> Rc<Layout> {
-        if !bounds.intersects(&window.content_mask().bounds) {
-            return Rc::new(Layout {
-                pieces: Vec::new(),
-                height: f32::from(bounds.size.height),
-            });
-        }
-        self.layout(f32::from(bounds.size.width), window)
+    ) -> Option<Rc<Layout>> {
+        bounds
+            .intersects(&window.content_mask().bounds)
+            .then(|| self.layout(f32::from(bounds.size.width), window))
     }
     fn paint(
         &mut self,
@@ -692,10 +728,13 @@ impl Element for LyricText {
         _: Option<&InspectorElementId>,
         bounds: Bounds<Pixels>,
         _: &mut (),
-        layout: &mut Rc<Layout>,
+        layout: &mut Option<Rc<Layout>>,
         window: &mut Window,
         cx: &mut App,
     ) {
+        let Some(layout) = layout else {
+            return;
+        };
         let viewport = window.content_mask().bounds;
         if !bounds.intersects(&viewport) {
             return;
@@ -747,6 +786,7 @@ impl Element for LyricText {
             }
             .max(1);
             let mut emphasis_index = 0;
+            let mut scaled = piece.scaled.borrow_mut();
             for glyph_index in 0..characters.len().max(1) {
                 let (glyph, glyph_x, glyph_width) = match characters.get(glyph_index) {
                     Some((glyph, x, width)) => (glyph, *x, *width),
@@ -805,7 +845,7 @@ impl Element for LyricText {
                     0.
                 };
                 // Quantized scale reuses the text cache while sustaining an emphasized long note.
-                let emphasized = (pulse > 0. || (self.scale != 1. && !piece.phonetic)).then(|| {
+                let shaped = if pulse > 0. || (self.scale != 1. && !piece.phonetic) {
                     // GPUI rasterizes by font size rather than transforming one glyph texture.
                     // Bound spring-generated atlas variants to subpixel size steps shared by words.
                     let paint_size = (self.font_size
@@ -814,9 +854,19 @@ impl Element for LyricText {
                         * 32.)
                         .round()
                         / 32.;
-                    self.shape(&glyph.text, paint_size, window)
-                });
-                let shaped = emphasized.as_ref().unwrap_or(glyph);
+                    if scaled.len() <= glyph_index {
+                        scaled.resize_with(characters.len().max(1), || None);
+                    }
+                    let cached = &mut scaled[glyph_index];
+                    if cached.as_ref().is_none_or(|line| {
+                        line.font_size != px(paint_size) || line.text != glyph.text
+                    }) {
+                        *cached = Some(self.shape(&glyph.text, paint_size, window));
+                    }
+                    cached.as_ref().unwrap()
+                } else {
+                    glyph
+                };
                 let origin = bounds.origin
                     + point(
                         px(piece.x + glyph_x + (glyph_width - f32::from(shaped.width())) * 0.5),
@@ -1000,4 +1050,194 @@ pub(super) fn interlude(
     .w(px(width))
     .h(px(height))
     .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LayoutCache, Line, LyricText, Motion};
+    use crate::lyrics::Word;
+    use gpui_kit::{
+        AppContext, Context, Font, FontWeight, IntoElement, ParentElement, Render, Styled,
+        TestAppContext, TextAlign, Window, div, px, size, white,
+    };
+    use std::{cell::Cell, ops::Deref, rc::Rc, sync::Arc};
+
+    #[test]
+    fn lyric_preparation_reuses_groups_and_sublines_until_revision_changes() {
+        let mut lines = vec![
+            Line {
+                text: "main".into(),
+                translation: Some("translation".into()),
+                romanization: Some("romanization".into()),
+                ..Line::default()
+            },
+            Line {
+                background: true,
+                ..Line::default()
+            },
+            Line {
+                text: "next".into(),
+                ..Line::default()
+            },
+        ];
+        let mut motion = Motion::default();
+        motion.prepare(&lines, 1);
+        assert_eq!(&*motion.groups, &[0, 2]);
+        assert_eq!(motion.rows.len(), 2);
+        let groups = motion.groups.clone();
+        let translation = motion.sublines[0][0].clone().unwrap();
+        let romanization = motion.sublines[0][1].clone().unwrap();
+        motion.prepare(&lines, 1);
+        assert!(Rc::ptr_eq(&groups, &motion.groups));
+        assert!(Arc::ptr_eq(
+            &translation,
+            motion.sublines[0][0].as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            &romanization,
+            motion.sublines[0][1].as_ref().unwrap()
+        ));
+
+        lines[0].translation = Some("updated".into());
+        lines[0].words.push(Word {
+            start: 0,
+            end: 1000,
+            text: "main".into(),
+            romanization: "ruby".into(),
+        });
+        motion.prepare(&lines, 2);
+        assert_eq!(motion.sublines[0][0].as_ref().unwrap().text, "updated");
+        assert!(motion.sublines[0][1].is_none());
+        assert!(!Rc::ptr_eq(&groups, &motion.groups));
+        assert!(!Arc::ptr_eq(
+            &translation,
+            motion.sublines[0][0].as_ref().unwrap()
+        ));
+        lines.push(Line::default());
+        motion.prepare(&lines, 2);
+        assert_eq!(&*motion.groups, &[0, 2, 3]);
+        assert_eq!(motion.sublines.len(), 4);
+    }
+
+    #[test]
+    fn lyric_scale_settles_and_restarts_when_the_active_line_changes() {
+        let mut motion = Motion::default();
+        motion.prepare(&[Line::default()], 1);
+        motion.snap = false;
+        motion.scale_step = 1. / 120.;
+        for _ in 0..1200 {
+            motion.settling = false;
+            motion.scale(0, false, true, true);
+            if !motion.settling {
+                break;
+            }
+        }
+        assert_eq!(motion.scales[0], (0.97, 0.));
+        assert!(!motion.settling);
+        assert_eq!(motion.scale(0, false, true, true), 0.97);
+        assert!(!motion.settling);
+        assert!(motion.scale(0, true, true, true) > 0.97);
+        assert!(motion.settling);
+    }
+
+    struct TextFixture(LyricText);
+    impl Render for TextFixture {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().child(self.0.clone())
+        }
+    }
+
+    #[gpui_kit::test]
+    fn lyric_scaled_glyphs_reuse_text_and_invalidate_for_size_and_motion(cx: &mut TestAppContext) {
+        let mut fixture = None;
+        let handle = cx.open_window(size(px(600.), px(300.)), |_, cx| {
+            let text = LyricText {
+                line: Arc::new(Line {
+                    text: "Hold".into(),
+                    words: vec![Word {
+                        start: 0,
+                        end: 2000,
+                        text: "Hold".into(),
+                        romanization: String::new(),
+                    }],
+                    ..Line::default()
+                }),
+                cache: LayoutCache::default(),
+                font: Font::default(),
+                font_size: 32.,
+                scale: 0.97,
+                color: white(),
+                now_ms: 10_000,
+                current: false,
+                mask_alpha: [0.2, 0.2],
+                subline: false,
+                motion: true,
+                blur: 2.,
+                align: TextAlign::Left,
+                edge: Cell::new(1.),
+            };
+            fixture = Some(cx.entity());
+            TextFixture(text)
+        });
+        let fixture = fixture.unwrap();
+        let layout = cx
+            .update_window(handle.into(), |_, window, cx| {
+                window.draw(cx).clear(cx);
+                fixture.read(cx).0.layout(600., window)
+            })
+            .unwrap();
+        let first = layout.pieces[0].scaled.borrow()[0].clone().unwrap();
+        assert_eq!(first.text.as_ref(), "H");
+        assert_eq!(first.font_size, px((32_f32 * 0.97 * 32.).round() / 32.));
+        cx.update_window(handle.into(), |_, window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+            let text = &fixture.read(cx).0;
+            assert!(Rc::ptr_eq(&layout, &text.layout(600., window)));
+            let scaled = layout.pieces[0].scaled.borrow();
+            assert!(Arc::ptr_eq(
+                scaled[0].as_ref().unwrap().deref(),
+                first.deref()
+            ));
+        })
+        .unwrap();
+        fixture.update(cx, |fixture, cx| {
+            fixture.0.motion = false;
+            cx.notify();
+        });
+        cx.update_window(handle.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+            assert_eq!(
+                layout.pieces[0].scaled.borrow()[0]
+                    .as_ref()
+                    .unwrap()
+                    .text
+                    .as_ref(),
+                "Hold"
+            );
+        })
+        .unwrap();
+        fixture.update(cx, |fixture, cx| {
+            fixture.0.scale = 0.98;
+            cx.notify();
+        });
+        cx.update_window(handle.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+            let scaled = layout.pieces[0].scaled.borrow();
+            assert_eq!(
+                scaled[0].as_ref().unwrap().font_size,
+                px((32_f32 * 0.98 * 32.).round() / 32.)
+            );
+            assert_eq!(scaled.len(), 4);
+            let mut text = fixture.read(cx).0.clone();
+            text.font.weight = FontWeight::BOLD;
+            assert!(!Rc::ptr_eq(&layout, &text.layout(600., window)));
+            assert!(!Rc::ptr_eq(
+                &text.layout(600., window),
+                &text.layout(180., window)
+            ));
+            window.remove_window();
+        })
+        .unwrap();
+    }
 }
