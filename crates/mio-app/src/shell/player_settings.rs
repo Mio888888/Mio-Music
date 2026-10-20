@@ -657,6 +657,9 @@ impl Mio {
                 view.child(
                     div()
                         .id("player-style-panel")
+                        .occlude()
+                        .on_any_mouse_down(|_, _, cx| cx.stop_propagation())
+                        .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
                         .absolute()
                         .right(px(0.))
                         .bottom(px(panel_bottom - 20. * (1. - panel_visibility)))
