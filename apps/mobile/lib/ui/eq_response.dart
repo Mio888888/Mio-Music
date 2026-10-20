@@ -44,7 +44,7 @@ class _EqResponsePlotState extends State<EqResponsePlot>
   Timer? _timer, _expiry;
   api.EqualizerSession? _captureSession;
   Stopwatch? _freshSince;
-  int _freshBudget = 0, _epoch = 0;
+  int _freshBudget = 0, _epoch = 0, _retryMs = 125;
   bool _inFlight = false, _foreground = true, _tickerEnabled = true;
   bool _reduceMotion = false, _failed = false, _visualEnabled = true;
   api.EqSnapshot get value => widget.value;
@@ -95,6 +95,7 @@ class _EqResponsePlotState extends State<EqResponsePlot>
   void _restart() {
     _stop();
     _failed = false;
+    _retryMs = 125;
     if (_live) {
       try {
         widget.session!.spectrumActive(active: true);
@@ -151,11 +152,13 @@ class _EqResponsePlotState extends State<EqResponsePlot>
     final epoch = _epoch;
     _inFlight = true;
     final elapsed = Stopwatch()..start();
+    var delay = Duration(milliseconds: _reduceMotion ? 100 : 34);
     bool current() =>
         _live && epoch == _epoch && identical(session, widget.session);
     try {
       final frame = await session.spectrum();
       if (!current()) return;
+      _retryMs = 125;
       if (!frame.playing || frame.generation != widget.generation) {
         _clear();
         return;
@@ -182,17 +185,21 @@ class _EqResponsePlotState extends State<EqResponsePlot>
       }, growable: false);
     } catch (error) {
       if (current()) {
-        if (!error.toString().contains('busy: spectrum')) {
+        if (!error.toString().contains('busy:')) {
           _stop();
           setState(() => _failed = true);
-        } else if (_freshSince == null ||
-            _freshSince!.elapsedMilliseconds > _freshBudget) {
-          _clear();
+        } else {
+          delay = Duration(milliseconds: _retryMs);
+          _retryMs = math.min(_retryMs * 2, 1000);
+          if (_freshSince == null ||
+              _freshSince!.elapsedMilliseconds > _freshBudget) {
+            _clear();
+          }
         }
       }
     } finally {
       _inFlight = false;
-      if (mounted) _schedule(Duration(milliseconds: _reduceMotion ? 100 : 34));
+      if (mounted) _schedule(delay);
     }
   }
 

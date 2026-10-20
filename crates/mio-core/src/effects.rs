@@ -12,6 +12,9 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 
+#[cfg(test)]
+mod tests;
+
 pub const NUM_EQ_BANDS: usize = 10;
 pub const EQ_GAIN_MIN: f64 = -24.;
 pub const EQ_GAIN_MAX: f64 = 24.;
@@ -680,7 +683,7 @@ pub struct SpectrumSource<S> {
     inner: S,
     effects: Arc<Effects>,
     channels: usize,
-    sample_count: usize,
+    channel: usize,
     stride: usize,
     stride_counter: usize,
     producer: u64,
@@ -709,7 +712,7 @@ impl<S: Source<Item = f32>> SpectrumSource<S> {
             inner,
             effects,
             channels,
-            sample_count: 0,
+            channel: 0,
             stride,
             stride_counter: 0,
             producer,
@@ -723,7 +726,12 @@ impl<S: Source<Item = f32>> Iterator for SpectrumSource<S> {
         // Only `Continuous`, on this same audio thread, advances the generation.
         let before = self.generation.load(Ordering::Relaxed);
         let sample = self.inner.next()?;
-        self.sample_count += 1;
+        let channel = self.channel;
+        self.channel = if channel + 1 == self.channels {
+            0
+        } else {
+            channel + 1
+        };
         if !self.effects.spectrum_capture.load(Ordering::Acquire) {
             return Some(sample);
         }
@@ -732,7 +740,7 @@ impl<S: Source<Item = f32>> Iterator for SpectrumSource<S> {
         if self.generation.load(Ordering::Relaxed) != before {
             return Some(sample);
         }
-        if (self.sample_count - 1) % self.channels == 0 {
+        if channel == 0 {
             self.stride_counter += 1;
             if self.stride_counter >= self.stride {
                 self.stride_counter = 0;

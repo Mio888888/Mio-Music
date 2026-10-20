@@ -32,7 +32,7 @@ class _PlayerSpectrumState extends State<PlayerSpectrum>
   Future<void>? _operation;
   Future<void> _cleanup = Future.value();
   Timer? _timer, _expiry;
-  int _epoch = 0;
+  int _epoch = 0, _retryMs = 125;
   bool _foreground = true, _enabled = false;
 
   /// The visualization switch itself. Rust drops its demand when it turns off,
@@ -63,6 +63,7 @@ class _PlayerSpectrumState extends State<PlayerSpectrum>
     ++_epoch;
     _timer?.cancel();
     _timer = null;
+    _retryMs = 125;
     _clear();
     _session?.close();
     final previous = _cleanup, pending = _operation;
@@ -83,40 +84,36 @@ class _PlayerSpectrumState extends State<PlayerSpectrum>
     unawaited(() async {
       await _cleanup;
       if (!_current(epoch)) return;
-      final operation = _open(epoch);
-      _operation = operation;
-      await operation;
-      if (_current(epoch) && _session != null) _schedule(epoch);
+      await _poll(epoch);
     }());
   }
 
   Future<void> _open(int epoch) async {
-    try {
-      final session = await api.beginPlayerSpectrum(
-        generation: widget.generation,
-      );
-      _session = session;
-      if (!_current(epoch)) session.close();
-    } catch (_) {
-      /* No fabricated signal on unavailable data. */
-    }
+    final session = await api.beginPlayerSpectrum(
+      generation: widget.generation,
+    );
+    _session = session;
+    if (!_current(epoch)) session.close();
   }
 
-  void _schedule(int epoch) {
-    _timer = Timer(
-      const Duration(milliseconds: 34),
-      () => unawaited(_poll(epoch)),
-    );
+  void _schedule(int epoch, Duration delay) {
+    _timer = Timer(delay, () {
+      _timer = null;
+      unawaited(_poll(epoch));
+    });
   }
 
   Future<void> _poll(int epoch) async {
-    final session = _session;
-    if (!_current(epoch) || session == null) return;
+    if (!_current(epoch)) return;
+    var delay = const Duration(milliseconds: 34);
     final operation = () async {
-      final elapsed = Stopwatch()..start();
       try {
-        final frame = await session.frame();
+        if (_session == null) await _open(epoch);
         if (!_current(epoch)) return;
+        final elapsed = Stopwatch()..start();
+        final frame = await _session!.frame();
+        if (!_current(epoch)) return;
+        _retryMs = 125;
         final age = frame.ageMs + elapsed.elapsedMilliseconds;
         if (!frame.playing || frame.generation != widget.generation) {
           _clear();
@@ -155,12 +152,17 @@ class _PlayerSpectrumState extends State<PlayerSpectrum>
         });
       } catch (error) {
         if (!_current(epoch)) return;
-        if (!error.toString().contains('busy: spectrum')) _stop();
+        if (error.toString().contains('busy:')) {
+          delay = Duration(milliseconds: _retryMs);
+          _retryMs = math.min(_retryMs * 2, 1000);
+        } else {
+          _stop();
+        }
       }
     }();
     _operation = operation;
     await operation;
-    if (_current(epoch)) _schedule(epoch);
+    if (_current(epoch)) _schedule(epoch, delay);
   }
 
   @override

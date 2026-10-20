@@ -749,7 +749,7 @@ impl Mio {
                 cx.background_executor()
                     .timer(std::time::Duration::from_millis(interval))
                     .await;
-                match this.update_in(cx, |this, _, cx| {
+                match update_main(&this, cx, |this, _, cx| {
                     let visible = this.navigation.current() == Page::Appearance
                         && !this.full_player_open
                         && this.settings_ui.category == settings_page::Category::Effects;

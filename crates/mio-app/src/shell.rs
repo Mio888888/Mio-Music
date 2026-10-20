@@ -3178,9 +3178,76 @@ mod tests {
     use gpui_kit::component::Root;
     use gpui_kit::test::TestWindowExt;
     use gpui_kit::{
-        AppContext, Bounds, InputEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-        TestAppContext, WindowBounds, WindowOptions, point, px, size,
+        AppContext, Bounds, Context, Entity, InputEvent, IntoElement, MouseButton, MouseDownEvent,
+        MouseMoveEvent, MouseUpEvent, Render, TestAppContext, Window, WindowBounds, WindowOptions,
+        point, px, size,
     };
+
+    #[gpui_kit::test]
+    fn spectrum_loop_survives_a_closed_auxiliary_window(cx: &mut TestAppContext) {
+        struct Auxiliary(Entity<Mio>);
+        impl Render for Auxiliary {
+            fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+                let _ = self.0.read(cx);
+                gpui_kit::div()
+            }
+        }
+
+        cx.update(gpui_kit::init);
+        let mut view = None;
+        let main = cx.update(|cx| {
+            cx.open_window(WindowOptions::default(), |window, cx| {
+                let content = cx.new(|cx| {
+                    let mut this = Mio::new_in(None, window, cx);
+                    this.start_spectrum_loop(window, cx);
+                    this
+                });
+                view = Some(content.clone());
+                cx.new(|cx| Root::new(content, window, cx))
+            })
+            .unwrap()
+        });
+        let view = view.unwrap();
+        let mut main_cx = cx
+            .update_window(main.into(), |_, window, cx| {
+                window.draw(cx).clear(cx);
+                window.to_async(cx)
+            })
+            .unwrap();
+        cx.run_until_parked();
+        view.update(cx, |this, _| {
+            this.full_player_open = true;
+            this.audio_visualization = true;
+            this.player.status = crate::playback::Status::Playing;
+        });
+        let auxiliary = cx.update(|cx| {
+            cx.open_window(WindowOptions::default(), |_, cx| {
+                cx.new(|_| Auxiliary(view.clone()))
+            })
+            .unwrap()
+        });
+        cx.update_window(auxiliary.into(), |_, window, cx| {
+            window.draw(cx).clear(cx);
+            window.remove_window();
+        })
+        .unwrap();
+        assert!(
+            view.downgrade()
+                .update_in(&mut main_cx, |_, _, _| {})
+                .is_err()
+        );
+        for _ in 0..2 {
+            view.update(cx, |this, _| this.player_spectrum.target.fill(10.));
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(33));
+            cx.run_until_parked();
+            cx.update(|cx| assert_eq!(view.read(cx).player_spectrum.target, [-80.; 128]));
+        }
+        cx.update_window(main.into(), |_, window, _| window.remove_window())
+            .unwrap();
+        drop(view);
+        cx.run_until_parked();
+    }
 
     #[gpui_kit::test]
     fn damaged_session_is_reported_and_never_overwritten_by_checkpoint_or_close(
