@@ -151,6 +151,7 @@ class MioButton extends StatefulWidget {
   final FocusNode? focusNode;
   final bool autofocus;
   final Color? background;
+  final Color? hoverBackground;
   final double radius;
   final double disabledOpacity;
   final bool insetFocusBorder;
@@ -165,6 +166,7 @@ class MioButton extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     this.background,
+    this.hoverBackground,
     this.radius = 4,
     this.disabledOpacity = .4,
     this.insetFocusBorder = true,
@@ -232,7 +234,8 @@ class _MioButtonState extends State<MioButton> {
               padding: widget.padding,
               decoration: BoxDecoration(
                 color: enabled && (_hovered || _pressed)
-                    ? widget.palette.color('--td-bg-color-component-hover')
+                    ? widget.hoverBackground ??
+                          widget.palette.color('--td-bg-color-component-hover')
                     : widget.background,
                 borderRadius: BorderRadius.circular(widget.radius),
                 border: widget.insetFocusBorder ? border : null,

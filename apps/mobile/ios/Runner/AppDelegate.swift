@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var hostChannel: FlutterMethodChannel?
+  private var deviceChannel: FlutterMethodChannel?
+  private var deviceRegistrar: FlutterPluginRegistrar?
   private var mediaHost: MioMediaHost?
   private var microphonePlugin: MioMicrophonePlugin?
   override func application(
@@ -17,8 +19,24 @@ import UniformTypeIdentifiers
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  func orientationDidChange() {
+    deviceChannel?.invokeMethod("orientationChanged", arguments: nil)
+  }
+
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let device = engineBridge.pluginRegistry.registrar(forPlugin: "MioDevice") {
+      deviceRegistrar = device
+      let channel = FlutterMethodChannel(name: "mio/device", binaryMessenger: device.messenger())
+      deviceChannel = channel
+      channel.setMethodCallHandler { [weak self] call, result in
+        guard call.method == "portraitOnly" else { result(FlutterMethodNotImplemented); return }
+        guard let scene = self?.deviceRegistrar?.viewController?.viewIfLoaded?.window?.windowScene else {
+          result(nil); return
+        }
+        result(SceneDelegate.portraitOnly(in: scene))
+      }
+    }
     if let files = engineBridge.pluginRegistry.registrar(forPlugin: "MioFilePicker") {
       MioFilePicker.register(with: files)
     }

@@ -151,6 +151,26 @@ class MioPalette {
   }
 
   Color get brand => color('--td-brand-color');
+  Color get onBrand {
+    final background = Color.alphaBlend(brand, surface);
+    final backgroundLuminance = background.computeLuminance();
+    double contrast(Color foreground) {
+      final luminance = Color.alphaBlend(
+        foreground,
+        background,
+      ).computeLuminance();
+      return luminance > backgroundLuminance
+          ? (luminance + .05) / (backgroundLuminance + .05)
+          : (backgroundLuminance + .05) / (luminance + .05);
+    }
+
+    final preferred = color('--td-text-color-anti');
+    if (contrast(preferred) >= 4.5) return preferred;
+    const dark = Color(0xff111111);
+    const light = Color(0xffffffff);
+    return contrast(dark) >= contrast(light) ? dark : light;
+  }
+
   Color get surface => color('--td-bg-color-container');
   Color get secondary => color('--td-text-color-secondary');
   Color get border => color('--td-border-level-1-color');

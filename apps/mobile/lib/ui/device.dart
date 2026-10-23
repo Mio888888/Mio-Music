@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -19,9 +21,128 @@ class MioDeviceScope extends InheritedWidget {
   static bool isTv(BuildContext context) => of(context)?.television == true;
   static bool wide(BuildContext context, double width) =>
       isTv(context) || width > 768;
+  static double rightNavigationInset(BuildContext context) {
+    if (defaultTargetPlatform != TargetPlatform.iOS || isTv(context)) {
+      return 0;
+    }
+    final inset = MediaQuery.viewPaddingOf(context).right;
+    return inset >= 72 ? inset : 0;
+  }
+
   @override
   bool updateShouldNotify(MioDeviceScope old) =>
       old.capabilities != capabilities;
+}
+
+class MioOrientationPolicy extends StatefulWidget {
+  final Widget child;
+  const MioOrientationPolicy({super.key, required this.child});
+  @override
+  State<MioOrientationPolicy> createState() => _MioOrientationPolicyState();
+}
+
+class _MioOrientationPolicyState extends State<MioOrientationPolicy>
+    with WidgetsBindingObserver {
+  static const _host = MethodChannel('mio/device');
+  ui.FlutterView? _view;
+  int _queryRevision = 0;
+  bool? _portraitOnly;
+  bool? _appliedPortraitOnly;
+  bool _applying = false;
+
+  Future<void> _update() async {
+    if (!mounted ||
+        kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.iOS &&
+            defaultTargetPlatform != TargetPlatform.android)) {
+      return;
+    }
+    final revision = ++_queryRevision;
+    final television = MioDeviceScope.isTv(context);
+    bool? portraitOnly;
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      portraitOnly = await _host.invokeMethod<bool>('portraitOnly');
+    } else {
+      final display = _view?.display;
+      if (display != null &&
+          !display.size.isEmpty &&
+          display.devicePixelRatio > 0) {
+        portraitOnly =
+            display.size.shortestSide / display.devicePixelRatio < 600;
+      }
+    }
+    if (!mounted || revision != _queryRevision || portraitOnly == null) return;
+    _portraitOnly = !television && portraitOnly;
+    unawaited(_apply());
+  }
+
+  Future<void> _apply() async {
+    if (_applying) return;
+    _applying = true;
+    try {
+      while (mounted && _portraitOnly != _appliedPortraitOnly) {
+        final portraitOnly = _portraitOnly;
+        if (portraitOnly == null) return;
+        await SystemChrome.setPreferredOrientations(
+          portraitOnly ? const [DeviceOrientation.portraitUp] : const [],
+        );
+        _appliedPortraitOnly = portraitOnly;
+      }
+    } on PlatformException catch (error, stack) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          library: 'Mio device orientation',
+        ),
+      );
+    } finally {
+      _applying = false;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      _host.setMethodCallHandler((call) async {
+        if (call.method == 'orientationChanged') unawaited(_update());
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _view = View.of(context);
+    unawaited(_update());
+  }
+
+  @override
+  void didChangeMetrics() => unawaited(_update());
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _appliedPortraitOnly = null;
+      unawaited(_update());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ++_queryRevision;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      _host.setMethodCallHandler(null);
+    }
+    _view = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// A menu supplied by the row; long-confirm never also activates that row.

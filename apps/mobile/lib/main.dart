@@ -94,9 +94,11 @@ class _MioAppState extends State<MioApp> {
                 style: _textStyle(palette),
                 child: MioDeviceScope(
                   capabilities: _core.capabilities,
-                  child: MioVisualPolicy(
-                    settings: _core.player?.visuals,
-                    child: child ?? const SizedBox.shrink(),
+                  child: MioOrientationPolicy(
+                    child: MioVisualPolicy(
+                      settings: _core.player?.visuals,
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               ),
@@ -125,6 +127,8 @@ class _MioAppState extends State<MioApp> {
             return SafeArea(
               // The shell paints its footer through the bottom system inset.
               bottom: _welcome,
+              right:
+                  _welcome || MioDeviceScope.rightNavigationInset(context) == 0,
               minimum: _core.capabilities?.television == true
                   ? EdgeInsets.fromLTRB(24, 16, 24, _welcome ? 16 : 0)
                   : EdgeInsets.zero,

@@ -2798,26 +2798,39 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
       _error == null &&
       _localSession != null;
 
-  Widget _localImportButton({bool pill = true}) => MioButton(
-    palette: p,
-    label: p.text('music.local.importFiles'),
-    radius: pill ? 999 : 6,
-    padding: const EdgeInsets.symmetric(horizontal: 10),
-    background: p.brand,
-    onPressed: _live && !_importBusy && !_catalogBusy
-        ? () => unawaited(_importAudio())
-        : null,
-    child: SizedBox(
-      height: 32,
-      child: Center(
-        widthFactor: 1,
-        child: Text(
-          p.text('music.local.importFiles'),
-          style: TextStyle(color: p.color('--td-text-color-anti')),
+  Widget _localImportButton({bool pill = true}) {
+    final enabled = _live && !_importBusy && !_catalogBusy;
+    return MioButton(
+      palette: p,
+      label: p.text('music.local.importFiles'),
+      radius: pill ? 999 : 6,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      background: enabled
+          ? p.brand
+          : p.color('--td-bg-color-component-disabled'),
+      hoverBackground: Color.alphaBlend(
+        p.onBrand.computeLuminance() > .5
+            ? const Color(0x14000000)
+            : const Color(0x14ffffff),
+        p.brand,
+      ),
+      disabledOpacity: 1,
+      onPressed: enabled ? () => unawaited(_importAudio()) : null,
+      child: SizedBox(
+        height: 32,
+        child: Center(
+          widthFactor: 1,
+          child: Text(
+            p.text('music.local.importFiles'),
+            style: TextStyle(
+              color: enabled ? p.onBrand : p.secondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Future<void> _playAllLocal() async {
     final session = _localSession;
@@ -2851,6 +2864,7 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
   }
 
   Widget _narrowLocalToolbar() {
+    final playEnabled = _localActionsEnabled && _total > 0;
     Widget circle(String icon, String label, VoidCallback? run) => SizedBox(
       width: 44,
       height: 44,
@@ -2883,11 +2897,18 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
             palette: p,
             label: p.text('common.playAll'),
             radius: 999,
-            background: p.brand,
+            background: playEnabled
+                ? p.brand
+                : p.color('--td-bg-color-component-disabled'),
+            hoverBackground: Color.alphaBlend(
+              p.onBrand.computeLuminance() > .5
+                  ? const Color(0x14000000)
+                  : const Color(0x14ffffff),
+              p.brand,
+            ),
+            disabledOpacity: 1,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            onPressed: _localActionsEnabled && _total > 0
-                ? () => unawaited(_playAllLocal())
-                : null,
+            onPressed: playEnabled ? () => unawaited(_playAllLocal()) : null,
             child: SizedBox(
               height: 44,
               child: Center(
@@ -2895,7 +2916,10 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
                   '${p.text('common.playAll')} · $_total',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.color('--td-text-color-anti')),
+                  style: TextStyle(
+                    color: playEnabled ? p.onBrand : p.secondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -2949,6 +2973,7 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
   /// Desktop wide layout: Play all, Refresh and More on the left, filter box
   /// on the right.
   Widget _wideLocalToolbar() {
+    final playEnabled = _localActionsEnabled && _total > 0;
     Widget outlined(Widget child, String label, VoidCallback? run) => SizedBox(
       height: 32,
       child: DecoratedBox(
@@ -2973,18 +2998,28 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
           palette: p,
           label: p.text('common.playAll'),
           radius: 6,
-          background: p.brand,
+          background: playEnabled
+              ? p.brand
+              : p.color('--td-bg-color-component-disabled'),
+          hoverBackground: Color.alphaBlend(
+            p.onBrand.computeLuminance() > .5
+                ? const Color(0x14000000)
+                : const Color(0x14ffffff),
+            p.brand,
+          ),
+          disabledOpacity: 1,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          onPressed: _localActionsEnabled && _total > 0
-              ? () => unawaited(_playAllLocal())
-              : null,
+          onPressed: playEnabled ? () => unawaited(_playAllLocal()) : null,
           child: SizedBox(
             height: 32,
             child: Center(
               widthFactor: 1,
               child: Text(
                 p.text('common.playAll'),
-                style: TextStyle(color: p.color('--td-text-color-anti')),
+                style: TextStyle(
+                  color: playEnabled ? p.onBrand : p.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),

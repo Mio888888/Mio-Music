@@ -231,6 +231,21 @@ class _MioShellState extends State<MioShell> {
 
   final _scroll = ScrollController();
   MioPalette get p => widget.palette;
+  MioPalette? _navigationPaletteSource, _playerNavigationPalette;
+  MioPalette get _rightNavigationPalette {
+    if (!_fullPlayer || p.dark) return p;
+    if (!identical(_navigationPaletteSource, p)) {
+      _navigationPaletteSource = p;
+      _playerNavigationPalette = MioPalette(
+        p.assets,
+        dark: true,
+        english: p.english,
+        coverTheme: core.player?.coverTheme,
+      );
+    }
+    return _playerNavigationPalette!;
+  }
+
   CoreController get core => widget.core;
   void _restoreOverlayFocus(FocusNode? node, {required bool playerOpen}) {
     if (node == null || !MioDeviceScope.isTv(context)) return;
@@ -289,7 +304,21 @@ class _MioShellState extends State<MioShell> {
     }
   }
 
+  void _goFromRightNavigation(_Page page) {
+    if (page == _Page.recognition && !_canRecognize) return;
+    if (_fullPlayer || _queueOpen) {
+      setState(() {
+        _fullPlayer = false;
+        _queueOpen = false;
+        _playerReturnFocus = null;
+        _queueReturnFocus = null;
+      });
+    }
+    _go(page);
+  }
+
   void _go(_Page page, {String? playlistId, bool replace = false}) {
+    if (page == _Page.recognition && !_canRecognize) return;
     if (page == _Page.queue) {
       if (core.player == null) return;
       _openQueue();
@@ -463,7 +492,11 @@ class _MioShellState extends State<MioShell> {
           },
           child: LayoutBuilder(
             builder: (context, box) {
-              final wide = MioDeviceScope.wide(context, box.maxWidth);
+              final navigationInset = MioDeviceScope.rightNavigationInset(
+                context,
+              );
+              final width = box.maxWidth - navigationInset;
+              final wide = MioDeviceScope.wide(context, width);
               // Wide settings replace the whole window like the desktop page:
               // title bar, category list and content, with no sidebar/player.
               final settingsRoot =
@@ -488,7 +521,7 @@ class _MioShellState extends State<MioShell> {
                     )
                   : _compactHeaderBackground;
               final viewportHeight = box.maxHeight - bottomInset;
-              final rem = MioPalette.rem(box.maxWidth);
+              final rem = MioPalette.rem(width);
               final textScale = MediaQuery.textScalerOf(context);
               final playerTextHeight = wide
                   ? textScale.scale(14) * 1.5 +
@@ -505,12 +538,16 @@ class _MioShellState extends State<MioShell> {
               final navigationHeight = math
                   .max(64.0, 51 + textScale.scale(10))
                   .ceilToDouble();
-              return SingerHost(
+              final workspace = SingerHost(
                 // Singer pages open inside the shell (like the desktop
                 // content area); TV keeps its own route for focus handling.
                 open: MioDeviceScope.isTv(context) ? null : _showSinger,
-                child: ColoredBox(
-                  color: p.color('--td-bg-color-page'),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: navigationInset > 0
+                        ? null
+                        : p.color('--td-bg-color-page'),
+                  ),
                   child: Stack(
                     clipBehavior:
                         !wide &&
@@ -531,7 +568,7 @@ class _MioShellState extends State<MioShell> {
                             Expanded(
                               child: Row(
                                 children: [
-                                  if (wide)
+                                  if (wide && navigationInset == 0)
                                     settingsRoot
                                         ? const SizedBox.shrink()
                                         : _sidebar(
@@ -552,7 +589,9 @@ class _MioShellState extends State<MioShell> {
                                                       '--settings-main-bg',
                                                     )
                                                   : null,
-                                              gradient: settingsRoot
+                                              gradient:
+                                                  settingsRoot ||
+                                                      navigationInset > 0
                                                   ? null
                                                   : mioWorkspaceBackground(
                                                       p,
@@ -585,12 +624,15 @@ class _MioShellState extends State<MioShell> {
                                                           _settingsPages
                                                               .contains(_page)
                                                       ? _compactSettingsHeader(
-                                                          box.maxWidth,
+                                                          width,
                                                         )
                                                       : _header(
-                                                          box.maxWidth,
+                                                          width,
                                                           wide,
                                                           rem,
+                                                          rightNavigation:
+                                                              navigationInset >
+                                                              0,
                                                         ),
                                                 if (core.error != null)
                                                   _error(),
@@ -609,7 +651,7 @@ class _MioShellState extends State<MioShell> {
                                                                     : 0,
                                                               ),
                                                           child: _content(
-                                                            box.maxWidth,
+                                                            width,
                                                             wide,
                                                             rem,
                                                           ),
@@ -653,20 +695,23 @@ class _MioShellState extends State<MioShell> {
                               SizedBox(height: bottomInset)
                             else
                               _player(
-                                box.maxWidth,
+                                width,
                                 wide,
                                 playerHeight,
                                 bottomInset +
-                                    (wide ? 0 : navigationHeight + 10),
+                                    (wide || navigationInset > 0
+                                        ? 0
+                                        : navigationHeight + 10),
+                                blendTrailingEdge: navigationInset > 0,
                               ),
                           ],
                         ),
                       ),
-                      if (!wide)
+                      if (!wide && navigationInset == 0)
                         if (_glassNavigation)
                           Positioned.fill(
                             child: _glassBottomNavigation(
-                              box.maxWidth,
+                              width,
                               navigationHeight,
                               bottomInset,
                             ),
@@ -683,8 +728,8 @@ class _MioShellState extends State<MioShell> {
                                   _backupOpen ||
                                   _recognitionOpen,
                               child: Center(
-                                child: _bottomNavigation(
-                                  box.maxWidth,
+                                child: _compactNavigation(
+                                  width,
                                   navigationHeight,
                                 ),
                               ),
@@ -715,56 +760,107 @@ class _MioShellState extends State<MioShell> {
                             child: ColoredBox(color: topBackground),
                           ),
                         ),
-                      if ((_fullPlayer || _artistReturnPlayer) &&
-                          core.player?.current != null)
-                        Positioned.fill(
-                          key: const ValueKey('full-player-overlay'),
-                          top: -topInset,
-                          child: Offstage(
-                            offstage: !_fullPlayer,
-                            child: ExcludeFocus(
-                              excluding: _queueOpen,
-                              child: TickerMode(
-                                enabled:
-                                    _fullPlayer &&
-                                    !_queueOpen &&
-                                    !_backupOpen &&
-                                    !_recognitionOpen,
-                                child: MioFocusPanel(
-                                  child: FullPlayer(
-                                    core: core,
-                                    state: core.player!,
-                                    palette: p,
-                                    onClose: _closePlayer,
-                                    // Wide layouts only need the bottom inset; the
-                                    // player extends its own background below the bar.
-                                    systemInsets: wide
-                                        ? EdgeInsets.only(bottom: bottomInset)
-                                        : EdgeInsets.only(
-                                            top: topInset,
-                                            bottom: bottomInset,
-                                          ),
-                                    onQueue: _openQueue,
-                                    onAppearance: _openPlayerAppearance,
-                                  ),
+                    ],
+                  ),
+                ),
+              );
+              final layout = Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: MediaQuery.removePadding(
+                          context: context,
+                          removeRight: navigationInset > 0,
+                          child: workspace,
+                        ),
+                      ),
+                      if (navigationInset > 0) SizedBox(width: navigationInset),
+                    ],
+                  ),
+                  if ((_fullPlayer || _artistReturnPlayer) &&
+                      core.player?.current != null)
+                    Positioned.fill(
+                      key: const ValueKey('full-player-overlay'),
+                      top: -topInset,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeRight: navigationInset > 0,
+                        child: Offstage(
+                          offstage: !_fullPlayer,
+                          child: ExcludeFocus(
+                            excluding: _queueOpen,
+                            child: TickerMode(
+                              enabled:
+                                  _fullPlayer &&
+                                  !_queueOpen &&
+                                  !_backupOpen &&
+                                  !_recognitionOpen,
+                              child: MioFocusPanel(
+                                child: FullPlayer(
+                                  core: core,
+                                  state: core.player!,
+                                  palette: p,
+                                  onClose: _closePlayer,
+                                  systemInsets: wide
+                                      ? EdgeInsets.only(bottom: bottomInset)
+                                      : EdgeInsets.only(
+                                          top: topInset,
+                                          bottom: bottomInset,
+                                        ),
+                                  trailingInset: navigationInset,
+                                  onQueue: _openQueue,
+                                  onAppearance: _openPlayerAppearance,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      if (_queueOpen && core.player != null)
-                        Positioned.fill(
-                          key: const ValueKey('queue-overlay'),
-                          child: QueueDrawer(
-                            key: _queueKey,
-                            state: core.player!,
-                            palette: p,
-                            onClose: _closeQueue,
-                          ),
+                      ),
+                    ),
+                  if (_queueOpen && core.player != null)
+                    Positioned.fill(
+                      key: const ValueKey('queue-overlay'),
+                      right: navigationInset,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeRight: navigationInset > 0,
+                        child: QueueDrawer(
+                          key: _queueKey,
+                          state: core.player!,
+                          palette: p,
+                          onClose: _closeQueue,
                         ),
-                    ],
+                      ),
+                    ),
+                  if (navigationInset > 0)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _rightNavigation(
+                        navigationInset,
+                        navigationHeight,
+                        bottomInset,
+                      ),
+                    ),
+                ],
+              );
+              if (navigationInset == 0) return layout;
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  color: p.color('--td-bg-color-page'),
+                  gradient: mioWorkspaceBackground(
+                    p,
+                    wide: wide,
+                    songTheme: core.player?.coverTheme != null,
+                    viewportHeight: viewportHeight,
+                    areaHeight: box.maxHeight,
                   ),
                 ),
+                child: layout,
               );
             },
           ),
@@ -987,7 +1083,12 @@ class _MioShellState extends State<MioShell> {
     ),
   );
 
-  Widget _header(double width, bool wide, double rem) => Padding(
+  Widget _header(
+    double width,
+    bool wide,
+    double rem, {
+    bool rightNavigation = false,
+  }) => Padding(
     padding: wide
         ? EdgeInsets.all(rem * 1.5)
         : EdgeInsets.symmetric(
@@ -1045,33 +1146,32 @@ class _MioShellState extends State<MioShell> {
           else
             Expanded(child: _searchBox(wide)),
           if (wide) ...[
-            SizedBox(width: rem * .5),
-            _iconButton(
-              'TD-Microphone',
-              p.text('music.recognize.startRecognize'),
-              core.player == null || _recognitionOpen
-                  ? null
-                  : () => _go(_Page.recognition),
-              focusNode: _recognitionFocus,
-              size: 32,
-              iconSize: 16,
-              radius: 999,
-            ),
+            if (!rightNavigation) ...[
+              SizedBox(width: rem * .5),
+              _iconButton(
+                'TD-Microphone',
+                p.text('music.recognize.startRecognize'),
+                !_canRecognize ? null : () => _go(_Page.recognition),
+                focusNode: _recognitionFocus,
+                size: 32,
+                iconSize: 16,
+                radius: 999,
+              ),
+            ],
             const Spacer(),
-          ] else ...[
+          ] else if (!rightNavigation) ...[
             const SizedBox(width: 8),
             _iconButton(
               'TD-Microphone',
               p.text('music.recognize.startRecognize'),
-              core.player == null || _recognitionOpen
-                  ? null
-                  : () => _go(_Page.recognition),
+              !_canRecognize ? null : () => _go(_Page.recognition),
               focusNode: _recognitionFocus,
               size: 36,
               iconSize: 18,
             ),
             const SizedBox(width: 6),
           ],
+          if (rightNavigation) const SizedBox(width: 8),
           if (wide)
             _backupButton()
           else
@@ -1085,16 +1185,18 @@ class _MioShellState extends State<MioShell> {
               size: 36,
               iconSize: 18,
             ),
-          const SizedBox(width: 6),
-          _iconButton(
-            wide ? 'nav-shezhi' : 'nav-xiazai',
-            p.text(
-              wide ? 'common.titleBar.settings' : 'common.homeNav.download',
+          if (!rightNavigation) ...[
+            const SizedBox(width: 6),
+            _iconButton(
+              wide ? 'nav-shezhi' : 'nav-xiazai',
+              p.text(
+                wide ? 'common.titleBar.settings' : 'common.homeNav.download',
+              ),
+              () => _go(wide ? _Page.appearance : _Page.downloads),
+              size: wide ? rem * 2.25 : 36,
+              iconSize: wide ? rem : 18,
             ),
-            () => _go(wide ? _Page.appearance : _Page.downloads),
-            size: wide ? rem * 2.25 : 36,
-            iconSize: wide ? rem : 18,
-          ),
+          ],
         ],
       ),
     ),
@@ -1640,15 +1742,18 @@ class _MioShellState extends State<MioShell> {
             ),
           ),
           SizedBox(height: wide ? 20 : 12),
-          MioButton(
-            palette: p,
-            label: p.text('music.find.goToPluginManage'),
-            background: p.brand,
-            radius: 3,
-            onPressed: core.player == null ? null : () => _go(_Page.plugins),
-            child: Text(
-              p.text('music.find.goToPluginManage'),
-              style: TextStyle(color: p.color('--td-text-color-anti')),
+          Align(
+            alignment: Alignment.center,
+            child: MioButton(
+              palette: p,
+              label: p.text('music.find.goToPluginManage'),
+              background: p.brand,
+              radius: 3,
+              onPressed: core.player == null ? null : () => _go(_Page.plugins),
+              child: Text(
+                p.text('music.find.goToPluginManage'),
+                style: TextStyle(color: p.color('--td-text-color-anti')),
+              ),
             ),
           ),
         ],
@@ -1656,12 +1761,14 @@ class _MioShellState extends State<MioShell> {
     );
   }
 
+  bool get _canRecognize => core.player != null && !_recognitionOpen;
+
   // The live lens needs the foreground, a free screen and a capable device;
   // otherwise the opaque bar below keeps working (TV focus, reduced mode,
   // full-screen overlays).
   bool get _glassNavigation =>
-      !_fullPlayer &&
-      !_queueOpen &&
+      !_fullPlayer && !_queueOpen && _glassRightNavigationEnabled;
+  bool get _glassRightNavigationEnabled =>
       !_backupOpen &&
       !_recognitionOpen &&
       !MioDeviceScope.isTv(context) &&
@@ -1686,11 +1793,8 @@ class _MioShellState extends State<MioShell> {
         for (final item in items)
           LiquidGlassTabBarItem(
             label: p.text(item.label),
-            iconBuilder: (context, glyph) => MioIcon(
-              'nav-${item.icon}',
-              size: glyph.size,
-              color: glyph.color,
-            ),
+            iconBuilder: (context, glyph) =>
+                MioIcon(item.icon, size: glyph.size, color: glyph.color),
           ),
       ],
       // No tab is highlighted on pages outside the four (e.g. singer pages);
@@ -1750,72 +1854,305 @@ class _MioShellState extends State<MioShell> {
     );
   }
 
-  Widget _bottomNavigation(double width, double height) => Container(
-    width: math.min(width - 2 * MioPalette.gutter(width), 520),
-    height: height,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(32),
-      boxShadow: const [
-        BoxShadow(
-          offset: Offset(0, 14),
-          color: Color(0x38000000),
-          blurRadius: 28,
-        ),
-      ],
-    ),
-    child: MioGlassSurface(
-      palette: p,
-      radius: 32,
-      tint: p.surface.withValues(alpha: p.dark ? .9 : 1),
-      enabled: !_fullPlayer && !_queueOpen && !_backupOpen && !_recognitionOpen,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-        child: Row(
-          children: [
-            for (final item in _compactNavItems)
-              Expanded(
-                child: MioButton(
-                  palette: p,
-                  label: p.text(item.label),
-                  radius: 999,
-                  padding: const EdgeInsets.fromLTRB(0, 5, 0, 4),
-                  background: _navPageActive(item.page)
-                      ? p.brand.withValues(alpha: p.dark ? .14 : .1)
-                      : null,
-                  onPressed: () => _go(item.page),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      MioIcon(
-                        'nav-${item.icon}',
-                        size: 21,
-                        color: _navPageActive(item.page)
-                            ? p.brand
-                            : p.secondary,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        p.text(item.label),
-                        style: TextStyle(
-                          fontSize: 10,
-                          height: 1,
-                          fontWeight: _navPageActive(item.page)
-                              ? FontWeight.bold
-                              : FontWeight.w500,
-                          color: _navPageActive(item.page)
-                              ? p.brand
-                              : p.secondary,
-                        ),
-                      ),
-                    ],
+  Widget _rightNavigation(
+    double width,
+    double itemHeight,
+    double bottomInset,
+  ) => SizedBox(
+    width: width,
+    child: Padding(
+      padding: EdgeInsets.only(top: width * 2 + 12, bottom: bottomInset + 12),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: SingleChildScrollView(
+          reverse: true,
+          clipBehavior: Clip.none,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_glassRightNavigationEnabled && _canRecognize)
+                _glassRightNavigation(width, itemHeight)
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+                  child: _compactNavigation(
+                    width - 16,
+                    itemHeight,
+                    direction: Axis.vertical,
                   ),
                 ),
-              ),
-          ],
+              const SizedBox(height: 4),
+              _rightSettingsNavigation(width - 16),
+            ],
+          ),
         ),
       ),
     ),
   );
+
+  Widget _glassRightNavigation(double width, double itemHeight) {
+    final p = _rightNavigationPalette;
+    final items = _rightNavItems;
+    final selected = _fullPlayer
+        ? -1
+        : items.indexWhere((item) => _navPageActive(item.page));
+    final length = itemHeight * items.length + 12;
+    final glyphSize = math.max(
+      40.0,
+      24 + MediaQuery.textScalerOf(context).scale(10),
+    );
+    final bar = MediaQuery.removePadding(
+      context: context,
+      removeLeft: true,
+      removeTop: true,
+      removeRight: true,
+      removeBottom: true,
+      child: RotatedBox(
+        quarterTurns: 1,
+        child: LiquidGlassTabBar(
+          items: [
+            for (final item in items)
+              LiquidGlassTabBarItem(
+                iconBuilder: (context, glyph) => RotatedBox(
+                  quarterTurns: 3,
+                  child: SizedBox.square(
+                    dimension: glyphSize,
+                    child: _compactNavGlyph(
+                      item.icon,
+                      item.label,
+                      color: glyph.color,
+                      selected: glyph.selected,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+          selectedIndex: selected < 0 ? 0 : selected,
+          onChanged: (index) => _goFromRightNavigation(items[index].page),
+          width: length,
+          height: width - 16,
+          margin: EdgeInsets.zero,
+          alignment: Alignment.center,
+          itemStyle: LiquidGlassTabItemStyle(
+            selectedColor: selected < 0 ? p.secondary : p.brand,
+            unselectedColor: p.secondary,
+            iconSize: glyphSize,
+            underGlassIconSize: glyphSize * 1.08,
+          ),
+          pillStyle: LiquidGlassTabPillStyle(
+            show: selected >= 0,
+            animated: true,
+            color: p.secondary.withValues(alpha: p.dark ? .12 : .09),
+            refractionIndex: 1.06,
+            magnification: 1.03,
+          ),
+          style: LiquidGlassTabBar.defaultStyle.copyWith(
+            color: p.surface.withValues(alpha: p.dark ? .5 : .4),
+            shadow: const LiquidGlassShadow(blur: 9, opacity: .13),
+          ),
+        ),
+      ),
+    );
+    return SizedBox(
+      width: width,
+      height: length + 24,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: ExcludeSemantics(child: bar)),
+          Positioned(
+            top: 18,
+            bottom: 18,
+            left: 14,
+            right: 14,
+            child: Column(
+              children: [
+                for (var index = 0; index < items.length; index++)
+                  Expanded(
+                    child: Semantics(
+                      button: true,
+                      selected: selected == index,
+                      label: p.text(items[index].label),
+                      onTap: () => _goFromRightNavigation(items[index].page),
+                      child: selected < 0 && index == 0
+                          ? GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTap: () =>
+                                  _goFromRightNavigation(items.first.page),
+                              child: const SizedBox.expand(),
+                            )
+                          : const SizedBox.expand(),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rightSettingsNavigation(double size) {
+    final p = _rightNavigationPalette;
+    final item = _compactSettingsNavItem;
+    final selected = !_fullPlayer && _navPageActive(item.page);
+    final color = selected ? p.brand : p.secondary;
+    void open() => _goFromRightNavigation(item.page);
+    final glyph = _compactNavGlyph(
+      item.icon,
+      item.label,
+      color: color,
+      selected: selected,
+    );
+    return SizedBox.square(
+      dimension: size,
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: p.text(item.label),
+        onTap: open,
+        excludeSemantics: true,
+        child: _glassRightNavigationEnabled
+            ? LiquidGlassTabBarAction(
+                size: size,
+                foregroundColor: color,
+                onTap: open,
+                style: LiquidGlassTabBarAction.defaultStyle.copyWith(
+                  color: p.surface.withValues(alpha: p.dark ? .5 : .4),
+                  blur: 6,
+                  shadow: const LiquidGlassShadow(blur: 9, opacity: .13),
+                ),
+                child: glyph,
+              )
+            : MioGlassSurface(
+                palette: p,
+                radius: size / 2,
+                enabled: false,
+                tint: p.surface.withValues(alpha: p.dark ? .9 : 1),
+                child: MioButton(
+                  palette: p,
+                  label: p.text(item.label),
+                  radius: size / 2,
+                  padding: EdgeInsets.zero,
+                  onPressed: open,
+                  child: Center(child: glyph),
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _compactNavGlyph(
+    String icon,
+    String label, {
+    required Color color,
+    required bool selected,
+  }) => Column(
+    mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      MioIcon(icon, size: 21, color: color),
+      const SizedBox(height: 3),
+      Text(
+        p.text(label),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 10,
+          height: 1,
+          fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+          color: color,
+        ),
+      ),
+    ],
+  );
+
+  Widget _compactNavigation(
+    double width,
+    double height, {
+    Axis direction = Axis.horizontal,
+  }) {
+    final vertical = direction == Axis.vertical;
+    final p = vertical ? _rightNavigationPalette : this.p;
+    final items = vertical ? _rightNavItems : _compactNavItems;
+    return Container(
+      width: vertical
+          ? width
+          : math.min(width - 2 * MioPalette.gutter(width), 520),
+      height: vertical ? height * items.length + 14 : height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: const [
+          BoxShadow(
+            offset: Offset(0, 14),
+            color: Color(0x38000000),
+            blurRadius: 28,
+          ),
+        ],
+      ),
+      child: MioGlassSurface(
+        palette: p,
+        radius: 32,
+        tint: p.surface.withValues(alpha: p.dark ? .9 : 1),
+        enabled:
+            (vertical || (!_fullPlayer && !_queueOpen)) &&
+            !_backupOpen &&
+            !_recognitionOpen,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: vertical ? 6 : 8,
+                vertical: 7,
+              ),
+              child: Flex(
+                direction: direction,
+                crossAxisAlignment: vertical
+                    ? CrossAxisAlignment.stretch
+                    : CrossAxisAlignment.center,
+                children: [
+                  for (final item in items)
+                    Expanded(
+                      child: Semantics(
+                        selected: _navPageActive(item.page),
+                        child: MioButton(
+                          palette: p,
+                          label: p.text(item.label),
+                          focusNode: item.page == _Page.recognition
+                              ? _recognitionFocus
+                              : null,
+                          radius: vertical ? 24 : 999,
+                          padding: const EdgeInsets.fromLTRB(0, 5, 0, 4),
+                          background: _navPageActive(item.page)
+                              ? p.brand.withValues(alpha: p.dark ? .14 : .1)
+                              : null,
+                          onPressed:
+                              item.page == _Page.recognition && !_canRecognize
+                              ? null
+                              : () => vertical
+                                    ? _goFromRightNavigation(item.page)
+                                    : _go(item.page),
+                          child: _compactNavGlyph(
+                            item.icon,
+                            item.label,
+                            color: _navPageActive(item.page)
+                                ? p.brand
+                                : p.secondary,
+                            selected: _navPageActive(item.page),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Color get _compactHeaderBackground => mioCompactSettingsHeaderBackground(
     p,
     songTheme: core.player?.coverTheme != null,
@@ -1934,8 +2271,9 @@ class _MioShellState extends State<MioShell> {
     double width,
     bool wide,
     double height,
-    double bottomExtension,
-  ) {
+    double bottomExtension, {
+    bool blendTrailingEdge = false,
+  }) {
     final state = core.player;
     final active = state?.current != null;
     final usable = active && state?.status != 'loading';
@@ -2071,125 +2409,140 @@ class _MioShellState extends State<MioShell> {
         if (wide) ...[const SizedBox(width: 12), actions],
       ],
     );
-    return Container(
-      height: height + bottomExtension,
-      decoration: const BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            offset: Offset(0, -1),
-            color: Color(0x39000000),
-            blurRadius: 8,
-          ),
-        ],
-      ),
+    final content = Padding(
+      padding: EdgeInsets.only(bottom: bottomExtension),
       child: Stack(
         fit: StackFit.expand,
         clipBehavior: Clip.none,
         children: [
-          // The seek thumb extends above the glass surface's clipping bounds.
-          MioGlassSurface(
-            palette: p,
-            radius: 0,
-            tint: mioPlayerTint(
-              p,
-              wide: wide,
-              active: active,
-              coverTheme: state?.coverTheme,
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: wide ? 40 : MioPalette.gutter(width) - 6,
             ),
-            enabled: visible,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: bottomExtension),
-              child: Stack(
-                fit: StackFit.expand,
-                clipBehavior: Clip.none,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: wide ? 40 : MioPalette.gutter(width) - 6,
-                    ),
+            child: Row(
+              children: [
+                Expanded(child: information),
+                if (wide)
+                  Expanded(child: Center(child: controls))
+                else ...[
+                  actions,
+                  controls,
+                ],
+                if (wide)
+                  Expanded(
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Expanded(child: information),
-                        if (wide)
-                          Expanded(child: Center(child: controls))
-                        else ...[
-                          actions,
-                          controls,
-                        ],
-                        if (wide)
-                          Expanded(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Flexible(
-                                  child: ValueListenableBuilder(
-                                    valueListenable: core.playback,
-                                    builder: (context, clock, _) => Text(
-                                      '${_time(clock?.position ?? 0)} / ${_time(clock?.duration ?? 0)}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: textColor,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                _iconButton(
-                                  playModeIcon(
-                                    state?.playMode ?? api.PlayMode.list,
-                                  ),
-                                  p.text(
-                                    playModeKey(
-                                      state?.playMode ?? api.PlayMode.list,
-                                    ),
-                                  ),
-                                  state == null
-                                      ? null
-                                      : () =>
-                                            _command(() => api.cyclePlayMode()),
-                                  size: 26,
-                                  iconSize: 18,
-                                  iconColor: textColor,
-                                  disabledOpacity: 1,
-                                ),
-                                const SizedBox(width: 12),
-                                MiniPlayerVolume(
-                                  core: core,
-                                  palette: p,
-                                  active: visible && state != null,
-                                ),
-                                const SizedBox(width: 12),
-                                _iconButton(
-                                  'nav-liebiao',
-                                  p.english ? 'Play queue' : '播放队列',
-                                  _openQueue,
-                                  size: 26,
-                                  iconSize: 18,
-                                  iconColor: textColor,
-                                  disabledOpacity: 1,
-                                ),
-                              ],
+                        Flexible(
+                          child: ValueListenableBuilder(
+                            valueListenable: core.playback,
+                            builder: (context, clock, _) => Text(
+                              '${_time(clock?.position ?? 0)} / ${_time(clock?.duration ?? 0)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12, color: textColor),
                             ),
-                          )
-                        else
-                          _iconButton(
-                            'nav-liebiao',
-                            p.english ? 'Play queue' : '播放队列',
-                            _openQueue,
-                            size: 44,
-                            iconSize: 16,
-                            iconColor: textColor,
-                            disabledOpacity: 1,
                           ),
+                        ),
+                        const SizedBox(width: 12),
+                        _iconButton(
+                          playModeIcon(state?.playMode ?? api.PlayMode.list),
+                          p.text(
+                            playModeKey(state?.playMode ?? api.PlayMode.list),
+                          ),
+                          state == null
+                              ? null
+                              : () => _command(() => api.cyclePlayMode()),
+                          size: 26,
+                          iconSize: 18,
+                          iconColor: textColor,
+                          disabledOpacity: 1,
+                        ),
+                        const SizedBox(width: 12),
+                        MiniPlayerVolume(
+                          core: core,
+                          palette: p,
+                          active: visible && state != null,
+                        ),
+                        const SizedBox(width: 12),
+                        _iconButton(
+                          'nav-liebiao',
+                          p.english ? 'Play queue' : '播放队列',
+                          _openQueue,
+                          size: 26,
+                          iconSize: 18,
+                          iconColor: textColor,
+                          disabledOpacity: 1,
+                        ),
                       ],
                     ),
+                  )
+                else
+                  _iconButton(
+                    'nav-liebiao',
+                    p.english ? 'Play queue' : '播放队列',
+                    _openQueue,
+                    size: 44,
+                    iconSize: 16,
+                    iconColor: textColor,
+                    disabledOpacity: 1,
                   ),
-                ],
-              ),
+              ],
             ),
           ),
+        ],
+      ),
+    );
+    final tint = mioPlayerTint(
+      p,
+      wide: wide,
+      active: active,
+      coverTheme: state?.coverTheme,
+    );
+    final surface = MioGlassSurface(
+      palette: p,
+      radius: 0,
+      tint: blendTrailingEdge ? const Color(0x00000000) : tint,
+      enabled: visible,
+      child: blendTrailingEdge
+          ? DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment(1 - 2 * math.min(72.0, width) / width, 0),
+                  end: Alignment.centerRight,
+                  colors: [
+                    tint,
+                    tint.withValues(alpha: tint.a * .9),
+                    tint.withValues(alpha: tint.a * .5),
+                    tint.withValues(alpha: tint.a * .1),
+                    tint.withValues(alpha: 0),
+                  ],
+                  stops: const [0, .2, .5, .8, 1],
+                ),
+              ),
+              child: const SizedBox.expand(),
+            )
+          : content,
+    );
+    const shadow = BoxDecoration(
+      boxShadow: [
+        BoxShadow(
+          offset: Offset(0, -1),
+          color: Color(0x39000000),
+          blurRadius: 8,
+        ),
+      ],
+    );
+    return Container(
+      height: height + bottomExtension,
+      decoration: blendTrailingEdge ? null : shadow,
+      child: Stack(
+        fit: StackFit.expand,
+        clipBehavior: Clip.none,
+        children: [
+          if (blendTrailingEdge) IgnorePointer(child: surface) else surface,
+          if (blendTrailingEdge) content,
+          // The seek thumb extends above the glass surface's clipping bounds.
           if (active)
             Positioned(
               top: -10,
@@ -2246,11 +2599,36 @@ class _MioShellState extends State<MioShell> {
     'common.homeNav.download',
   ];
   static const _navIcons = ['faxian', 'yanchu', 'shouye', 'xiazai'];
+  static const _primaryCompactNavItems = [
+    (
+      page: _Page.discover,
+      label: 'common.homeNav.discover',
+      icon: 'nav-faxian',
+    ),
+    (
+      page: _Page.playlists,
+      label: 'common.homeNav.playlists',
+      icon: 'nav-yanchu',
+    ),
+    (page: _Page.local, label: 'common.homeNav.local', icon: 'nav-shouye'),
+  ];
+  static const _rightNavItems = [
+    ..._primaryCompactNavItems,
+    (page: _Page.recognition, label: 'play.audioMatch', icon: 'TD-Microphone'),
+    (
+      page: _Page.downloads,
+      label: 'common.homeNav.download',
+      icon: 'nav-xiazai',
+    ),
+  ];
+  static const _compactSettingsNavItem = (
+    page: _Page.settings,
+    label: 'common.titleBar.settings',
+    icon: 'nav-shezhi',
+  );
   static const _compactNavItems = [
-    (page: _Page.discover, label: 'common.homeNav.discover', icon: 'faxian'),
-    (page: _Page.playlists, label: 'common.homeNav.playlists', icon: 'yanchu'),
-    (page: _Page.local, label: 'common.homeNav.local', icon: 'shouye'),
-    (page: _Page.settings, label: 'common.titleBar.settings', icon: 'shezhi'),
+    ..._primaryCompactNavItems,
+    _compactSettingsNavItem,
   ];
   static const _settingsItems = [
     (

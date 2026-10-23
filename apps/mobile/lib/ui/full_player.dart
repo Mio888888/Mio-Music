@@ -37,6 +37,7 @@ class FullPlayer extends StatefulWidget {
   final VoidCallback onQueue;
   final VoidCallback onAppearance;
   final EdgeInsets systemInsets;
+  final double trailingInset;
   const FullPlayer({
     super.key,
     required this.core,
@@ -46,6 +47,7 @@ class FullPlayer extends StatefulWidget {
     required this.onQueue,
     required this.onAppearance,
     this.systemInsets = EdgeInsets.zero,
+    this.trailingInset = 0,
   });
   @override
   State<FullPlayer> createState() => _FullPlayerState();
@@ -1690,7 +1692,10 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
     child: MioVisualMonitor(
       child: MioTvScreenLease(
         child: LayoutBuilder(
-          builder: (context, box) {
+          builder: (context, constraints) {
+            final box = constraints.deflate(
+              EdgeInsets.only(right: widget.trailingInset),
+            );
             final policy = MioVisualPolicy.of(context);
             final wide = MioDeviceScope.wide(context, box.maxWidth);
             final insets = wide
@@ -1847,106 +1852,122 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                             child: ColoredBox(color: Color(0x41000000)),
                           ),
                         ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom:
-                              (contentHeight * .1).clamp(70.0, 80.0) *
-                                  (1 - idleProgress) +
-                              // The safe-area gap is only kept while the bar is shown.
-                              insets.bottom * (1 - idleProgress) -
-                              (wide ? 10 : 0),
-                          child: PlayerSpectrum(
-                            generation: state.playbackGeneration,
-                            playing: state.status == 'playing',
-                            wide: wide,
-                            // A lighter tint of the theme colour reads better over the blurred cover.
-                            accent: Color.lerp(
-                              p.brand,
-                              const Color(0xffffffff),
-                              .4,
-                            )!,
-                            backgroundResponse:
-                                policy.background &&
-                                !policy.reduced &&
-                                _cover != null &&
-                                !_backgroundFailed &&
-                                state.backgroundRendering.audioResponse &&
-                                !state.backgroundRendering.staticMode &&
-                                !MediaQuery.disableAnimationsOf(context) &&
-                                ImageFilter.isShaderFilterSupported,
-                            onLowFrequency: (value) => _backgroundBass = value,
-                          ),
-                        ),
-                        if (wide) ...[
-                          if (insets.bottom > 0)
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              height: insets.bottom,
-                              child: IgnorePointer(
-                                child: Opacity(
-                                  opacity: (1 - idleProgress).clamp(0.0, 1.0),
-                                  // Same veil as the transport bar above it.
-                                  child: const ColoredBox(
-                                    color: Color(0x20000000),
-                                  ),
+                        Positioned.fill(
+                          right: widget.trailingInset,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom:
+                                    (contentHeight * .1).clamp(70.0, 80.0) *
+                                        (1 - idleProgress) +
+                                    // The safe-area gap is only kept while the bar is shown.
+                                    insets.bottom * (1 - idleProgress) -
+                                    (wide ? 10 : 0),
+                                child: PlayerSpectrum(
+                                  generation: state.playbackGeneration,
+                                  playing: state.status == 'playing',
+                                  wide: wide,
+                                  // A lighter tint of the theme colour reads better over the blurred cover.
+                                  accent: Color.lerp(
+                                    p.brand,
+                                    const Color(0xffffffff),
+                                    .4,
+                                  )!,
+                                  backgroundResponse:
+                                      policy.background &&
+                                      !policy.reduced &&
+                                      _cover != null &&
+                                      !_backgroundFailed &&
+                                      state.backgroundRendering.audioResponse &&
+                                      !state.backgroundRendering.staticMode &&
+                                      !MediaQuery.disableAnimationsOf(
+                                        context,
+                                      ) &&
+                                      ImageFilter.isShaderFilterSupported,
+                                  onLowFrequency: (value) =>
+                                      _backgroundBass = value,
                                 ),
                               ),
-                            ),
-                          Positioned.fill(
-                            bottom: insets.bottom,
-                            child: LayoutBuilder(
-                              builder: (context, inner) => _wideLayout(
-                                inner,
-                                gutter,
-                                albumFraction,
-                                showAlbum,
-                                lyricFont,
-                                header(idleProgress),
-                                hidden,
-                                idleProgress,
+                              if (wide) ...[
+                                if (insets.bottom > 0)
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: insets.bottom,
+                                    child: IgnorePointer(
+                                      child: Opacity(
+                                        opacity: (1 - idleProgress).clamp(
+                                          0.0,
+                                          1.0,
+                                        ),
+                                        // Same veil as the transport bar above it.
+                                        child: const ColoredBox(
+                                          color: Color(0x20000000),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                Positioned.fill(
+                                  bottom: insets.bottom,
+                                  child: LayoutBuilder(
+                                    builder: (context, inner) => _wideLayout(
+                                      inner,
+                                      gutter,
+                                      albumFraction,
+                                      showAlbum,
+                                      lyricFont,
+                                      header(idleProgress),
+                                      hidden,
+                                      idleProgress,
+                                    ),
+                                  ),
+                                ),
+                              ] else
+                                Positioned.fill(
+                                  top: insets.top,
+                                  bottom: insets.bottom,
+                                  child: LayoutBuilder(
+                                    builder: (context, contentBox) =>
+                                        _narrowLayout(
+                                          contentBox,
+                                          header(0),
+                                          lyricFont,
+                                          hidden,
+                                          idleProgress,
+                                        ),
+                                  ),
+                                ),
+                              Positioned(
+                                right: wide
+                                    ? 20
+                                    : (box.maxWidth * .04).clamp(16.0, 24.0),
+                                bottom: wide
+                                    ? 100 + insets.bottom
+                                    : (contentHeight * .1).clamp(70.0, 80.0) +
+                                          insets.bottom +
+                                          12,
+                                child: _idleChrome(
+                                  _button(
+                                    'PenBall',
+                                    p.text('play.playerTheme'),
+                                    () => unawaited(_openStyle()),
+                                    size: wide ? 50 : 44,
+                                    iconSize: 20,
+                                    focusNode: _styleLauncher,
+                                    background: Color(
+                                      wide ? 0x26ffffff : 0x38000000,
+                                    ),
+                                    outlined: !wide,
+                                  ),
+                                  hidden,
+                                  idleProgress,
+                                  shift: const Offset(0, 20),
+                                ),
                               ),
-                            ),
-                          ),
-                        ] else
-                          Positioned.fill(
-                            top: insets.top,
-                            bottom: insets.bottom,
-                            child: LayoutBuilder(
-                              builder: (context, contentBox) => _narrowLayout(
-                                contentBox,
-                                header(0),
-                                lyricFont,
-                                hidden,
-                                idleProgress,
-                              ),
-                            ),
-                          ),
-                        Positioned(
-                          right: wide
-                              ? 20
-                              : (box.maxWidth * .04).clamp(16.0, 24.0),
-                          bottom: wide
-                              ? 100 + insets.bottom
-                              : (contentHeight * .1).clamp(70.0, 80.0) +
-                                    insets.bottom +
-                                    12,
-                          child: _idleChrome(
-                            _button(
-                              'PenBall',
-                              p.text('play.playerTheme'),
-                              () => unawaited(_openStyle()),
-                              size: wide ? 50 : 44,
-                              iconSize: 20,
-                              focusNode: _styleLauncher,
-                              background: Color(wide ? 0x26ffffff : 0x38000000),
-                              outlined: !wide,
-                            ),
-                            hidden,
-                            idleProgress,
-                            shift: const Offset(0, 20),
+                            ],
                           ),
                         ),
                       ],
