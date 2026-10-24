@@ -112,20 +112,24 @@ For native ABI validation from the repository root:
 source tools/mobile-env.sh
 cargo build --locked -p mio-mobile-bridge --lib --target aarch64-linux-android
 cargo build --locked -p mio-mobile-bridge --lib --target armv7-linux-androideabi
+cargo build --locked -p mio-mobile-bridge --lib --target x86_64-linux-android
 ```
 
 Both arm64 and armv7 now have complete debug and Release-mode APK build evidence.
+The release workflow also includes x86_64. Its Release APK builds locally with verified
+signature and x86_64 Flutter/AOT/Rust libraries; runtime verification remains separate.
 From `apps/mobile`, build the additional packages with:
 
 ```sh
 flutter build apk --debug --no-pub --target-platform android-arm --split-per-abi
-flutter build apk --release --no-pub --target-platform android-arm,android-arm64 --split-per-abi
+flutter build apk --debug --no-pub --target-platform android-x64 --split-per-abi
+flutter build apk --release --no-pub --target-platform android-arm,android-arm64,android-x64 --split-per-abi
 ```
 
 For one universal Release APK with version code 1, use:
 
 ```sh
-flutter build apk --release --no-pub --target-platform android-arm,android-arm64
+flutter build apk --release --no-pub --target-platform android-arm,android-arm64,android-x64
 ```
 
 This produces `app-release.apk`. The last verified dual-ABI Release package is `bddefdf4` (242 inputs,
@@ -331,11 +335,13 @@ Flutter, including when a text field has focus. Physical remote/headset input,
 multi-track key skipping on TV and input before a media session exists remain unverified.
 
 Split outputs are `app-armeabi-v7a-debug.apk`, `app-armeabi-v7a-release.apk` and
-`app-arm64-v8a-release.apk` in `build/app/outputs/flutter-apk`. Release mode still
+`app-arm64-v8a-release.apk` in `build/app/outputs/flutter-apk`; the x86_64 targets
+produce `app-x86_64-debug.apk` and `app-x86_64-release.apk`. Release mode still
 uses the local debug certificate. The arm64 Release package has a TV-emulator
 startup/local playback/background/pause/restart slice; armv7 installation and
-playback remain unverified. x86 Android is not supported by the native-assets
-hook. Do not change an emulator's ABI to work around this.
+playback remain unverified. The native-assets hook also supports x86_64 with
+`android-x64`; its runtime requires separate verification on a matching emulator
+or device. 32-bit x86 Android remains unsupported.
 
 Keep `NativeMedia` annotated with `@Keep`: Rust calls its callbacks by JNI name,
 which R8 cannot discover. The first Release build removed seven callbacks and

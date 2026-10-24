@@ -27,6 +27,7 @@ void main(List<String> args) async {
       final triple = switch (input.config.code.targetArchitecture) {
         Architecture.arm64 => 'aarch64-linux-android',
         Architecture.arm => 'armv7-linux-androideabi',
+        Architecture.x64 => 'x86_64-linux-android',
         final architecture => throw UnsupportedError(
           'Unsupported Android ABI: $architecture',
         ),
@@ -34,6 +35,7 @@ void main(List<String> args) async {
       final compilerTriple = switch (triple) {
         'armv7-linux-androideabi' => 'armv7a-linux-androideabi',
         'aarch64-linux-android' => 'aarch64-linux-android',
+        'x86_64-linux-android' => 'x86_64-linux-android',
         _ => throw UnsupportedError('Unsupported Android ABI: $triple'),
       };
       final key = triple.replaceAll('-', '_');

@@ -109,13 +109,15 @@ Plugins run in a resource-limited QuickJS sandbox. To write your own connector, 
 | Platform | Package | Status |
 |---|---|---|
 | macOS (Apple Silicon) | `.dmg`, updater `.app.tar.gz` | **Reference platform.** Playback, lyrics, downloads, backup and the main pages verified in the native app |
+| macOS (Intel x86_64) | `.dmg`, updater `.app.tar.gz` | Separate native build and updater package configured; native runtime verification is pending |
 | Windows x64 | NSIS `-setup.exe` | Built, type-checked and unit-tested in CI; not yet run on a device |
 | Linux x86_64 | `.AppImage`, `.deb` | Built, type-checked and unit-tested in CI (Ubuntu 24.04, glibc 2.39+); not yet run on a device |
 | Android phone / tablet / TV (arm64-v8a, armeabi-v7a) | `.apk` | Acceptance runs on API 36 phone, tablet and TV emulators; physical devices and the armv7 runtime are pending |
+| Android x86_64 | `.apk` | Local Release APK build, signature and native-library architecture verified; x86_64 runtime verification is pending |
 | iPhone / iPad | unsigned `.ipa` | Runs in the iOS simulator; code signing and physical devices are pending |
 | HarmonyOS | — | Experimental, outside `main`: an unsigned debug `.hap` builds; not yet run on a device |
 
-There is no Intel macOS or x86_64 Android build. macOS packages are ad-hoc signed and not notarized.
+macOS packages are built separately for Apple Silicon (`aarch64`) and Intel (`x86_64`); choose the package matching your Mac. Android APKs are split into `arm64-v8a`, `armeabi-v7a` and `x86_64`. macOS packages are ad-hoc signed and not notarized.
 
 ## Releases
 
@@ -177,7 +179,7 @@ cargo check --workspace --locked
 
 | What | Where | When |
 |---|---|---|
-| `cargo fmt --check`, `cargo check`, `cargo test` for the whole workspace | macOS 15, Windows, Ubuntu 24.04 (`Desktop checks`) | Every push to `main` |
+| `cargo fmt --check`, `cargo check`, `cargo test` for the whole workspace | macOS 15 (Apple Silicon and Intel), Windows, Ubuntu 24.04 (`Desktop checks`) | Every push to `main` |
 | Release builds of all five platforms | `Build` workflow | When the version has no tag yet, or on demand with `build_only` |
 | Interactive acceptance | macOS app; Android emulators; iOS simulator | Manually, during development |
 

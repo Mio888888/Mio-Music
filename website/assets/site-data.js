@@ -1,6 +1,6 @@
 var carouselItems = [
   { title: '播放主界面', copy: 'Rust 原生引擎驱动，专辑封面主色动态主题与频谱实时可视化。' },
-  { title: 'Apple Music 风格动态歌词', copy: '逐字动画、翻译合并显示，沉浸感拉满。' },
+  { title: 'iPhone Duo 双屏演示', copy: '展开呈现宽屏歌词与黑胶唱片，合上保留便捷操控与右侧导航。' },
   { title: '10 段均衡器与音效', copy: '参数 EQ、低音增强、环绕声模拟，调出你的声音。' },
   { title: '频谱可视化', copy: 'FFT 实时频谱与动态背景随音频律动。' },
   { title: '下载管理', copy: '暂停 / 恢复 / 批量操作，实时进度追踪。' },
@@ -46,7 +46,7 @@ var i18n = {
     osLabels: { mac: 'macOS', windows: 'Windows', linux: 'Linux', unknown: 'Unknown system' },
     carouselItems: [
       { title: 'Main Player', copy: 'Driven by the native Rust engine, with album-art dynamic theming and real-time spectrum.' },
-      { title: 'Apple Music-style Lyrics', copy: 'Word-by-word animation with merged translations for full immersion.' },
+      { title: 'iPhone Duo · Folded & Unfolded', copy: 'Wide-screen lyrics and vinyl visuals when unfolded; compact playback controls and right-side navigation when folded.' },
       { title: '10-band EQ & Effects', copy: 'Parametric EQ, bass boost, and surround simulation to tune your sound.' },
       { title: 'Spectrum Visualizer', copy: 'Real-time FFT spectrum and the animated background react to the audio.' },
       { title: 'Download Manager', copy: 'Pause / resume / batch operations with live progress tracking.' },
@@ -209,7 +209,7 @@ var i18n = {
     },
     attrs: {
       'Mio Music 播放主界面截图': 'Mio Music main player screenshot',
-      'Mio Music Apple Music 风格动态歌词截图': 'Mio Music Apple Music-style lyrics screenshot',
+      'Mio Music iPhone Duo 展开与折叠双屏演示图': 'Mio Music on iPhone Duo in unfolded and folded views',
       'Mio Music 10 段均衡器与音效截图': 'Mio Music 10-band EQ & effects screenshot',
       'Mio Music 频谱可视化截图': 'Mio Music spectrum visualizer screenshot',
       'Mio Music 下载管理截图': 'Mio Music download manager screenshot',
@@ -217,7 +217,7 @@ var i18n = {
       '上一张截图': 'Previous screenshot',
       '下一张截图': 'Next screenshot',
       '查看播放主界面': 'View main player screenshot',
-      '查看 Apple Music 风格动态歌词': 'View Apple Music-style lyrics screenshot',
+      '查看 iPhone Duo 双屏演示': 'View iPhone Duo in unfolded and folded views',
       '查看 10 段均衡器与音效': 'View 10-band EQ & effects screenshot',
       '查看频谱可视化': 'View spectrum visualizer screenshot',
       '查看下载管理': 'View download manager screenshot',

@@ -21,6 +21,7 @@ function initCarousel(){
   var next = root.querySelector('[data-carousel-next]');
   var title = root.querySelector('[data-carousel-title]');
   var copy = root.querySelector('[data-carousel-copy]');
+  var caption = root.querySelector('[data-carousel-caption]');
   var active = 0;
 
   function setActive(index){
@@ -36,6 +37,7 @@ function initCarousel(){
     });
     if(title) title.textContent = items[active].title;
     if(copy) copy.textContent = items[active].copy;
+    if(caption) caption.hidden = slides[active].hasAttribute('data-embedded-caption');
     if(thumbs[active] && thumbs[active].offsetParent) thumbs[active].scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 

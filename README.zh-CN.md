@@ -109,13 +109,15 @@
 | 平台 | 安装包 | 状态 |
 |---|---|---|
 | macOS（Apple 芯片） | `.dmg`，更新用 `.app.tar.gz` | **基准平台。** 播放、歌词、下载、备份与主要页面已在原生应用中验证 |
+| macOS（Intel x86_64） | `.dmg`，更新用 `.app.tar.gz` | 已配置独立原生构建和更新包；原生运行待验证 |
 | Windows x64 | NSIS `-setup.exe` | CI 中完成构建、类型检查与单元测试；尚未在设备上运行 |
 | Linux x86_64 | `.AppImage`、`.deb` | CI 中完成构建、类型检查与单元测试（Ubuntu 24.04，需 glibc 2.39+）；尚未在设备上运行 |
 | Android 手机 / 平板 / 电视（arm64-v8a、armeabi-v7a） | `.apk` | 已在 API 36 手机、平板、电视模拟器上做验收；真机与 armv7 运行待验证 |
+| Android x86_64 | `.apk` | 本地 Release 构建、签名及原生库架构检查通过；该架构运行待验证 |
 | iPhone / iPad | 未签名 `.ipa` | 可在 iOS 模拟器中运行；代码签名与真机待验证 |
 | 鸿蒙 | — | 实验性，不在 `main`：可构建未签名的调试 `.hap`；尚未在设备上运行 |
 
-不提供 Intel 版 macOS 与 x86_64 Android 包。macOS 包为临时签名，未经公证。
+macOS 按 Apple 芯片（`aarch64`）与 Intel（`x86_64`）分别构建，请选择与 Mac 芯片对应的包。Android APK 按 `arm64-v8a`、`armeabi-v7a` 和 `x86_64` 分包。macOS 包为临时签名，未经公证。
 
 ## 发布情况
 
@@ -177,7 +179,7 @@ cargo check --workspace --locked
 
 | 内容 | 环境 | 时机 |
 |---|---|---|
-| 整个工作区的 `cargo fmt --check`、`cargo check`、`cargo test` | macOS 15、Windows、Ubuntu 24.04（`Desktop checks`） | 每次推送到 `main` |
+| 整个工作区的 `cargo fmt --check`、`cargo check`、`cargo test` | macOS 15（Apple 芯片与 Intel）、Windows、Ubuntu 24.04（`Desktop checks`） | 每次推送到 `main` |
 | 五个平台的发布构建 | `Build` 工作流 | 版本号还没有 tag 时，或手动以 `build_only` 运行 |
 | 交互验收 | macOS 应用；Android 模拟器；iOS 模拟器 | 开发过程中人工进行 |
 

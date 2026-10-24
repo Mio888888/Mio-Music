@@ -201,7 +201,15 @@ jobs:
   build-macos:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: aarch64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -232,7 +240,7 @@ jobs:
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: mio-macos
+          name: mio-macos-${{ matrix.arch }}
           path: |
             dist/*.dmg
             dist/*.app.tar.gz*
@@ -296,7 +304,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -357,7 +365,7 @@ jobs:
         run: |
           flutter pub get
           flutter build apk --release --split-per-abi \
-            --target-platform android-arm,android-arm64 \
+            --target-platform android-arm,android-arm64,android-x64 \
             --build-name "${{ needs.check-version.outputs.version }}" \
             --build-number "$(python3 -I ../../tools/ci/version.py --code)"
 
@@ -371,11 +379,14 @@ jobs:
           STEM="${MIO_PRODUCT_NAME// /.}"
           mkdir -p dist
 
-          for abi in arm64-v8a armeabi-v7a; do
+          for abi in arm64-v8a armeabi-v7a x86_64; do
             apk="apps/mobile/build/app/outputs/flutter-apk/app-${abi}-release.apk"
             test -f "$apk"
             echo "Verifying release APK: $apk"
             "$APKSIGNER" verify -v --print-certs "$apk"
+            for library in libflutter.so libapp.so libmio_mobile_bridge.so; do
+              unzip -p "$apk" "lib/${abi}/${library}" > /dev/null
+            done
             cp "$apk" "dist/${STEM}_${VERSION}_android_${abi}.apk"
           done
 
@@ -490,7 +501,12 @@ jobs:
               github.rest.repos.listReleaseAssets,
               { owner, repo, release_id: releaseId, per_page: 100 },
             )
-            const required = [/\.apk$/, /\.ipa$/, /\.dmg$/, /\.app\.tar\.gz$/, /-setup\.exe$/, /\.AppImage$/, /\.deb$/, /^latest\.json$/]
+            const required = [
+              /_android_arm64-v8a\.apk$/, /_android_armeabi-v7a\.apk$/, /_android_x86_64\.apk$/,
+              /\.ipa$/, /_aarch64\.dmg$/, /_x86_64\.dmg$/,
+              /_aarch64\.app\.tar\.gz$/, /_x86_64\.app\.tar\.gz$/,
+              /-setup\.exe$/, /\.AppImage$/, /\.deb$/, /^latest\.json$/,
+            ]
             const missing = required.filter((pattern) => !assets.some((asset) => pattern.test(asset.name)))
             if (missing.length > 0) {
               core.setFailed(`Release ${tag} is missing assets matching ${missing.join(', ')}`)

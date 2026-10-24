@@ -14,7 +14,8 @@ from pathlib import Path
 
 # asset name suffix -> manifest targets
 PACKAGES = {
-    ".app.tar.gz": ("darwin-aarch64", "darwin-aarch64-app"),
+    "_aarch64.app.tar.gz": ("darwin-aarch64", "darwin-aarch64-app"),
+    "_x86_64.app.tar.gz": ("darwin-x86_64", "darwin-x86_64-app"),
     "_x64-setup.exe": ("windows-x86_64", "windows-x86_64-nsis"),
     "_amd64.AppImage": ("linux-x86_64", "linux-x86_64-appimage"),
 }
