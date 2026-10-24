@@ -8,12 +8,14 @@ class SceneDelegate: FlutterSceneDelegate {
   }
 
   @available(iOS 26.0, *)
-  override func windowScene(_ windowScene: UIWindowScene, didUpdateEffectiveGeometry previousEffectiveGeometry: UIWindowScene.Geometry) {
+  @objc(windowScene:didUpdateEffectiveGeometry:)
+  func mioWindowScene(_ windowScene: UIWindowScene, didUpdateEffectiveGeometry previousEffectiveGeometry: UIWindowScene.Geometry) {
     (UIApplication.shared.delegate as? AppDelegate)?.orientationDidChange()
   }
 
   @available(iOS 27.0, *)
-  override func supportedInterfaceOrientations(for windowScene: UIWindowScene) -> UIInterfaceOrientationMask {
+  @objc(supportedInterfaceOrientationsForWindowScene:)
+  func mioSupportedInterfaceOrientations(for windowScene: UIWindowScene) -> UIInterfaceOrientationMask {
     Self.portraitOnly(in: windowScene) ? .portrait : .all
   }
 }
