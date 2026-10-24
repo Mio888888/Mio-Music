@@ -4,7 +4,7 @@ resolver = "2"
 exclude = ["vendor/gpui-fast", "vendor/gpui-fast-apple", "vendor/gpui-component"]
 
 [workspace.package]
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 publish = false
 license = "AGPL-3.0-only"
