@@ -31,6 +31,7 @@ var Buffer={from:__from};
 var __crypto={md5:__md5,sha1:__sha1,aes128EcbHex:__aes128ecb,aes128EcbBase64:__aes128ecbB64,aesEncrypt(){throw Error('当前宿主未实现 AES');},rsaEncrypt(){throw Error('当前宿主未实现 RSA');},randomBytes(){throw Error('当前宿主未实现随机字节');}};
 var cerumusic={env:'browser',platform:'desktop',version:'1.0.3',request:__request,requestAll:__requestAll,utils:{buffer:{from:__from,bufToString:(b,e)=>__from(b).toString(e)},crypto:__crypto},NoticeCenter(){}};
 cerumusic.utils.lyric={validTtml:__validTtml,decodeKuwo:(body,lyricx)=>JSON.parse(__decodeKuwo(String(body),Boolean(lyricx)))};
+cerumusic.locale=typeof __locale==='string'?__locale:'zh-CN';
 if(typeof __configJson==='string'){try{cerumusic.config=JSON.parse(__configJson);}catch(e){cerumusic.config={};}}else{cerumusic.config={};}
 cerumusic.storage={
  get(k){if(typeof __storeGet!=='function')return undefined;var r=__storeGet(String(k));return r===''?undefined:JSON.parse(r);},

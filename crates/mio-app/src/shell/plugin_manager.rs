@@ -150,7 +150,7 @@ impl Mio {
                 window.push_notification(
                     Notification::success(
                         self.t("settings.plugin.installSuccess")
-                            .replace("{name}", &plugin.name),
+                            .replace("{name}", plugin.title()),
                     ),
                     cx,
                 );
@@ -645,7 +645,7 @@ impl Mio {
                 colors,
                 english,
                 id: plugin.id.clone(),
-                name: plugin.name.clone(),
+                name: plugin.title().to_owned(),
                 rows,
                 testing: false,
                 connection: None,
@@ -846,7 +846,7 @@ impl Mio {
                                     .text_size(px(16.))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(primary)
-                                    .child(plugin.name.clone()),
+                                    .child(plugin.title().to_owned()),
                             )
                             .when(!plugin.version.is_empty(), |row| {
                                 row.child(

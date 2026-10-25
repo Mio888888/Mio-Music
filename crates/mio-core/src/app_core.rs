@@ -549,6 +549,7 @@ impl AppCore {
                 .filter(|s| !s.is_empty()),
         });
         // Providers must be registered before restoring a virtual playback client.
+        list_plugins::set_language(preferences.english());
         list_plugins::restore(&store)?;
         let online = Online::restore(&store)?;
         let local = local_music::Library::load(&store)?;
@@ -1082,6 +1083,10 @@ impl AppCore {
             self.preferences.english = previous.1;
             self.preferences.language = previous.2;
             return Err(format!("Cannot save preferences: {error}"));
+        }
+        // List plugins follow the interface language; the setting itself is already saved.
+        if let Err(error) = list_plugins::apply_language(&self.store, self.preferences.english()) {
+            eprintln!("list plugins: {error}");
         }
         Ok(())
     }

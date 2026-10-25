@@ -95,6 +95,9 @@ pub struct ListSource {
 pub struct ListPlugin {
     code: Arc<str>,
     pub name: String,
+    /// What the interface shows instead of `name` (which identifies the plugin), in the
+    /// interface language; empty when the script declares none.
+    pub display_name: String,
     pub version: String,
     pub author: String,
     pub description: String,
@@ -137,7 +140,7 @@ impl ListPlugin {
         let meta = execute_as(
             Kind::List,
             &code,
-            "var t=(v,n)=>typeof v==='string'?v.slice(0,n):''; return {name:t(__list.name,256), version:t(__list.version,64), author:t(__list.author,256), description:t(__list.description,1000), icon:t(__list.icon,65536), sources: __list.sources||{}, config: Array.isArray(__list.config)?__list.config:[], defaults: __list.defaults||{}, legacyService:__list.__legacyService===true};",
+            "var t=(v,n)=>typeof v==='string'?v.slice(0,n):''; return {name:t(__list.name,256), displayName:t(__list.displayName,256), version:t(__list.version,64), author:t(__list.author,256), description:t(__list.description,1000), icon:t(__list.icon,65536), sources: __list.sources||{}, config: Array.isArray(__list.config)?__list.config:[], defaults: __list.defaults||{}, legacyService:__list.__legacyService===true};",
             Arc::new(AtomicBool::new(false)),
             &logs,
         )?;
@@ -216,6 +219,7 @@ impl ListPlugin {
         Ok(Self {
             code: code.into(),
             name,
+            display_name: text("displayName"),
             version: text("version"),
             author: text("author"),
             description: text("description"),

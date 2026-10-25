@@ -14,6 +14,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Whether the interface is English; list plugins read it as `cerumusic.locale`.
+static ENGLISH: AtomicBool = AtomicBool::new(false);
+
+/// Sets the interface language plugins are told about (`en-US` or `zh-CN`). Applies to the
+/// scripts run from now on.
+pub fn set_english(english: bool) {
+    ENGLISH.store(english, Ordering::Relaxed);
+}
+
 const LOG_LINES: usize = 500;
 const LOG_LINE_CHARS: usize = 2000;
 
@@ -480,6 +489,8 @@ pub(crate) fn execute_env(
         }).map_err(|_| "歌词解析桥初始化失败")?).map_err(|_| "歌词解析桥初始化失败")?;
         ctx.globals().set("__sha1", Function::new(ctx.clone(), |s: String| sha1_smol::Sha1::from(s.as_bytes()).digest().to_string()).map_err(|_| "插件摘要失败")?).map_err(|_| "插件摘要失败")?;
         ctx.globals().set("__md5", Function::new(ctx.clone(), |s: String| format!("{:x}", Md5::digest(s.as_bytes()))).map_err(|_| "插件摘要失败")?).map_err(|_| "插件摘要失败")?;
+        let locale = if ENGLISH.load(Ordering::Relaxed) { "en-US" } else { "zh-CN" };
+        ctx.globals().set("__locale", locale).map_err(|_| "无法安装插件语言")?;
         // Set the host platform before author code and the LX conversion handshake run.
         let runtime = if cfg!(any(target_os = "android", target_os = "ios")) {
             format!("{}\ncerumusic.platform='mobile';lx.env='mobile';", include_str!("runtime.js"))

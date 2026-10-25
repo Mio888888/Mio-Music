@@ -371,10 +371,17 @@ impl Mio {
     fn new_in(store: Option<Storage>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         // List plugins register their sources first: stored songs, downloads and sessions of a
         // plugin's source are only recognised once its provider exists.
-        if let Some(store) = &store
-            && let Err(error) = crate::list_plugins::restore(store)
-        {
-            eprintln!("list plugins: {error}");
+        if let Some(store) = &store {
+            let english = store
+                .load::<Preferences>("preferences.json")
+                .ok()
+                .flatten()
+                .unwrap_or_default()
+                .english();
+            crate::list_plugins::set_language(english);
+            if let Err(error) = crate::list_plugins::restore(store) {
+                eprintln!("list plugins: {error}");
+            }
         }
         let (pending_session, session_write_blocked) =
             match store.as_ref().map(Storage::load_session) {

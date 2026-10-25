@@ -698,6 +698,13 @@ impl Mio {
             "zh-CN" => false,
             _ => crate::platform::system_is_english(),
         };
+        // List plugins follow the interface language: tell them and refresh their texts.
+        if let Some(store) = &self.store
+            && let Err(error) = crate::list_plugins::apply_language(store, self.english)
+        {
+            eprintln!("list plugins: {error}");
+        }
+        self.refresh_installed_plugins();
         self.apply_language(window, cx);
     }
 

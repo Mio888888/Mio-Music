@@ -54,6 +54,10 @@ pub struct StoredListPlugin {
     pub version: String,
     pub author: String,
     pub description: String,
+    /// What the interface shows instead of `name` (which identifies the plugin), in the
+    /// interface language; empty falls back to `name`.
+    #[serde(default)]
+    pub display_name: String,
     pub sources: Vec<StoredSource>,
     pub enabled: bool,
     #[serde(default)]
@@ -78,6 +82,15 @@ pub struct StoredListPlugin {
 }
 
 impl StoredListPlugin {
+    /// The plugin's title in the interface language.
+    pub fn title(&self) -> &str {
+        if self.display_name.is_empty() {
+            &self.name
+        } else {
+            &self.display_name
+        }
+    }
+
     /// Ships with the application: always installed, and switched off rather than removed.
     pub fn bundled(&self) -> bool {
         crate::plugin_catalog::is_bundled(&self.name)
@@ -151,6 +164,7 @@ fn describe(plugin: &ListPlugin, id: String, code: String, enabled: bool) -> Sto
         version: plugin.version.clone(),
         author: plugin.author.clone(),
         description: plugin.description.clone(),
+        display_name: plugin.display_name.clone(),
         sources: plugin
             .sources
             .iter()
@@ -230,6 +244,49 @@ fn replace(existing: &mut StoredListPlugin, plugin: &ListPlugin, code: String, e
     next.provide_play = existing.provide_play && next.can_play;
     next.provide_download = existing.provide_download && next.can_download;
     *existing = next;
+}
+
+/// Tells list plugins the interface language (`cerumusic.locale`). It applies to the scripts run
+/// from now on; [`apply_language`] also refreshes what is stored.
+pub fn set_language(english: bool) {
+    mio_plugin::set_english(english);
+}
+
+/// Re-reads each installed plugin's display text (title, description, source names and form
+/// labels) from its script in the current language, keeping its configuration and state.
+/// Returns whether anything changed.
+fn relocalize(registry: &mut Registry) -> bool {
+    let mut changed = false;
+    for stored in &mut registry.plugins {
+        let Ok(plugin) = ListPlugin::load(stored.code.clone()) else {
+            continue;
+        };
+        let next = describe(&plugin, stored.id.clone(), stored.code.clone(), stored.enabled);
+        let text = |s: &StoredListPlugin| {
+            serde_json::to_value((&s.display_name, &s.description, &s.sources, &s.config_schema))
+        };
+        if text(stored).ok() != text(&next).ok() {
+            stored.display_name = next.display_name;
+            stored.description = next.description;
+            stored.sources = next.sources;
+            stored.config_schema = next.config_schema;
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// The interface language changed: tells the plugins, refreshes the stored display text and
+/// re-registers the active plugins so their source names follow.
+pub fn apply_language(store: &Storage, english: bool) -> Result<(), String> {
+    set_language(english);
+    let _gate = GATE.lock().map_err(|_| "列表插件不可用")?;
+    let mut registry = Registry::read(store)?;
+    if relocalize(&mut registry) {
+        registry.save(store)?;
+    }
+    register_all(store, &registry);
+    Ok(())
 }
 
 /// Adds the bundled plugins that are missing and updates older copies, keeping each one's
@@ -350,9 +407,9 @@ fn register_all(store: &Storage, registry: &Registry) {
 pub fn restore(store: &Storage) -> Result<(), String> {
     let _gate = GATE.lock().map_err(|_| "列表插件不可用")?;
     let mut registry = Registry::read(store)?;
-    if seed_bundled(&mut registry)
-        && let Err(error) = registry.save(store)
-    {
+    // The language may have changed since the plugins were stored: refresh their display text.
+    let changed = seed_bundled(&mut registry) | relocalize(&mut registry);
+    if changed && let Err(error) = registry.save(store) {
         // Register what is already installed; the next start retries the bundled plugins.
         eprintln!("bundled list plugins not saved: {error}");
         registry = Registry::read(store)?;
