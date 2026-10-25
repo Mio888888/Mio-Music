@@ -1,7 +1,7 @@
 name: mio_music
 description: "Mio Music mobile application"
 publish_to: 'none'
-version: 1.0.2+1
+version: 1.0.3+1
 
 environment:
   sdk: ^3.13.5
