@@ -1146,7 +1146,7 @@ class _MioShellState extends State<MioShell> {
           else
             Expanded(child: _searchBox(wide)),
           if (wide) ...[
-            if (!rightNavigation) ...[
+            if (!rightNavigation && _recognitionAvailable) ...[
               SizedBox(width: rem * .5),
               _iconButton(
                 'TD-Microphone',
@@ -1159,7 +1159,7 @@ class _MioShellState extends State<MioShell> {
               ),
             ],
             const Spacer(),
-          ] else if (!rightNavigation) ...[
+          ] else if (!rightNavigation && _recognitionAvailable) ...[
             const SizedBox(width: 8),
             _iconButton(
               'TD-Microphone',
@@ -1761,7 +1761,16 @@ class _MioShellState extends State<MioShell> {
     );
   }
 
-  bool get _canRecognize => core.player != null && !_recognitionOpen;
+  /// Recognition is offered only while an installed, enabled plugin can identify songs.
+  bool get _recognitionAvailable => api.recognitionAvailable();
+
+  bool get _canRecognize =>
+      _recognitionAvailable && core.player != null && !_recognitionOpen;
+
+  List<({String icon, String label, _Page page})> get _rightNavigationItems => [
+    for (final item in _rightNavItems)
+      if (item.page != _Page.recognition || _recognitionAvailable) item,
+  ];
 
   // The live lens needs the foreground, a free screen and a capable device;
   // otherwise the opaque bar below keeps working (TV focus, reduced mode,
@@ -1870,7 +1879,8 @@ class _MioShellState extends State<MioShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_glassRightNavigationEnabled && _canRecognize)
+              if (_glassRightNavigationEnabled &&
+                  (!_recognitionAvailable || _canRecognize))
                 _glassRightNavigation(width, itemHeight)
               else
                 Padding(
@@ -1892,7 +1902,7 @@ class _MioShellState extends State<MioShell> {
 
   Widget _glassRightNavigation(double width, double itemHeight) {
     final p = _rightNavigationPalette;
-    final items = _rightNavItems;
+    final items = _rightNavigationItems;
     final selected = _fullPlayer
         ? -1
         : items.indexWhere((item) => _navPageActive(item.page));
@@ -2074,7 +2084,7 @@ class _MioShellState extends State<MioShell> {
   }) {
     final vertical = direction == Axis.vertical;
     final p = vertical ? _rightNavigationPalette : this.p;
-    final items = vertical ? _rightNavItems : _compactNavItems;
+    final items = vertical ? _rightNavigationItems : _compactNavItems;
     return Container(
       width: vertical
           ? width

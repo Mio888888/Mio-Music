@@ -82,7 +82,7 @@ pub fn write_download_tags(
     cover: Option<&[u8]>,
     lyrics: Option<&str>,
 ) -> Result<(), String> {
-    // The extension decides first, as in the original. Kuwo serves MP4 audio under an `.aac`
+    // The extension decides first, as in the original. Some services serve MP4 audio under an `.aac`
     // name, which that reads as raw ADTS and rejects; the content tells the real format.
     let mut file = lofty::read_from_path(path)
         .or_else(|_| {

@@ -507,6 +507,7 @@ impl Mio {
             .into_any_element()
     }
 }
+/// Whether the plugin pages the new comments by cursor: the answer says so itself.
 fn item_source_cursor(value: &Value) -> bool {
-    value["source"].as_str() == Some("mg")
+    value["cursorPaged"].as_bool() == Some(true)
 }

@@ -14,6 +14,9 @@ md-5 = "0.10"
 regex-lite = "0.1"
 sha1_smol = "=1.0.1"
 aes = "=0.8.4"
+wasmi = "=0.40.0"
+flate2 = "=1.1.10"
+encoding_rs = "=0.8.42"
 mio-music-sdk = { path = "../mio-music-sdk" }
 serde_json.workspace = true
 

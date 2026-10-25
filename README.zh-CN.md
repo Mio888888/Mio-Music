@@ -74,6 +74,26 @@
 
 插件运行在有资源限制的 QuickJS 沙箱中。开发自己的接入脚本可阅读[插件开发者指南](https://mio888888.github.io/Mio-Music/docs/plugins/)。
 
+### 第三方插件（社区推荐）
+
+> **非官方。** 下列插件由独立的第三方开发和维护，并非 Mio Music 项目的作品，仅作推荐参考。Mio Music 与其作者、仓库没有任何关联，不内置、不托管、不审核也不背书这些脚本，不保证它们可用、正确、安全，或在你所在地区合法。安装前请先阅读代码，风险自负。
+
+- **来源：** [niamadoutraore89/mio-music-plugins](https://gitea.com/niamadoutraore89/mio-music-plugins)（AGPL-3.0-only）。
+- **安装：** 打开 **设置 → 插件 → 音乐列表插件 → 安装列表插件**，粘贴下表中的 URL 并确认。URL 始终指向该仓库 `main` 分支的最新版本；需要离线安装时，可下载文件后选择本地文件。
+- **限制：** 这些插件只提供列表与搜索，不返回播放或下载地址，它们列出的歌曲需要由支持同一来源的音源插件解析。
+- **听歌识曲：** 应用自身不带任何识曲服务。只有已启用的插件声明了 `recognize` 能力（列表插件 6 提供）时才显示识曲入口，否则隐藏。
+
+| 插件 | ID | 能力 | 安装 URL |
+|---|---|---|---|
+| 列表插件 1 | `bd` | 歌单详情与封面（搜索目前返回空页） | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/bd.list.js` |
+| 列表插件 2 | `kg` | 搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面 | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kg.list.js` |
+| 列表插件 3 | `kw` | 搜索、歌单、发现、榜单、歌手、歌词、评论、封面 | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kw.list.js` |
+| 列表插件 4 | `mg` | 搜索、歌单、发现、榜单、歌手、歌词、评论、封面 | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/mg.list.js` |
+| 列表插件 5 | `tx` | 搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面 | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/tx.list.js` |
+| 列表插件 6 | `wy` | 搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面、听歌识曲 | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/wy.list.js` |
+
+这些服务是各自独立的产品，拥有各自的条款与商标。你需要自行确保有权访问、播放和下载相关内容，并遵守所在地区的法律和各服务的条款。关于这些插件的问题请到其仓库反馈，不要提交到本项目。
+
 ## 功能特性
 
 ### 音乐播放
@@ -101,7 +121,7 @@
 - 本地音乐扫描、标签与封面、标签编辑、收藏与歌单
 - 下载支持暂停/继续、重试、速度显示与标签写入
 - 兼容 S3 的备份与恢复（AES-GCM 加密），可部分导入旧版应用数据
-- DLNA 投放、听歌识曲、签名自动更新
+- DLNA 投放、听歌识曲（仅在安装了支持识曲的插件时提供）、签名自动更新
 - 本地优先：音乐库与设置保存在本地 SQLite，不依赖任何云服务
 
 ## 客户端支持

@@ -30,7 +30,7 @@ function __from(data,encoding){
 var Buffer={from:__from};
 var __crypto={md5:__md5,sha1:__sha1,aes128EcbHex:__aes128ecb,aes128EcbBase64:__aes128ecbB64,aesEncrypt(){throw Error('当前宿主未实现 AES');},rsaEncrypt(){throw Error('当前宿主未实现 RSA');},randomBytes(){throw Error('当前宿主未实现随机字节');}};
 var cerumusic={env:'browser',platform:'desktop',version:'1.0.3',request:__request,requestAll:__requestAll,utils:{buffer:{from:__from,bufToString:(b,e)=>__from(b).toString(e)},crypto:__crypto},NoticeCenter(){}};
-cerumusic.utils.lyric={validTtml:__validTtml,decodeKuwo:(body,lyricx)=>JSON.parse(__decodeKuwo(String(body),Boolean(lyricx)))};
+cerumusic.utils.lyric={validTtml:__validTtml};
 cerumusic.locale=typeof __locale==='string'?__locale:'zh-CN';
 if(typeof __configJson==='string'){try{cerumusic.config=JSON.parse(__configJson);}catch(e){cerumusic.config={};}}else{cerumusic.config={};}
 cerumusic.storage={
@@ -43,3 +43,40 @@ var lx={env:'desktop',version:'2.0.0',EVENT_NAMES:{request:'request',inited:'ini
  on(event,handler){__lxUsed=true;if(event==='request')__handler=handler;},
  send(event,data){__lxUsed=true;if(event==='inited'){__inited=true;__lxSources=data?.sources||{};}return Promise.resolve();}};
 function require(){throw Error('当前宿主不支持 require');}
+/** A bounded WebAssembly host for list plugins. Handlers answer the module's imports: `handlers[module][name](...args)` runs with `this` set to the instance and returns a number (nothing means 0). */
+var __wasmLive=new Map();
+function __wasmBytes(data){
+ if(typeof data==='string')return data;
+ var u8=data instanceof Uint8Array?data:new Uint8Array(data),s='';
+ for(var i=0;i<u8.length;i+=8192)s+=String.fromCharCode.apply(null,u8.subarray(i,i+8192));
+ return btoa(s);
+}
+function __wasmReply(text){var r=JSON.parse(text);if(r.error)throw Error(r.error);return r.result;}
+function __wasmDispatch(id,index,args){
+ var live=__wasmLive.get(id),fn=live&&live.table[index];
+ if(typeof fn!=='function')return 0;
+ var r=fn.apply(live.api,JSON.parse(args));
+ return typeof r==='number'&&isFinite(r)?r:0;
+}
+cerumusic.utils.wasm={
+ instantiate(bytes,handlers,options){
+  var made=__wasmReply(__wasmNew(__wasmBytes(bytes),JSON.stringify(options||{})));
+  var table=made.imports.map(i=>(handlers&&handlers[i.module]&&handlers[i.module][i.name])||null),id=made.id;
+  var api={
+   /** Calls an exported function with number arguments; answers its first result. */
+   call(name,...args){return __wasmReply(__wasmCall(id,'export',String(name),0,JSON.stringify(args)));},
+   /** Calls element `index` of an exported table. */
+   callIndirect(tableName,index,...args){return __wasmReply(__wasmCall(id,'table',String(tableName),index>>>0,JSON.stringify(args)));},
+   /** Reads `length` bytes of an exported memory. */
+   read(memory,ptr,length){return Uint8Array.from(atob(__wasmReply(__wasmRead(id,String(memory),ptr,length))),c=>c.charCodeAt(0));},
+   write(memory,ptr,data){__wasmReply(__wasmWrite(id,String(memory),ptr,__wasmBytes(data)));},
+   close(){__wasmLive.delete(id);__wasmFree(id);}
+  };
+  __wasmLive.set(id,{api,table});
+  return api;
+ }
+};
+/** zlib inflate: bytes (Uint8Array or base64) in, Uint8Array out (at most 8 MiB). */
+cerumusic.utils.zlib={inflate(data){return Uint8Array.from(atob(__zlibInflate(__wasmBytes(data))),c=>c.charCodeAt(0));}};
+/** Decodes bytes (Uint8Array or base64) as text in the charset `label` (`utf-8`, `gb18030`, ...); malformed input becomes U+FFFD. */
+cerumusic.utils.encoding={decode(data,label){return __decodeText(__wasmBytes(data),String(label||'utf-8'));}};

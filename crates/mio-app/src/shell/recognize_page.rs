@@ -213,12 +213,16 @@ impl Mio {
         cx: &mut Context<Self>,
     ) {
         let Some(online) = self.online.clone() else {
-            self.recognition.status = "请先在设置中启用支持网易云的音乐源".into();
+            self.recognition.status = "请先在设置中启用支持该歌曲来源的音乐源".into();
             cx.notify();
             return;
         };
-        if !online.sources().iter().any(|source| source.id == "wy") {
-            self.recognition.status = "当前音乐源不支持网易云歌曲，可使用搜索".into();
+        if !online
+            .sources()
+            .iter()
+            .any(|source| source.id == item.source)
+        {
+            self.recognition.status = "当前音乐源不支持该歌曲，可使用搜索".into();
             cx.notify();
             return;
         }
@@ -243,7 +247,7 @@ impl Mio {
             .or_else(|| item.songmid.as_u64().map(|v| v.to_string()))
             .unwrap_or_default();
         let song = Song {
-            id: crate::online::song_id("wy", &raw),
+            id: crate::online::song_id(&item.source, &raw),
             title: item.name,
             artist: item.singer,
             album: item.album_name,

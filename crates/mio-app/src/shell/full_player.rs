@@ -239,7 +239,7 @@ impl Mio {
         self.lyric_scroll.set_offset(point(px(0.), px(0.)));
         let revision = self.lyrics_revision;
         let task = cx.background_executor().spawn(async move {
-            // NetEase and QQ Music songs ask the TTML library first (word timings, background
+            // Songs whose plugin offers TTML ask the TTML library first (word timings, background
             // vocals, translations); everything else, and a miss, uses the source's own answer.
             crate::lyrics::fetch_online(&item)
         });

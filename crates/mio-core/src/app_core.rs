@@ -659,9 +659,12 @@ impl AppCore {
             .online
             .as_ref()
             .is_some_and(|online| Arc::ptr_eq(online, expected))
-            || !expected.sources().iter().any(|source| source.id == "wy")
+            || !expected
+                .sources()
+                .iter()
+                .any(|source| source.id == row.item.source)
         {
-            return Err("source_unavailable: enable the original recognition source".into());
+            return Err("source_unavailable: enable the source of the recognized song".into());
         }
         let prepared = crate::online::PreparedSourceSearch::from_recognition(&row)?;
         let mut keep = self

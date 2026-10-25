@@ -7,7 +7,7 @@
 //! ```js
 //! module.exports = { listPlugin: {
 //!   name, version, author, description,
-//!   sources: { tx: { name: 'QQ 音乐', icon: '🎵', capabilities: ['search', 'searchPlaylist', ...] } },
+//!   sources: { myid: { name: 'My source', icon: '🎵', capabilities: ['search', 'searchPlaylist', ...] } },
 //!   async search(source, { keyword, page, limit }) { return SearchResult },
 //!   async searchPlaylist(source, { keyword, page, limit }) { return PlaylistResult },
 //!   async playlistDetail(source, { id, page, limit }) { return PlaylistDetail },
@@ -28,14 +28,13 @@
 use crate::runtime::{Kind, Logs, PluginEnv, execute_as, execute_env, push_log, validate_url};
 use mio_music_sdk::{
     Capabilities, DiscoveryCategories, DiscoveryChart, DiscoveryPlaylistPage, MusicItem,
-    MusicListProvider, Origin, PlaylistDetail, PlaylistResult, SearchResult, SingerAlbumPage,
-    SingerInfo,
+    MusicListProvider, Origin, PlaylistDetail, PlaylistResult, Recognized, SearchResult,
+    SingerAlbumPage, SingerInfo,
 };
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::sync::{Arc, atomic::AtomicBool};
 
-const SOURCE_IDS: &[&str] = &["kw", "wy", "kg", "tx", "mg", "bd", "git"];
 const CAPABILITIES: &[&str] = &[
     "search",
     "searchPlaylist",
@@ -50,6 +49,8 @@ const CAPABILITIES: &[&str] = &[
     "download",
     "testConnection",
     "userPlaylists",
+    "recognize",
+    "resolvePlaylistId",
 ];
 const QUALITIES: &[&str] = &[
     "128k",
@@ -80,6 +81,9 @@ pub struct ConfigField {
 }
 /// A page of results is never larger than this, whatever the plugin returns.
 const MAX_ITEMS: usize = 500;
+/// Audio a recognition call carries: 15 seconds at 8 kHz.
+const RECOGNIZE_SAMPLES: usize = 120_000;
+const RECOGNIZE_MATCHES: usize = 20;
 
 #[derive(Clone, Debug)]
 pub struct ListSource {
@@ -160,9 +164,7 @@ impl ListPlugin {
             .and_then(Value::as_object)
             .ok_or("列表插件未声明来源")?
             .iter()
-            .filter(|(id, _)| {
-                SOURCE_IDS.contains(&id.as_str()) || mio_music_sdk::is_custom_source_id(id)
-            })
+            .filter(|(id, _)| mio_music_sdk::is_custom_source_id(id))
             .map(|(id, data)| ListSource {
                 id: id.clone(),
                 name: data
@@ -409,6 +411,8 @@ fn capabilities_of(list: &[String]) -> Capabilities {
         cover: has("cover"),
         play: has("play"),
         download: has("download"),
+        recognize: has("recognize"),
+        resolve_playlist_id: has("resolvePlaylistId"),
     }
 }
 
@@ -561,6 +565,94 @@ impl MusicListProvider for ListProvider {
 
     fn qualities(&self) -> Vec<String> {
         self.qualities.clone()
+    }
+    fn resolve_playlist_id(&self, input: &str) -> Result<Option<String>, String> {
+        let value: Value = self.call(
+            "resolvePlaylistId",
+            self.caps.resolve_playlist_id,
+            json!({"input": input}),
+        )?;
+        Ok(value.as_str().map(str::to_owned))
+    }
+    fn recognize(
+        &self,
+        samples: &[f32],
+        cancelled: &AtomicBool,
+    ) -> Result<Vec<Recognized>, String> {
+        use base64::Engine as _;
+        use std::sync::atomic::Ordering;
+        if !self.caps.recognize {
+            return Err("插件未提供该能力".into());
+        }
+        if samples.is_empty() || samples.len() > RECOGNIZE_SAMPLES {
+            return Err("识别音频长度无效".into());
+        }
+        let mut bytes = Vec::with_capacity(samples.len() * 4);
+        for sample in samples {
+            bytes.extend_from_slice(&sample.to_le_bytes());
+        }
+        let source = serde_json::to_string(&self.id).map_err(|_| "无效来源")?;
+        let args = json!({
+            "pcm": base64::engine::general_purpose::STANDARD.encode(bytes),
+            "sampleRate": 8000,
+        });
+        let action = format!(
+            "if(typeof __list.recognize!=='function')throw Error('插件缺少 recognize'); return await __list.recognize({source}, {args});"
+        );
+        // The script stops when `stop` is set; this thread relays the caller's cancellation.
+        let stop = Arc::new(AtomicBool::new(false));
+        let value = std::thread::scope(|scope| {
+            let worker = scope.spawn(|| {
+                execute_env(
+                    Kind::List,
+                    &self.plugin.code,
+                    &action,
+                    stop.clone(),
+                    &self.plugin.logs,
+                    self.plugin.env.clone(),
+                )
+            });
+            while !worker.is_finished() {
+                if cancelled.load(Ordering::Relaxed) {
+                    stop.store(true, Ordering::Relaxed);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            worker
+                .join()
+                .unwrap_or_else(|_| Err("列表插件执行失败".into()))
+        })
+        .inspect_err(|error| {
+            push_log(
+                &self.plugin.logs,
+                format!("[error] recognize 失败：{error}"),
+            );
+        })?;
+        let rows = value
+            .get("matches")
+            .and_then(Value::as_array)
+            .ok_or("插件返回的数据格式无效")?;
+        let mut found = Vec::new();
+        for row in rows.iter().take(RECOGNIZE_MATCHES) {
+            let Some(mut item) = row
+                .get("item")
+                .cloned()
+                .and_then(|item| serde_json::from_value::<MusicItem>(item).ok())
+            else {
+                continue;
+            };
+            // Like every other result, the song is answered as the source the call was for.
+            item.source = self.id.clone();
+            found.push(Recognized {
+                item,
+                start_time_ms: row
+                    .get("startTimeMs")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(24 * 60 * 60 * 1000),
+            });
+        }
+        Ok(found)
     }
     fn music_url(&self, song: &Value, quality: &str, download: bool) -> Result<String, String> {
         let capability = if download {

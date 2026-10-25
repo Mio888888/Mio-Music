@@ -163,16 +163,21 @@ impl Drop for Session {
     }
 }
 pub(crate) fn begin() -> Result<RecognitionSession, String> {
+    if !mio_core::recognition::available() {
+        return Err("recognition_unavailable: install a plugin that supports recognition".into());
+    }
     let permit = SnapshotPermit::acquire()?;
     let ((cache, playback, store), lease) = runtime::inspect_with_lease(|core| {
         let playback = core.online.clone().and_then(|online| {
+            // Recognized songs belong to the source of the plugin that identified them.
+            let provider = mio_music_sdk::recognizer()?;
+            let id = provider.id().to_owned();
             online
                 .sources()
                 .iter()
-                .any(|source| source.id == "wy")
+                .any(|source| source.id == id)
                 .then_some(())?;
-            let provider = mio_music_sdk::provider("wy")?;
-            Some(crate::discovery::Guard::new(online, provider, "wy".into()))
+            Some(crate::discovery::Guard::new(online, provider, id))
         });
         (core.paths.cache.clone(), playback, core.store.clone())
     })?;
@@ -214,10 +219,9 @@ impl Session {
     }
     pub(crate) fn play(&self, index: u32, jump_to_match: bool) -> Result<(), String> {
         self.check()?;
-        let guard = self
-            .playback
-            .as_ref()
-            .ok_or("source_unavailable: enable a NetEase source and reopen recognition")?;
+        let guard = self.playback.as_ref().ok_or(
+            "source_unavailable: enable the source of the recognized songs and reopen recognition",
+        )?;
         guard.check(&self.lease)?;
         let row = self
             .result
@@ -410,7 +414,7 @@ fn project(rows: &[mio_core::recognition::Match]) -> Result<Vec<RecognizedTrack>
             Ok(RecognizedTrack {
                 index: index as u32,
                 track: Track {
-                    id: mio_core::online::song_id("wy", raw),
+                    id: mio_core::online::song_id(&row.item.source, raw),
                     title: row.item.name.clone(),
                     artist: row.item.singer.clone(),
                     album: row.item.album_name.clone(),

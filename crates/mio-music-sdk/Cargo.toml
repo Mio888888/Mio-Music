@@ -10,11 +10,8 @@ repository.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "gzip", "brotli"] }
-hex = "=0.4.3"
 regex = "=1.13.1"
 icu_normalizer = "=2.3.0"
 base64 = "=0.22.1"
-encoding_rs = "=0.8.42"
-flate2 = "=1.1.10"
 roxmltree = "=0.21.1"
 

@@ -1,7 +1,7 @@
 //! "Import from network" of the playlist import dialog (`songlist.vue`
-//! `handleNetworkPlaylistImport`): the user picks a platform and pastes a playlist link or ID, the
-//! whole playlist is read through the built-in sources and saved as a new local playlist. No
-//! plugin is involved.
+//! `handleNetworkPlaylistImport`): the user picks one of the installed sources that can read
+//! playlists and pastes a playlist link or ID, the whole playlist is read through that source's
+//! plugin and saved as a new local playlist.
 use super::*;
 use crate::library;
 use gpui_kit::component::{WindowExt, button::ButtonCustomVariant, spinner::Spinner};
@@ -10,39 +10,8 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-/// Platform, dot color and name key, in the original's order.
-const PLATFORMS: [(&str, u32, &str); 6] = [
-    ("wy", 0xe60026, "music.songlist.netease"),
-    ("tx", 0x31c27a, "music.songlist.qq"),
-    ("kw", 0xf5a623, "music.songlist.kuwo"),
-    ("bd", 0x5b9df5, "music.songlist.bodo"),
-    ("kg", 0x2ca2f9, "music.songlist.kugou"),
-    ("mg", 0xff6c37, "music.songlist.migu"),
-];
-
 /// Pages read at most from one playlist, so a source that never reports its end cannot loop.
 const MAX_PAGES: usize = 400;
-
-/// The playlist ID in a pasted link, or the input itself when it is only digits
-/// (`resolvePlaylistId`). Kugou takes the input as typed.
-fn resolve_playlist_id(input: &str, platform: &str) -> Option<String> {
-    let numeric = !input.is_empty() && input.bytes().all(|b| b.is_ascii_digit());
-    let pattern = match platform {
-        "wy" => r"(?i)(?:music\.163\.com/.*[?&]id=|playlist\?id=|playlist/|id=)(\d+)",
-        "tx" => {
-            r"(?i)(?:y\.qq\.com/n/ryqq/playlist/|music\.qq\.com/.*[?&]id=|playlist[?&]id=|[?&]id=)(\d+)"
-        }
-        "kw" => r"(?i)(?:kuwo\.cn/playlist_detail/|kuwo\.cn/.*[?&]pid=|[?&](?:pid|id)=)(\d+)",
-        "kg" => return Some(input.to_owned()),
-        "mg" => r"(?i)[?&]id=(\d+)",
-        "bd" => r"(?i)[?&]playlistId=(\d+)",
-        _ => return numeric.then(|| input.to_owned()),
-    };
-    regex::Regex::new(pattern)
-        .ok()
-        .and_then(|re| re.captures(input).map(|c| c[1].to_owned()))
-        .or_else(|| numeric.then(|| input.to_owned()))
-}
 
 enum Outcome {
     Success { count: usize, name: String },
@@ -53,6 +22,8 @@ enum Outcome {
 struct NetworkImport {
     parent: WeakEntity<Mio>,
     path: PathBuf,
+    /// Source ID and name of each installed source that can read a playlist.
+    platforms: Vec<(String, String)>,
     platform: usize,
     input: Entity<InputState>,
     busy: bool,
@@ -71,6 +42,21 @@ impl Mio {
         let english = self.english;
         let colors = self.ui_colors();
         let parent = cx.weak_entity();
+        let platforms: Vec<(String, String)> = self
+            .online
+            .as_ref()
+            .map(|online| {
+                online
+                    .sources()
+                    .into_iter()
+                    .filter(|source| {
+                        mio_music_sdk::provider_with(&source.id, |caps| caps.playlist_detail)
+                            .is_some()
+                    })
+                    .map(|source| (source.id, source.name))
+                    .collect()
+            })
+            .unwrap_or_default();
         let editor = cx.new(|cx| {
             let input = cx.new(|cx| {
                 InputState::new(window, cx).placeholder(i18n::text(
@@ -91,6 +77,7 @@ impl Mio {
             NetworkImport {
                 parent,
                 path,
+                platforms,
                 platform: 0,
                 input,
                 busy: false,
@@ -153,9 +140,12 @@ impl NetworkImport {
             cx.notify();
             return;
         }
-        let (source, _, name_key) = PLATFORMS[self.platform];
-        let platform_name = self.t(name_key);
-        let Some(id) = resolve_playlist_id(&input, source) else {
+        let Some((source, platform_name)) = self.platforms.get(self.platform).cloned() else {
+            self.outcome = Some(Outcome::Warning(self.t("music.songlist.noNetworkSource")));
+            cx.notify();
+            return;
+        };
+        let Some(id) = mio_music_sdk::resolve_playlist_id(&source, &input) else {
             self.outcome = Some(Outcome::Error(
                 self.t("music.songlist.unrecognizedLink")
                     .replace("{platform}", &platform_name),
@@ -185,7 +175,7 @@ impl NetworkImport {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    read_playlist(source, &id, &cancelled)
+                    read_playlist(&source, &id, &cancelled)
                         .map_err(|error| format!("{failed_template}：{error}"))
                         .and_then(|(songs, cover)| {
                             if songs.is_empty() {
@@ -198,7 +188,7 @@ impl NetworkImport {
                                 &path,
                                 &name,
                                 &description,
-                                source,
+                                &source,
                                 (!cover.is_empty()).then_some(cover.as_str()),
                                 &songs,
                             )
@@ -289,14 +279,18 @@ impl Render for NetworkImport {
             .hover(color(self.colors, "--td-brand-color-hover"))
             .active(color(self.colors, "--td-brand-color-active"));
         let focused = self.input.read(cx).focus_handle(cx).is_focused(window);
-        let platform_name = self.t(PLATFORMS[self.platform].2);
+        let platform_name = self
+            .platforms
+            .get(self.platform)
+            .map(|(_, name)| name.clone())
+            .unwrap_or_default();
 
         let mut grid = div().flex().flex_wrap().gap(px(6.)).mb(px(22.));
-        for (index, (_, dot, name_key)) in PLATFORMS.iter().enumerate() {
+        for (index, (_, name)) in self.platforms.iter().enumerate() {
             let active = index == self.platform;
             grid = grid.child(
                 gpui_kit::base::Button::new(("network-import-platform", index))
-                    .accessibility_label(self.t(name_key))
+                    .accessibility_label(name.clone())
                     .disabled(self.busy)
                     .px(px(12.))
                     .py(px(if narrow { 11. } else { 8. }))
@@ -323,13 +317,13 @@ impl Render for NetworkImport {
                     .flex()
                     .items_center()
                     .gap(px(6.))
-                    .child(div().size(px(8.)).rounded_full().bg(rgb(*dot)))
+                    .child(div().size(px(8.)).rounded_full().bg(brand))
                     .child(
                         div()
                             .text_size(px(12.))
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(primary)
-                            .child(self.t(name_key)),
+                            .child(name.clone()),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.platform = index;

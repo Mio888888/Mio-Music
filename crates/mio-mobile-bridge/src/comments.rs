@@ -196,7 +196,9 @@ impl Session {
             && (ids.len() as u64) < total
             && objects < 2000
             && bytes < 8 * 1024 * 1024
-            && (hot || self.guard.source != "mg" || (!cursor.is_empty() && cursor != tab.cursor));
+            && (hot
+                || data["cursorPaged"].as_bool() != Some(true)
+                || (!cursor.is_empty() && cursor != tab.cursor));
         // A failed provider/parse/admission never advances either tab's cursor.
         self.guard.check(&self.lease)?;
         state.tabs[index] = Tab {

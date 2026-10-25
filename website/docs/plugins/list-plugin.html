@@ -106,6 +106,8 @@
     <tr><td><code>download</code></td><td><code>downloadUrl</code>（缺省用 <code>musicUrl</code>）</td><td>由本插件解析下载地址</td></tr>
     <tr><td><code>testConnection</code></td><td><code>testConnection</code></td><td>配置页的「测试连接」</td></tr>
     <tr><td><code>userPlaylists</code></td><td><code>getPlaylists</code></td><td>「导入歌单」：列出服务器上用户自己的歌单</td></tr>
+    <tr><td><code>resolvePlaylistId</code></td><td><code>resolvePlaylistId</code></td><td>「从网络导入歌单」：从用户粘贴的链接里取出歌单 ID。需要同时声明 <code>playlistDetail</code>，应用据此决定列出哪些平台</td></tr>
+    <tr><td><code>recognize</code></td><td><code>recognize</code></td><td>听歌识曲：根据一小段音频认出歌曲。应用只在有已启用的插件声明了该能力时才显示识曲入口</td></tr>
   </tbody>
 </table>
 <p>宿主<strong>只会调用已声明能力对应的方法</strong>。声明了能力却没有实现对应方法，调用时会得到「插件缺少 xxx」的错误；调用了未声明的能力，则得到「插件未声明该能力」。<code>play</code> 与 <code>download</code> 还需要用户在插件卡片上打开「由本插件提供播放 / 下载」才会生效。</p>
@@ -170,6 +172,8 @@
     <tr><td><code>downloadUrl</code></td><td><code>{ song, quality }</code></td><td>URL 字符串，或 <code>{ url }</code></td></tr>
     <tr><td><code>testConnection</code></td><td><code>{}</code></td><td><code>true</code> 或 <code>{success: true}</code></td></tr>
     <tr><td><code>getPlaylists</code></td><td><code>{ page, limit }</code></td><td><a href="data-types.html#playlistresult">PlaylistResult</a></td></tr>
+    <tr><td><code>resolvePlaylistId</code></td><td><code>{ input }</code></td><td>歌单 ID 字符串，没有就 <code>null</code></td></tr>
+    <tr><td><code>recognize</code></td><td><code>{ pcm, sampleRate }</code></td><td><code>{ matches: [{ item, startTimeMs }] }</code></td></tr>
   </tbody>
 </table>
 
@@ -217,6 +221,20 @@
 <ul>
   <li><code>testConnection</code> 要求至少有一个来源声明了 <code>testConnection</code> 能力。返回 <code>true</code> 或 <code>{success: true}</code> 视为成功，其余视为失败；失败时请 <code>throw</code> 带原因的 <code>Error</code>，比如「用户名或密码错误」。应用的「测试连接」使用<strong>当前表单里的值</strong>（保存之前），并且每次都应实际请求一次服务器，所以请从 <code>cerumusic.config</code> 读取参数，不要只依赖 <code>cerumusic.storage</code> 里缓存的会话。</li>
   <li><code>getPlaylists</code> 返回用户在服务器上的歌单（区别于公开歌单的搜索与发现）。声明 <code>userPlaylists</code> 与 <code>playlistDetail</code> 后，应用就可以「导入歌单」：先列出歌单，再分页读取完整的歌曲，最后事务性地创建本地歌单。</li>
+</ul>
+
+<h3 id="resolve-playlist-id">resolvePlaylistId</h3>
+<ul>
+  <li>用户在「从网络导入歌单」里选一个已安装、声明了 <code>playlistDetail</code> 的来源，再粘贴链接或 ID。应用先调用 <code>resolvePlaylistId(source, { input })</code>，返回的字符串就作为 <code>playlistDetail</code> 的 <code>id</code>；返回 <code>null</code> 或空串时，只有纯数字的输入会被原样当作 ID，其余提示「无法识别」。</li>
+  <li>来源用什么写法分享歌单由插件自己决定（链接里的参数名、路径、短码都可以），应用不内置任何平台的链接规则。</li>
+</ul>
+
+<h3 id="recognize">recognize</h3>
+<ul>
+  <li>入参 <code>pcm</code> 是 base64 编码的音频：单声道、<code>sampleRate</code>（固定为 8000）Hz、32 位浮点、小端，最长 15 秒。应用负责录音或解码文件、重采样与静音检测；<strong>只有指纹或特征，不含原始音频文件本身，是否上传由你的实现决定，请在插件说明里写清楚</strong>。</li>
+  <li>返回 <code>{ matches: [{ item, startTimeMs }] }</code>：<code>item</code> 是 <a href="data-types.html#musicitem">MusicItem</a>，<code>startTimeMs</code> 是这段音频在歌曲中的起点（毫秒），最多保留 20 条。和其他调用一样，宿主会把每首歌的 <code>source</code> 改成这个来源，识别出的歌曲之后通过这个来源播放。</li>
+  <li>没有匹配时请 <code>throw</code> 带原因的 <code>Error</code>（例如「未识别到歌曲」），消息会显示给用户。</li>
+  <li>计算量大的部分（音频指纹算法）可以用 <a href="runtime-api.html#wasm"><code>cerumusic.utils.wasm</code></a> 运行随脚本附带的 WebAssembly 模块。</li>
 </ul>
 
 <h2 id="host">宿主替你做的事</h2>

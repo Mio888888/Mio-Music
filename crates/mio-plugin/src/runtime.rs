@@ -472,6 +472,9 @@ pub(crate) fn execute_env(
                 if let Ok(mut map) = store.lock() && map.remove(&key).is_some() { persist(&map); }
             }).map_err(|_| "无法安装插件存储")?).map_err(|_| "无法安装插件存储")?;
         }
+        if kind == Kind::List {
+            crate::wasm::install(&ctx, cancelled.clone(), deadline)?;
+        }
         let sink = logs.clone();
         ctx.globals().set("__log", Function::new(ctx.clone(), move |level: String, text: String| {
             push_log(&sink, format!("[{}] {text}", level.chars().take(8).collect::<String>()));
@@ -482,11 +485,21 @@ pub(crate) fn execute_env(
         ctx.globals().set("__validTtml", Function::new(ctx.clone(), |text: String| -> bool {
             text.len()<=2*1024*1024 && mio_music_sdk::parse_ttml(&text).is_ok_and(|lines| lines.iter().any(|line| line.words.iter().any(|word| !word.text.trim().is_empty())))
         }).map_err(|_| "TTML 解析桥初始化失败")?).map_err(|_| "TTML 解析桥初始化失败")?;
-        ctx.globals().set("__decodeKuwo", Function::new(ctx.clone(), |body: String, lyricx: bool| -> rquickjs::Result<String> {
-            mio_music_sdk::decode_lyric_payload(&json!({"format":"kw","data":{"bytes":body,"isLyricx":lyricx}}), "kw")
-                .and_then(|lyric| serde_json::to_string(&lyric).map_err(|_| "歌词格式无效".to_string()))
-                .map_err(|_| rquickjs::Error::Unknown)
-        }).map_err(|_| "歌词解析桥初始化失败")?).map_err(|_| "歌词解析桥初始化失败")?;
+        // Generic byte utilities for scripts that decode a source's own lyric/payload format:
+        // zlib inflate (answers base64, at most 8 MiB) and text decoding by charset label.
+        ctx.globals().set("__zlibInflate", Function::new(ctx.clone(), |data: String| -> rquickjs::Result<String> {
+            use flate2::read::ZlibDecoder;
+            let bytes = STANDARD.decode(data.trim()).map_err(|_| rquickjs::Error::Unknown)?;
+            let mut out = Vec::new();
+            ZlibDecoder::new(&bytes[..]).take(8 * 1024 * 1024 + 1).read_to_end(&mut out).map_err(|_| rquickjs::Error::Unknown)?;
+            if out.len() > 8 * 1024 * 1024 { return Err(rquickjs::Error::Unknown); }
+            Ok(STANDARD.encode(out))
+        }).map_err(|_| "解压桥初始化失败")?).map_err(|_| "解压桥初始化失败")?;
+        ctx.globals().set("__decodeText", Function::new(ctx.clone(), |data: String, label: String| -> rquickjs::Result<String> {
+            let bytes = STANDARD.decode(data.trim()).map_err(|_| rquickjs::Error::Unknown)?;
+            let encoding = encoding_rs::Encoding::for_label(label.trim().as_bytes()).ok_or(rquickjs::Error::Unknown)?;
+            Ok(encoding.decode_without_bom_handling(&bytes).0.into_owned())
+        }).map_err(|_| "文字解码桥初始化失败")?).map_err(|_| "文字解码桥初始化失败")?;
         ctx.globals().set("__sha1", Function::new(ctx.clone(), |s: String| sha1_smol::Sha1::from(s.as_bytes()).digest().to_string()).map_err(|_| "插件摘要失败")?).map_err(|_| "插件摘要失败")?;
         ctx.globals().set("__md5", Function::new(ctx.clone(), |s: String| format!("{:x}", Md5::digest(s.as_bytes()))).map_err(|_| "插件摘要失败")?).map_err(|_| "插件摘要失败")?;
         let locale = if ENGLISH.load(Ordering::Relaxed) { "en-US" } else { "zh-CN" };

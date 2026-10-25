@@ -92,17 +92,16 @@ pub(crate) fn network_sources() -> Result<Vec<DiscoverySource>, String> {
     let (online, lease) = runtime::inspect_with_lease(|core| core.online.clone())?;
     let sources = online.map(|o| o.sources()).unwrap_or_default();
     let mut result = Vec::new();
-    for id in ["wy", "tx", "kw", "bd", "kg", "mg"] {
-        if let Some(source) = sources.iter().find(|s| s.id == id) {
-            if mio_music_sdk::provider_with(id, |c| c.playlist_detail).is_some() {
-                if source.name.len() > 1024 {
-                    return Err("capacity_exceeded: source name".into());
-                }
-                result.push(DiscoverySource {
-                    id: id.into(),
-                    name: source.name.clone(),
-                });
+    // Every installed source whose plugin can read a playlist, in registration order.
+    for source in &sources {
+        if mio_music_sdk::provider_with(&source.id, |c| c.playlist_detail).is_some() {
+            if source.name.len() > 1024 {
+                return Err("capacity_exceeded: source name".into());
             }
+            result.push(DiscoverySource {
+                id: source.id.clone(),
+                name: source.name.clone(),
+            });
         }
     }
     lease.ensure_open()?;

@@ -165,6 +165,20 @@
       <a href="./docs/plugins/" class="px-6 py-3 rounded-full bg-purple-500 text-white font-semibold text-xs hover:bg-purple-400 transition-all shadow-[0_0_30px_rgba(168,85,247,0.35)]">阅读插件开发文档 →</a>
       <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer" class="px-6 py-3 rounded-full bg-white/5 border border-white/10 text-white text-xs font-medium hover:bg-white/10 transition-all backdrop-blur-md">查看内置插件源码</a>
     </div>
+    <div class="mt-16 max-w-3xl mx-auto bg-[#262A34] rounded-2xl border border-white/5 p-6 reveal" id="third-party-plugins">
+      <h3 class="text-base font-dot tracking-tight mb-2">第三方插件推荐（非官方）</h3>
+      <p class="text-xs text-gray-400 leading-relaxed mb-4">社区作者独立开发的列表插件，共 6 个，对接公开的在线音乐服务，只提供列表与搜索，播放需另配音源插件。它们并非 Mio Music 项目的作品，与本项目没有任何关联，仅作推荐参考；请先阅读代码再安装，风险自负，并遵守所在地区的法律与各服务的条款。</p>
+      <p class="text-xs text-gray-500 leading-relaxed mb-4">在「设置 → 插件 → 音乐列表插件 → 安装列表插件」中粘贴下列地址即可，地址始终指向该仓库 main 分支的最新版本。</p>
+      <ul class="space-y-2 text-xs text-gray-400 mb-4">
+        <li><span class="text-white">列表插件 1</span> <span class="text-gray-500">(bd)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/bd.list.js</code></li>
+        <li><span class="text-white">列表插件 2</span> <span class="text-gray-500">(kg)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kg.list.js</code></li>
+        <li><span class="text-white">列表插件 3</span> <span class="text-gray-500">(kw)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kw.list.js</code></li>
+        <li><span class="text-white">列表插件 4</span> <span class="text-gray-500">(mg)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/mg.list.js</code></li>
+        <li><span class="text-white">列表插件 5</span> <span class="text-gray-500">(tx)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/tx.list.js</code></li>
+        <li><span class="text-white">列表插件 6</span> <span class="text-gray-500">(wy)</span> <code class="block break-all text-gray-500">https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/wy.list.js</code></li>
+      </ul>
+      <a href="https://gitea.com/niamadoutraore89/mio-music-plugins" target="_blank" rel="noreferrer" class="text-xs text-cyan-400 hover:text-cyan-300">第三方插件仓库（独立项目，非官方）→</a>
+    </div>
   </section>
   <!-- DOWNLOAD CTA -->
   <section class="relative z-10 max-w-4xl mx-auto px-6 py-24 text-center reveal" id="download"> <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 backdrop-blur-md mb-8"> <iconify-icon icon="solar:download-minimalistic-linear" width="14" class="text-purple-400"></iconify-icon> <span class="text-xs text-purple-300">GitHub Releases · 免费开源</span> </div> <h2 class="text-4xl md:text-5xl font-dot tracking-tight mb-4">下载适合你的桌面版</h2> <p class="text-sm text-gray-400 mb-6 max-w-lg mx-auto"> 自动识别当前设备，并从 GitHub Releases 读取最新版本与安装包地址。 </p> <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto mb-4 text-left"> <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3"> <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">当前识别</div> <div id="detected-os" class="text-sm text-white font-dot tracking-tight" aria-live="polite">正在识别系统...</div> </div> <div class="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3"> <div class="text-[10px] text-gray-500 uppercase tracking-widest mb-1">最新版本</div>

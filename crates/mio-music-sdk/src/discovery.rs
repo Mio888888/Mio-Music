@@ -1,8 +1,6 @@
-//! Source-specific discovery, ported from the original `sources/*/playlist.rs`.
+//! Discovery categories and charts, as plugins describe them.
 use crate::PlaylistItem;
 use serde::{Deserialize, Serialize};
-
-pub const DISCOVERY_SOURCES: &[&str] = &["kw", "wy", "kg", "tx", "mg"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscoveryCategory {

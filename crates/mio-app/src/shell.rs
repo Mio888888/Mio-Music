@@ -1003,6 +1003,9 @@ impl Mio {
         }
     }
     fn go(&mut self, page: Page, cx: &mut Context<Self>) {
+        if page == Page::Recognize && !crate::recognition::available() {
+            return;
+        }
         // The source and plugin settings are categories of the settings page.
         let page = match page {
             Page::MusicSettings => {
@@ -1277,17 +1280,20 @@ impl Mio {
                             ),
                     ),
             )
-            .child(
-                control(
-                    "recognize",
-                    "Record",
-                    self.t("music.recognize.startRecognize"),
-                    mode,
-                    cx,
+            // Offered only while a plugin that can identify songs is installed and enabled.
+            .when(crate::recognition::available(), |bar| {
+                bar.child(
+                    control(
+                        "recognize",
+                        "Record",
+                        self.t("music.recognize.startRecognize"),
+                        mode,
+                        cx,
+                    )
+                    .icon(crate::skin::icon("TD-Microphone").size(px(16.)))
+                    .on_click(cx.listener(|this, _, _, cx| this.go(Page::Recognize, cx))),
                 )
-                .icon(crate::skin::icon("TD-Microphone").size(px(16.)))
-                .on_click(cx.listener(|this, _, _, cx| this.go(Page::Recognize, cx))),
-            )
+            })
             .child(div().flex_1())
             .child(
                 // `TitleBarControls.vue` .window-controls: 0.125rem between its children.

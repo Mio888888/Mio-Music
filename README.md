@@ -74,6 +74,26 @@ Features also depend on server versions and account permissions. Scripts, config
 
 Plugins run in a resource-limited QuickJS sandbox. To write your own connector, see the [plugin developer guide](https://mio888888.github.io/Mio-Music/docs/plugins/).
 
+### Third-party plugins (community recommendation)
+
+> **Unofficial.** The plugins below are developed and maintained by an independent third party, not by the Mio Music project. They are listed for reference only. Mio Music is not affiliated with their author or repository, and does not bundle, host, review or endorse the scripts, nor guarantee that they are available, correct, secure or lawful in your region. Read the code before installing and use them at your own risk.
+
+- **Source:** [niamadoutraore89/mio-music-plugins](https://gitea.com/niamadoutraore89/mio-music-plugins) (AGPL-3.0-only). 
+- **Install:** open **Settings → Plugins → Music list plugins → Install list plugin**, paste the URL from the table and confirm. The URLs always point to the latest version on that repository's `main` branch; to install offline, download the file and choose it as a local file.
+- **Limits:** these plugins only provide listing and search. They do not return playback or download URLs, so the tracks they list need a source plugin that supports the same source.
+- **Song recognition:** the app has no recognition service of its own. The recognition entry appears only while an enabled plugin declares the `recognize` capability (list plugin 6 does); without one it is hidden.
+
+| Plugin | ID | Capabilities | Install URL |
+|---|---|---|---|
+| List plugin 1 | `bd` | Playlist detail and covers (search currently returns an empty page) | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/bd.list.js` |
+| List plugin 2 | `kg` | Search, playlists, albums, discovery, charts, artists, lyrics, comments, covers | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kg.list.js` |
+| List plugin 3 | `kw` | Search, playlists, discovery, charts, artists, lyrics, comments, covers | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kw.list.js` |
+| List plugin 4 | `mg` | Search, playlists, discovery, charts, artists, lyrics, comments, covers | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/mg.list.js` |
+| List plugin 5 | `tx` | Search, playlists, albums, discovery, charts, artists, lyrics, comments, covers | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/tx.list.js` |
+| List plugin 6 | `wy` | Search, playlists, albums, discovery, charts, artists, lyrics, comments, covers, song recognition | `https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/wy.list.js` |
+
+These services are separate products with their own terms and trademarks. You are responsible for having the right to access, play and download the content, and for following the laws of your region and each service's terms. Questions and issues about these plugins belong in their own repository, not in this project's tracker.
+
 ## Features
 
 ### Music Playback
@@ -101,7 +121,7 @@ Plugins run in a resource-limited QuickJS sandbox. To write your own connector, 
 - Local library scanning, tags and covers, tag editing, favorites and playlists
 - Downloads with pause/resume, retry, speed display and tag writing
 - S3-compatible backup and restore (AES-GCM encrypted), partial import of legacy app data
-- DLNA casting, song recognition, signed auto-update
+- DLNA casting, song recognition (offered only while a plugin that supports it is installed), signed auto-update
 - Local first: library and settings live in local SQLite; no cloud service is required
 
 ## Platform Support

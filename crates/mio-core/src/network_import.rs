@@ -29,36 +29,9 @@ pub struct Request {
 
 impl Request {
     pub fn prepare(source: &str, input: &str) -> Result<Self, Error> {
-        let input = input.trim();
-        if input.is_empty() || input.len() > 4096 || input.chars().any(char::is_control) {
-            return Err(Error::Input);
-        }
-        let numeric = input.bytes().all(|byte| byte.is_ascii_digit());
-        let pattern = match source {
-            "wy" => r"(?i)(?:music\.163\.com/.*[?&]id=|playlist\?id=|playlist/|id=)(\d+)",
-            "tx" => {
-                r"(?i)(?:y\.qq\.com/n/ryqq/playlist/|music\.qq\.com/.*[?&]id=|playlist[?&]id=|[?&]id=)(\d+)"
-            }
-            "kw" => r"(?i)(?:kuwo\.cn/playlist_detail/|kuwo\.cn/.*[?&]pid=|[?&](?:pid|id)=)(\d+)",
-            "mg" => r"(?i)[?&]id=(\d+)",
-            "bd" => r"(?i)[?&]playlistId=(\d+)",
-            "kg" => "",
-            _ => return Err(Error::Input),
-        };
-        let id = if source == "kg" || numeric {
-            input.to_owned()
-        } else {
-            regex::Regex::new(pattern)
-                .ok()
-                .and_then(|pattern| {
-                    pattern
-                        .captures(input)
-                        .map(|captures| captures[1].to_owned())
-                })
-                .ok_or(Error::Input)?
-        };
         let provider = mio_music_sdk::provider_with(source, |caps| caps.playlist_detail)
             .ok_or(Error::Unavailable)?;
+        let id = mio_music_sdk::resolve_playlist_id(source, input).ok_or(Error::Input)?;
         Ok(Self {
             source: source.to_owned(),
             id,

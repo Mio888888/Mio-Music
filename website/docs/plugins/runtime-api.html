@@ -150,6 +150,37 @@ if (!baseUrl) throw new Error('请先在插件“配置”中填写服务器地�
   </tbody>
 </table>
 
+<h3 id="zlib-encoding">zlib / encoding</h3>
+<p>通用的字节工具，给需要自行解码来源专有歌词或数据格式的插件用。宿主不含任何来源专用的解码，XOR 密钥、分段格式与解析都写在你的脚本里。</p>
+<table>
+  <thead><tr><th>函数</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td><code>zlib.inflate(data)</code></td><td>解压一段 zlib 数据。<code>data</code> 是 <code>Uint8Array</code> 或 base64 字符串，返回 <code>Uint8Array</code>，解压后最多 8 MiB，数据无效时抛错。</td></tr>
+    <tr><td><code>encoding.decode(data, label)</code></td><td>按字符集 <code>label</code>（<code>'utf-8'</code>、<code>'gb18030'</code>、<code>'big5'</code> 等 WHATWG 标签）把字节解码成字符串；非法字节变成 U+FFFD，未知标签抛错。QuickJS 没有 <code>TextDecoder</code>，GB18030 等多字节编码只能由宿主解。</td></tr>
+  </tbody>
+</table>
+
+<h3 id="wasm">wasm</h3>
+<p>QuickJS 没有 <code>WebAssembly</code>，需要运行 WebAssembly 模块的列表插件（例如音频指纹算法）通过宿主提供的受限桥执行。宿主不知道模块做什么：它只实例化你给出的字节，按你的要求调用导出函数或表项，并把模块对<strong>导入函数</strong>的每次调用交给你脚本里的处理函数回答。仅列表插件可用。</p>
+<pre class="language-javascript"><code>const inst = cerumusic.utils.wasm.instantiate(base64OrBytes, {
+  a: { // 导入的模块名 → 函数名 → 处理函数
+    b(x, y) { /* this 就是 inst；返回数字，不返回则视为 0 */ return 0; },
+  },
+}, { fuel: 600000000, maxMemory: 64 * 1024 * 1024 });
+try {
+  inst.call('exportName', 1, 2);          // 调用导出函数，返回第一个结果（数字）
+  inst.callIndirect('tableName', 3, 4);   // 调用导出表的第 3 项，其余是参数
+  const bytes = inst.read('memory', ptr, length);  // Uint8Array
+  inst.write('memory', ptr, bytes);       // Uint8Array 或 base64 字符串
+} finally {
+  inst.close();
+}</code></pre>
+<ul>
+  <li>数值参数和结果都以 JavaScript 数字传递（<code>i64</code> 超过 2<sup>53</sup> 会丢失精度）；没有提供处理函数的导入返回 0。</li>
+  <li>模块只能导入函数；处理函数抛出的错误会中止这次调用，并成为调用方得到的错误。</li>
+  <li>限制：模块 ≤ 4 MiB，线性内存默认 64 MiB（最大 128 MiB），指令燃料默认 6 亿（最大 20 亿），同时最多 4 个实例；不能在处理函数里重入同一个实例。</li>
+</ul>
+
 <h2 id="limits">限制一览</h2>
 <p>所有限制都是为了保证一个失控的脚本不会拖垮应用。超过任何一项都会让这次调用失败。</p>
 <table>

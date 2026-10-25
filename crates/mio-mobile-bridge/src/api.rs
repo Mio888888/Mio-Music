@@ -10,6 +10,13 @@ pub struct DeviceCapabilities {
     pub dlna: bool,
 }
 
+/// Whether an installed, enabled plugin can identify songs from audio; recognition is offered
+/// only then.
+#[frb(sync)]
+pub fn recognition_available() -> bool {
+    mio_core::recognition::available()
+}
+
 #[frb(sync)]
 pub fn capabilities() -> Result<DeviceCapabilities, String> {
     #[cfg(target_os = "android")]

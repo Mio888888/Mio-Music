@@ -1,4 +1,4 @@
-//! TTML lyrics from the `amll-ttml-db` library, for QQ Music and NetEase songs.
+//! TTML lyrics (word-timed, with translation and romanization), as a plugin can supply them.
 //!
 //! The original asks the library first (`fetchTtmlLyrics`) and falls back to the source's own
 //! lyric API. Parsing follows the AMLL TTML format as `TTMLParser` and `toAmllLyrics` read it:

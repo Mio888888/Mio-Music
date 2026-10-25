@@ -100,7 +100,7 @@ impl PreparedSourceSearch {
         bounded_metadata_size(item)?;
         Ok(Self {
             items: vec![item.clone()],
-            source: "wy".into(),
+            source: item.source.clone(),
             total: 1,
             has_more: false,
             declared_pages: None,
@@ -1806,9 +1806,6 @@ impl Online {
                     .ok_or("插件未声明音质")?
             }
         };
-        if item.source == "tx" && std::env::var_os("MIO_GPUI_PLAYBACK_TRACE").is_some() {
-            eprintln!("[playback] plugin_input source=tx quality={quality}");
-        }
         let song = serde_json::to_value(item).map_err(|_| "无效歌曲信息")?;
         // A list plugin that provides this source's playback / download answers instead of
         // the playback plugin, which is then not asked at all.

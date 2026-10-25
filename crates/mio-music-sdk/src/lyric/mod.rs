@@ -1,15 +1,10 @@
-//! Lyric retrieval per source, ported from each original `getLyric`. Decoding and parsing are
-//! the original code unchanged (`*_parse.rs`, `*_qrc.rs`, ...); only the requests are rewritten
-//! as bounded blocking calls.
+//! Lyric retrieval through the enabled list plugin. A plugin answers with the generic
+//! shape below, decoding its own service's formats itself.
 //!
 //! The result keeps the original shape: `lyric` is line-level LRC (`[mm:ss.xxx]text`), `tlyric`
-//! a translation, `rlyric` a romanization, and `crlyric` the word-timed form of the source.
-mod kg_krc;
-mod kw_parse;
-mod mg_mrc;
+//! a translation, `rlyric` a romanization, and `crlyric` the word-timed form, whose layout
+//! `crlyricFormat` names (see `mio-core`'s lyric parser).
 pub mod ttml;
-mod tx_qrc;
-mod wy_parse;
 
 use crate::MusicItem;
 use serde::{Deserialize, Serialize};
@@ -22,6 +17,9 @@ pub struct Lyric {
     pub tlyric: String,
     pub rlyric: String,
     pub crlyric: String,
+    /// How `crlyric` lays out its word timing; empty means `wordTagBefore`.
+    #[serde(default)]
+    pub crlyric_format: String,
     pub source: String,
 }
 
@@ -39,6 +37,7 @@ impl Lyric {
             tlyric: text("tlyric"),
             rlyric: text("rlyric"),
             crlyric: text("crlyric"),
+            crlyric_format: text("crlyricFormat"),
             source: source.to_string(),
         }
     }
@@ -61,105 +60,17 @@ pub(crate) fn request(item: &MusicItem) -> Result<Value, String> {
     Ok(payload)
 }
 
-/// Pure decoding of a plugin response; no network access or source API fallback.
+/// Pure decoding of a plugin response; no network access or source API fallback. A plugin
+/// decodes its own service's formats and answers with the generic shape above; an answer that
+/// still carries a source-specific `format` (an older plugin) is refused.
 pub fn decode_payload(value: &Value, source: &str) -> Result<Lyric, String> {
-    use base64::Engine;
     if value.to_string().len() > 4 * 1024 * 1024 {
         return Err("插件歌词数据过大".into());
     }
-    let data = &value["data"];
-    let text = |key: &str| data[key].as_str().unwrap_or("");
-    match value["format"].as_str() {
-        Some("kw") => {
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(text("bytes"))
-                .map_err(|_| "歌词字节格式无效")?;
-            let decoded =
-                kw_parse::decode_lyric(&bytes, data["isLyricx"].as_bool().unwrap_or(false))?;
-            Ok(Lyric::from_value(
-                &kw_parse::build_lyric_result(&decoded)?,
-                source,
-            ))
-        }
-        Some("wy") => {
-            let field = |key: &str| data[key]["lyric"].as_str().unwrap_or("");
-            let (lrc, tlrc, rlrc) =
-                wy_parse::fix_time_label(field("lrc"), field("tlyric"), field("romalrc"));
-            if let Some(yrc) = data["yrc"]["lyric"].as_str() {
-                return Ok(Lyric::from_value(
-                    &wy_parse::parse_yrc_lyrics(
-                        yrc,
-                        field("ytlrc"),
-                        field("yromalrc"),
-                        &lrc,
-                        &tlrc,
-                        &rlrc,
-                    ),
-                    source,
-                ));
-            }
-            let header = |s: &str| {
-                if s.is_empty() {
-                    String::new()
-                } else {
-                    wy_parse::parse_lrc_with_header(s)
-                }
-            };
-            Ok(Lyric {
-                lyric: header(&lrc),
-                tlyric: header(&tlrc),
-                rlyric: header(&rlrc),
-                source: source.into(),
-                ..Default::default()
-            })
-        }
-        Some("tx") => {
-            let mut lyric = Lyric::from_value(
-                &tx_qrc::parse_qrc_lyrics(
-                    &tx_qrc::qrc_decrypt(text("lyric"))?,
-                    &tx_qrc::qrc_decrypt(text("trans"))?,
-                    &tx_qrc::qrc_decrypt(text("roma"))?,
-                ),
-                source,
-            );
-            for text in [&mut lyric.tlyric, &mut lyric.rlyric] {
-                if !text.lines().any(|line| {
-                    let body = line.split_once(']').map_or(line, |(_, rest)| rest).trim();
-                    !body.is_empty() && body != "//"
-                }) {
-                    text.clear();
-                }
-            }
-            Ok(lyric)
-        }
-        Some("kg") => {
-            if text("fmt") == "krc" {
-                Ok(Lyric::from_value(
-                    &kg_krc::decode_krc(text("content"))?,
-                    source,
-                ))
-            } else {
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(text("content"))
-                    .map_err(|_| "歌词字节格式无效")?;
-                Ok(Lyric {
-                    lyric: String::from_utf8_lossy(&bytes).into_owned(),
-                    source: source.into(),
-                    ..Default::default()
-                })
-            }
-        }
-        Some("mg") => {
-            let mut lyric = Lyric::from_value(
-                &mg_mrc::parse_mrc_lyrics(&mg_mrc::decrypt_mrc(text("mrc"))),
-                source,
-            );
-            lyric.tlyric = text("tlyric").into();
-            Ok(lyric)
-        }
-        Some(_) => Err("插件歌词编码不支持".into()),
-        None => Ok(Lyric::from_value(value, source)),
+    if value.get("format").is_some_and(|format| !format.is_null()) {
+        return Err("插件歌词编码不支持，请更新插件".into());
     }
+    Ok(Lyric::from_value(value, source))
 }
 
 pub fn get(item: &MusicItem) -> Result<Lyric, String> {

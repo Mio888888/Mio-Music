@@ -15,28 +15,26 @@ pub use aggregate::{
     dedupe_and_sort_songs, search_playlists_all,
 };
 pub use discovery::{
-    DISCOVERY_SOURCES, DiscoveryCategories, DiscoveryCategory, DiscoveryCategoryGroup,
-    DiscoveryChart, DiscoveryPlaylistPage,
+    DiscoveryCategories, DiscoveryCategory, DiscoveryCategoryGroup, DiscoveryChart,
+    DiscoveryPlaylistPage,
 };
 pub use lyric::{
     Lyric, decode_payload as decode_lyric_payload, get as get_lyric,
     ttml::{Found as FoundLyric, TimedLine, TimedWord, find as find_lyric, parse as parse_ttml},
 };
 pub use provider::{
-    Capabilities, MusicListProvider, Origin, capabilities, is_custom_source_id, provider,
-    provider_with, providers, register, replace_plugins, unregister_matching, unregister_plugin,
+    Capabilities, MusicListProvider, Origin, Recognized, capabilities, is_custom_source_id,
+    provider, provider_with, providers, recognizer, register, replace_plugins, resolve_playlist_id,
+    unregister_matching, unregister_plugin,
 };
 pub use types::{
     MusicItem, PlaylistDetail, PlaylistInfo, PlaylistItem, PlaylistResult, QualityInfo,
     SearchResult, SingerAlbum, SingerAlbumPage, SingerInfo,
 };
 
-/// Sources of the original, in its aggregate order; each is answered by one
-/// [`MusicListProvider`] (see the `provider` module).
-pub const IMPLEMENTED_SOURCES: &[&str] = &["kw", "wy", "kg", "tx", "mg", "bd", "git"];
-
 pub use pic::{fill_missing_pics, get as get_cover, get_with as get_cover_with};
 
+/// Whether an enabled plugin answers for `source` with search or playback.
 pub fn is_implemented(source: &str) -> bool {
     let caps = capabilities(source);
     caps.search || caps.play
@@ -104,11 +102,6 @@ pub fn search_playlist_source(
     check_search(keyword, page, limit)?;
     require(source, |c| c.search_playlist, "该来源的歌单搜索尚未接入")?
         .search_playlist(keyword, page, limit)
-}
-
-/// Kuwo search, kept for existing callers; see [`search_source`].
-pub fn search(keyword: &str, page: usize, limit: usize) -> Result<SearchResult, String> {
-    search_source("kw", keyword, page, limit)
 }
 
 /// Single-source song search (the original `search` SDK method). `page` is 1-based and `limit`

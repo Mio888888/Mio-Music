@@ -25,6 +25,17 @@ pub struct Capabilities {
     pub play: bool,
     /// The provider resolves download addresses itself (`music_url` with `download`).
     pub download: bool,
+    /// The provider identifies a song from a few seconds of audio (`recognize`).
+    pub recognize: bool,
+    /// The provider reads a playlist ID out of a pasted link (`resolvePlaylistId`).
+    pub resolve_playlist_id: bool,
+}
+
+/// One song a provider identified from audio, and where in it the sample began.
+#[derive(Clone, Debug)]
+pub struct Recognized {
+    pub item: crate::MusicItem,
+    pub start_time_ms: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -109,6 +120,18 @@ pub trait MusicListProvider: Send + Sync {
     ) -> Result<String, String> {
         unsupported("播放地址")
     }
+    /// The playlist ID in a pasted link or text, `None` when it holds none.
+    fn resolve_playlist_id(&self, _input: &str) -> Result<Option<String>, String> {
+        unsupported("歌单链接解析")
+    }
+    /// The songs `samples` (mono, 8 kHz, at most 15 seconds) most likely come from.
+    fn recognize(
+        &self,
+        _samples: &[f32],
+        _cancelled: &std::sync::atomic::AtomicBool,
+    ) -> Result<Vec<Recognized>, String> {
+        unsupported("识曲")
+    }
     fn discovery_categories(&self) -> Result<DiscoveryCategories, String> {
         unsupported("发现分类")
     }
@@ -143,8 +166,8 @@ pub trait MusicListProvider: Send + Sync {
 
 static OVERRIDES: RwLock<Vec<Arc<dyn MusicListProvider>>> = RwLock::new(Vec::new());
 
-/// A source ID a plugin may introduce besides the original's seven: 2–16 lower-case letters,
-/// digits and `_`, starting with a letter.
+/// A source ID a plugin may introduce: 2–16 lower-case letters, digits and `_`, starting with a
+/// letter. Songs, quality names and the interface refer to sources by it.
 pub fn is_custom_source_id(id: &str) -> bool {
     (2..=16).contains(&id.len())
         && id.as_bytes()[0].is_ascii_lowercase()
@@ -154,10 +177,9 @@ pub fn is_custom_source_id(id: &str) -> bool {
 }
 
 /// Registers a plugin's provider, replacing one that an earlier registration made for the same
-/// source. Only the seven known source IDs are accepted: songs, quality names and the UI refer to
-/// those.
+/// source. Only well-formed source IDs are accepted (see [`is_custom_source_id`]).
 pub fn register(provider: Arc<dyn MusicListProvider>) -> Result<(), String> {
-    if !crate::IMPLEMENTED_SOURCES.contains(&provider.id()) && !is_custom_source_id(provider.id()) {
+    if !is_custom_source_id(provider.id()) {
         return Err(format!("无效的来源 ID {}", provider.id()));
     }
     let mut list = OVERRIDES.write().map_err(|_| "来源注册表不可用")?;
@@ -173,10 +195,7 @@ pub fn replace_plugins(
     providers: Vec<Arc<dyn MusicListProvider>>,
     commit: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
-    if providers
-        .iter()
-        .any(|p| !crate::IMPLEMENTED_SOURCES.contains(&p.id()) && !is_custom_source_id(p.id()))
-    {
+    if providers.iter().any(|p| !is_custom_source_id(p.id())) {
         return Err("无效的来源 ID".into());
     }
     let mut list = OVERRIDES.write().map_err(|_| "来源注册表不可用")?;
@@ -234,6 +253,42 @@ pub fn capabilities(source: &str) -> Capabilities {
     provider(source)
         .map(|p| p.capabilities())
         .unwrap_or_default()
+}
+
+/// The playlist ID of a pasted link or ID for `source`: what the source's plugin reads out of
+/// it (`resolvePlaylistId`), or the input itself when it is only digits. `None` when the source
+/// cannot read playlists or nothing in the input is an ID.
+pub fn resolve_playlist_id(source: &str, input: &str) -> Option<String> {
+    let input = input.trim();
+    if input.is_empty() || input.len() > 4096 || input.chars().any(char::is_control) {
+        return None;
+    }
+    let provider = provider_with(source, |c| c.playlist_detail)?;
+    let found = if provider.capabilities().resolve_playlist_id {
+        provider.resolve_playlist_id(input).ok().flatten()
+    } else {
+        None
+    };
+    found
+        .map(|id| id.trim().to_owned())
+        .filter(|id| !id.is_empty() && id.len() <= 512 && !id.chars().any(char::is_control))
+        .or_else(|| {
+            input
+                .bytes()
+                .all(|b| b.is_ascii_digit())
+                .then(|| input.to_owned())
+        })
+}
+
+/// The enabled provider that identifies songs from audio, if any. Recognition is offered only
+/// while one is installed and enabled.
+pub fn recognizer() -> Option<Arc<dyn MusicListProvider>> {
+    OVERRIDES
+        .read()
+        .ok()?
+        .iter()
+        .find(|p| p.capabilities().recognize)
+        .cloned()
 }
 
 /// Registered external sources in registration order.

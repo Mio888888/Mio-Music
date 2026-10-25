@@ -224,7 +224,7 @@ fn line_level(lyric: &Lyric) -> Option<Lyrics> {
     let translation = parse(&lyric.tlyric).timed;
     let romanization = parse(&lyric.rlyric).timed;
     let mut lines: Vec<Line> = Vec::new();
-    // Some sources (Kuwo's H5 text) interleave the translation as a second line with the same
+    // Some lyric texts interleave the translation as a second line with the same
     // time. When that is how most lines look and there is no separate translation, fold it in.
     let repeats = main
         .timed
@@ -319,8 +319,7 @@ fn mark_background(words: &mut [Word]) -> bool {
     is_bg
 }
 
-/// `parseYrc`: `[start,duration]` then `(start,duration,0)word` pairs (NetEase's YRC; Kuwo's
-/// converted lines look the same).
+/// `wordTagBefore`: `[start,duration]` then `(start,duration,0)word` pairs.
 fn parse_yrc(text: &str) -> Vec<RawLine> {
     let mut out = Vec::new();
     for raw in text.lines() {
@@ -388,8 +387,8 @@ fn text_words(content: &str) -> Vec<Word> {
         .collect()
 }
 
-/// `parseQrc`: `[start,duration]` then `word(start,duration)` pairs. A QQ Music answer is the
-/// decrypted XML, whose other lines simply do not start with a time prefix.
+/// `wordTagAfter`: `[start,duration]` then `word(start,duration)` pairs. Other lines of the text
+/// (an XML wrapper, say) simply do not start with a time prefix.
 fn parse_qrc(text: &str) -> Vec<RawLine> {
     let mut out = Vec::new();
     for raw in text.lines() {
@@ -418,8 +417,8 @@ fn parse_qrc(text: &str) -> Vec<RawLine> {
     out
 }
 
-/// `parseLys` (Lyricify Syllable, which KuGou's lines are rewritten to): `[property]` then
-/// `word(start,duration)` pairs. The property encodes duet and background.
+/// `wordTagAfterWithProperty` (Lyricify Syllable): `[property]` then `word(start,duration)`
+/// pairs. The property encodes duet and background.
 fn parse_lys(text: &str) -> Vec<RawLine> {
     let mut out = Vec::new();
     for raw in text.lines() {
@@ -505,18 +504,21 @@ fn sanitize(lines: Vec<RawLine>) -> Vec<RawLine> {
     cleaned
 }
 
-/// The word-timed lyrics of an online answer, or `None` when the source has none or its form
-/// does not parse (the caller then shows the line-level text). The parser follows the source as
-/// the original's `parseCrLyricBySource` does: KuGou LYS, QQ Music QRC, the rest YRC. Migu's
-/// `[mm:ss.xxx]<offset,duration>` form matches none of them, so Migu stays line-level there too.
+/// The word-timed lyrics of an online answer, or `None` when the plugin gave none or its form
+/// does not parse (the caller then shows the line-level text). The plugin names the layout of
+/// `crlyric` in `crlyricFormat`: `wordTagBefore` (the default: `[start,duration]` then
+/// `(start,duration,0)word` pairs), `wordTagAfter` (`[start,duration]` then `word(start,duration)`
+/// pairs) or `wordTagAfterWithProperty` (`[property]` then `word(start,duration)` pairs, the
+/// property encoding duet and background). Any other text matches none of them and stays
+/// line-level.
 fn word_timed(lyric: &Lyric) -> Option<Lyrics> {
     let text = lyric.crlyric.trim();
     if text.is_empty() {
         return None;
     }
-    let raw = match lyric.source.as_str() {
-        "kg" => parse_lys(text),
-        "tx" => parse_qrc(text),
+    let raw = match lyric.crlyric_format.as_str() {
+        "wordTagAfterWithProperty" => parse_lys(text),
+        "wordTagAfter" => parse_qrc(text),
         _ => parse_yrc(text),
     };
     build_word_lines(raw, &lyric.tlyric, &lyric.rlyric)

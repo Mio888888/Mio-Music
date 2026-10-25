@@ -508,8 +508,8 @@ class _RecognitionState extends State<_Recognition>
     } catch (_) {
       if (_current) {
         _message = t(
-          'Could not start playback. Enable a music source that supports NetEase songs, then reopen recognition, or search for this song.',
-          '无法开始播放。请启用支持网易云歌曲的音乐源后重新打开识曲，或搜索这首歌。',
+          'Could not start playback. Enable a music source that supports the recognized song, then reopen recognition, or search for this song.',
+          '无法开始播放。请启用支持该歌曲来源的音乐源后重新打开识曲，或搜索这首歌。',
         );
       }
     } finally {
@@ -924,8 +924,8 @@ class _RecognitionState extends State<_Recognition>
                     const SizedBox(height: 16),
                     Text(
                       t(
-                        'Choose one audio file (up to 128 MiB). Recognition analyzes up to the first 15 seconds locally and sends an audio fingerprint to NetEase Music. The audio file itself is not uploaded.',
-                        '选择一个音频文件（不超过 128 MiB）。识曲将在本机分析开头最多 15 秒，向网易云音乐发送音频指纹，不上传音频文件本身。',
+                        'Choose one audio file (up to 128 MiB). Recognition analyzes up to the first 15 seconds locally and sends an audio fingerprint to the service used by the recognition plugin. The audio file itself is not uploaded.',
+                        '选择一个音频文件（不超过 128 MiB）。识曲将在本机分析开头最多 15 秒，向识曲插件所用的服务发送音频指纹，不上传音频文件本身。',
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -967,8 +967,8 @@ class _RecognitionState extends State<_Recognition>
                       const SizedBox(height: 16),
                       Text(
                         t(
-                          'Microphone recognition records for up to 15 seconds and sends an audio fingerprint to NetEase Music. Recording stops when the app leaves the foreground. Current playback pauses during recording.',
-                          '麦克风识曲最多录音 15 秒，并向网易云音乐发送音频指纹。离开前台会停止录音；录音期间会暂停当前播放。',
+                          'Microphone recognition records for up to 15 seconds and sends an audio fingerprint to the service used by the recognition plugin. Recording stops when the app leaves the foreground. Current playback pauses during recording.',
+                          '麦克风识曲最多录音 15 秒，并向识曲插件所用的服务发送音频指纹。离开前台会停止录音；录音期间会暂停当前播放。',
                         ),
                       ),
                       const SizedBox(height: 8),

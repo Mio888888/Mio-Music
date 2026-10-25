@@ -1,11 +1,9 @@
-//! Bounded native audio capture and the original application's AFP fingerprint algorithm.
-use base64::Engine as _;
+//! Bounded native audio capture. Identifying the audio is the job of a recognition plugin (the
+//! `recognize` capability of a list plugin); this module only supplies it 8 kHz mono samples.
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rodio::Source;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
-    io::Read,
     path::Path,
     sync::{
         Arc, Mutex,
@@ -25,7 +23,7 @@ pub struct Match {
 impl Match {
     pub fn validate(&self) -> Result<(), String> {
         let item = &self.item;
-        if item.source != "wy"
+        if !mio_music_sdk::is_custom_source_id(&item.source)
             || item
                 .songmid
                 .as_str()
@@ -239,350 +237,29 @@ where
     )
 }
 
-#[derive(Default)]
-struct Bindings {
-    functions: HashMap<String, (u32, i32)>,
-    byte_types: std::collections::HashSet<i32>,
-    byte_values: HashMap<i32, (u8, u32)>,
-    next_byte_handle: i32,
-    limits: wasmi::StoreLimits,
-}
-impl Bindings {
-    fn release_byte(&mut self, handle: i32) -> Result<u8, wasmi::Error> {
-        let (value, references) = self
-            .byte_values
-            .get_mut(&handle)
-            .ok_or_else(|| wasmi::Error::new("invalid byte handle"))?;
-        *references = references
-            .checked_sub(1)
-            .ok_or_else(|| wasmi::Error::new("invalid byte reference count"))?;
-        let byte = *value;
-        if *references == 0 {
-            self.byte_values.remove(&handle);
-        }
-        Ok(byte)
-    }
-}
-fn fingerprint(pcm: &[f32], cancelled: &AtomicBool) -> Result<String, String> {
-    use wasmi::{Caller, Config, Engine, ExternType, Linker, Module, Store, Val};
-    let mut config = Config::default();
-    config.consume_fuel(true);
-    let engine = Engine::new(&config);
-    let binary = include_bytes!("../assets/recognition/afp.wasm");
-    let module = Module::new(&engine, &binary[..]).map_err(|_| "无法加载指纹模块")?;
-    let mut store = Store::new(
-        &engine,
-        Bindings {
-            next_byte_handle: 5, // Emscripten reserves handles 0 through 4.
-            limits: wasmi::StoreLimitsBuilder::new()
-                .memory_size(64 * 1024 * 1024)
-                .build(),
-            ..Bindings::default()
-        },
-    );
-    store.limiter(|state| &mut state.limits);
-    store
-        .set_fuel(600_000_000)
-        .map_err(|_| "指纹计算初始化失败")?;
-    let mut linker = Linker::new(&engine);
-    for import in module.imports() {
-        let ExternType::Func(ty) = import.ty() else {
-            return Err("不支持的指纹模块导入".into());
-        };
-        let name = import.name().to_owned();
-        linker
-            .func_new(
-                import.module(),
-                import.name(),
-                ty.clone(),
-                move |mut caller: Caller<'_, Bindings>, args, result| {
-                    let arg = |i: usize| args.get(i).and_then(Val::i32).unwrap_or(0);
-                    match name.as_str() {
-                        "b" => {
-                            // Only one-byte integer types can cross the AFP vector boundary.
-                            if arg(2) == 1 {
-                                caller.data_mut().byte_types.insert(arg(0));
-                            }
-                        }
-                        "o" => {
-                            // _emval_take_value returns a handle, not the byte itself.
-                            if !caller.data().byte_types.contains(&arg(0)) {
-                                return Err(wasmi::Error::new("unsupported byte type"));
-                            }
-                            let memory = caller
-                                .get_export("B")
-                                .and_then(wasmi::Extern::into_memory)
-                                .ok_or_else(|| wasmi::Error::new("missing memory"))?;
-                            let mut byte = [0];
-                            memory
-                                .read(&caller, arg(1) as usize, &mut byte)
-                                .map_err(|_| wasmi::Error::new("invalid byte address"))?;
-                            let [value @ Val::I32(_)] = result else {
-                                return Err(wasmi::Error::new("invalid byte result type"));
-                            };
-                            let state = caller.data_mut();
-                            if state.next_byte_handle >= 5 + 65536 {
-                                return Err(wasmi::Error::new("byte handle budget exceeded"));
-                            }
-                            let handle = state.next_byte_handle;
-                            state.next_byte_handle += 1;
-                            state.byte_values.insert(handle, (byte[0], 1));
-                            *value = Val::I32(handle);
-                            return Ok(());
-                        }
-                        "n" => {
-                            let (_, references) = caller
-                                .data_mut()
-                                .byte_values
-                                .get_mut(&arg(0))
-                                .ok_or_else(|| wasmi::Error::new("invalid byte handle"))?;
-                            *references = references
-                                .checked_add(1)
-                                .ok_or_else(|| wasmi::Error::new("byte reference overflow"))?;
-                        }
-                        "m" => {
-                            caller.data_mut().release_byte(arg(0))?;
-                        }
-                        "l" | "c" => {
-                            let memory = caller
-                                .get_export("B")
-                                .and_then(wasmi::Extern::into_memory)
-                                .ok_or_else(|| wasmi::Error::new("missing memory"))?;
-                            let ptr = arg(if name == "l" { 0 } else { 1 }) as usize;
-                            let data = memory.data(&caller);
-                            let tail = data
-                                .get(ptr..)
-                                .ok_or_else(|| wasmi::Error::new("invalid binding"))?;
-                            let len = tail
-                                .iter()
-                                .take(512)
-                                .position(|v| *v == 0)
-                                .ok_or_else(|| wasmi::Error::new("invalid binding name"))?;
-                            let binding = std::str::from_utf8(&tail[..len])
-                                .map_err(|_| wasmi::Error::new("invalid binding name"))?
-                                .to_owned();
-                            let (wrapper, context) = if name == "l" {
-                                (arg(4) as u32, arg(5))
-                            } else {
-                                (arg(5) as u32, arg(6))
-                            };
-                            caller
-                                .data_mut()
-                                .functions
-                                .insert(binding, (wrapper, context));
-                        }
-                        "r" => {
-                            let memory = caller
-                                .get_export("B")
-                                .and_then(wasmi::Extern::into_memory)
-                                .ok_or_else(|| wasmi::Error::new("missing memory"))?;
-                            let (dst, src, len) =
-                                (arg(0) as usize, arg(1) as usize, arg(2) as usize);
-                            let data = memory.data_mut(&mut caller);
-                            if src.checked_add(len).is_none_or(|end| end > data.len())
-                                || dst.checked_add(len).is_none_or(|end| end > data.len())
-                            {
-                                return Err(wasmi::Error::new("invalid copy"));
-                            }
-                            data.copy_within(src..src + len, dst);
-                        }
-                        "h" | "d" | "f" | "s" => {
-                            return Err(wasmi::Error::new("fingerprint runtime error"));
-                        }
-                        // Embind type/class registration and unused libc output hooks.
-                        _ => {}
-                    }
-                    for value in result {
-                        *value = Val::default(value.ty());
-                    }
-                    Ok(())
-                },
-            )
-            .map_err(|_| "指纹模块初始化失败")?;
-    }
-    let instance = linker
-        .instantiate(&mut store, &module)
-        .and_then(|i| i.start(&mut store))
-        .map_err(|_| "指纹模块初始化失败")?;
-    instance
-        .get_typed_func::<(), ()>(&store, "C")
-        .and_then(|f| f.call(&mut store, ()))
-        .map_err(|_| "指纹绑定初始化失败")?;
-    let memory = instance.get_memory(&store, "B").ok_or("指纹模块缺少内存")?;
-    let malloc = instance
-        .get_typed_func::<i32, i32>(&store, "E")
-        .map_err(|_| "指纹模块缺少分配器")?;
-    let length = pcm.len() * 4;
-    let ptr = malloc
-        .call(&mut store, (length + 5) as i32)
-        .map_err(|_| "指纹内存分配失败")?;
-    let mut bytes = Vec::with_capacity(length + 5);
-    bytes.extend_from_slice(&(length as u32).to_le_bytes());
-    for sample in pcm {
-        bytes.extend_from_slice(&sample.to_le_bytes());
-    }
-    bytes.push(0);
-    memory
-        .write(&mut store, ptr as usize, &bytes)
-        .map_err(|_| "指纹输入失败")?;
-    let table = instance
-        .get_table(&store, "D")
-        .ok_or("指纹模块缺少函数表")?;
-    let invoke = |store: &mut Store<Bindings>, name: &str, params: &[i32]| -> Result<i32, String> {
-        let (index, context) = *store
-            .data()
-            .functions
-            .get(name)
-            .ok_or_else(|| format!("指纹模块缺少 {name}"))?;
-        let function = table
-            .get(&*store, index)
-            .and_then(|v| v.funcref().and_then(|r| r.func().copied()))
-            .ok_or("无效指纹函数")?;
-        let mut args = vec![Val::I32(context)];
-        args.extend(params.iter().copied().map(Val::I32));
-        let mut result = [Val::I32(0)];
-        function
-            .call(store, &args, &mut result)
-            .map_err(|_| "指纹计算失败")?;
-        result[0].i32().ok_or("无效指纹结果".into())
-    };
-    check(cancelled)?;
-    let vector = invoke(&mut store, "ExtractQueryFP", &[ptr])?;
-    check(cancelled)?;
-    let size = invoke(&mut store, "size", &[vector])?;
-    if !(1..=65536).contains(&size) {
-        return Err("未能提取音频指纹".into());
-    }
-    let mut output = Vec::with_capacity(size as usize);
-    for i in 0..size {
-        check(cancelled)?;
-        let handle = invoke(&mut store, "get", &[vector, i])?;
-        // Match emscripten::val's fromWireType: read and release the returned handle.
-        output.push(
-            store
-                .data_mut()
-                .release_byte(handle)
-                .map_err(|_| "无效指纹结果")?,
-        );
-    }
-    if !store.data().byte_values.is_empty() || output.iter().all(|byte| *byte == 0) {
-        return Err("未能提取音频指纹".into());
-    }
-    // The entire isolated instance, input and vector allocations are released here.
-    Ok(base64::engine::general_purpose::STANDARD.encode(output))
+/// Whether a plugin that identifies songs from audio is installed and enabled. Without one
+/// there is nothing to offer, so the interface hides recognition.
+pub fn available() -> bool {
+    mio_music_sdk::recognizer().is_some()
 }
 fn query(pcm: &[f32], cancelled: &AtomicBool) -> Result<Vec<Match>, String> {
     check(cancelled)?;
     if pcm.len() < 8000 || !pcm.iter().any(|s| s.abs() > 0.002) {
         return Err("未检测到足够的声音，请重试".into());
     }
-    let fp = fingerprint(pcm, cancelled)?;
+    let provider = mio_music_sdk::recognizer().ok_or("未安装或未启用支持识曲的插件")?;
+    let rows = provider.recognize(pcm, cancelled)?;
     check(cancelled)?;
-    let client = reqwest::blocking::Client::builder()
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(15))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|_| "无法初始化识别请求")?;
-    let response = client
-        .post("https://interface.music.163.com/api/music/audio/match")
-        .query(&[
-            ("sessionId", uuid::Uuid::new_v4().to_string()),
-            ("algorithmCode", "shazam_v2".into()),
-            ("duration", (pcm.len() as f64 / 8000.).to_string()),
-            ("rawdata", fp),
-            ("times", "1".into()),
-            ("decrypt", "1".into()),
-        ])
-        .send()
-        .map_err(|_| "识别服务请求失败，请稍后重试")?;
-    if !response.status().is_success() {
-        return Err("识别服务请求失败，请稍后重试".into());
-    }
-    let mut bytes = Vec::new();
-    response
-        .take(1024 * 1024 + 1)
-        .read_to_end(&mut bytes)
-        .map_err(|_| "无法读取识别结果")?;
-    check(cancelled)?;
-    if bytes.len() > 1024 * 1024 {
-        return Err("识别结果过大".into());
-    }
-    let json: serde_json::Value =
-        serde_json::from_slice(&bytes).map_err(|_| "识别服务返回无效数据")?;
-    if json
-        .get("code")
-        .and_then(|v| v.as_i64())
-        .is_some_and(|c| c != 200)
-    {
-        return Err("识别服务暂时不可用".into());
-    }
-    let rows = json
-        .pointer("/data/result")
-        .and_then(|v| v.as_array())
-        .ok_or("未识别到歌曲，请重试")?;
-    let mut matches = Vec::new();
-    for row in rows.iter().take(20) {
-        let song = &row["song"];
-        let id = song["id"]
-            .as_u64()
-            .map(|id| id.to_string())
-            .or_else(|| song["id"].as_str().map(str::to_owned))
-            .unwrap_or_default();
-        let name = song["name"].as_str().unwrap_or_default();
-        if id.is_empty() || id.len() > 512 || name.is_empty() || name.len() > 2048 {
-            continue;
-        }
-        let artists = song["artists"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|a| a["name"].as_str())
-                    .collect::<Vec<_>>()
-                    .join(" / ")
-            })
-            .unwrap_or_default();
-        let album = &song["album"];
-        let mut img = album["picUrl"]
-            .as_str()
-            .or_else(|| album["cover"].as_str())
-            .or_else(|| album["img1v1Url"].as_str())
-            .unwrap_or_default()
-            .replace("http:", "https:");
-        if !img.is_empty() && !img.starts_with("http") {
-            img = format!("https://p1.music.126.net/{img}/{img}.jpg");
-        }
-        if !img.is_empty() && !img.contains("param=") {
-            img.push_str("?param=100y100");
-        }
-        if artists.len() > 4096
-            || album["name"].as_str().unwrap_or_default().len() > 2048
-            || img.len() > 4096
-        {
-            continue;
-        }
-        let mut types = Vec::new();
-        for (key, quality) in [
-            ("hrMusic", "hires"),
-            ("sqMusic", "flac"),
-            ("hMusic", "320k"),
-            ("mMusic", "320k"),
-            ("lMusic", "128k"),
-        ] {
-            if song[key].is_object() && !types.contains(&quality) {
-                types.push(quality);
-            }
-        }
-        let item = serde_json::from_value(serde_json::json!({"songmid":id,"name":name,"singer":artists,"albumName":album["name"].as_str().unwrap_or_default(),"source":"wy","img":img,"types":types})).map_err(|_| "无效歌曲信息")?;
-        matches.push(Match {
-            item,
-            timestamp: chrono::Utc::now().timestamp_millis(),
-            start_time_ms: row["startTime"]
-                .as_u64()
-                .unwrap_or(0)
-                .min(24 * 60 * 60 * 1000),
-        });
-    }
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let matches: Vec<Match> = rows
+        .into_iter()
+        .map(|row| Match {
+            item: row.item,
+            timestamp,
+            start_time_ms: row.start_time_ms,
+        })
+        .filter(|row| row.validate().is_ok())
+        .collect();
     if matches.is_empty() {
         return Err("未识别到歌曲，请重试".into());
     }

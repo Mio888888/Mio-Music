@@ -5508,7 +5508,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "uuid",
- "wasmi",
 ]
 
 [[package]]
@@ -5528,9 +5527,6 @@ name = "mio-music-sdk"
 version = "1.0.2"
 dependencies = [
  "base64 0.22.1",
- "encoding_rs",
- "flate2",
- "hex",
  "icu_normalizer",
  "regex",
  "reqwest",
@@ -5545,6 +5541,8 @@ version = "1.0.2"
 dependencies = [
  "aes",
  "base64 0.22.1",
+ "encoding_rs",
+ "flate2",
  "md-5",
  "mio-music-sdk",
  "regex-lite",
@@ -5553,6 +5551,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1_smol",
+ "wasmi",
 ]
 
 [[package]]

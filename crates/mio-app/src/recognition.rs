@@ -1,5 +1,5 @@
 //! Desktop microphone authorization; the bounded recognition engine is shared.
-pub use mio_core::recognition::{Match, Progress, recognize_file};
+pub use mio_core::recognition::{Match, Progress, available, recognize_file};
 use std::sync::{Arc, atomic::AtomicBool};
 #[cfg(target_os = "macos")]
 use std::{

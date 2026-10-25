@@ -71,6 +71,27 @@
 Navidrome 与 Jellyfin 已对官方公开演示服务器实际调用；Songloft、Plex、Emby 只按其文档用本地模拟服务跑通了流程，未对真实服务器验证；Jellyfin 的下载地址因演示账号无权限而未验证。
 </div>
 
+<h3 id="third-party-plugins">第三方插件（社区推荐）</h3>
+<div class="callout warn">
+<strong>非官方插件</strong>
+下列插件由独立的第三方开发和维护，并非 Mio Music 项目的作品，仅作推荐参考。Mio Music 与其作者、仓库没有任何关联，不内置、不托管、不审核也不背书这些脚本，不保证它们可用、正确、安全，或在你所在地区合法。安装前请先阅读代码，风险自负。
+</div>
+<p>来源仓库：<a href="https://gitea.com/niamadoutraore89/mio-music-plugins" target="_blank" rel="noreferrer">niamadoutraore89/mio-music-plugins</a>（AGPL-3.0-only）。它与内置插件仓库 <a href="https://github.com/Mio888888/mio-music-plugins" target="_blank" rel="noreferrer">mio-music-plugins</a> 名称相近，但是两个互相独立的仓库。</p>
+<p>安装方式：<strong>设置 → 插件 → 音乐列表插件 → 安装列表插件</strong>，粘贴下表中的 URL 并确认。URL 始终指向该仓库 <code>main</code> 分支的最新版本；需要离线安装时，可下载文件后选择本地文件。这些插件只提供列表与搜索，不返回播放或下载地址，它们列出的歌曲需要由支持同一来源的音源插件解析。</p>
+<p>听歌识曲同样由插件提供：应用自身不带识曲服务，只有已启用的插件声明了 <code>recognize</code> 能力（上表的列表插件 6）时，才会显示识曲入口，否则隐藏。</p>
+<table>
+  <thead><tr><th>插件</th><th>ID</th><th>能力</th><th>安装 URL</th></tr></thead>
+  <tbody>
+    <tr><td>列表插件 1</td><td><code>bd</code></td><td>歌单详情与封面（搜索目前返回空页）</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/bd.list.js</code></td></tr>
+    <tr><td>列表插件 2</td><td><code>kg</code></td><td>搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kg.list.js</code></td></tr>
+    <tr><td>列表插件 3</td><td><code>kw</code></td><td>搜索、歌单、发现、榜单、歌手、歌词、评论、封面</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/kw.list.js</code></td></tr>
+    <tr><td>列表插件 4</td><td><code>mg</code></td><td>搜索、歌单、发现、榜单、歌手、歌词、评论、封面</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/mg.list.js</code></td></tr>
+    <tr><td>列表插件 5</td><td><code>tx</code></td><td>搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/tx.list.js</code></td></tr>
+    <tr><td>列表插件 6</td><td><code>wy</code></td><td>搜索、歌单、专辑、发现、榜单、歌手、歌词、评论、封面、听歌识曲</td><td><code>https://gitea.com/niamadoutraore89/mio-music-plugins/raw/branch/main/wy.list.js</code></td></tr>
+  </tbody>
+</table>
+<p>这些服务是各自独立的产品，拥有各自的条款与商标。你需要自行确保有权访问、播放和下载相关内容，并遵守所在地区的法律和各服务的条款。关于这些插件的问题请到其仓库反馈，不要提交到本项目。</p>
+
 <h3>由插件提供播放与下载</h3>
 <p>列表插件可以自己解析播放与下载地址。启用后，该来源的歌曲不再走音源插件，所以<strong>没有安装任何音源插件时也能搜索与播放</strong>。关闭后，该来源的歌曲会继续交给当前的音源插件解析。插件卡片上有「由本插件提供播放」与「由本插件提供下载」两个开关，分别控制播放与下载。</p>
 

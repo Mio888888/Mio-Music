@@ -1,1 +1,0 @@
-AFP WebAssembly copied without modification from Mio-Music/public/afp.wasm.js (base64 decoded). Its JavaScript wrapper identifies https://fn.music.163.com/g/chrome-extension-home-page-beta/ as the source. The algorithm is executed by wasmi in an isolated bounded store; no JavaScript runtime is used. The original asset does not include a separate license notice.

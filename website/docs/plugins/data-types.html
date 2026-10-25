@@ -186,11 +186,13 @@
     <tr><td><code>lyric</code></td><td>string</td><td>逐行 LRC 文本，每行形如 <code>[mm:ss.xx]歌词</code>。<strong>既没有 <code>lyric</code> 也没有可解析的 <code>ttml</code>，就视为没有歌词。</strong></td></tr>
     <tr><td><code>tlyric</code></td><td>string</td><td>翻译 LRC，时间轴与 <code>lyric</code> 对应，没有就留空。</td></tr>
     <tr><td><code>rlyric</code></td><td>string</td><td>音译（罗马音）LRC，没有就留空。</td></tr>
-    <tr><td><code>crlyric</code></td><td>string</td><td>来源特有的逐字歌词文本，一般留空。</td></tr>
+    <tr><td><code>crlyric</code></td><td>string</td><td>逐字歌词文本，没有就留空。排版由 <code>crlyricFormat</code> 说明。</td></tr>
+    <tr><td><code>crlyricFormat</code></td><td>string</td><td>可选，<code>crlyric</code> 的逐字排版。<code>wordTagBefore</code>（默认）：<code>[start,duration]</code> 之后是若干 <code>(start,duration,0)词</code>，标签在词前；<code>wordTagAfter</code>：<code>[start,duration]</code> 之后是若干 <code>词(start,duration)</code>，标签在词后；<code>wordTagAfterWithProperty</code>：行首是 <code>[属性]</code>（0–8，表示对唱与背景声），之后同样是 <code>词(start,duration)</code>。时间单位都是毫秒。不符合任何一种的文本只显示逐行歌词。</td></tr>
     <tr><td><code>source</code></td><td>string</td><td>来源 ID。</td></tr>
     <tr><td><code>ttml</code></td><td>string</td><td>可选。<strong>带逐字时间的 TTML 文档</strong>。提供它，歌词页就能做逐字高亮。可用 <a href="runtime-api.html#utils">cerumusic.utils.lyric.validTtml</a> 事先校验。</td></tr>
   </tbody>
 </table>
+<p>来源自己的加密、压缩或私有排版格式（例如 KRC、MRC、QRC、LYRICX）由<strong>插件自己解码</strong>成上面的通用字段；宿主不提供这些来源专用的解码，只提供 <a href="runtime-api.html#zlib-encoding">zlib 解压与字符集解码</a>这类通用工具。</p>
 <p>整个返回值序列化后不得超过 4 MB。服务器没有歌词时，<code>throw new Error('没有找到歌词')</code>，而不是返回空对象。</p>
 
 <h2 id="comments">Comments（评论）</h2>
@@ -215,6 +217,7 @@
   <li>一页最多 <strong>300</strong> 条，整体序列化后不超过 <strong>4 MB</strong>，否则整次调用被拒绝。</li>
   <li><code>text</code> 按纯文本展示，宿主会对其中的 HTML 做转义，所以不必也不应当自己转义。</li>
   <li><code>avatar</code> 与 <code>images</code> 只接受不含用户名密码的 <code>http(s)</code> 地址，不合法的会被忽略。</li>
+  <li>返回对象里加上 <code>cursorPaged: true</code>，表示「最新评论」要靠游标翻页：此时返回的 <code>cursor</code> 为空，或与上一页相同，应用就认为已经到底并停止翻页。</li>
   <li><code>cursor</code> 只允许字母、数字与下划线，最长 256 个字符。如果连续两次返回的内容相同（<code>id</code> 全部重复），应用会认为已经到底并停止翻页。</li>
 </ul>
 </article>

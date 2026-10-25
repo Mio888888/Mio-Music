@@ -20,41 +20,6 @@
       "unicode_decimal": 58885
     },
     {
-      "icon_id": "8032933",
-      "name": "咪咕音乐",
-      "font_class": "mg",
-      "unicode": "ea19",
-      "unicode_decimal": 59929
-    },
-    {
-      "icon_id": "12385755",
-      "name": "QQ音乐",
-      "font_class": "tx",
-      "unicode": "e602",
-      "unicode_decimal": 58882
-    },
-    {
-      "icon_id": "34064856",
-      "name": "网易云音乐",
-      "font_class": "wy",
-      "unicode": "e60b",
-      "unicode_decimal": 58891
-    },
-    {
-      "icon_id": "37870308",
-      "name": "酷狗音乐",
-      "font_class": "kg",
-      "unicode": "eb7d",
-      "unicode_decimal": 60285
-    },
-    {
-      "icon_id": "42713468",
-      "name": "酷我音乐",
-      "font_class": "kw",
-      "unicode": "e601",
-      "unicode_decimal": 58881
-    },
-    {
       "icon_id": "5029",
       "name": "列表",
       "font_class": "liebiao",
@@ -130,13 +95,6 @@
       "font_class": "zuixiaohua",
       "unicode": "e67a",
       "unicode_decimal": 59002
-    },
-    {
-      "icon_id": "3079449",
-      "name": "QQ音乐",
-      "font_class": "QQmusic",
-      "unicode": "e615",
-      "unicode_decimal": 58901
     },
     {
       "icon_id": "6017834",
@@ -265,25 +223,11 @@
       "unicode_decimal": 58989
     },
     {
-      "icon_id": "13040975",
-      "name": "网易云",
-      "font_class": "wangyiyun",
-      "unicode": "e604",
-      "unicode_decimal": 58884
-    },
-    {
       "icon_id": "24267251",
       "name": "播放-循环播放",
       "font_class": "bofang-xunhuanbofang",
       "unicode": "e68d",
       "unicode_decimal": 59021
-    },
-    {
-      "icon_id": "25663405",
-      "name": "酷狗音乐",
-      "font_class": "kugouyinle",
-      "unicode": "e670",
-      "unicode_decimal": 58992
     },
     {
       "icon_id": "27253647",

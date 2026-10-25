@@ -261,9 +261,19 @@ fn relocalize(registry: &mut Registry) -> bool {
         let Ok(plugin) = ListPlugin::load(stored.code.clone()) else {
             continue;
         };
-        let next = describe(&plugin, stored.id.clone(), stored.code.clone(), stored.enabled);
+        let next = describe(
+            &plugin,
+            stored.id.clone(),
+            stored.code.clone(),
+            stored.enabled,
+        );
         let text = |s: &StoredListPlugin| {
-            serde_json::to_value((&s.display_name, &s.description, &s.sources, &s.config_schema))
+            serde_json::to_value((
+                &s.display_name,
+                &s.description,
+                &s.sources,
+                &s.config_schema,
+            ))
         };
         if text(stored).ok() != text(&next).ok() {
             stored.display_name = next.display_name;
@@ -752,10 +762,10 @@ pub fn prepare_change(store: &Storage, change: Change) -> Result<PreparedChange,
             live.clone(),
         )));
         let prepared = plugin.providers(&stored.id, stored.provide_play, stored.provide_download);
-        if prepared.iter().any(|p| {
-            !mio_music_sdk::IMPLEMENTED_SOURCES.contains(&p.id())
-                && !mio_music_sdk::is_custom_source_id(p.id())
-        }) {
+        if prepared
+            .iter()
+            .any(|p| !mio_music_sdk::is_custom_source_id(p.id()))
+        {
             return Err("插件来源 ID 无效".into());
         }
         leases.push((live, prepared.iter().map(Arc::downgrade).collect()));

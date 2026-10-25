@@ -9,11 +9,11 @@
   },
   "locales/zh-CN.json": {
     "source": "crates/mio-core/locales/zh-CN.json",
-    "sha256": "d8b8842510fe08035e75a824a9cf37ba466b720794962988069417791ed4fab2"
+    "sha256": "8b4fd6fa6982dd3fd199058c73e667e000c9d47ec078b7dd5980569d9aed7685"
   },
   "locales/en-US.json": {
     "source": "crates/mio-core/locales/en-US.json",
-    "sha256": "c6aabae3ba2ebf0759fe9458ac1debab924995cee8d9d8012d2a3957cdc2fa25"
+    "sha256": "58dd548d453b48ab6a789af1a3d10f790fb6e0e2612241ea85bb4de529691290"
   },
   "icons/Add.svg": {
     "source": "crates/mio-app/assets/icons/Add.svg",
@@ -673,7 +673,7 @@
   },
   "icons/iconfont.json": {
     "source": "crates/mio-app/assets/icons/iconfont.json",
-    "sha256": "79864476cc60f07de84e942cd1f63a70ec4aa4eab6fb3109ca31738d302d7cae"
+    "sha256": "b73d317f02e198b1d89d07e6e1649396e9b04d8b092def7b1f9336d19ad3ab57"
   },
   "icons/lyricOpen.svg": {
     "source": "crates/mio-app/assets/icons/lyricOpen.svg",
@@ -825,7 +825,7 @@
   },
   "fonts/iconfont.ttf": {
     "source": "crates/mio-app/assets/fonts/iconfont.ttf",
-    "sha256": "e17abaf3e462c04f88a027069985a96d0ecd9ddaede58346e2a702c9a47bbfe3"
+    "sha256": "0a30de293f4c0191c450c08cfe8599a000d1a6ad95bfd50c337d18df2bfc62d9"
   },
   "fonts/lyricfont.ttf": {
     "source": "crates/mio-app/assets/fonts/lyricfont.ttf",
