@@ -825,21 +825,23 @@ impl Mio {
     ) -> Vec<AnyElement> {
         self.sync_effects_controls(window, cx);
         vec![
-            self.setting_group(
-                "effects-equalizer",
-                Some(self.t("settings.effects.equalizer")),
-                narrow,
-            )
-            .child(self.equalizer_panel(narrow, cx))
-            .into_any_element(),
-            self.setting_group(
-                "effects-audio-effect",
-                Some(self.t("settings.effects.audioEffect")),
-                narrow,
-            )
-            .child(self.audio_effect_panel(narrow, cx))
-            .into_any_element(),
+            self.setting_group("effects-equalizer", None, narrow)
+                .child(self.equalizer_panel(narrow, cx))
+                .into_any_element(),
+            self.setting_group("effects-audio-effect", None, narrow)
+                .child(self.audio_effect_panel(narrow, cx))
+                .into_any_element(),
         ]
+    }
+
+    /// A group title drawn like `setting_group`'s, to share its row with the group's controls.
+    fn effects_title(&self, key: &str, narrow: bool) -> Div {
+        div()
+            .text_size(px(if narrow { 16. } else { 18. }))
+            .font_weight(FontWeight::SEMIBOLD)
+            .line_height(relative(1.35))
+            .text_color(color(self.ui_colors(), "--td-text-color-primary"))
+            .child(self.t(key))
     }
 
     fn equalizer_panel(&self, narrow: bool, cx: &mut Context<Self>) -> Div {
@@ -854,39 +856,47 @@ impl Mio {
         let panel_border =
             crate::skin::mixed_color(mode, "--td-brand-color", 0.12, "--td-border-level-1-color");
 
+        // The group's title shares its row with the switch and reset button.
+        let title = self.effects_title("settings.effects.equalizer", narrow);
+        let switch = Switch::new("eq-enabled")
+            .accessibility_label(self.t("settings.equalizer.title"))
+            .checked(enabled)
+            .label(if enabled {
+                self.t("settings.equalizer.on")
+            } else {
+                self.t("settings.equalizer.off")
+            })
+            .on_click(cx.listener(|this, checked: &bool, _, cx| {
+                this.eq.enabled = *checked;
+                this.eq.add_log(
+                    if *checked {
+                        "Equalizer enabled"
+                    } else {
+                        "Equalizer disabled"
+                    }
+                    .into(),
+                );
+                this.eq_changed(true, cx);
+            }));
+        let reset = Button::new("eq-reset")
+            .label(self.t("settings.equalizer.reset"))
+            .ghost()
+            .on_click(cx.listener(|this, _, window, cx| this.eq_reset(window, cx)));
         let header = div()
             .flex()
-            .justify_end()
+            .flex_wrap()
             .items_center()
+            .justify_between()
             .gap(px(8.))
             .mb(px(14.))
+            .child(title)
             .child(
-                Switch::new("eq-enabled")
-                    .accessibility_label(self.t("settings.equalizer.title"))
-                    .checked(enabled)
-                    .label(if enabled {
-                        self.t("settings.equalizer.on")
-                    } else {
-                        self.t("settings.equalizer.off")
-                    })
-                    .on_click(cx.listener(|this, checked: &bool, _, cx| {
-                        this.eq.enabled = *checked;
-                        this.eq.add_log(
-                            if *checked {
-                                "Equalizer enabled"
-                            } else {
-                                "Equalizer disabled"
-                            }
-                            .into(),
-                        );
-                        this.eq_changed(true, cx);
-                    })),
-            )
-            .child(
-                Button::new("eq-reset")
-                    .label(self.t("settings.equalizer.reset"))
-                    .ghost()
-                    .on_click(cx.listener(|this, _, window, cx| this.eq_reset(window, cx))),
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .child(switch)
+                    .child(reset),
             );
 
         let plot = self.response_plot(narrow);
@@ -1527,17 +1537,25 @@ impl Mio {
         div()
             .text_color(primary)
             .child(
-                div().flex().justify_end().mb(px(14.)).child(
-                    Button::new("effects-reset-all")
-                        .label(self.t("settings.audioEffect.resetAll"))
-                        .ghost()
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.audio_effects = AudioEffects::default();
-                            this.apply_audio_effects();
-                            this.save_audio_effects();
-                            cx.notify();
-                        })),
-                ),
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(8.))
+                    .mb(px(14.))
+                    .child(self.effects_title("settings.effects.audioEffect", narrow))
+                    .child(
+                        Button::new("effects-reset-all")
+                            .label(self.t("settings.audioEffect.resetAll"))
+                            .ghost()
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.audio_effects = AudioEffects::default();
+                                this.apply_audio_effects();
+                                this.save_audio_effects();
+                                cx.notify();
+                            })),
+                    ),
             )
             .child(
                 div()
