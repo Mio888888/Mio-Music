@@ -6,7 +6,9 @@
 #   MIO_APPIMAGETOOL   path of an already installed appimagetool (otherwise a pinned build is fetched)
 #
 # Asset names follow tauri-action's: dots instead of spaces, `_<version>_amd64` suffixes.
-# The AppImage carries libdav1d (not available everywhere); every other library is the system's.
+# The AppImage carries every shared library the binary links against (xkbcommon, xcb, dav1d, ...)
+# except glibc, the C++ runtime and the GPU stack, which must come from the host: a minimal
+# system must be able to start it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 product=${MIO_PRODUCT_NAME:-Mio Music}
@@ -21,15 +23,16 @@ work="$out/linux"
 rm -rf "$work"
 mkdir -p "$out" "$work"
 
-dav1d=$(ldd "$binary" | awk '/libdav1d\.so/ {print $3; exit}')
+# Libraries that have to match the host's kernel, drivers or C library are never bundled.
+system_libs='^(ld-linux.*|linux-vdso|libc|libm|libdl|libpthread|librt|libutil|libresolv|libnsl|libcrypt|libanl|libBrokenLocale|libthread_db|libstdc\+\+|libgcc_s|libGL|libGLX|libGLdispatch|libEGL|libGLESv2|libOpenGL|libvulkan|libdrm|libgbm)\.so'
 
 # --- AppImage ---------------------------------------------------------------------------------
 appdir="$work/AppDir"
 mkdir -p "$appdir/usr/bin" "$appdir/usr/lib" "$appdir/usr/share/applications"
 install -m 755 "$binary" "$appdir/usr/bin/mio-app"
-if [ -n "$dav1d" ]; then
-    cp -L "$dav1d" "$appdir/usr/lib/"
-fi
+ldd "$binary" | awk '/=> \// {print $3}' | while read -r lib; do
+    [[ $(basename "$lib") =~ $system_libs ]] || cp -L "$lib" "$appdir/usr/lib/"
+done
 # The desktop file is named after the windows' app_id, which Wayland compositors use to find the
 # window's icon.
 desktop_id=com.vant.Mio.Music.GPUI.desktop
