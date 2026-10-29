@@ -248,7 +248,9 @@ jobs:
   build-linux:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
-    runs-on: ubuntu-24.04
+    # The oldest supported LTS: an AppImage only runs where its glibc is at least as new as the
+    # build system's.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -263,8 +265,11 @@ jobs:
           sudo apt-get update && sudo apt-get install -y
           gcc g++ clang cmake pkg-config libfontconfig-dev libwayland-dev
           libwebkit2gtk-4.1-dev libxkbcommon-x11-dev libx11-xcb-dev
-          libssl-dev libzstd-dev libasound2-dev libvulkan1 libdav1d-dev
+          libssl-dev libzstd-dev libasound2-dev libvulkan1
           desktop-file-utils
+
+      - name: Build dav1d from source
+        run: tools/ci/install-dav1d-linux.sh
 
       - name: Build AppImage and deb
         run: tools/package-linux.sh
