@@ -546,24 +546,28 @@ class _MioTvInputNavigationState extends State<MioTvInputNavigation> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // The field itself is only reached through its gate.
-    widget.focusNode.skipTraversal = _tv;
-    widget.focusNode.onKeyEvent = _tv ? _fieldKey : null;
+    // The field itself is only reached through its gate; other devices keep
+    // their focus node exactly as the caller made it.
+    if (!_tv) return;
+    widget.focusNode.skipTraversal = true;
+    widget.focusNode.onKeyEvent = _fieldKey;
   }
 
   @override
   void didUpdateWidget(MioTvInputNavigation old) {
     super.didUpdateWidget(old);
     if (!identical(old.focusNode, widget.focusNode)) {
-      old.focusNode.onKeyEvent = null;
-      old.focusNode.skipTraversal = false;
+      if (_tv) {
+        old.focusNode.onKeyEvent = null;
+        old.focusNode.skipTraversal = false;
+      }
       didChangeDependencies();
     }
   }
 
   @override
   void dispose() {
-    widget.focusNode.onKeyEvent = null;
+    if (_tv) widget.focusNode.onKeyEvent = null;
     _gate.removeListener(_changed);
     _gate.dispose();
     super.dispose();
