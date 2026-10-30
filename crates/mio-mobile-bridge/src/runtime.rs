@@ -172,6 +172,27 @@ impl Drop for OwnerExit {
     }
 }
 
+/// A TV has little free storage, so a fresh install keeps a smaller audio
+/// cache than the 1 GiB every other device starts with. Later changes are the
+/// user's and are never overridden.
+#[cfg(target_os = "android")]
+fn tv_first_run_defaults(paths: &Paths) {
+    use mio_core::storage::{Preferences, Storage};
+    const TV_CACHE_LIMIT: u64 = 256 * 1024 * 1024;
+    if !crate::android::capabilities().is_ok_and(|device| device.television) {
+        return;
+    }
+    if std::fs::create_dir_all(&paths.data).is_err() {
+        return;
+    }
+    let store = Storage::from_paths(paths);
+    if matches!(store.load::<Preferences>("preferences.json"), Ok(None)) {
+        let mut preferences = Preferences::default();
+        preferences.app.cache_size_limit = TV_CACHE_LIMIT;
+        let _ = store.save("preferences.json", &preferences);
+    }
+}
+
 pub(crate) fn initialize(paths: HostPaths) -> Result<PlayerSnapshot, String> {
     #[cfg(target_os = "android")]
     if !crate::android::context_ready() {
@@ -230,6 +251,8 @@ pub(crate) fn initialize(paths: HostPaths) -> Result<PlayerSnapshot, String> {
                 }
             }
             let _providers = ProviderExit(mio_core::storage::Storage::from_paths(&core_paths));
+            #[cfg(target_os = "android")]
+            tv_first_run_defaults(&core_paths);
             // The cleanup guard also covers a partially failed initialization.
             let mut core = match AppCore::open(core_paths) {
                 Ok(core) => core,

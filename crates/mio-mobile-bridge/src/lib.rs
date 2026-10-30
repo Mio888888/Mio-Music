@@ -52,4 +52,5 @@ mod dlna_cast;
 
 mod dlna_handoff;
 
+mod lan_settings;
 mod lan_transfer;

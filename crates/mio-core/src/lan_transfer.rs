@@ -1,4 +1,5 @@
-//! Page-owned LAN receiver. The host supplies the existing install/import rules.
+//! Page-owned LAN receiver. The host supplies the existing install/import rules
+//! and the settings API behind `/api/<op>`.
 mod http;
 mod net;
 use std::{
@@ -18,6 +19,12 @@ const FILE_LIMIT: u64 = 256 * 1024 * 1024;
 const TOTAL_LIMIT: u64 = 512 * 1024 * 1024;
 const PLUGIN_LIMIT: u64 = 1024 * 1024;
 const RESERVE: u64 = 64 * 1024 * 1024;
+/// Largest JSON body; an exported play queue is the biggest thing sent.
+const API_LIMIT: u64 = 16 * 1024 * 1024;
+/// Idle time before the session closes; every authenticated request renews it.
+const IDLE: Duration = Duration::from_secs(30 * 60);
+/// Hard end of a session however busy it is.
+const LIFETIME: Duration = Duration::from_secs(8 * 60 * 60);
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 struct Permit;
 impl Drop for Permit {
@@ -90,6 +97,9 @@ pub enum Upload {
     PluginUrl(String),
 }
 pub type Handler = dyn Fn(Upload, Arc<AtomicBool>) -> Result<String, String> + Send + Sync;
+/// Settings calls from the paired browser: operation name and JSON arguments.
+pub type ApiHandler =
+    dyn Fn(&str, serde_json::Value) -> Result<serde_json::Value, String> + Send + Sync;
 struct Pairing {
     invitation: Option<String>,
     session: String,
@@ -110,11 +120,20 @@ struct State {
     destination: PathBuf,
     pairing: Mutex<Pairing>,
     progress: Mutex<Progress>,
-    expires: Instant,
+    expires: Mutex<Instant>,
+    ends: Instant,
 }
 impl State {
+    fn expires(&self) -> Instant {
+        *self.expires.lock().unwrap_or_else(|e| e.into_inner())
+    }
+    /// Paired activity keeps the session open, up to its lifetime.
+    fn renew(&self) {
+        *self.expires.lock().unwrap_or_else(|e| e.into_inner()) =
+            (Instant::now() + IDLE).min(self.ends);
+    }
     fn check(&self) -> Result<(), String> {
-        if Instant::now() >= self.expires {
+        if Instant::now() >= self.expires() {
             self.control.close();
             return Err("lan_session_expired".into());
         }
@@ -148,6 +167,7 @@ impl Server {
         cache: &Path,
         destination: &Path,
         handler: Arc<Handler>,
+        api: Arc<ApiHandler>,
     ) -> Result<Self, String> {
         let mut startup = StartupGuard(Some(control.clone()));
         control.check()?;
@@ -211,7 +231,8 @@ impl Server {
                 events: VecDeque::new(),
                 error: None,
             }),
-            expires: Instant::now() + Duration::from_secs(15 * 60),
+            expires: Mutex::new(Instant::now() + IDLE),
+            ends: Instant::now() + LIFETIME,
         });
         let worker = state.clone();
         let thread = std::thread::Builder::new()
@@ -219,7 +240,7 @@ impl Server {
             .spawn(move || {
                 let _permit = permit;
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    serve(&worker, stage.path(), &handler)
+                    serve(&worker, stage.path(), &handler, &api)
                 }))
                 .unwrap_or_else(|_| Err("lan_worker_failed".into()));
                 if let Err(error) = result {
@@ -311,7 +332,12 @@ fn same_secret(actual: &str, expected: &str) -> bool {
             .fold(0u8, |value, (a, b)| value | (a ^ b))
             == 0
 }
-fn serve(state: &State, stage: &Path, handler: &Arc<Handler>) -> Result<(), String> {
+fn serve(
+    state: &State,
+    stage: &Path,
+    handler: &Arc<Handler>,
+    api: &Arc<ApiHandler>,
+) -> Result<(), String> {
     let mut connections = 0u32;
     loop {
         state.check()?;
@@ -359,7 +385,7 @@ fn serve(state: &State, stage: &Path, handler: &Arc<Handler>) -> Result<(), Stri
             state.control.check()?;
             *current = Some(stream.try_clone().map_err(|_| "lan_socket_failed")?);
         }
-        let result = receive(state, stage, &mut stream, peer, handler);
+        let result = receive(state, stage, &mut stream, peer, handler, api);
         if let Err(error) = result {
             json(
                 &mut stream,
@@ -376,11 +402,12 @@ fn serve(state: &State, stage: &Path, handler: &Arc<Handler>) -> Result<(), Stri
             .take();
     }
 }
-// Only public LAN wording is exposed; neither settings nor plugin configuration enter this script.
+// Wording only: the settings values themselves travel over the authenticated /api calls.
 fn browser_script() -> &'static [u8] {
     static SCRIPT: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
     SCRIPT.get_or_init(|| {
         let mut languages = serde_json::Map::new();
+        let mut texts = serde_json::Map::new();
         for (name, source) in [
             ("en-US", include_str!("../locales/en-US.json")),
             ("zh-CN", include_str!("../locales/zh-CN.json")),
@@ -388,10 +415,17 @@ fn browser_script() -> &'static [u8] {
             let locale: serde_json::Value =
                 serde_json::from_str(source).expect("bundled locale JSON");
             languages.insert(name.into(), locale["lanTransfer"].clone());
+            // The sections the settings pages take their wording from.
+            let mut shared = serde_json::Map::new();
+            for section in ["settings", "play", "quality", "visuals"] {
+                shared.insert(section.into(), locale[section].clone());
+            }
+            texts.insert(name.into(), serde_json::Value::Object(shared));
         }
         format!(
-            "window.MIO_LAN={};\n{}",
+            "window.MIO_LAN={};\nwindow.MIO_TEXT={};\n{}",
             serde_json::Value::Object(languages),
+            serde_json::Value::Object(texts),
             include_str!("lan_transfer/app.js")
         )
         .into_bytes()
@@ -405,12 +439,70 @@ fn json(stream: &mut TcpStream, status: u16, value: serde_json::Value) {
         value.to_string().as_bytes(),
     );
 }
+/// One settings call: a bounded JSON body in, `{ok,data}` or `{ok,message}` out.
+fn call(
+    state: &State,
+    stream: &mut TcpStream,
+    input: &mut BufReader<TcpStream>,
+    request: &http::Request,
+    op: &str,
+    api: &Arc<ApiHandler>,
+) -> Result<(), String> {
+    if op.is_empty()
+        || op.len() > 64
+        || !op
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    {
+        return Err("invalid_path".into());
+    }
+    if request.length > API_LIMIT {
+        return Err("capacity_exceeded: request size".into());
+    }
+    let mut body = vec![0u8; request.length as usize];
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut filled = 0;
+    while filled < body.len() {
+        state.check()?;
+        if Instant::now() >= deadline {
+            return Err("upload_timeout".into());
+        }
+        match input.read(&mut body[filled..]) {
+            Ok(0) => return Err("upload_incomplete".into()),
+            Ok(count) => filled += count,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Err(_) => return Err("upload_incomplete".into()),
+        }
+    }
+    let args = if body.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_slice(&body).map_err(|_| "invalid_json")?
+    };
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| api(op, args)))
+        .unwrap_or_else(|_| Err("lan_worker_failed".into()));
+    state.renew();
+    match result {
+        Ok(data) => json(stream, 200, serde_json::json!({"ok":true,"data":data})),
+        Err(message) => json(
+            stream,
+            409,
+            serde_json::json!({"ok":false,"message":message}),
+        ),
+    }
+    Ok(())
+}
 fn receive(
     state: &State,
     stage: &Path,
     stream: &mut TcpStream,
     peer: Ipv4Addr,
     handler: &Arc<Handler>,
+    api: &Arc<ApiHandler>,
 ) -> Result<(), String> {
     let mut input = BufReader::with_capacity(
         16 * 1024,
@@ -418,7 +510,7 @@ fn receive(
     );
     let request = http::request(
         &mut input,
-        state.expires.min(Instant::now() + Duration::from_secs(3)),
+        state.expires().min(Instant::now() + Duration::from_secs(3)),
     )?;
     state.check()?;
     if request.headers.get("host").map(String::as_str) != Some(&state.authority) {
@@ -437,6 +529,18 @@ fn receive(
                 200,
                 "text/javascript; charset=utf-8",
                 browser_script(),
+            ),
+            "/settings.js" => http::response(
+                stream,
+                200,
+                "text/javascript; charset=utf-8",
+                include_bytes!("lan_transfer/settings.js"),
+            ),
+            "/app.css" => http::response(
+                stream,
+                200,
+                "text/css; charset=utf-8",
+                include_bytes!("lan_transfer/app.css"),
             ),
             _ => http::response(stream, 404, "text/plain", b"Not found"),
         }
@@ -479,6 +583,10 @@ fn receive(
         if pairing.peer != Some(peer) || !same_secret(key, &pairing.session) {
             return Err("unauthorized".into());
         }
+    }
+    state.renew();
+    if let Some(op) = request.path.strip_prefix("/api/") {
+        return call(state, stream, &mut input, &request, op, api);
     }
     let id = {
         let mut progress = state.progress.lock().map_err(|_| "lan_unavailable")?;

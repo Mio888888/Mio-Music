@@ -107,6 +107,11 @@ impl Session {
                 Upload::PluginUrl(url) => install(&lease, url, true, closed),
             }
         });
+        let api_lease = self.lease.clone();
+        let api_closed = self.control.closed.clone();
+        let api = Arc::new(move |op: &str, args: serde_json::Value| {
+            crate::lan_settings::call(&api_lease, &api_closed, op, args)
+        });
         let mut server = self.server.lock().map_err(|_| "lan_unavailable")?;
         let receiver = Server::start(
             self.control.clone(),
@@ -114,6 +119,7 @@ impl Session {
             &self.cache,
             &self.data,
             handler,
+            api,
         )?;
         let view = project(receiver.view());
         *server = Some(receiver);

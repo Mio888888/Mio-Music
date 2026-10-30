@@ -10,6 +10,28 @@ impl Interface {
             && (u32::from(address) & self.mask) == (u32::from(self.address) & self.mask)
     }
 }
+/// Where a phone on the same Wi-Fi can actually reach the TV: Wi-Fi first,
+/// then wired, then anything else; tunnels and peer-to-peer links are never
+/// the local network.
+#[cfg(unix)]
+fn rank(name: &str) -> Option<u8> {
+    let name = name.to_ascii_lowercase();
+    if [
+        "tun", "tap", "ppp", "p2p", "dummy", "clat", "v4-", "ip6", "sit", "veth", "docker", "wg",
+        "lo",
+    ]
+    .iter()
+    .any(|prefix| name.starts_with(prefix))
+    {
+        None
+    } else if name.starts_with("wlan") || name.starts_with("wl") {
+        Some(0)
+    } else if name.starts_with("eth") || name.starts_with("en") {
+        Some(1)
+    } else {
+        Some(2)
+    }
+}
 fn private(ip: Ipv4Addr) -> bool {
     ip.is_private() && !ip.is_loopback() && !ip.is_unspecified()
 }
@@ -26,7 +48,7 @@ pub(super) fn interfaces() -> Result<Vec<Interface>, String> {
         }
     }
     let _list = List(head);
-    let mut rows = Vec::new();
+    let mut rows: Vec<(u8, Interface)> = Vec::new();
     let mut next = head;
     while !next.is_null() {
         let row = unsafe { &*next };
@@ -36,6 +58,11 @@ pub(super) fn interfaces() -> Result<Vec<Interface>, String> {
             && row.ifa_flags & libc::IFF_UP as u32 != 0
             && row.ifa_flags & libc::IFF_LOOPBACK as u32 == 0
         {
+            let name = unsafe { std::ffi::CStr::from_ptr(row.ifa_name) }.to_string_lossy();
+            let Some(rank) = rank(&name) else {
+                next = row.ifa_next;
+                continue;
+            };
             let ip = unsafe { &*(row.ifa_addr as *const libc::sockaddr_in) };
             let mask = unsafe { &*(row.ifa_netmask as *const libc::sockaddr_in) };
             let address = Ipv4Addr::from(u32::from_be(ip.sin_addr.s_addr));
@@ -44,9 +71,9 @@ pub(super) fn interfaces() -> Result<Vec<Interface>, String> {
             if private(address)
                 && mask != 0
                 && inverse & inverse.wrapping_add(1) == 0
-                && !rows.iter().any(|i: &Interface| i.address == address)
+                && !rows.iter().any(|(_, i)| i.address == address)
             {
-                rows.push(Interface { address, mask });
+                rows.push((rank, Interface { address, mask }));
                 if rows.len() > 16 {
                     return Err("capacity_exceeded: LAN interfaces".into());
                 }
@@ -54,8 +81,8 @@ pub(super) fn interfaces() -> Result<Vec<Interface>, String> {
         }
         next = row.ifa_next;
     }
-    rows.sort_by_key(|row| row.address);
-    Ok(rows)
+    rows.sort_by_key(|(rank, row)| (*rank, row.address));
+    Ok(rows.into_iter().map(|(_, row)| row).collect())
 }
 #[cfg(not(unix))]
 pub(super) fn interfaces() -> Result<Vec<Interface>, String> {
