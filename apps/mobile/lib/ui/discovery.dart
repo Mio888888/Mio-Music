@@ -2380,16 +2380,10 @@ class DiscoveryViewState extends State<DiscoveryView>
       },
       onBack: _modalBusy || _playing ? null : _back,
       onPlay: _playlistEnabled && _tracks.isNotEmpty
-          ? () => setState(() {
-              _shuffleRequested = false;
-              _confirm = true;
-            })
+          ? () => _askConfirmation(shuffle: false)
           : null,
       onShuffle: _playlistEnabled && _tracks.isNotEmpty
-          ? () => setState(() {
-              _shuffleRequested = true;
-              _confirm = true;
-            })
+          ? () => _askConfirmation(shuffle: true)
           : null,
       onMore: _playlistEnabled
           ? (anchor) => unawaited(_playlistActions(anchor))
@@ -2914,6 +2908,19 @@ class DiscoveryViewState extends State<DiscoveryView>
         ),
       ),
     );
+  }
+
+  void _askConfirmation({required bool shuffle}) {
+    setState(() {
+      _shuffleRequested = shuffle;
+      _confirm = true;
+    });
+    if (!MioDeviceScope.isTv(context)) return;
+    // The page behind stops taking focus once the dialog is up. A remote has
+    // no pointer, so move focus into the dialog or it would stay on the page.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _confirm) _confirmationScope.requestScopeFocus();
+    });
   }
 
   Widget _confirmation() => Positioned.fill(

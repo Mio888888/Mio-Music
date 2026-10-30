@@ -1529,7 +1529,9 @@ class _MioShellState extends State<MioShell> {
           palette: p,
           ready:
               core.player != null &&
-              _page == page &&
+              // Wide screens show the Appearance page under the Settings route.
+              (_page == page ||
+                  (page == _Page.appearance && _page == _Page.settings)) &&
               !_fullPlayer &&
               !_queueOpen &&
               !_backupOpen &&
