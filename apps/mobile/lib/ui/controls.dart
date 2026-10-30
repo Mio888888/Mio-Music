@@ -2,7 +2,13 @@ import 'device.dart';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart'
-    show TextInputAction, LogicalKeyboardKey, LengthLimitingTextInputFormatter;
+    show
+        TextInputAction,
+        LogicalKeyboardKey,
+        LengthLimitingTextInputFormatter,
+        KeyEvent,
+        KeyDownEvent,
+        KeyUpEvent;
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'resources.dart';
@@ -68,52 +74,59 @@ class MioInput extends StatelessWidget {
     builder: (context, _) => Semantics(
       textField: true,
       label: placeholder,
-      child: Container(
-        height: height,
-        padding: EdgeInsets.only(
-          left: leadingIcon == null ? 14 : 34,
-          right: 14,
-        ),
-        decoration: BoxDecoration(
-          color: background ?? palette.surface,
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: focusNode.hasFocus && MioDeviceScope.isTv(context)
-                ? palette.brand
-                : palette.border,
+      child: MioTvInputNavigation(
+        focusNode: focusNode,
+        controller: controller,
+        enabled: maxLines == 1,
+        radius: radius,
+        child: Container(
+          height: height,
+          padding: EdgeInsets.only(
+            left: leadingIcon == null ? 14 : 34,
+            right: 14,
           ),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.centerLeft,
-          children: [
-            if (leadingIcon != null)
-              Positioned(
-                left: -22,
-                child: MioIcon(
-                  leadingIcon!,
-                  size: 14,
-                  color: palette.color('--td-text-color-placeholder'),
-                ),
-              ),
-            ValueListenableBuilder(
-              valueListenable: controller,
-              builder: (context, value, _) => value.text.isEmpty
-                  ? IgnorePointer(
-                      child: Text(
-                        placeholder,
-                        style: TextStyle(
-                          color: palette.color('--td-text-color-placeholder'),
-                          fontSize: fontSize,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+          decoration: BoxDecoration(
+            color: background ?? palette.surface,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: focusNode.hasFocus && MioDeviceScope.isTv(context)
+                  ? palette.brand
+                  : palette.border,
             ),
-            MioTvInputNavigation(
-              focusNode: focusNode,
-              enabled: maxLines == 1,
-              child: EditableText(
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.centerLeft,
+            children: [
+              if (leadingIcon != null)
+                Positioned(
+                  left: -22,
+                  child: MioIcon(
+                    leadingIcon!,
+                    size: 14,
+                    color: palette.color('--td-text-color-placeholder'),
+                  ),
+                ),
+              ValueListenableBuilder(
+                valueListenable: controller,
+                builder: (context, value, _) => value.text.isEmpty
+                    ? IgnorePointer(
+                        child: Text(
+                          placeholder,
+                          // TV fields are fixed-height: ellipsize, never wrap.
+                          maxLines: MioDeviceScope.isTv(context) ? 1 : null,
+                          overflow: MioDeviceScope.isTv(context)
+                              ? TextOverflow.ellipsis
+                              : null,
+                          style: TextStyle(
+                            color: palette.color('--td-text-color-placeholder'),
+                            fontSize: fontSize,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+              EditableText(
                 controller: controller,
                 focusNode: focusNode,
                 style: DefaultTextStyle.of(context).style
@@ -133,8 +146,8 @@ class MioInput extends StatelessWidget {
                 enableSuggestions: !obscureText,
                 autocorrect: !obscureText,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),
@@ -157,6 +170,10 @@ class MioButton extends StatefulWidget {
   final bool insetFocusBorder;
   final bool preserveFocusWhenDisabled;
   final EdgeInsets padding;
+
+  /// Scale of the TV focus lift; wide list rows use less so they stay inside
+  /// their list.
+  final double tvScale;
   const MioButton({
     super.key,
     required this.palette,
@@ -172,6 +189,7 @@ class MioButton extends StatefulWidget {
     this.insetFocusBorder = true,
     this.preserveFocusWhenDisabled = false,
     this.padding = const EdgeInsets.all(8),
+    this.tvScale = 1.05,
   });
   @override
   State<MioButton> createState() => _MioButtonState();
@@ -185,9 +203,14 @@ class _MioButtonState extends State<MioButton> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
+    final tvFocus = _hasFocus && MioDeviceScope.isTv(context);
+    final animate = !MediaQuery.disableAnimationsOf(context);
     final border = Border.all(
       width: MioButton.focusBorderWidth,
-      color: (_focused || (_hasFocus && MioDeviceScope.isTv(context)))
+      color: tvFocus
+          // TV rings use the text colour so they read on brand fills too.
+          ? widget.palette.color('--td-text-color-primary')
+          : _focused
           ? widget.palette.brand
           : const Color(0x00000000),
     );
@@ -227,28 +250,45 @@ class _MioButtonState extends State<MioButton> {
             onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
             onTapUp: enabled ? (_) => setState(() => _pressed = false) : null,
             onTapCancel: () => setState(() => _pressed = false),
-            child: AnimatedContainer(
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 120),
-              padding: widget.padding,
-              decoration: BoxDecoration(
-                color: enabled && (_hovered || _pressed)
-                    ? widget.hoverBackground ??
-                          widget.palette.color('--td-bg-color-component-hover')
-                    : widget.background,
-                borderRadius: BorderRadius.circular(widget.radius),
-                border: widget.insetFocusBorder ? border : null,
-              ),
-              foregroundDecoration: widget.insetFocusBorder
-                  ? null
-                  : BoxDecoration(
-                      borderRadius: BorderRadius.circular(widget.radius),
-                      border: border,
-                    ),
-              child: Opacity(
-                opacity: enabled ? 1 : widget.disabledOpacity,
-                child: widget.child,
+            // TV focus lifts and glows the control like a console menu.
+            child: _tvLift(
+              context,
+              tvFocus,
+              animate,
+              AnimatedContainer(
+                duration: animate
+                    ? const Duration(milliseconds: 120)
+                    : Duration.zero,
+                padding: widget.padding,
+                decoration: BoxDecoration(
+                  color: enabled && (_hovered || _pressed)
+                      ? widget.hoverBackground ??
+                            widget.palette.color(
+                              '--td-bg-color-component-hover',
+                            )
+                      : widget.background,
+                  borderRadius: BorderRadius.circular(widget.radius),
+                  border: widget.insetFocusBorder ? border : null,
+                  boxShadow: tvFocus
+                      ? [
+                          BoxShadow(
+                            color: widget.palette.brand.withValues(alpha: .45),
+                            blurRadius: 22,
+                            spreadRadius: 1,
+                          ),
+                        ]
+                      : null,
+                ),
+                foregroundDecoration: widget.insetFocusBorder
+                    ? null
+                    : BoxDecoration(
+                        borderRadius: BorderRadius.circular(widget.radius),
+                        border: border,
+                      ),
+                child: Opacity(
+                  opacity: enabled ? 1 : widget.disabledOpacity,
+                  child: widget.child,
+                ),
               ),
             ),
           ),
@@ -256,6 +296,21 @@ class _MioButtonState extends State<MioButton> {
       ),
     );
   }
+
+  /// Only TV adds the scale layer, so other devices keep their widget tree.
+  Widget _tvLift(
+    BuildContext context,
+    bool focused,
+    bool animate,
+    Widget child,
+  ) => MioDeviceScope.isTv(context)
+      ? AnimatedScale(
+          scale: focused ? widget.tvScale : 1,
+          duration: animate ? const Duration(milliseconds: 160) : Duration.zero,
+          curve: Curves.easeOutCubic,
+          child: child,
+        )
+      : child;
 }
 
 /// Touch drag commits once on release; keyboard and accessibility use bounded steps.
@@ -271,6 +326,10 @@ class MioSeekBar extends StatefulWidget {
   final double height;
   final Color? trackColor;
   final bool showThumb, hollowThumb;
+
+  /// On TV the thumb only appears while the bar has focus, so a bar resting on
+  /// a card edge does not read as a stray dot.
+  final bool thumbOnlyWhenFocusedOnTv;
   const MioSeekBar({
     super.key,
     this.focusNode,
@@ -285,6 +344,7 @@ class MioSeekBar extends StatefulWidget {
     this.trackColor,
     this.showThumb = false,
     this.hollowThumb = false,
+    this.thumbOnlyWhenFocusedOnTv = false,
   });
   @override
   State<MioSeekBar> createState() => _MioSeekBarState();
@@ -410,7 +470,12 @@ class _MioSeekBarState extends State<MioSeekBar> {
                         ),
                       ),
                     ),
-                    if (widget.showThumb && _rangeValid && box.maxWidth >= 16)
+                    if (widget.showThumb &&
+                        _rangeValid &&
+                        box.maxWidth >= 16 &&
+                        (!(widget.thumbOnlyWhenFocusedOnTv &&
+                                MioDeviceScope.isTv(context)) ||
+                            _hasFocus))
                       Positioned(
                         // Keep the whole thumb visible at both track ends.
                         left: (box.maxWidth * (_value / widget.maximum) - 8)
@@ -439,46 +504,152 @@ class _MioSeekBarState extends State<MioSeekBar> {
   );
 }
 
-/// Single-line TV fields keep left/right for caret editing and use up/down
-/// to leave the field after the system keyboard has been dismissed.
-class MioTvInputNavigation extends StatelessWidget {
+/// A single-line field on TV is a stop in the focus order like any button:
+/// moving onto it never raises the system keyboard, and OK starts editing. While
+/// editing, left/right move the caret and leave the field at either end, and
+/// up/down leave it at once.
+class MioTvInputNavigation extends StatefulWidget {
   final FocusNode focusNode;
+  final TextEditingController? controller;
   final FocusNode? upFallback;
   final Widget child;
   final bool enabled;
+  final double radius;
   const MioTvInputNavigation({
     super.key,
     required this.focusNode,
+    this.controller,
     this.upFallback,
     required this.child,
     this.enabled = true,
+    this.radius = 8,
   });
 
   @override
+  State<MioTvInputNavigation> createState() => _MioTvInputNavigationState();
+}
+
+class _MioTvInputNavigationState extends State<MioTvInputNavigation> {
+  final _gate = FocusNode(debugLabel: 'Input gate');
+  bool get _tv => widget.enabled && MioDeviceScope.isTv(context);
+
+  @override
+  void initState() {
+    super.initState();
+    _gate.addListener(_changed);
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The field itself is only reached through its gate.
+    widget.focusNode.skipTraversal = _tv;
+    widget.focusNode.onKeyEvent = _tv ? _fieldKey : null;
+  }
+
+  @override
+  void didUpdateWidget(MioTvInputNavigation old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.focusNode, widget.focusNode)) {
+      old.focusNode.onKeyEvent = null;
+      old.focusNode.skipTraversal = false;
+      didChangeDependencies();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.onKeyEvent = null;
+    _gate.removeListener(_changed);
+    _gate.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _fieldKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
+      _gate.requestFocus();
+      return KeyEventResult.handled;
+    }
+    final controller = widget.controller;
+    final selection = controller?.selection;
+    if (controller == null || selection == null || !selection.isCollapsed) {
+      return KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.arrowRight &&
+        selection.baseOffset >= controller.text.length) {
+      return node.focusInDirection(TraversalDirection.right)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft && selection.baseOffset <= 0) {
+      return node.focusInDirection(TraversalDirection.left)
+          ? KeyEventResult.handled
+          : KeyEventResult.ignored;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _gateKey(FocusNode node, KeyEvent event) {
+    final key = event.logicalKey;
+    if (event is KeyDownEvent &&
+        (key == LogicalKeyboardKey.select ||
+            key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter)) {
+      widget.focusNode.requestFocus();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!enabled || !MioDeviceScope.isTv(context)) return child;
+    if (!_tv) return widget.child;
+    final focused = _gate.hasPrimaryFocus;
     return Focus(
-      canRequestFocus: false,
-      skipTraversal: true,
+      focusNode: _gate,
+      onKeyEvent: _gateKey,
       onFocusChange: (focused) {
         if (focused) revealTvFocus(context);
       },
-      child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.arrowUp): () {
-            if (!focusNode.focusInDirection(TraversalDirection.up)) {
-              final fallback = upFallback;
-              if (fallback != null &&
-                  fallback.context != null &&
-                  fallback.canRequestFocus) {
-                fallback.requestFocus();
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.radius),
+          border: Border.all(
+            width: MioButton.focusBorderWidth,
+            color: focused
+                ? DefaultTextStyle.of(context).style.color ??
+                      const Color(0xffffffff)
+                : const Color(0x00000000),
+          ),
+        ),
+        child: CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowUp): () {
+              if (!widget.focusNode.focusInDirection(TraversalDirection.up) &&
+                  !_gate.focusInDirection(TraversalDirection.up)) {
+                final fallback = widget.upFallback;
+                if (fallback != null &&
+                    fallback.context != null &&
+                    fallback.canRequestFocus) {
+                  fallback.requestFocus();
+                }
               }
-            }
+            },
+            const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+              if (!widget.focusNode.focusInDirection(TraversalDirection.down)) {
+                _gate.focusInDirection(TraversalDirection.down);
+              }
+            },
           },
-          const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
-              focusNode.focusInDirection(TraversalDirection.down),
-        },
-        child: child,
+          child: widget.child,
+        ),
       ),
     );
   }

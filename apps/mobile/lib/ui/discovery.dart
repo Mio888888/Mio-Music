@@ -23,6 +23,9 @@ import 'context_menu.dart';
 import 'favorite_button.dart';
 import 'online_playlist_header.dart';
 import 'search_track_row.dart';
+import 'tv/tv_widgets.dart';
+
+part 'tv/tv_discovery.dart';
 
 enum _PlaylistAction { save, download, downloadAll, select }
 
@@ -112,6 +115,11 @@ class DiscoveryViewState extends State<DiscoveryView>
   bool _charts = false, _loading = false, _more = true, _foreground = true;
   bool _categoriesOpen = false, _playing = false;
   final _categoryRowKey = GlobalKey();
+
+  /// TV only: the card that opened the details gets focus back on return.
+  final _tvCardFocus = <String, FocusNode>{};
+  final _tvMoreFocus = FocusNode(debugLabel: 'More categories');
+  String? _tvReturnCard;
   int _epoch = 0, _detailEpoch = 0, _group = 0, _total = 0;
   final _scroll = ScrollController(), _songScroll = ScrollController();
   MioPalette get p => widget.palette;
@@ -131,7 +139,7 @@ class DiscoveryViewState extends State<DiscoveryView>
     }
     if (_modalBusy) return true;
     if (_categoriesOpen) {
-      setState(() => _categoriesOpen = false);
+      _closeCategories();
       return true;
     }
     if (_selected != null) {
@@ -505,6 +513,7 @@ class DiscoveryViewState extends State<DiscoveryView>
   Future<void> _openCard(api.DiscoveryCard card) async {
     final session = _session;
     if (!_live || _loading || session == null) return;
+    if (MioDeviceScope.isTv(context)) _tvReturnCard = card.id;
     _closeDetails();
     final epoch = _epoch, detailEpoch = _detailEpoch;
     setState(() {
@@ -571,6 +580,7 @@ class DiscoveryViewState extends State<DiscoveryView>
       _error = null;
       _more = _browseMore;
     });
+    if (MioDeviceScope.isTv(context)) _restoreTvCardFocus();
   }
 
   bool _browseMore = true;
@@ -614,6 +624,7 @@ class DiscoveryViewState extends State<DiscoveryView>
     _categoriesOpen = false;
     _category = id;
     _categoryName = name;
+    _restoreMoreFocus();
     unawaited(_open(preserveCategories: !_wide));
   }
 
@@ -985,6 +996,42 @@ class DiscoveryViewState extends State<DiscoveryView>
       ],
     ),
   );
+  void _switchBrowseTab(bool charts) {
+    if (_charts == charts) return;
+    // Rebuild right away and drop the other tab's cards so a blocked reload
+    // can never leave stale content under the new heading.
+    setState(() {
+      // The browse page is only tappable when no artist page or modal sheet
+      // is above it, so these flags are stale here.
+      _artistRoute = false;
+      _modalBusy = false;
+      _charts = charts;
+      _cards = [];
+    });
+    unawaited(_open());
+  }
+
+  void _openCategories() => setState(() {
+    _group = 0;
+    _categoriesOpen = true;
+  });
+  void _closeCategories() {
+    setState(() => _categoriesOpen = false);
+    _restoreMoreFocus();
+  }
+
+  /// The picker's pills unmount with it, so hand focus back to its opener.
+  void _restoreMoreFocus() {
+    if (!MioDeviceScope.isTv(context)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_categoriesOpen && _tvMoreFocus.context != null) {
+        _tvMoreFocus.requestFocus();
+      }
+    });
+  }
+
+  void _showCategoryGroup(int index) => setState(() => _group = index);
+
   Widget _browseTab(bool charts) {
     final selected = _charts == charts;
     final label = p.text(
@@ -1000,24 +1047,7 @@ class DiscoveryViewState extends State<DiscoveryView>
           insetFocusBorder: false,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           background: selected ? p.surface : const Color(0x00000000),
-          onPressed: _live
-              ? () {
-                  if (_charts != charts) {
-                    // Rebuild right away and drop the other tab's cards so a
-                    // blocked reload can never leave stale content under the
-                    // new heading.
-                    setState(() {
-                      // The browse page is only tappable when no artist page or
-                      // modal sheet is above it, so these flags are stale here.
-                      _artistRoute = false;
-                      _modalBusy = false;
-                      _charts = charts;
-                      _cards = [];
-                    });
-                    unawaited(_open());
-                  }
-                }
-              : null,
+          onPressed: _live ? () => _switchBrowseTab(charts) : null,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: _wide ? 20 : 24),
             child: Center(
@@ -1076,7 +1106,11 @@ class DiscoveryViewState extends State<DiscoveryView>
     ),
   );
 
-  Widget _browse() => _wide ? _browseWide() : _browseNarrow();
+  Widget _browse() => MioDeviceScope.isTv(context)
+      ? _browseTv()
+      : _wide
+      ? _browseWide()
+      : _browseNarrow();
 
   // The page title and subtitle are gone: the shell header already names the
   // page, so the tabs start the content right away.
@@ -2005,7 +2039,7 @@ class DiscoveryViewState extends State<DiscoveryView>
     }
 
     return Container(
-      height: 40,
+      height: MioDeviceScope.isTv(context) ? 32 : 40,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: p.color('--song-list-header-bg'),
@@ -2091,10 +2125,23 @@ class DiscoveryViewState extends State<DiscoveryView>
     final duration = track.duration.isFinite && track.duration > 0
         ? '${(track.duration ~/ 60).toString().padLeft(2, '0')}:${(track.duration.toInt() % 60).toString().padLeft(2, '0')}'
         : '--:--';
+    final tv = MioDeviceScope.isTv(context);
+    final title = Text(
+      track.title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: tv ? 16 : 14,
+        height: 16.8 / 14,
+        fontWeight: FontWeight.w500,
+        color: playing ? p.brand : p.color('--song-list-title-color'),
+      ),
+    );
     return Container(
       key: key,
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      // TV packs two lines per row (tags join the title) to show more songs.
+      height: tv ? 60 : 76,
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: tv ? 4 : 6),
       decoration: BoxDecoration(
         color: playing ? p.color('--song-list-item-playing') : null,
         border: Border(
@@ -2164,19 +2211,27 @@ class DiscoveryViewState extends State<DiscoveryView>
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          track.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 16.8 / 14,
-                            fontWeight: FontWeight.w500,
-                            color: playing
-                                ? p.brand
-                                : p.color('--song-list-title-color'),
-                          ),
-                        ),
+                        if (tv)
+                          Row(
+                            children: [
+                              Flexible(child: title),
+                              const SizedBox(width: 8),
+                              if (quality.isNotEmpty)
+                                badge(
+                                  quality,
+                                  '--song-list-quality-bg',
+                                  '--song-list-quality-color',
+                                ),
+                              if (source.isNotEmpty)
+                                badge(
+                                  source,
+                                  '--song-list-source-bg',
+                                  '--song-list-source-color',
+                                ),
+                            ],
+                          )
+                        else
+                          title,
                         const SizedBox(height: 1),
                         SizedBox(
                           height: 18,
@@ -2187,7 +2242,8 @@ class DiscoveryViewState extends State<DiscoveryView>
                             child: _artistLink(track),
                           ),
                         ),
-                        if (quality.isNotEmpty || source.isNotEmpty) ...[
+                        if (!tv &&
+                            (quality.isNotEmpty || source.isNotEmpty)) ...[
                           const SizedBox(height: 2),
                           // Both tags stay whole; a narrow title column scales
                           // them down instead of truncating them.
@@ -2309,7 +2365,10 @@ class DiscoveryViewState extends State<DiscoveryView>
           : (card.description.isNotEmpty ? card.description : card.author),
       count: p.text('common.songCount').replaceAll('{count}', '$_total'),
       cover: card.cover,
-      compact: _compactPlaylist && !_filterFocus.hasFocus,
+      // TV never has room for the tall header above the song list.
+      compact:
+          MioDeviceScope.isTv(context) ||
+          (_compactPlaylist && !_filterFocus.hasFocus),
       wide: _wide,
       busy: !_playlistEnabled,
       filter: _filter,
@@ -2341,7 +2400,9 @@ class DiscoveryViewState extends State<DiscoveryView>
           ? const Color(0x00000000)
           : p.color('--song-list-content-bg'),
       child: Padding(
-        padding: EdgeInsets.all(_wide ? 20 : 0),
+        padding: EdgeInsets.all(
+          MioDeviceScope.isTv(context) ? 10 : (_wide ? 20 : 0),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2351,7 +2412,9 @@ class DiscoveryViewState extends State<DiscoveryView>
               ),
               child: _swipeHeader(SingleChildScrollView(child: header)),
             ),
-            SizedBox(height: _wide ? 20 : 10),
+            SizedBox(
+              height: MioDeviceScope.isTv(context) ? 8 : (_wide ? 20 : 10),
+            ),
             if (_selectingSongs)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2954,7 +3017,11 @@ class DiscoveryViewState extends State<DiscoveryView>
           ),
           if (_confirm) _confirmation(),
           if (_categoriesOpen && _categories?.groups.isNotEmpty == true)
-            (_wide ? _categorySheet() : _categorySheetNarrow()),
+            (MioDeviceScope.isTv(context)
+                ? _tvCategorySheet()
+                : _wide
+                ? _categorySheet()
+                : _categorySheetNarrow()),
         ],
       ),
     );
@@ -2969,6 +3036,10 @@ class DiscoveryViewState extends State<DiscoveryView>
     _songScroll.dispose();
     _filter.dispose();
     _filterFocus.dispose();
+    _tvMoreFocus.dispose();
+    for (final node in _tvCardFocus.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 }

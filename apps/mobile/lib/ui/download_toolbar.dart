@@ -1,3 +1,5 @@
+import 'device.dart';
+
 import 'package:flutter/widgets.dart';
 
 import '../src/rust/api.dart' as api;
@@ -87,7 +89,7 @@ class DownloadToolbar extends StatelessWidget {
           key: const ValueKey('start-all'),
           palette: p,
           narrow: narrow,
-          iconOnly: leading != null,
+          iconOnly: leading != null && !MioDeviceScope.isTv(context),
           icon: 'Play',
           label: p.text('download.startAll'),
           onPressed: enabled && canStart
@@ -98,7 +100,7 @@ class DownloadToolbar extends StatelessWidget {
           key: const ValueKey('pause-all'),
           palette: p,
           narrow: narrow,
-          iconOnly: leading != null,
+          iconOnly: leading != null && !MioDeviceScope.isTv(context),
           icon: 'Pause',
           label: p.text('download.pauseAll'),
           onPressed: enabled && canPause
@@ -111,7 +113,7 @@ class DownloadToolbar extends StatelessWidget {
           key: const ValueKey('clear'),
           palette: p,
           narrow: narrow,
-          iconOnly: leading != null,
+          iconOnly: leading != null && !MioDeviceScope.isTv(context),
           icon: 'Delete',
           label: p.text(
             activeBucket ? 'download.clearQueue' : 'download.clearRecords',
@@ -214,11 +216,12 @@ class _ToolbarButton extends StatelessWidget {
     final p = palette;
     final primary = p.color('--td-text-color-primary');
     final color = active ? p.brand : p.secondary;
+    final tv = MioDeviceScope.isTv(context);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: active
             ? p.brand.withValues(alpha: .12)
-            : primary.withValues(alpha: .04),
+            : primary.withValues(alpha: tv ? .08 : .04),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
           color: active
@@ -234,25 +237,31 @@ class _ToolbarButton extends StatelessWidget {
         disabledOpacity: .5,
         insetFocusBorder: false,
         padding: EdgeInsets.symmetric(
-          horizontal: narrow
+          horizontal: tv
+              ? 18
+              : narrow
               ? 14
               : iconOnly
               ? 12
               : 10.4,
-          vertical: narrow ? 0 : 6,
+          vertical: narrow ? 0 : (tv ? 9 : 6),
         ),
         onPressed: onPressed,
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: narrow ? 44 : 17),
+          constraints: BoxConstraints(minHeight: narrow ? 44 : (tv ? 22 : 17)),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              MioIcon(icon, size: 14, color: color),
+              MioIcon(icon, size: tv ? 18 : 14, color: color),
               if (!iconOnly) ...[
-                const SizedBox(width: 5),
+                SizedBox(width: tv ? 8 : 5),
                 Text(
                   label,
-                  style: TextStyle(fontSize: 13, height: 16 / 13, color: color),
+                  style: TextStyle(
+                    fontSize: tv ? 15 : 13,
+                    height: tv ? 1.3 : 16 / 13,
+                    color: color,
+                  ),
                 ),
               ],
             ],
@@ -292,6 +301,11 @@ class DownloadTabs extends StatelessWidget {
       'download.tabFailed',
     ];
     const dots = ['--td-brand-color', '--td-success-color', '--td-error-color'];
+    final tv = MioDeviceScope.isTv(context);
+    // A filled pill marks the chosen tab on TV, so it never reads like the
+    // focus highlight.
+    Color tabText(bool on) =>
+        on ? (tv ? p.color('--td-text-color-anti') : p.brand) : p.secondary;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Padding(
@@ -310,17 +324,23 @@ class DownloadTabs extends StatelessWidget {
                     radius: 999,
                     insetFocusBorder: false,
                     background: selected.index == i
-                        ? p.brand.withValues(alpha: .15)
-                        : primary.withValues(alpha: .06),
+                        ? (tv ? p.brand : p.brand.withValues(alpha: .15))
+                        : primary.withValues(alpha: tv ? .1 : .06),
                     padding: EdgeInsets.symmetric(
-                      horizontal: narrow ? 18 : 15.35,
-                      vertical: 8,
+                      horizontal: tv
+                          ? 20
+                          : narrow
+                          ? 18
+                          : 15.35,
+                      vertical: tv ? 9 : 8,
                     ),
                     onPressed: enabled
                         ? () => onSelected(api.DownloadBucket.values[i])
                         : null,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: narrow ? 28 : 16),
+                      constraints: BoxConstraints(
+                        minHeight: narrow ? 28 : (tv ? 20 : 16),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -336,11 +356,12 @@ class DownloadTabs extends StatelessWidget {
                           Text(
                             p.text(keys[i]),
                             style: TextStyle(
-                              fontSize: 13,
-                              height: 16 / 13,
-                              color: selected.index == i
-                                  ? p.brand
-                                  : p.secondary,
+                              fontSize: tv ? 15 : 13,
+                              height: tv ? 1.3 : 16 / 13,
+                              fontWeight: tv && selected.index == i
+                                  ? FontWeight.w700
+                                  : null,
+                              color: tabText(selected.index == i),
                             ),
                           ),
                           if (counts[i] > 0) ...[
@@ -352,19 +373,21 @@ class DownloadTabs extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: selected.index == i
-                                    ? p.brand.withValues(alpha: .20)
+                                    ? (tv
+                                          ? p
+                                                .color('--td-text-color-anti')
+                                                .withValues(alpha: .25)
+                                          : p.brand.withValues(alpha: .20))
                                     : primary.withValues(alpha: .10),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
                                 '${counts[i]}',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  height: 14 / 11,
+                                  fontSize: tv ? 13 : 11,
+                                  height: tv ? 1.3 : 14 / 11,
                                   fontWeight: FontWeight.w600,
-                                  color: selected.index == i
-                                      ? p.brand
-                                      : p.secondary,
+                                  color: tabText(selected.index == i),
                                 ),
                               ),
                             ),
@@ -398,9 +421,10 @@ class DownloadConcurrency extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palette;
+    final tv = MioDeviceScope.isTv(context);
     Widget step(String label, int delta) => SizedBox(
-      width: narrow ? 44 : 32,
-      height: narrow ? 44 : 32,
+      width: narrow ? 44 : (tv ? 48 : 32),
+      height: narrow ? 44 : (tv ? 48 : 32),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: p.color('--td-bg-color-component'),
@@ -419,7 +443,7 @@ class DownloadConcurrency extends StatelessWidget {
               ? () => onChanged(value + delta)
               : null,
           child: Center(
-            child: Text(label, style: const TextStyle(fontSize: 16)),
+            child: Text(label, style: TextStyle(fontSize: tv ? 20 : 16)),
           ),
         ),
       ),
@@ -436,7 +460,10 @@ class DownloadConcurrency extends StatelessWidget {
             child: Text(
               '$value',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: tv ? 20 : 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -446,7 +473,7 @@ class DownloadConcurrency extends StatelessWidget {
     );
     final label = Text(
       p.text('download.concurrentDownloads'),
-      style: TextStyle(fontSize: 13, color: p.secondary),
+      style: TextStyle(fontSize: tv ? 16 : 13, color: p.secondary),
     );
     return Container(
       width: double.infinity,
@@ -482,9 +509,13 @@ class DownloadEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = palette;
+    final tv = MioDeviceScope.isTv(context);
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: narrow ? 48 : 60),
+      padding: EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: narrow ? 48 : (tv ? 40 : 60),
+      ),
       decoration: BoxDecoration(
         border: Border.all(
           color: p.color('--td-text-color-primary').withValues(alpha: .08),
@@ -504,7 +535,7 @@ class DownloadEmpty extends StatelessWidget {
         children: [
           MioIcon(
             'nav-xiazai',
-            size: 48,
+            size: tv ? 64 : 48,
             color: p
                 .color('--td-text-color-placeholder')
                 .withValues(
@@ -514,7 +545,7 @@ class DownloadEmpty extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             p.text(searching ? 'download.noMatch' : 'download.empty'),
-            style: TextStyle(fontSize: 14, color: p.secondary),
+            style: TextStyle(fontSize: tv ? 18 : 14, color: p.secondary),
           ),
         ],
       ),

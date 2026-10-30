@@ -29,6 +29,8 @@ import 'wide_auto_hide.dart';
 import 'comments.dart';
 import 'queue_drawer.dart' show playModeKey, playModeIcon;
 
+part 'tv/tv_full_player.dart';
+
 class FullPlayer extends StatefulWidget {
   final CoreController core;
   final api.PlayerSnapshot state;
@@ -136,6 +138,16 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
   bool _showLyrics = false;
   bool _translation = true;
   bool _romanization = false;
+  void _toggleTranslation() {
+    setState(() => _translation = !_translation);
+    _follow(force: true);
+  }
+
+  void _toggleRomanization() {
+    setState(() => _romanization = !_romanization);
+    _follow(force: true);
+  }
+
   bool _coverFailed = false;
   bool _coverBusy = false;
   String? _error;
@@ -1698,6 +1710,7 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
             );
             final policy = MioVisualPolicy.of(context);
             final wide = MioDeviceScope.wide(context, box.maxWidth);
+            final tv = MioDeviceScope.isTv(context);
             final insets = wide
                 ? EdgeInsets.only(bottom: widget.systemInsets.bottom)
                 : widget.systemInsets;
@@ -1737,71 +1750,8 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                     _headerButton(wide),
                     const Spacer(),
                     if (!wide) _headerButton(false, switchMode: true),
-                    // The desktop header only has collapse and settings; the
-                    // translation, romanization and follow toggles stay for TV.
-                    if (wide && MioDeviceScope.isTv(context)) ...[
-                      MioButton(
-                        palette: p,
-                        label: p.english ? 'Translation' : '翻译',
-                        focusNode: _headerNodes[1],
-                        onPressed: () {
-                          setState(() => _translation = !_translation);
-                          _follow(force: true);
-                        },
-                        child: Text(
-                          wide && p.english
-                              ? 'Translation'
-                              : (p.english ? 'T' : '译'),
-                          style: TextStyle(
-                            color: _translation
-                                ? const Color(0xffffffff)
-                                : const Color(0x77ffffff),
-                          ),
-                        ),
-                      ),
-                      MioButton(
-                        palette: p,
-                        label: p.english ? 'Romanization' : '音译',
-                        focusNode: _headerNodes[2],
-                        onPressed: () {
-                          setState(() => _romanization = !_romanization);
-                          _follow(force: true);
-                        },
-                        child: Text(
-                          wide && p.english
-                              ? 'Romanization'
-                              : (p.english ? 'R' : '音'),
-                          style: TextStyle(
-                            color: _romanization
-                                ? const Color(0xffffffff)
-                                : const Color(0x77ffffff),
-                          ),
-                        ),
-                      ),
-                      _button(
-                        'Lyrics',
-                        p.english ? 'Follow current line' : '跟随当前歌词',
-                        () {
-                          _follow(force: true);
-                        },
-                        focusNode: _headerNodes[3],
-                      ),
-                    ],
-                    // The gear is dropped on touch wide layouts; the style button
-                    // at the bottom right already opens the same settings.
                     if (wide && MioDeviceScope.isTv(context))
-                      Transform.translate(
-                        // Desktop's right header starts 5px lower and travels
-                        // 70px, while the collapse control travels 45px.
-                        offset: Offset(0, 5 - 25 * idleProgress),
-                        child: _button(
-                          'Settings',
-                          p.text('settings.musicSource.navAppearance'),
-                          widget.onAppearance,
-                          focusNode: _headerNodes[4],
-                          size: 32,
-                        ),
-                      ),
+                      _tvHeaderActions(),
                   ],
                 ),
               ),
@@ -1860,7 +1810,12 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                                 left: 0,
                                 right: 0,
                                 bottom:
-                                    (contentHeight * .1).clamp(70.0, 80.0) *
+                                    (tv
+                                            ? _tvDeckHeight
+                                            : (contentHeight * .1).clamp(
+                                                70.0,
+                                                80.0,
+                                              )) *
                                         (1 - idleProgress) +
                                     // The safe-area gap is only kept while the bar is shown.
                                     insets.bottom * (1 - idleProgress) -
@@ -1913,16 +1868,17 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                                 Positioned.fill(
                                   bottom: insets.bottom,
                                   child: LayoutBuilder(
-                                    builder: (context, inner) => _wideLayout(
-                                      inner,
-                                      gutter,
-                                      albumFraction,
-                                      showAlbum,
-                                      lyricFont,
-                                      header(idleProgress),
-                                      hidden,
-                                      idleProgress,
-                                    ),
+                                    builder: (context, inner) =>
+                                        (tv ? _tvLayout : _wideLayout)(
+                                          inner,
+                                          gutter,
+                                          albumFraction,
+                                          showAlbum,
+                                          lyricFont,
+                                          header(idleProgress),
+                                          hidden,
+                                          idleProgress,
+                                        ),
                                   ),
                                 ),
                               ] else
@@ -1940,33 +1896,35 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                                         ),
                                   ),
                                 ),
-                              Positioned(
-                                right: wide
-                                    ? 20
-                                    : (box.maxWidth * .04).clamp(16.0, 24.0),
-                                bottom: wide
-                                    ? 100 + insets.bottom
-                                    : (contentHeight * .1).clamp(70.0, 80.0) +
-                                          insets.bottom +
-                                          12,
-                                child: _idleChrome(
-                                  _button(
-                                    'PenBall',
-                                    p.text('play.playerTheme'),
-                                    () => unawaited(_openStyle()),
-                                    size: wide ? 50 : 44,
-                                    iconSize: 20,
-                                    focusNode: _styleLauncher,
-                                    background: Color(
-                                      wide ? 0x26ffffff : 0x38000000,
+                              // TV carries the style button in its control deck.
+                              if (!tv)
+                                Positioned(
+                                  right: wide
+                                      ? 20
+                                      : (box.maxWidth * .04).clamp(16.0, 24.0),
+                                  bottom: wide
+                                      ? 100 + insets.bottom
+                                      : (contentHeight * .1).clamp(70.0, 80.0) +
+                                            insets.bottom +
+                                            12,
+                                  child: _idleChrome(
+                                    _button(
+                                      'PenBall',
+                                      p.text('play.playerTheme'),
+                                      () => unawaited(_openStyle()),
+                                      size: wide ? 50 : 44,
+                                      iconSize: 20,
+                                      focusNode: _styleLauncher,
+                                      background: Color(
+                                        wide ? 0x26ffffff : 0x38000000,
+                                      ),
+                                      outlined: !wide,
                                     ),
-                                    outlined: !wide,
+                                    hidden,
+                                    idleProgress,
+                                    shift: const Offset(0, 20),
                                   ),
-                                  hidden,
-                                  idleProgress,
-                                  shift: const Offset(0, 20),
                                 ),
-                              ),
                             ],
                           ),
                         ),

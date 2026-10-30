@@ -48,12 +48,21 @@ class SearchTrackRow extends StatefulWidget {
 class _SearchTrackRowState extends State<SearchTrackRow> {
   final _playFocus = FocusNode(debugLabel: 'Search song playback');
   final _artistGroup = FocusNode(debugLabel: 'Search song artist');
+  final _trailingGroup = FocusNode(debugLabel: 'Search song actions');
 
   @override
   void dispose() {
     _playFocus.dispose();
     _artistGroup.dispose();
+    _trailingGroup.dispose();
     super.dispose();
+  }
+
+  FocusNode? _first(FocusNode group) {
+    for (final node in group.traversalDescendants) {
+      if (node.canRequestFocus && !node.skipTraversal) return node;
+    }
+    return null;
   }
 
   KeyEventResult _navigate(FocusNode _, KeyEvent event) {
@@ -61,21 +70,27 @@ class _SearchTrackRowState extends State<SearchTrackRow> {
       return KeyEventResult.ignored;
     }
     // The artist lies inside the playback rectangle, so spatial traversal
-    // cannot reach it. Keep vertical traversal between songs unchanged.
-    if (_playFocus.hasPrimaryFocus &&
-        event.logicalKey == LogicalKeyboardKey.arrowRight) {
-      for (final node in _artistGroup.traversalDescendants) {
-        if (node.canRequestFocus && !node.skipTraversal) {
-          node.requestFocus();
-          return KeyEventResult.handled;
-        }
+    // cannot reach it. Keep vertical traversal between songs unchanged. The
+    // order along a row is playback, artist, then the row's own actions.
+    final key = event.logicalKey;
+    FocusNode? target;
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (_playFocus.hasPrimaryFocus) {
+        target = _first(_artistGroup);
+      } else if (_artistGroup.hasFocus) {
+        target = _first(_trailingGroup);
       }
-    } else if (_artistGroup.hasFocus &&
-        event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      _playFocus.requestFocus();
-      return KeyEventResult.handled;
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      if (_artistGroup.hasFocus) {
+        target = _playFocus;
+      } else if (_trailingGroup.hasFocus &&
+          FocusManager.instance.primaryFocus == _first(_trailingGroup)) {
+        target = _first(_artistGroup) ?? _playFocus;
+      }
     }
-    return KeyEventResult.ignored;
+    if (target == null) return KeyEventResult.ignored;
+    target.requestFocus();
+    return KeyEventResult.handled;
   }
 
   @override
@@ -91,11 +106,12 @@ class _SearchTrackRowState extends State<SearchTrackRow> {
         onMenu = widget.onMenu;
     final p = palette;
     final scale = MediaQuery.textScalerOf(context);
-    final titleSize = narrow ? 15.0 : 14.0;
+    final tv = MioDeviceScope.isTv(context);
+    final titleSize = narrow ? 15.0 : (tv ? 16.0 : 14.0);
     final three = widget.threeLine;
     final stacked = narrow || three;
     final rowHeight = math.max(
-      three ? 76.0 : (narrow ? 72.0 : 56.0),
+      three ? 76.0 : (narrow ? 72.0 : (tv ? 64.0 : 56.0)),
       scale.scale(titleSize) +
           3 +
           math.max(scale.scale(12) + 4, scale.scale(10) + 4) +
@@ -161,7 +177,8 @@ class _SearchTrackRowState extends State<SearchTrackRow> {
                 child: MioButton(
                   palette: p,
                   focusNode: _playFocus,
-                  radius: 6,
+                  radius: tv ? 12 : 6,
+                  tvScale: 1.012,
                   disabledOpacity: 1,
                   label: [
                     '$number. ${track.title}',
@@ -191,7 +208,11 @@ class _SearchTrackRowState extends State<SearchTrackRow> {
                           ),
                         ),
                       ),
-                      MioCover(track.cover, size: 40, radius: 4),
+                      MioCover(
+                        track.cover,
+                        size: tv ? 48 : 40,
+                        radius: tv ? 8 : 4,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -323,7 +344,13 @@ class _SearchTrackRowState extends State<SearchTrackRow> {
                   ),
                 ),
               ),
-              ?trailing,
+              if (trailing != null)
+                Focus(
+                  focusNode: _trailingGroup,
+                  canRequestFocus: false,
+                  skipTraversal: true,
+                  child: trailing,
+                ),
               if (widget.durationAtEnd)
                 SizedBox(
                   width: 44,

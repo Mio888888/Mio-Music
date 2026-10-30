@@ -1,3 +1,5 @@
+import 'device.dart';
+
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
@@ -331,6 +333,8 @@ class OnlinePlaylistHeader extends StatelessWidget {
         child: MioButton(
           palette: p,
           label: label,
+          // On TV the opened page starts on its primary action.
+          autofocus: filled && MioDeviceScope.isTv(context),
           radius: 8,
           insetFocusBorder: false,
           padding: const EdgeInsets.symmetric(horizontal: 12),

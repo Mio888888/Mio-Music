@@ -15,6 +15,9 @@ import 'resources.dart';
 import 'online_append.dart';
 import 'search_track_row.dart';
 import 'play_choice.dart';
+import 'tv/tv_widgets.dart';
+
+part 'tv/tv_search.dart';
 
 enum _SongAction { favorite, retryFavorite, select }
 
@@ -73,6 +76,9 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
   int _epoch = 0;
   int _total = 0;
   final _scroll = ScrollController();
+  final _tvCardFocus = <String, FocusNode>{};
+  final _tvMenuFocus = <String, FocusNode>{};
+  String? _tvReturnCard;
   MioPalette get p => widget.palette;
   bool get _live => mounted && widget.active && widget.ready && _foreground;
 
@@ -150,6 +156,12 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
   void dispose() {
     _close();
     _scroll.dispose();
+    for (final node in _tvMenuFocus.values) {
+      node.dispose();
+    }
+    for (final node in _tvCardFocus.values) {
+      node.dispose();
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -395,6 +407,12 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
     unawaited(_load(reset: true));
   }
 
+  /// [returnCard] names the TV card to focus again when the details close.
+  void _openPlaylistResult(api.PlaylistSearchItem item, [String? returnCard]) {
+    _tvReturnCard = returnCard;
+    setState(() => _selectedPlaylist = item);
+  }
+
   void _artistVisibility(bool visible) {
     if (!mounted) return;
     setState(() {
@@ -484,6 +502,11 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
                       }
                     })
                   : null,
+            )
+          : MioDeviceScope.isTv(context)
+          ? _tvRowMenu(
+              song,
+              _live && session != null && !_loading && !_artistRoute,
             )
           : null,
     );
@@ -595,14 +618,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
       if (mounted) {
         setState(() => _modalBusy = false);
         if (!retry && current()) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (current() &&
-                !_modalBusy &&
-                originFocus?.context != null &&
-                originFocus!.canRequestFocus) {
-              originFocus.requestFocus();
-            }
-          });
+          _restoreMenuFocus(song.id, originFocus, 4);
         }
         if (retry && current()) {
           unawaited(_showSongMenu(song, anchor, restoreFocus: originFocus));
@@ -611,6 +627,24 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
         }
       }
     }
+  }
+
+  /// The rows are rebuilt by the action's note and the refreshed list, which
+  /// can drop the control the menu was opened from; its row's own node (TV)
+  /// survives, so fall back to that until the new row is mounted.
+  void _restoreMenuFocus(String id, FocusNode? origin, int attempts) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _modalBusy) return;
+      final fallback = _tvMenuFocus[id];
+      final target = origin?.context != null && origin!.canRequestFocus
+          ? origin
+          : fallback;
+      if (target?.context != null && target!.canRequestFocus) {
+        target.requestFocus();
+      } else if (attempts > 1) {
+        _restoreMenuFocus(id, origin, attempts - 1);
+      }
+    });
   }
 
   Widget _sourceChip(String? source, String label, bool narrow) => Semantics(
@@ -672,7 +706,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
     ),
   );
 
-  Widget _results(bool narrow) {
+  Widget _results(bool narrow, [EdgeInsets padding = EdgeInsets.zero]) {
     if (!_loading && _noSources) {
       return _message(p.text('music.search.noOnlineSources'), _error);
     }
@@ -745,7 +779,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
     ];
     return ListView.builder(
       controller: _scroll,
-      padding: EdgeInsets.zero,
+      padding: padding,
       itemCount: header.length + _items.length + footer.length,
       itemBuilder: (context, index) {
         if (index < header.length) return header[index];
@@ -755,6 +789,55 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
       },
     );
   }
+
+  /// Failed sources and a retry above the playlist results.
+  Widget _playlistNotices() => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      for (final source in _sourceStates.where((s) => s.failed))
+        Text(
+          '${source.name}: ${p.text('music.search.searchFailed')}',
+          style: TextStyle(color: p.secondary),
+        ),
+      if (_sourceStates.any((s) => s.failed))
+        MioButton(
+          palette: p,
+          label: p.text('common.retry'),
+          onPressed: _loading
+              ? null
+              : () => unawaited(_load(retryFailed: true)),
+          child: Text(p.text('common.retry')),
+        ),
+      if (_error != null) ...[
+        Text(_error!, style: TextStyle(color: p.secondary)),
+        MioButton(
+          palette: p,
+          label: p.text('common.retry'),
+          onPressed: _loading
+              ? null
+              : () => unawaited(_load(reset: _playlistSession == null)),
+          child: Text(p.text('common.retry')),
+        ),
+      ],
+    ],
+  );
+
+  Widget _playlistFooter() => Column(
+    children: [
+      if (_loading)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(p.text('common.loading')),
+        ),
+      if (_more && !_loading && _error == null)
+        MioButton(
+          palette: p,
+          label: p.english ? 'Load more' : '加载更多',
+          onPressed: () => unawaited(_load()),
+          child: Text(p.english ? 'Load more' : '加载更多'),
+        ),
+    ],
+  );
 
   Widget _playlistResults(bool narrow) {
     if (!_loading && _noSources) {
@@ -780,6 +863,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
         p.text('music.search.tryOther'),
       );
     }
+    if (MioDeviceScope.isTv(context)) return _tvPlaylistGrid();
     return LayoutBuilder(
       builder: (context, box) {
         const gap = 12.0;
@@ -796,40 +880,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
         return CustomScrollView(
           controller: _scroll,
           slivers: [
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final source in _sourceStates.where((s) => s.failed))
-                    Text(
-                      '${source.name}: ${p.text('music.search.searchFailed')}',
-                      style: TextStyle(color: p.secondary),
-                    ),
-                  if (_sourceStates.any((s) => s.failed))
-                    MioButton(
-                      palette: p,
-                      label: p.text('common.retry'),
-                      onPressed: _loading
-                          ? null
-                          : () => unawaited(_load(retryFailed: true)),
-                      child: Text(p.text('common.retry')),
-                    ),
-                  if (_error != null) ...[
-                    Text(_error!, style: TextStyle(color: p.secondary)),
-                    MioButton(
-                      palette: p,
-                      label: p.text('common.retry'),
-                      onPressed: _loading
-                          ? null
-                          : () => unawaited(
-                              _load(reset: _playlistSession == null),
-                            ),
-                      child: Text(p.text('common.retry')),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            SliverToBoxAdapter(child: _playlistNotices()),
             SliverPadding(
               padding: EdgeInsets.all(padding),
               sliver: SliverGrid(
@@ -913,24 +964,7 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
                 }, childCount: _playlists.length),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  if (_loading)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(p.text('common.loading')),
-                    ),
-                  if (_more && !_loading && _error == null)
-                    MioButton(
-                      palette: p,
-                      label: p.english ? 'Load more' : '加载更多',
-                      onPressed: () => unawaited(_load()),
-                      child: Text(p.english ? 'Load more' : '加载更多'),
-                    ),
-                ],
-              ),
-            ),
+            SliverToBoxAdapter(child: _playlistFooter()),
           ],
         );
       },
@@ -956,10 +990,12 @@ class SearchViewState extends State<SearchView> with WidgetsBindingObserver {
           if (mounted) {
             setState(() => _selectedPlaylist = null);
             widget.onDetailsChanged?.call(false);
+            if (MioDeviceScope.isTv(context)) _restoreTvCardFocus();
           }
         },
       );
     }
+    if (MioDeviceScope.isTv(context)) return _tvBody();
     final width = widget.viewportWidth;
     final narrow = !MioDeviceScope.wide(context, width);
     final chips = [

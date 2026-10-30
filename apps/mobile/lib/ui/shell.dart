@@ -22,8 +22,8 @@ import 'catalog.dart';
 import 'resources.dart';
 import 'search.dart';
 import 'plugins.dart';
-import 'lan_transfer.dart';
 import 'visual_settings.dart';
+import 'tv/tv_settings.dart';
 import 'full_player.dart';
 import 'queue_drawer.dart';
 import 'recent.dart';
@@ -37,6 +37,9 @@ import 'releases.dart';
 import 'recognition.dart';
 import 'discovery.dart';
 import 'singer.dart';
+import 'tv/tv_top_bar.dart';
+
+part 'tv/tv_shortcuts.dart';
 
 class MioShell extends StatefulWidget {
   final CoreController core;
@@ -63,7 +66,6 @@ enum _Page {
   lyricSettings,
   storageSettings,
   about,
-  lanTransfer,
   visualSettings,
   settings,
   musicSources,
@@ -73,6 +75,14 @@ enum _Page {
 typedef _Route = ({_Page page, String? playlistId});
 
 class _MioShellState extends State<MioShell> {
+  /// Times of recent Up presses that moved no focus (TV "raise the player").
+  final _blockedUps = <DateTime>[];
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_tvRemoteKey);
+  }
+
   _Page _page = _Page.discover;
   bool _fullPlayer = false;
   bool _queueOpen = false;
@@ -125,6 +135,7 @@ class _MioShellState extends State<MioShell> {
   FocusNode? _queueReturnFocus, _playerReturnFocus;
   final _recognitionFocus = FocusNode(debugLabel: 'Header recognition');
   final _backupFocus = FocusNode(debugLabel: 'Header backup');
+  final _guideFocus = FocusNode(debugLabel: 'Discover guide');
 
   void _restoreModalFocus(FocusNode? node, _Route route) {
     if (node == null) return;
@@ -147,6 +158,11 @@ class _MioShellState extends State<MioShell> {
   bool _backupOpen = false;
   Future<void> _restoreBackup() async {
     if (_backupOpen || core.player == null) return;
+    // The S3 form is typed on the phone, in the settings web page.
+    if (MioDeviceScope.isTv(context)) {
+      _go(_Page.settings);
+      return;
+    }
     final returnFocus = _backupFocus.hasFocus ? _backupFocus : null;
     final route = (page: _page, playlistId: _selectedPlaylist);
     final revision = core.player!.sourceRevision;
@@ -224,8 +240,32 @@ class _MioShellState extends State<MioShell> {
       if (node?.context != null && node!.canRequestFocus) {
         node.requestFocus();
       } else {
-        _pageScopes[_page]!.nextFocus();
+        _focusPageScope(route, 6);
       }
+    });
+  }
+
+  /// A page that loads its rows after it appears has nothing to focus yet, and
+  /// focus would otherwise stay wherever it was (the player bar's seek slider
+  /// seeks on left/right). Try again until the page offers a control.
+  void _focusPageScope(_Route route, int attempts) {
+    final scope = _pageScopes[route.page]!;
+    scope.nextFocus();
+    final focus = FocusManager.instance.primaryFocus;
+    if ((focus != null && focus.ancestors.contains(scope)) || attempts <= 1) {
+      return;
+    }
+    Future<void>.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted ||
+          _page != route.page ||
+          _selectedPlaylist != route.playlistId ||
+          _fullPlayer ||
+          _queueOpen ||
+          _backupOpen ||
+          _recognitionOpen) {
+        return;
+      }
+      _focusPageScope(route, attempts - 1);
     });
   }
 
@@ -400,11 +440,13 @@ class _MioShellState extends State<MioShell> {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_tvRemoteKey);
     _leaveSingers();
     _search.dispose();
     _searchFocus.dispose();
     _recognitionFocus.dispose();
     _backupFocus.dispose();
+    _guideFocus.dispose();
     _scroll.dispose();
     for (final scope in _pageScopes.values) {
       scope.dispose();
@@ -499,11 +541,13 @@ class _MioShellState extends State<MioShell> {
               final wide = MioDeviceScope.wide(context, width);
               // Wide settings replace the whole window like the desktop page:
               // title bar, category list and content, with no sidebar/player.
+              // TV hands every settings page to the phone (a QR code), so it has
+              // no category list and keeps its sidebar and player bar.
               final settingsRoot =
                   wide &&
-                  !MioDeviceScope.isTv(context) &&
                   _artists.isEmpty &&
-                  _settingsPages.contains(_page);
+                  _settingsPages.contains(_page) &&
+                  !MioDeviceScope.isTv(context);
               final bottomInset = math.max(
                 MediaQuery.paddingOf(context).bottom,
                 MioDeviceScope.isTv(context) ? 16.0 : 0.0,
@@ -539,14 +583,25 @@ class _MioShellState extends State<MioShell> {
                   .max(64.0, 51 + textScale.scale(10))
                   .ceilToDouble();
               final workspace = SingerHost(
-                // Singer pages open inside the shell (like the desktop
-                // content area); TV keeps its own route for focus handling.
-                open: MioDeviceScope.isTv(context) ? null : _showSinger,
+                // Singer pages open inside the shell (like the desktop content
+                // area), so the player bar stays under them on TV too.
+                open: _showSinger,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: navigationInset > 0
                         ? null
                         : p.color('--td-bg-color-page'),
+                    // TV paints one backdrop behind the content and the
+                    // floating player instead of a docked bar's own strip.
+                    gradient: MioDeviceScope.isTv(context)
+                        ? mioWorkspaceBackground(
+                            p,
+                            wide: true,
+                            songTheme: core.player?.coverTheme != null,
+                            viewportHeight: viewportHeight,
+                            areaHeight: viewportHeight,
+                          )
+                        : null,
                   ),
                   child: Stack(
                     clipBehavior:
@@ -568,7 +623,9 @@ class _MioShellState extends State<MioShell> {
                             Expanded(
                               child: Row(
                                 children: [
-                                  if (wide && navigationInset == 0)
+                                  if (wide &&
+                                      navigationInset == 0 &&
+                                      !MioDeviceScope.isTv(context))
                                     settingsRoot
                                         ? const SizedBox.shrink()
                                         : _sidebar(
@@ -591,7 +648,10 @@ class _MioShellState extends State<MioShell> {
                                                   : null,
                                               gradient:
                                                   settingsRoot ||
-                                                      navigationInset > 0
+                                                      navigationInset > 0 ||
+                                                      MioDeviceScope.isTv(
+                                                        context,
+                                                      )
                                                   ? null
                                                   : mioWorkspaceBackground(
                                                       p,
@@ -626,6 +686,10 @@ class _MioShellState extends State<MioShell> {
                                                       ? _compactSettingsHeader(
                                                           width,
                                                         )
+                                                      : MioDeviceScope.isTv(
+                                                          context,
+                                                        )
+                                                      ? _tvTopBar()
                                                       : _header(
                                                           width,
                                                           wide,
@@ -693,6 +757,27 @@ class _MioShellState extends State<MioShell> {
                               ),
                             if (settingsRoot)
                               SizedBox(height: bottomInset)
+                            else if (MioDeviceScope.isTv(context))
+                              // TV floats the player as a rounded card above
+                              // the screen edge instead of a docked bar.
+                              Padding(
+                                // Bottom 24 keeps the card inside the TV's overscan.
+                                padding: const EdgeInsets.fromLTRB(
+                                  28,
+                                  4,
+                                  28,
+                                  24,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: _player(
+                                    width,
+                                    wide,
+                                    playerHeight,
+                                    bottomInset,
+                                  ),
+                                ),
+                              )
                             else
                               _player(
                                 width,
@@ -950,6 +1035,92 @@ class _MioShellState extends State<MioShell> {
         ),
       );
 
+  /// Directional search from the TV top bar skips the Discover guide button
+  /// for the player bar controls, so Down goes there directly.
+  KeyEventResult _tvTopBarKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.arrowDown ||
+        _page != _Page.discover ||
+        _guideFocus.context == null ||
+        !_guideFocus.canRequestFocus) {
+      return KeyEventResult.ignored;
+    }
+    _guideFocus.requestFocus();
+    return KeyEventResult.handled;
+  }
+
+  Widget _tvTopBar() => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: _tvTopBarKey,
+    child: TvTopBar(
+      palette: p,
+      autofocusFirst: true,
+      tabs: [
+        for (var i = 0; i < _navPages.length; i++)
+          (
+            icon: _navIcons[i],
+            label: p.text(_navKeys[i]),
+            active: _navActive(i),
+            onPressed: () => _go(_navPages[i]),
+          ),
+      ],
+      actions: [
+        _iconButton(
+          'nav-xiangzuo',
+          p.text('common.back'),
+          _historyIndex > 0 ||
+                  _discoveryDetails ||
+                  _searchDetails ||
+                  _artists.isNotEmpty
+              ? _headerBack
+              : null,
+          size: 40,
+          iconSize: 20,
+          radius: 999,
+        ),
+        _iconButton(
+          'nav-xiangyou',
+          p.english ? 'Forward' : '前进',
+          _historyIndex + 1 < _history.length ? () => _move(1) : null,
+          size: 40,
+          iconSize: 20,
+          radius: 999,
+        ),
+        SizedBox(width: 136, child: _searchBox(true)),
+        if (_recognitionAvailable)
+          _iconButton(
+            'TD-Microphone',
+            p.text('music.recognize.startRecognize'),
+            !_canRecognize ? null : () => _go(_Page.recognition),
+            focusNode: _recognitionFocus,
+            size: 40,
+            iconSize: 20,
+            radius: 999,
+          ),
+        _iconButton(
+          'BackupCloud',
+          p.text('backup.backupAndRestore'),
+          core.player == null || _backupOpen
+              ? null
+              : () => unawaited(_restoreBackup()),
+          focusNode: _backupFocus,
+          size: 40,
+          iconSize: 20,
+          radius: 999,
+        ),
+        _iconButton(
+          'nav-shezhi',
+          p.text('common.titleBar.settings'),
+          () => _go(_Page.appearance),
+          size: 40,
+          iconSize: 20,
+          radius: 999,
+        ),
+      ],
+    ),
+  );
+
   /// Settings title bar of the wide layout: Back, title and the settings gear.
   Widget _settingsHeader(double rem) => Container(
     padding: EdgeInsets.all(rem * 1.5),
@@ -1017,71 +1188,73 @@ class _MioShellState extends State<MioShell> {
     ({_Page page, String label, String description, String icon}) item,
     bool selected,
     double rem,
-  ) => DecoratedBox(
-    decoration: BoxDecoration(
-      color: selected ? p.color('--settings-nav-active-bg') : null,
-      borderRadius: BorderRadius.circular(5),
-      border: Border(
-        left: BorderSide(
-          color: selected
-              ? p.color('--settings-nav-active-border')
-              : const Color(0x00000000),
-          width: 3,
+  ) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: selected ? p.color('--settings-nav-active-bg') : null,
+        borderRadius: BorderRadius.circular(5),
+        border: Border(
+          left: BorderSide(
+            color: selected
+                ? p.color('--settings-nav-active-border')
+                : const Color(0x00000000),
+            width: 3,
+          ),
         ),
       ),
-    ),
-    child: MioButton(
-      palette: p,
-      label: p.text(item.label),
-      radius: 5,
-      insetFocusBorder: false,
-      padding: EdgeInsets.symmetric(
-        horizontal: rem * 1.5,
-        vertical: rem * .875,
-      ),
-      onPressed: () => _go(item.page, replace: true),
-      child: Row(
-        children: [
-          MioIcon(
-            item.icon,
-            size: 20,
-            color: p.color(
-              selected
-                  ? '--settings-nav-icon-active'
-                  : '--settings-nav-icon-color',
+      child: MioButton(
+        palette: p,
+        label: p.text(item.label),
+        radius: 5,
+        insetFocusBorder: false,
+        padding: EdgeInsets.symmetric(
+          horizontal: rem * 1.5,
+          vertical: rem * .875,
+        ),
+        onPressed: () => _go(item.page, replace: true),
+        child: Row(
+          children: [
+            MioIcon(
+              item.icon,
+              size: 20,
+              color: p.color(
+                selected
+                    ? '--settings-nav-icon-active'
+                    : '--settings-nav-icon-color',
+              ),
             ),
-          ),
-          SizedBox(width: rem * .75),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  p.text(item.label),
-                  style: TextStyle(
-                    fontSize: rem * .875,
-                    height: 1.6,
-                    fontWeight: FontWeight.w500,
-                    color: p.color('--settings-nav-label-color'),
+            SizedBox(width: rem * .75),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    p.text(item.label),
+                    style: TextStyle(
+                      fontSize: rem * .875,
+                      height: 1.6,
+                      fontWeight: FontWeight.w500,
+                      color: p.color('--settings-nav-label-color'),
+                    ),
                   ),
-                ),
-                SizedBox(height: rem * .125),
-                Text(
-                  p.text(item.description),
-                  style: TextStyle(
-                    fontSize: rem * .75,
-                    height: 1.3,
-                    color: p.color('--settings-nav-desc-color'),
+                  SizedBox(height: rem * .125),
+                  Text(
+                    p.text(item.description),
+                    style: TextStyle(
+                      fontSize: rem * .75,
+                      height: 1.3,
+                      color: p.color('--settings-nav-desc-color'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _header(
     double width,
@@ -1247,30 +1420,32 @@ class _MioShellState extends State<MioShell> {
               !_fullPlayer && !_queueOpen && !_backupOpen && !_recognitionOpen,
         ),
         Expanded(
-          child: Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              ValueListenableBuilder(
-                valueListenable: _search,
-                builder: (context, value, _) => value.text.isEmpty
-                    ? IgnorePointer(
-                        child: Text(
-                          p.text('common.searchMusicArtist'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: p.color('--td-text-color-placeholder'),
-                            fontSize: 14,
+          child: MioTvInputNavigation(
+            focusNode: _searchFocus,
+            controller: _search,
+            radius: 16,
+            // The topmost field has no directional candidate above it.
+            upFallback: wide ? _recognitionFocus : null,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                ValueListenableBuilder(
+                  valueListenable: _search,
+                  builder: (context, value, _) => value.text.isEmpty
+                      ? IgnorePointer(
+                          child: Text(
+                            p.text('common.searchMusicArtist'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.color('--td-text-color-placeholder'),
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              MioTvInputNavigation(
-                focusNode: _searchFocus,
-                // The topmost field has no directional candidate above it.
-                upFallback: wide ? _recognitionFocus : null,
-                child: EditableText(
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                EditableText(
                   controller: _search,
                   focusNode: _searchFocus,
                   style: DefaultTextStyle.of(context).style
@@ -1280,8 +1455,8 @@ class _MioShellState extends State<MioShell> {
                   textInputAction: TextInputAction.search,
                   onSubmitted: (_) => _submitSearch(),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         _iconButton(
@@ -1348,7 +1523,20 @@ class _MioShellState extends State<MioShell> {
     );
   }
 
-  Widget _compactPage(_Page page, double width) => MobileSettingsPage(
+  Widget _compactPage(_Page page, double width) => MioDeviceScope.isTv(context)
+      // Remote-driven TV settings are a QR code to the phone-side web pages.
+      ? TvSettingsQrPage(
+          palette: p,
+          ready:
+              core.player != null &&
+              _page == page &&
+              !_fullPlayer &&
+              !_queueOpen &&
+              !_backupOpen &&
+              !_recognitionOpen,
+        )
+      : _settingsPage(page, width);
+  Widget _settingsPage(_Page page, double width) => MobileSettingsPage(
     key: ValueKey(page),
     core: core,
     palette: p,
@@ -1568,20 +1756,6 @@ class _MioShellState extends State<MioShell> {
             : ReleaseSettingsView(updates: core.updates, palette: p),
       ),
       _retainedPage(
-        _Page.lanTransfer,
-        LanTransferPage(
-          palette: p,
-          ready: core.player != null,
-          television: MioDeviceScope.isTv(context),
-          active:
-              _page == _Page.lanTransfer &&
-              !_fullPlayer &&
-              !_queueOpen &&
-              !_backupOpen &&
-              !_recognitionOpen,
-        ),
-      ),
-      _retainedPage(
         _Page.visualSettings,
         (!wide || _cardSettings)
             ? _compactPage(_Page.visualSettings, width)
@@ -1746,6 +1920,7 @@ class _MioShellState extends State<MioShell> {
             alignment: Alignment.center,
             child: MioButton(
               palette: p,
+              focusNode: _guideFocus,
               label: p.text('music.find.goToPluginManage'),
               background: p.brand,
               radius: 3,
@@ -1762,7 +1937,9 @@ class _MioShellState extends State<MioShell> {
   }
 
   /// Recognition is offered only while an installed, enabled plugin can identify songs.
-  bool get _recognitionAvailable => api.recognitionAvailable();
+  // A TV remote has no microphone to listen with, so it never offers this.
+  bool get _recognitionAvailable =>
+      !MioDeviceScope.isTv(context) && api.recognitionAvailable();
 
   bool get _canRecognize =>
       _recognitionAvailable && core.player != null && !_recognitionOpen;
@@ -2555,9 +2732,11 @@ class _MioShellState extends State<MioShell> {
           // The seek thumb extends above the glass surface's clipping bounds.
           if (active)
             Positioned(
-              top: -10,
-              left: 0,
-              right: 0,
+              // On TV the bar sits inside the rounded card, clear of its
+              // corners, instead of straddling the top edge.
+              top: MioDeviceScope.isTv(context) ? -4 : -10,
+              left: MioDeviceScope.isTv(context) ? 28 : 0,
+              right: MioDeviceScope.isTv(context) ? 28 : 0,
               height: 24,
               child: ValueListenableBuilder(
                 valueListenable: core.playback,
@@ -2570,6 +2749,7 @@ class _MioShellState extends State<MioShell> {
                   )),
                   palette: p,
                   showThumb: true,
+                  thumbOnlyWhenFocusedOnTv: true,
                   value: clock?.position ?? 0,
                   maximum: clock?.duration ?? 0,
                   onChanged: usable

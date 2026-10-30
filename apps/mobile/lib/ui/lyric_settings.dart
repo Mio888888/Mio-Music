@@ -455,12 +455,11 @@ class _LyricSettingsViewState extends State<LyricSettingsView>
             ),
             const SizedBox(height: 24),
           ],
-          if (!MioDeviceScope.isTv(context))
-            MioSettingsSection(
-              palette: p,
-              title: p.english ? 'Floating lyrics' : '悬浮歌词',
-              child: NativeLyricSettings(palette: p, active: _live),
-            ),
+          MioSettingsSection(
+            palette: p,
+            title: p.english ? 'Floating lyrics' : '悬浮歌词',
+            child: NativeLyricSettings(palette: p, active: _live),
+          ),
           if (_loading || _busy)
             Semantics(
               liveRegion: true,

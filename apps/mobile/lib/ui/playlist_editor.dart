@@ -1,3 +1,5 @@
+import 'device.dart';
+
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -110,88 +112,94 @@ class _PlaylistMetadataFormState extends State<PlaylistMetadataForm> {
   }
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Align(
-      alignment: Alignment.topLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              p.text(
-                widget.playlistId == null
-                    ? 'music.songlist.createNewPlaylist'
-                    : 'music.songlist.editPlaylistInfo',
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_loading) Text(p.english ? 'Loading…' : '加载中…'),
-            if (!_loading && _editor != null) ...[
-              Text('${p.text('music.songlist.playlistName')} · 50'),
-              const SizedBox(height: 8),
-              MioInput(
-                palette: p,
-                controller: _name,
-                focusNode: _nameFocus,
-                placeholder: p.text('music.songlist.playlistNamePlaceholder'),
-                readOnly: _saving,
-                height: 44,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) => _descriptionFocus.requestFocus(),
-              ),
-              const SizedBox(height: 16),
-              Text('${p.text('music.songlist.playlistDesc')} · 200'),
-              const SizedBox(height: 8),
-              MioInput(
-                palette: p,
-                controller: _description,
-                focusNode: _descriptionFocus,
-                placeholder: p.text('music.songlist.playlistDescPlaceholder'),
-                readOnly: _saving,
-                maxLines: 4,
-                height: 112,
-                keyboardType: TextInputType.multiline,
-                textInputAction: TextInputAction.newline,
-              ),
-              const SizedBox(height: 16),
-            ],
-            if (_error != null) ...[
+  Widget build(BuildContext context) {
+    // TV has little height: a shorter description box and tighter gaps keep
+    // Save and Cancel on the first screen.
+    final tv = MioDeviceScope.isTv(context);
+    final gap = tv ? 10.0 : 16.0;
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(vertical: tv ? 4 : 12),
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                _error!,
-                style: TextStyle(color: p.color('--td-error-color')),
+                p.text(
+                  widget.playlistId == null
+                      ? 'music.songlist.createNewPlaylist'
+                      : 'music.songlist.editPlaylistInfo',
+                ),
               ),
-              const SizedBox(height: 12),
-            ],
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                MioButton(
+              SizedBox(height: gap),
+              if (_loading) Text(p.english ? 'Loading…' : '加载中…'),
+              if (!_loading && _editor != null) ...[
+                Text('${p.text('music.songlist.playlistName')} · 50'),
+                const SizedBox(height: 8),
+                MioInput(
                   palette: p,
-                  label: p.text('common.cancel'),
-                  onPressed: _saving ? null : widget.onClose,
-                  child: Text(p.text('common.cancel')),
+                  controller: _name,
+                  focusNode: _nameFocus,
+                  placeholder: p.text('music.songlist.playlistNamePlaceholder'),
+                  readOnly: _saving,
+                  height: 44,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) => _descriptionFocus.requestFocus(),
                 ),
-                MioButton(
+                SizedBox(height: gap),
+                Text('${p.text('music.songlist.playlistDesc')} · 200'),
+                const SizedBox(height: 8),
+                MioInput(
                   palette: p,
-                  label: p.text('common.save'),
-                  onPressed: _loading || _saving || _editor == null
-                      ? null
-                      : () => unawaited(_save()),
-                  background: p.brand.withValues(alpha: .12),
-                  child: Text(
-                    _saving
-                        ? (p.english ? 'Saving…' : '保存中…')
-                        : p.text('common.save'),
-                  ),
+                  controller: _description,
+                  focusNode: _descriptionFocus,
+                  placeholder: p.text('music.songlist.playlistDescPlaceholder'),
+                  readOnly: _saving,
+                  maxLines: tv ? 2 : 4,
+                  height: tv ? 72 : 112,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
                 ),
+                SizedBox(height: gap),
               ],
-            ),
-          ],
+              if (_error != null) ...[
+                Text(
+                  _error!,
+                  style: TextStyle(color: p.color('--td-error-color')),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  MioButton(
+                    palette: p,
+                    label: p.text('common.cancel'),
+                    onPressed: _saving ? null : widget.onClose,
+                    child: Text(p.text('common.cancel')),
+                  ),
+                  MioButton(
+                    palette: p,
+                    label: p.text('common.save'),
+                    onPressed: _loading || _saving || _editor == null
+                        ? null
+                        : () => unawaited(_save()),
+                    background: p.brand.withValues(alpha: .12),
+                    child: Text(
+                      _saving
+                          ? (p.english ? 'Saving…' : '保存中…')
+                          : p.text('common.save'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

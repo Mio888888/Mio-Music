@@ -273,9 +273,14 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
       context,
       MediaQuery.sizeOf(context).width,
     );
+    final tv = MioDeviceScope.isTv(context);
     return math.max(
-      narrow ? 68 : 66,
-      scale.scale(14) * 1.6 + scale.scale(12) * 1.6 + 8,
+      narrow
+          ? 68
+          : tv
+          ? 76
+          : 66,
+      scale.scale(tv ? 16 : 14) * 1.6 + scale.scale(tv ? 13 : 12) * 1.6 + 8,
     );
   }
 
@@ -353,12 +358,12 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
         child: Row(
           children: [
             SizedBox(
-              width: 20,
+              width: tv ? 32 : 20,
               child: Text(
                 '${index + 1}'.padLeft(2, '0'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: tv ? 14 : 13,
                   fontWeight: FontWeight.w500,
                   color: p.color('--td-text-color-placeholder'),
                 ),
@@ -374,14 +379,14 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
                     song.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, height: 1.6),
+                    style: TextStyle(fontSize: tv ? 16 : 14, height: 1.6),
                   ),
                   Text(
                     song.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: tv ? 13 : 12,
                       height: 1.6,
                       color: p.secondary,
                     ),
@@ -391,12 +396,12 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 6),
             SizedBox(
-              width: 40,
+              width: tv ? 48 : 40,
               child: Text(
                 _duration(song.duration),
                 textAlign: TextAlign.right,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: tv ? 13 : 12,
                   color: p
                       .color('--td-text-color-placeholder')
                       .withValues(alpha: .72),
@@ -441,6 +446,16 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
                         children: [
                           Expanded(child: play),
                           const SizedBox(width: 6),
+                          if (tv)
+                            _icon(
+                              'Menu',
+                              p.english ? 'Reorder' : '调整顺序',
+                              _enabled
+                                  ? () => setState(
+                                      () => _selected = selected ? null : index,
+                                    )
+                                  : null,
+                            ),
                           SizedBox(
                             width: 44,
                             height: 44,
@@ -475,16 +490,6 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                          if (tv)
-                            _icon(
-                              'Menu',
-                              p.english ? 'Reorder' : '调整顺序',
-                              _enabled
-                                  ? () => setState(
-                                      () => _selected = selected ? null : index,
-                                    )
-                                  : null,
-                            ),
                         ],
                       ),
                     ),
@@ -653,48 +658,55 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
     return '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
   }
 
-  Widget _header(bool narrow, double gutter) => Container(
-    padding: EdgeInsets.symmetric(
-      horizontal: narrow ? gutter : 16,
-      vertical: narrow ? 12 : 16,
-    ),
-    decoration: BoxDecoration(
-      border: Border(
-        bottom: BorderSide(
-          color: p.color('--td-text-color-primary').withValues(alpha: .1),
+  Widget _header(bool narrow, double gutter) {
+    final tv = MioDeviceScope.isTv(context);
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: narrow ? gutter : 16,
+        vertical: narrow ? 12 : (tv ? 12 : 16),
+      ),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: p.color('--td-text-color-primary').withValues(alpha: .1),
+          ),
         ),
       ),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            '${p.text('play.playlistTitle')} (${widget.state.queueCount})',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: narrow ? 17 : 16,
-              fontWeight: FontWeight.w600,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '${p.text('play.playlistTitle')} (${widget.state.queueCount})',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: tv
+                    ? 20
+                    : narrow
+                    ? 17
+                    : 16,
+                fontWeight: tv ? FontWeight.w800 : FontWeight.w600,
+              ),
             ),
           ),
-        ),
-        SizedBox.square(
-          dimension: narrow ? 44 : 36,
-          child: MioButton(
-            palette: p,
-            label: p.text('common.close'),
-            onPressed: widget.onClose,
-            radius: 22,
-            padding: EdgeInsets.zero,
-            background: const Color(0x1f787880),
-            child: Center(
-              child: MioIcon('WindowClose', color: p.secondary, size: 18),
+          SizedBox.square(
+            dimension: narrow ? 44 : (tv ? 48 : 36),
+            child: MioButton(
+              palette: p,
+              label: p.text('common.close'),
+              onPressed: widget.onClose,
+              radius: 22,
+              padding: EdgeInsets.zero,
+              background: const Color(0x1f787880),
+              child: Center(
+                child: MioIcon('WindowClose', color: p.secondary, size: 18),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Widget _footerAction(
     String label,
@@ -702,43 +714,49 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
     VoidCallback? action,
     bool narrow, {
     String? icon,
-  }) => Expanded(
-    child: Container(
-      constraints: BoxConstraints(minHeight: narrow ? 44 : 34),
-      decoration: BoxDecoration(
-        border: Border.all(color: tint.withValues(alpha: .2)),
-        borderRadius: BorderRadius.circular(narrow ? 999 : 8),
-      ),
-      child: MioButton(
-        palette: p,
-        label: label,
-        onPressed: action,
-        radius: narrow ? 999 : 8,
-        background: tint.withValues(alpha: .1),
-        padding: EdgeInsets.symmetric(horizontal: 6, vertical: narrow ? 8 : 4),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              MioIcon(icon, color: tint, size: 16),
-              const SizedBox(width: 6),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: tint,
+  }) {
+    final tv = MioDeviceScope.isTv(context);
+    return Expanded(
+      child: Container(
+        constraints: BoxConstraints(minHeight: narrow || tv ? 48 : 34),
+        decoration: BoxDecoration(
+          border: Border.all(color: tint.withValues(alpha: .2)),
+          borderRadius: BorderRadius.circular(narrow || tv ? 999 : 8),
+        ),
+        child: MioButton(
+          palette: p,
+          label: label,
+          onPressed: action,
+          radius: narrow || tv ? 999 : 8,
+          background: tint.withValues(alpha: .1),
+          padding: EdgeInsets.symmetric(
+            horizontal: 6,
+            vertical: narrow ? 8 : 4,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                MioIcon(icon, color: tint, size: tv ? 18 : 16),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: tv ? 15 : 13,
+                    fontWeight: FontWeight.w500,
+                    color: tint,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _footer(bool narrow, double gutter, double bottomInset) => Container(
     padding: EdgeInsets.fromLTRB(
@@ -830,6 +848,9 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
               math.min(box.maxHeight * .76, 620.0 + bottomInset),
               math.max(0.0, box.maxHeight - 12),
             )
+          : MioDeviceScope.isTv(context)
+          // TV: a side sheet that clears the player's taller control deck.
+          ? math.max(0.0, box.maxHeight - 48)
           : math.max(
               0.0,
               box.maxHeight - (box.maxHeight * .1).clamp(70.0, 80.0) - 80,
@@ -871,9 +892,18 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
                 ),
                 Positioned(
                   right: 0,
-                  top: narrow ? null : 72,
+                  top: narrow
+                      ? null
+                      : MioDeviceScope.isTv(context)
+                      ? 24
+                      : 72,
                   bottom: narrow ? 0 : null,
-                  width: narrow ? box.maxWidth : math.min(box.maxWidth, 380.0),
+                  width: narrow
+                      ? box.maxWidth
+                      : math.min(
+                          box.maxWidth,
+                          MioDeviceScope.isTv(context) ? 440.0 : 380.0,
+                        ),
                   height: height,
                   child: Semantics(
                     scopesRoute: true,

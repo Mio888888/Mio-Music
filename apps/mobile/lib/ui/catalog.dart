@@ -31,6 +31,9 @@ import 'local_tag_editor.dart';
 import 'download_toolbar.dart';
 import 'online_playlist_header.dart';
 import 'download_task_card.dart';
+import 'tv/tv_widgets.dart';
+
+part 'tv/tv_catalog.dart';
 
 enum CatalogKind { local, playlists, downloads, savedPlaylist }
 
@@ -1535,7 +1538,9 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
           else if (_wide && widget.kind == CatalogKind.local) ...[
             // No page title on wide layouts: one toolbar row carries the
             // actions, the song count and the search box.
-            _wideLocalToolbar(),
+            MioDeviceScope.isTv(context)
+                ? _tvLocalToolbar()
+                : _wideLocalToolbar(),
             const SizedBox(height: 12),
           ] else if (_wide &&
               widget.kind == CatalogKind.savedPlaylist &&
@@ -1545,38 +1550,50 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
           ] else if (_wide && widget.kind == CatalogKind.playlists) ...[
             // No page title on wide layouts: the count, the actions and an
             // icon-only refresh share a single row.
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    p
-                        .text('music.songlist.myPlaylists')
-                        .replaceAll('{count}', '$_total'),
-                    style: TextStyle(
-                      fontSize: rem * 1.25,
-                      height: 24 / (rem * 1.25),
-                      fontWeight: FontWeight.w600,
+            Padding(
+              // Cards sit 10 in from the page edge; keep the header on their edge.
+              padding: EdgeInsets.symmetric(
+                horizontal: MioDeviceScope.isTv(context) ? 10 : 0,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      p
+                          .text('music.songlist.myPlaylists')
+                          .replaceAll('{count}', '$_total'),
+                      style: TextStyle(
+                        fontSize: MioDeviceScope.isTv(context)
+                            ? 22
+                            : rem * 1.25,
+                        height: 24 / (rem * 1.25),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                _widePlaylistActions(rem),
-                SizedBox(width: rem * .75),
-                SizedBox.square(
-                  dimension: 32,
-                  child: MioButton(
-                    palette: p,
-                    label: p.text('common.refresh'),
-                    radius: 6,
-                    padding: EdgeInsets.zero,
-                    onPressed: _live && !_loading && !_editing && !_catalogBusy
-                        ? () => unawaited(_load(reset: true))
-                        : null,
-                    child: Center(
-                      child: MioIcon('Refresh', size: 18, color: p.secondary),
+                  if (MioDeviceScope.isTv(context))
+                    _tvPlaylistActions()
+                  else
+                    _widePlaylistActions(rem),
+                  SizedBox(width: rem * .75),
+                  SizedBox.square(
+                    dimension: MioDeviceScope.isTv(context) ? 40 : 32,
+                    child: MioButton(
+                      palette: p,
+                      label: p.text('common.refresh'),
+                      radius: 6,
+                      padding: EdgeInsets.zero,
+                      onPressed:
+                          _live && !_loading && !_editing && !_catalogBusy
+                          ? () => unawaited(_load(reset: true))
+                          : null,
+                      child: Center(
+                        child: MioIcon('Refresh', size: 18, color: p.secondary),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             SizedBox(height: rem * 1.5),
           ] else if (_wide)
@@ -1880,6 +1897,7 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
               : _narrowPlaylistRow(_items[i] as api.PlaylistInfo),
         );
       }
+      if (MioDeviceScope.isTv(context)) return _tvPlaylistGrid();
       return LayoutBuilder(
         builder: (context, box) {
           final gap = _wide ? rem * 1.5 : 12.0;
@@ -2216,7 +2234,8 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
       description: 'By local',
       count: p.text('common.songCount').replaceAll('{count}', '$_total'),
       cover: playlist.cover,
-      compact: false,
+      // TV has no height for the tall header above the song table.
+      compact: MioDeviceScope.isTv(context),
       wide: true,
       busy: true,
       search: false,

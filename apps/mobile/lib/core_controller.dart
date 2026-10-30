@@ -109,8 +109,13 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
       capabilities = core.capabilities();
       final data = await getApplicationSupportDirectory();
       final cache = await getTemporaryDirectory();
-      final downloads = Platform.isAndroid
+      // A TV keeps downloads in the app's own directory, like the cache: it
+      // has no file manager to browse a shared folder and frees the space on
+      // uninstall.
+      final downloads = Platform.isAndroid && !capabilities!.television
           ? await getExternalStorageDirectory() ?? data
+          : Platform.isAndroid
+          ? data
           : await getApplicationDocumentsDirectory();
       _paths ??= core.HostPaths(
         data: data.path,

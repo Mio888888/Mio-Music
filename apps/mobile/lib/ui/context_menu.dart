@@ -145,11 +145,13 @@ class _MioContextMenuState<T> extends State<MioContextMenu<T>> {
   Widget build(BuildContext context) {
     final p = widget.palette;
     final media = MediaQuery.of(context);
+    // A TV's overscan margin is not a system inset, so keep clear of it.
+    final edge = MioDeviceScope.isTv(context) ? 28.0 : 8.0;
     final padding = EdgeInsets.fromLTRB(
-      media.padding.left + 8,
-      media.padding.top + 8,
-      media.padding.right + 8,
-      math.max(media.padding.bottom, media.viewInsets.bottom) + 8,
+      media.padding.left + edge,
+      media.padding.top + edge,
+      media.padding.right + edge,
+      math.max(media.padding.bottom, media.viewInsets.bottom) + edge,
     );
     return CallbackShortcuts(
       bindings: {

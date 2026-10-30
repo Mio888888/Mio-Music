@@ -21,6 +21,9 @@ import 'resources.dart';
 import 'favorite_button.dart';
 import 'search_track_row.dart';
 import 'context_menu.dart';
+import 'tv/tv_widgets.dart';
+
+part 'tv/tv_singer.dart';
 
 /// Phone artist navigation shares the existing shell's playback and navigation.
 class SingerHost extends InheritedWidget {
@@ -54,6 +57,9 @@ class SingerPage extends StatefulWidget {
 enum _SingerAction { save, download, downloadAll, select }
 
 class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
+  // TV: Play All takes focus back when the confirmation closes.
+  final _tvPlayFocus = FocusNode(debugLabel: 'Artist play all');
+  bool _tvConfirmShown = false;
   final _confirmationScope = FocusScopeNode(
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
   );
@@ -823,6 +829,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     _confirmationScope.dispose();
+    _tvPlayFocus.dispose();
     widget.core.removeListener(_coreChanged);
     WidgetsBinding.instance.removeObserver(this);
     _suspend();
@@ -1275,6 +1282,13 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
     }
   }
 
+  /// Switches between the songs and albums tabs.
+  void _showTab(bool albums) {
+    setState(() => _tabAlbums = albums);
+    if (albums && _albums.isEmpty && _albumMore) unawaited(_albumsLoad());
+    _refill(_epoch);
+  }
+
   void _artistVisibility(bool visible) {
     if (!mounted) return;
     setState(() => _artistRoute = visible);
@@ -1322,6 +1336,9 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
     return CustomScrollView(
       controller: detail ? _detailScroll : _songScroll,
       slivers: [
+        // Room for the focus lift of the first row on TV.
+        if (MioDeviceScope.isTv(context))
+          const SliverToBoxAdapter(child: SizedBox(height: 6)),
         if (error != null && tracks.isEmpty)
           SliverToBoxAdapter(
             child: _error(
@@ -1359,10 +1376,12 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
               durationAtEnd: true,
               // Judged on the window: the page is hosted in a content area
               // narrower than the window on wide layouts.
-              threeLine: MioDeviceScope.wide(
-                context,
-                MediaQuery.sizeOf(context).width,
-              ),
+              threeLine:
+                  !MioDeviceScope.isTv(context) &&
+                  MioDeviceScope.wide(
+                    context,
+                    MediaQuery.sizeOf(context).width,
+                  ),
               onPlay: active ? () => unawaited(_play(id: song.id)) : null,
               artist: _artistLink(song, detail),
               trailing: _selectingSongs
@@ -1745,9 +1764,16 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
           child: SafeArea(
             top: widget.onClose == null,
             bottom: widget.onClose == null,
+            // Inside the TV shell the frame already keeps the overscan margin;
+            // this is only breathing room for the focus ring.
+            minimum: MioDeviceScope.isTv(context)
+                ? const EdgeInsets.fromLTRB(16, 12, 16, 4)
+                : EdgeInsets.zero,
             child: LayoutBuilder(
               builder: (context, box) {
                 final wide = MioDeviceScope.wide(context, box.maxWidth);
+                final tv = MioDeviceScope.isTv(context);
+                if (tv) _trackTvConfirmation();
                 return Stack(
                   children: [
                     ExcludeFocus(
@@ -1771,13 +1797,17 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
                                   maxHeight: math.max(0, box.maxHeight - 100),
                                 ),
                                 child: SingleChildScrollView(
-                                  child: wide || _detail
+                                  child: tv
+                                      ? _tvHeader()
+                                      : wide || _detail
                                       ? _header(wide, box.maxWidth)
                                       : _phoneHeader(box.maxWidth),
                                 ),
                               ),
                             ),
-                            if (!_detail)
+                            if (tv)
+                              _tvControls()
+                            else if (!_detail)
                               Container(
                                 alignment: Alignment.centerLeft,
                                 padding: EdgeInsets.symmetric(
@@ -1798,26 +1828,14 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
                                       '${p.text('music.singer.tabSongs')}($_songTotal)',
                                       !_tabAlbums,
                                       _live && !_actionBusy
-                                          ? () {
-                                              setState(
-                                                () => _tabAlbums = false,
-                                              );
-                                              _refill(_epoch);
-                                            }
+                                          ? () => _showTab(false)
                                           : null,
                                     ),
                                     _tabButton(
                                       '${p.text('music.singer.tabAlbums')}(${_profile?.albumCount ?? _albumTotal})',
                                       _tabAlbums,
                                       _live && !_actionBusy
-                                          ? () {
-                                              setState(() => _tabAlbums = true);
-                                              if (_albums.isEmpty &&
-                                                  _albumMore) {
-                                                unawaited(_albumsLoad());
-                                              }
-                                              _refill(_epoch);
-                                            }
+                                          ? () => _showTab(true)
                                           : null,
                                     ),
                                   ],
@@ -1854,7 +1872,9 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
                                         excluding: _detail,
                                         child: Offstage(
                                           offstage: _detail,
-                                          child: _albumList(wide),
+                                          child: tv
+                                              ? _tvAlbumGrid()
+                                              : _albumList(wide),
                                         ),
                                       ),
                                     if (_detail)
