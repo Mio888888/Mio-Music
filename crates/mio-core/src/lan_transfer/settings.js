@@ -13,8 +13,8 @@
     control && h('div', {class: 'control'}, control));
   const wide = (name, desc, control) => row(name, desc, control, true);
   const button = (text, onclick, kind) => h('button', {type: 'button', class: kind || '', text, onclick});
-  const toggle = (value, change, name) => h('button', {
-    type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(!!value), 'aria-label': name || '',
+  const toggle = (value, change, name, disabled) => h('button', {
+    type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(!!value), 'aria-label': name || '', disabled: !!disabled,
     onclick: event => change(event.currentTarget.getAttribute('aria-checked') !== 'true'),
   });
   const segmented = (options, value, change) => h('div', {class: 'seg', role: 'group'},
@@ -38,7 +38,29 @@
   async function run(work, refresh) {
     try { await work(); if (refresh !== false) await show(current, true); } catch (error) { toast(describe(error), true); await show(current, true).catch(() => {}); }
   }
-  const save = (op, args) => run(() => call(op, args));
+  const saved = () => toast(tr('Saved', '已保存'));
+  const save = (op, args) => run(async () => { await call(op, args); saved(); });
+  // In-page replacement for confirm()/prompt(): resolves true / the typed text, or null when cancelled.
+  function ask({title, message, input, ok, danger, placeholder}) {
+    return new Promise(resolve => {
+      const field = input ? h('input', {type: 'text', placeholder: placeholder || '', maxlength: 128, autocomplete: 'off', spellcheck: 'false'}) : null;
+      const done = value => { document.removeEventListener('keydown', keys, true); backdrop.remove(); resolve(value); };
+      const accept = () => done(input ? (field.value.trim() || null) : true);
+      const keys = event => {
+        if (event.key === 'Escape') { event.preventDefault(); done(null); }
+        else if (event.key === 'Enter' && input) { event.preventDefault(); accept(); }
+      };
+      const confirmButton = button(ok || tr('OK', '确定'), accept, danger ? 'danger' : 'primary');
+      const backdrop = h('div', {class: 'backdrop', onclick: event => { if (event.target === backdrop) done(null); }},
+        h('div', {class: 'dialog', role: 'dialog', 'aria-modal': 'true'},
+          title && h('h3', {text: title}), message && h('p', {text: message}), field,
+          h('div', {class: 'actions'}, button(tr('Cancel', '取消'), () => done(null)), confirmButton)));
+      document.addEventListener('keydown', keys, true);
+      document.body.append(backdrop);
+      (field || confirmButton).focus();
+    });
+  }
+  const pageHead = (title, desc) => h('header', {class: 'pagehead'}, h('h2', {text: title}), desc && h('p', {text: desc}));
   const qualityName = q => {
     const key = {'128k': 'display128k', '320k': 'display320k', flac: 'displayFlac', flac24bit: 'displayFlac24bit', hires: 'displayHires', atmos: 'displayAtmos', atmosPlus: 'displayAtmosPlus', master: 'displayMaster'}[q];
     return key ? label('quality.' + key, q) : q;
@@ -95,8 +117,9 @@
         row(label('settings.playback.routePreload'), label('settings.playback.routePreloadDesc'), toggle(general.routePreload, routePreload => save('general.set', {routePreload})))),
       card(label('settings.playback.playlistManagement', tr('Queue', '播放列表')), null,
         row(tr('Songs in queue', '队列歌曲'), tr('About ' + general.artistCount + ' artists', '约 ' + general.artistCount + ' 位歌手'), h('b', {text: String(general.queueCount)})),
-        h('div', {class: 'actions'}, button(tr('Clear queue', '清空播放列表'), e => {
-          if (confirm(tr('Clear the whole play queue?', '确定清空整个播放列表吗？'))) busy(e.currentTarget, () => save('queue.clear'));
+        h('div', {class: 'actions'}, button(tr('Clear queue', '清空播放列表'), async e => {
+          const node = e.currentTarget;
+          if (await ask({title: tr('Clear queue', '清空播放列表'), message: tr('Clear the whole play queue?', '确定清空整个播放列表吗？'), ok: tr('Clear', '清空'), danger: true})) busy(node, () => save('queue.clear'));
         }, 'danger'))),
       await queueTransfer(),
     ];
@@ -124,7 +147,7 @@
     .map(([key, text]) => [key, label('settings.equalizer.' + text, key)]);
   async function effects() {
     const [balance, eq] = [await call('balance.get'), await call('eq.get')];
-    const edit = (args) => run(() => call('eq.edit', args));
+    const edit = (args) => run(async () => { await call('eq.edit', args); saved(); });
     const bandEdit = (index, band, patch) => edit(Object.assign({action: 'band', index}, band, patch));
     const presetNode = select(eq.presets.map(p => [p.id, p.localeKey ? label(p.localeKey, p.name) : p.name]), eq.currentPresetId, id => edit({action: 'preset', id}));
     const current = eq.presets.find(p => p.id === eq.currentPresetId);
@@ -140,7 +163,7 @@
         h('div', {class: 'actions'},
           current && !current.builtin && button(tr('Update preset', '更新预设'), () => edit({action: 'updatePreset', id: current.id})),
           current && !current.builtin && button(tr('Delete preset', '删除预设'), () => edit({action: 'deletePreset', id: current.id}), 'danger'),
-          button(tr('Save as new…', '另存为…'), () => { const name = prompt(tr('Preset name', '预设名称')); if (name && name.trim()) edit({action: 'savePreset', name: name.trim()}); }),
+          button(tr('Save as new…', '另存为…'), async () => { const name = await ask({title: tr('Save as new preset', '另存为新预设'), input: true, placeholder: tr('Preset name', '预设名称'), ok: tr('Save', '保存')}); if (name) edit({action: 'savePreset', name}); }),
           button(tr('Reset', '重置'), () => edit({action: 'reset'}))),
         wide(tr('Global gain', '总增益'), null, slider(-24, 24, 0.5, eq.globalGain, x => (x > 0 ? '+' : '') + x.toFixed(1) + ' dB', gain => edit({action: 'gain', gain})))),
       card(tr('Bands', '频段'), null,
@@ -156,17 +179,22 @@
         return h('div', null, area, h('div', {class: 'actions'},
           button(tr('Export', '导出'), async e => busy(e.currentTarget, async () => { try { area.value = (await call('eq.export')).text; } catch (error) { toast(describe(error), true); } })),
           button(tr('Import', '导入'), () => { if (area.value.trim()) edit({action: 'importConfig', text: area.value}); }, 'primary'),
-          button(label('settings.equalizer.textImportPresetTitle', tr('Import text preset', '导入文本预设')), () => {
+          button(label('settings.equalizer.textImportPresetTitle', tr('Import text preset', '导入文本预设')), async () => {
             if (!area.value.trim()) return;
-            const name = prompt(label('settings.equalizer.textImportPresetNamePlaceholder', tr('Preset name', '预设名称')));
-            if (name && name.trim()) edit({action: 'importText', name: name.trim(), text: area.value});
+            const name = await ask({title: label('settings.equalizer.textImportPresetTitle', tr('Import text preset', '导入文本预设')), input: true, placeholder: label('settings.equalizer.textImportPresetNamePlaceholder', tr('Preset name', '预设名称')), ok: tr('Import', '导入')});
+            if (name) edit({action: 'importText', name, text: area.value});
           }),
           h('a', {href: 'https://mio888888.github.io/EQVault/', target: '_blank', rel: 'noopener noreferrer', text: label('settings.equalizer.downloadPresets', 'EQVault')})));
       })()),
     ];
   }
 
-  function fieldControl(plugin, field, values) {
+  // ---- plugins -----------------------------------------------------------
+  const openPlugins = new Set();   // expanded cards survive the redraw after every change
+  const freshPlugins = new Set();  // cards that appeared since the page was last drawn
+  let knownPlugins = null, installMode = 'url';
+
+  function fieldControl(field, values) {
     const set = value => { values[field.key] = value; };
     const value = field.value === null || field.value === undefined ? '' : field.value;
     set(field.value === undefined ? null : field.value);
@@ -176,40 +204,156 @@
     const input = h('input', {type: field.kind === 'password' ? 'password' : 'text', value, placeholder: field.placeholder || '', autocomplete: 'off', spellcheck: 'false', oninput: () => set(input.value)});
     return input;
   }
+
+  function pluginStatus(plugin) {
+    if (plugin.kind === 'playback') return plugin.active ? ['', tr('In use', '使用中')] : ['off', tr('Not in use', '未使用')];
+    if (!plugin.configured) return ['warn', tr('Needs setup', '待配置')];
+    return plugin.enabled ? ['', tr('Enabled', '已启用')] : ['off', tr('Disabled', '已停用')];
+  }
+
   function pluginCard(plugin) {
+    const key = plugin.kind + ':' + plugin.id;
+    const expanded = openPlugins.has(key);
+    const [tone, stateText] = pluginStatus(plugin);
+    const subtitle = [plugin.author, plugin.sources.length ? plugin.sources.map(s => s.name).join(' · ') : ''].filter(Boolean).join(' · ');
+    const playback = plugin.kind === 'playback';
+    const main = playback
+      ? toggle(plugin.active, on => { if (on) save('plugins.activate', {id: plugin.id}); }, tr('Use for playback', '作为播放插件'), plugin.active)
+      : toggle(plugin.enabled, enabled => save('plugins.enable', {id: plugin.id, enabled}), tr('Enabled', '启用'));
+    const head = h('div', {class: 'ph'},
+      h('div', {class: 'avatar', 'aria-hidden': 'true', text: (plugin.name || '?').trim().slice(0, 1).toUpperCase()}),
+      h('div', {class: 'info'},
+        h('div', {class: 'title'}, h('span', {text: plugin.name}), h('span', {class: 'tag', text: /^v/i.test(plugin.version) ? plugin.version : 'v' + plugin.version}),
+          plugin.bundled && h('span', {class: 'tag', text: tr('Built-in', '内置')}),
+          h('span', {class: 'tag' + (tone ? ' ' + tone : ''), text: stateText})),
+        subtitle && h('div', {class: 'sub', text: subtitle})),
+      main,
+      h('button', {type: 'button', class: 'more', 'aria-expanded': String(expanded), 'aria-label': tr('Details', '详情'), text: '⌄', onclick: () => {
+        if (openPlugins.has(key)) openPlugins.delete(key); else openPlugins.add(key);
+        freshPlugins.delete(key);
+        show('plugins', true);
+      }}));
+    const card = h('section', {class: 'card plugin' + (freshPlugins.has(key) ? ' fresh' : '')}, head);
+    if (!expanded) return card;
+
     const values = {};
-    const list = plugin.kind === 'list';
-    const head = h('div', null, h('b', {text: plugin.name}), h('span', {class: 'tag', text: 'v' + plugin.version}),
-      plugin.bundled && h('span', {class: 'tag', text: tr('Built-in', '内置')}),
-      list && !plugin.configured && h('span', {class: 'tag', text: tr('Needs setup', '待配置')}));
-    const rows = [row(plugin.author || '', plugin.description || '', null)];
-    if (plugin.kind === 'playback') {
-      rows.push(row(tr('Use for playback', '作为播放插件'), null, toggle(plugin.active, on => { if (on) save('plugins.activate', {id: plugin.id}); }, plugin.name)));
-    } else {
-      rows.push(row(tr('Enabled', '启用'), null, toggle(plugin.enabled, enabled => save('plugins.enable', {id: plugin.id, enabled}), plugin.name)));
-      if (plugin.sources.length) rows.push(row(tr('Sources', '音源'), plugin.sources.map(s => s.name).join(' · '), null));
-      rows.push(row(tr('Provide playback', '提供播放'), null, toggle(plugin.providePlay, play => save('plugins.provide', {id: plugin.id, play, download: plugin.provideDownload}))));
-      rows.push(row(tr('Provide downloads', '提供下载'), null, toggle(plugin.provideDownload, download => save('plugins.provide', {id: plugin.id, play: plugin.providePlay, download}))));
-      for (const field of plugin.fields) rows.push(wide(field.label + (field.required ? ' *' : ''), field.description, fieldControl(plugin, field, values)));
-      if (plugin.fields.length) rows.push(h('div', {class: 'actions'}, button(tr('Save configuration', '保存配置'), e => busy(e.currentTarget, () => run(() => call('plugins.configure', {id: plugin.id, revision: plugin.revision, values: JSON.stringify(values)}))), 'primary')));
+    const body = h('div', {class: 'pb'}, plugin.description && h('p', {class: 'about', text: plugin.description}));
+    if (!playback) {
+      body.append(
+        row(tr('Provide playback', '提供播放'), tr('Let this plugin resolve song URLs.', '允许该插件解析歌曲播放地址。'), toggle(plugin.providePlay, play => save('plugins.provide', {id: plugin.id, play, download: plugin.provideDownload}), tr('Provide playback', '提供播放'))),
+        row(tr('Provide downloads', '提供下载'), tr('Let this plugin resolve download links.', '允许该插件解析下载地址。'), toggle(plugin.provideDownload, download => save('plugins.provide', {id: plugin.id, play: plugin.providePlay, download}), tr('Provide downloads', '提供下载'))));
+      if (plugin.fields.length) {
+        body.append(h('div', {class: 'sectiontitle', text: tr('Configuration', '配置')}),
+          h('div', {class: 'fields'}, plugin.fields.map(field => h('div', null,
+            h('div', {class: 'name'}, field.label, field.required && h('span', {class: 'req', text: '*'})),
+            field.description && h('div', {class: 'desc', text: field.description}),
+            fieldControl(field, values)))),
+          h('div', {class: 'actions'}, button(tr('Save configuration', '保存配置'), e => busy(e.currentTarget, () => run(async () => {
+            await call('plugins.configure', {id: plugin.id, revision: plugin.revision, values: JSON.stringify(values)});
+            saved();
+          })), 'primary')));
+      }
     }
     const logs = h('pre', {class: 'log', hidden: true});
-    rows.push(h('div', {class: 'actions'},
-      plugin.kind === 'playback' && button(tr('Logs', '日志'), async e => busy(e.currentTarget, async () => { try { const r = await call('plugins.logs', {id: plugin.id}); logs.hidden = false; logs.textContent = r.lines.join('\n') || tr('No logs', '暂无日志'); } catch (error) { toast(describe(error), true); } })),
-      !plugin.bundled && button(tr('Remove', '卸载'), () => { if (confirm(tr('Remove this plugin?', '确定卸载该插件吗？'))) save('plugins.remove', {kind: plugin.kind, id: plugin.id}); }, 'danger')), logs);
-    return h('section', {class: 'card'}, head, rows);
+    body.append(h('div', {class: 'actions'},
+      playback && button(tr('View logs', '查看日志'), e => busy(e.currentTarget, async () => {
+        try { const r = await call('plugins.logs', {id: plugin.id}); logs.hidden = false; logs.textContent = r.lines.join('\n') || tr('No logs', '暂无日志'); } catch (error) { toast(describe(error), true); }
+      })),
+      !plugin.bundled && button(tr('Remove plugin', '卸载插件'), async e => {
+        const node = e.currentTarget;
+        if (await ask({title: tr('Remove plugin', '卸载插件'), message: tr(`Remove “${plugin.name}”? Its settings are deleted too.`, `确定卸载“${plugin.name}”吗？它的配置也会一并删除。`), ok: tr('Remove', '卸载'), danger: true})) {
+          openPlugins.delete(key);
+          busy(node, () => save('plugins.remove', {kind: plugin.kind, id: plugin.id}));
+        }
+      }, 'danger')), logs);
+    card.append(body);
+    return card;
   }
+
+  // One install card with three ways in. Input stays put when an install fails so it can be fixed.
+  function installCard() {
+    const status = h('p', {class: 'inline-note', role: 'status'});
+    const say = (text, bad) => { status.className = 'inline-note' + (bad ? ' bad' : ''); status.textContent = text || ''; };
+    async function install(node, work) {
+      await busy(node, async () => {
+        say(tr('Installing…', '正在安装…'));
+        try { await work(); say(''); toast(tr('Plugin installed', '插件已安装')); await show('plugins', true); }
+        catch (error) { say(describe(error), true); toast(describe(error), true); }
+      });
+    }
+
+    const url = h('input', {type: 'url', placeholder: 'https://…/plugin.js', maxlength: 4096, autocomplete: 'off', spellcheck: 'false'});
+    const urlButton = button(tr('Install', '安装'), e => {
+      if (!url.value.trim()) { say(describe(new Error('invalid_plugin_url')), true); url.focus(); return; }
+      install(e.currentTarget, () => call('plugins.installUrl', {url: url.value.trim()}));
+    }, 'primary');
+    url.addEventListener('keydown', event => { if (event.key === 'Enter') urlButton.click(); });
+
+    const file = h('input', {type: 'file', accept: '.js,.txt'});
+    const dropTitle = h('b'), dropHint = h('span');
+    const fileButton = button(tr('Install file', '安装文件'), e => {
+      const f = file.files[0];
+      if (!f || f.size === 0 || f.size > 1048576) { say(describe(new Error('badFile')), true); return; }
+      install(e.currentTarget, () => upload('/plugin', f, f.name));
+    }, 'primary');
+    const drop = h('label', {class: 'drop'}, file, dropTitle, dropHint);
+    const drawFile = () => {
+      const f = file.files[0];
+      dropTitle.textContent = f ? f.name : tr('Choose a plugin file', '选择插件文件');
+      dropHint.textContent = f ? size(f.size) : tr('Click to browse or drop a .js file here · up to 1 MiB', '点击选择,或把 .js 文件拖到这里 · 不超过 1 MiB');
+      fileButton.disabled = !f;
+    };
+    file.addEventListener('change', () => { say(''); drawFile(); });
+    drop.addEventListener('dragover', event => { event.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', event => {
+      event.preventDefault(); drop.classList.remove('over');
+      if (event.dataTransfer && event.dataTransfer.files.length) { file.files = event.dataTransfer.files; file.dispatchEvent(new Event('change')); }
+    });
+    drawFile();
+
+    const code = h('textarea', {placeholder: tr('Paste the plugin source here', '在这里粘贴插件源码'), spellcheck: 'false'});
+    const count = h('span');
+    const drawCount = () => { count.textContent = code.value.length ? code.value.length.toLocaleString() + ' ' + tr('characters', '字符') : ''; };
+    code.addEventListener('input', drawCount);
+    const codeButton = button(tr('Install code', '安装代码'), e => {
+      if (!code.value.trim()) { say(describe(new Error('invalid_text')), true); code.focus(); return; }
+      install(e.currentTarget, () => call('plugins.installCode', {code: code.value}));
+    }, 'primary');
+
+    const modes = {
+      url: [tr('Link', '链接'), () => h('div', {class: 'inline'}, url, urlButton)],
+      file: [tr('File', '文件'), () => [drop, h('div', {class: 'actions'}, fileButton)]],
+      code: [tr('Code', '代码'), () => [code, h('div', {class: 'counter'}, count), h('div', {class: 'actions'}, codeButton)]],
+    };
+    const panel = h('div', {class: 'panel'});
+    const modeBar = h('div', {class: 'seg', role: 'group', 'aria-label': tr('Install method', '安装方式')});
+    const draw = () => {
+      modeBar.replaceChildren(...Object.entries(modes).map(([key, [name]]) => h('button', {type: 'button', 'aria-pressed': String(key === installMode), text: name, onclick: () => { installMode = key; say(''); draw(); }})));
+      panel.replaceChildren(...[].concat(modes[installMode][1]()));
+    };
+    draw();
+    return h('section', {class: 'card install'},
+      h('h2', {text: tr('Install a plugin', '安装插件')}),
+      h('div', {class: 'callout'}, h('span', {'aria-hidden': 'true', text: '⚠'}), h('span', {text: tr('Plugins run code on your TV. Only install ones you trust.', '插件会在电视上运行代码，请只安装你信任的插件。')})),
+      modeBar, panel, status);
+  }
+
   async function plugins() {
     const {plugins: rows} = await call('plugins.list');
-    const url = h('input', {type: 'url', placeholder: 'https://…', maxlength: 4096, autocomplete: 'off', spellcheck: 'false'});
-    const code = h('textarea', {placeholder: tr('Paste plugin code', '粘贴插件代码'), spellcheck: 'false'});
-    const file = h('input', {type: 'file', accept: '.js,.txt'});
+    const ids = new Set(rows.map(p => p.kind + ':' + p.id));
+    if (knownPlugins) for (const key of ids) if (!knownPlugins.has(key)) { freshPlugins.add(key); openPlugins.add(key); }
+    for (const key of [...openPlugins]) if (!ids.has(key)) { openPlugins.delete(key); freshPlugins.delete(key); }
+    knownPlugins = ids;
+    const playback = rows.filter(p => p.kind === 'playback'), sources = rows.filter(p => p.kind !== 'playback');
+    const group = (title, list, empty) => [
+      h('div', {class: 'groupname'}, h('span', {text: title}), h('span', {text: String(list.length)})),
+      list.length ? list.map(pluginCard) : h('div', {class: 'card empty', text: empty}),
+    ];
     return [
-      card(tr('Install a plugin', '安装插件'), tr('Only install plugins you trust.', '只安装你信任的插件。'),
-        wide(tr('From URL', '通过链接'), null, h('div', null, url, h('div', {class: 'actions'}, button(tr('Install', '安装'), e => busy(e.currentTarget, () => run(async () => { if (!url.value.trim()) throw new Error('invalid_plugin_url'); await call('plugins.installUrl', {url: url.value.trim()}); toast(tr('Plugin installed', '插件已安装')); })), 'primary')))),
-        wide(tr('From file', '通过文件'), tr('Up to 1 MiB', '不超过 1 MiB'), h('div', null, file, h('div', {class: 'actions'}, button(tr('Install file', '安装文件'), e => busy(e.currentTarget, () => run(async () => { const f = file.files[0]; if (!f || f.size === 0 || f.size > 1048576) throw new Error('badFile'); await upload('/plugin', f, f.name); toast(tr('Plugin installed', '插件已安装')); })))))),
-        wide(tr('From code', '粘贴代码'), null, h('div', null, code, h('div', {class: 'actions'}, button(tr('Install code', '安装代码'), e => busy(e.currentTarget, () => run(async () => { if (!code.value.trim()) throw new Error('invalid_text'); await call('plugins.installCode', {code: code.value}); toast(tr('Plugin installed', '插件已安装')); })))))))
-      , rows.map(pluginCard),
+      installCard(),
+      group(tr('Playback plugins', '播放插件'), playback, tr('No playback plugin installed yet.', '还没有安装播放插件。')),
+      group(tr('Source plugins', '音源插件'), sources, tr('No source plugin installed yet.', '还没有安装音源插件。')),
     ];
   }
 
@@ -258,8 +402,9 @@
         toggleRow('downloadLyrics', t('tagDownloadLyricsFile'), t('tagDownloadLyricsFileDesc'))),
       card(t('localCacheConfig'), null,
         row(t('existingCacheSize'), general.cacheFiles ? t('fileCount').replace('{count}', general.cacheFiles) : t('noCache'), h('b', {text: size(general.cacheBytes)})),
-        h('div', {class: 'actions'}, button(t('clearLocalCache'), e => {
-          if (confirm(t('clearCacheBody'))) busy(e.currentTarget, () => run(async () => { await call('cache.clear'); toast(t('clearSuccess')); }));
+        h('div', {class: 'actions'}, button(t('clearLocalCache'), async e => {
+          const node = e.currentTarget;
+          if (await ask({title: t('clearLocalCache'), message: t('clearCacheBody'), ok: t('clearLocalCache'), danger: true})) busy(node, () => run(async () => { await call('cache.clear'); toast(t('clearSuccess')); }));
         }, 'danger'))),
       card(t('directoryConfig'), tr('The TV keeps music and cache in its app directory, managed by the system.', '电视的歌曲和缓存都放在应用目录,由系统管理。'),
         row(t('cacheDirectory'), general.paths.cache, null), row(t('downloadDirectory'), general.paths.downloads, null)),
@@ -362,20 +507,30 @@
     ];
   }
 
+  // [key, name, page, group, description]; the group only shows in the wide sidebar.
   const PAGES = [
-    ['appearance', () => label('settings.musicSource.navAppearance', tr('Appearance', '外观设置')), appearance],
-    ['playback', () => label('settings.musicSource.navPlaylist', tr('Playback', '播放设置')), playback],
-    ['effects', () => label('settings.musicSource.navEffects', tr('Audio effects', '音效设置')), effects],
-    ['plugins', () => label('settings.musicSource.navPlugins', tr('Plugins', '插件管理')), plugins],
-    ['sources', () => label('settings.musicSource.navMusic', tr('Music source', '音乐源')), sources],
-    ['storage', () => label('settings.musicSource.navStorage', tr('Storage', '存储管理')), storage],
-    ['backup', () => tr('Backup & restore', '备份与恢复'), backup],
-    ['transfer', () => tr('Send files', '传输文件'), transfer],
-    ['about', () => label('settings.musicSource.navAbout', tr('About', '关于')), about],
+    ['appearance', () => label('settings.musicSource.navAppearance', tr('Appearance', '外观设置')), appearance, () => tr('Player', '播放'), () => tr('Theme, language, player style and lyric font.', '主题、语言、播放器样式和歌词字体。')],
+    ['playback', () => label('settings.musicSource.navPlaylist', tr('Playback', '播放设置')), playback, () => tr('Player', '播放'), () => tr('Transitions, full-screen performance and the play queue.', '切歌过渡、全屏播放性能和播放列表。')],
+    ['effects', () => label('settings.musicSource.navEffects', tr('Audio effects', '音效设置')), effects, () => tr('Player', '播放'), () => tr('Channel balance and the equalizer.', '声道平衡和均衡器。')],
+    ['plugins', () => label('settings.musicSource.navPlugins', tr('Plugins', '插件管理')), plugins, () => tr('Library', '音乐库'), () => tr('Install, configure and remove playback and source plugins.', '安装、配置和卸载播放插件与音源插件。')],
+    ['sources', () => label('settings.musicSource.navMusic', tr('Music source', '音乐源')), sources, () => tr('Library', '音乐库'), () => tr('Choose the source and the sound quality to request.', '选择音乐源和请求的音质。')],
+    ['storage', () => label('settings.musicSource.navStorage', tr('Storage', '存储管理')), storage, () => tr('Library', '音乐库'), () => tr('Cache, download file names and tags.', '缓存、下载文件名和标签。')],
+    ['backup', () => tr('Backup & restore', '备份与恢复'), backup, () => tr('Device', '设备'), () => tr('Encrypted backups to your own S3 bucket.', '把加密备份存到你自己的 S3 存储桶。')],
+    ['transfer', () => tr('Send files', '传输文件'), transfer, () => tr('Device', '设备'), () => tr('Send audio files from this device to the TV.', '把这台设备上的音频文件发送到电视。')],
+    ['about', () => label('settings.musicSource.navAbout', tr('About', '关于')), about, () => tr('Device', '设备'), () => '']
   ];
 
   function drawTabs() {
-    tabs.replaceChildren(...PAGES.map(([key, name]) => h('button', {type: 'button', 'aria-current': key === current ? 'page' : null, text: name(), onclick: () => show(key)})));
+    const nodes = [];
+    let group = null;
+    for (const [key, name, , groupName] of PAGES) {
+      if (groupName() !== group) { group = groupName(); nodes.push(h('div', {class: 'group', 'aria-hidden': 'true', text: group})); }
+      nodes.push(h('button', {type: 'button', 'aria-current': key === current ? 'page' : null, text: name(), onclick: () => show(key)}));
+    }
+    tabs.replaceChildren(...nodes);
+    // Keep the active chip in view on phones.
+    const active = tabs.querySelector('[aria-current=page]');
+    if (active && tabs.scrollWidth > tabs.clientWidth && tabs.scrollHeight <= tabs.clientHeight + 1) tabs.scrollLeft = active.offsetLeft - (tabs.clientWidth - active.offsetWidth) / 2;
   }
   async function show(key, keepScroll) {
     const mine = ++token, scroll = window.scrollY;
@@ -386,11 +541,11 @@
     try {
       const nodes = await entry[2]();
       if (mine !== token) return;
-      page.replaceChildren(...[].concat(nodes).flat().filter(Boolean));
+      page.replaceChildren(pageHead(entry[1](), entry[4]()), ...[].concat(nodes).flat(Infinity).filter(Boolean));
       window.scrollTo(0, keepScroll ? scroll : 0);
     } catch (error) {
       if (mine !== token) return;
-      page.replaceChildren(card(null, null, h('p', {text: describe(error)}), button(tr('Retry', '重试'), () => show(key))));
+      page.replaceChildren(pageHead(entry[1](), entry[4]()), card(null, null, h('p', {text: describe(error)}), button(tr('Retry', '重试'), () => show(key))));
     }
   }
   window.MioSettings = {start: () => show('appearance')};

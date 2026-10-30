@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mio Music</title>
 <link rel="stylesheet" href="/app.css">
-<header class="top"><h1>Mio Music · <span id="title"></span></h1><select id="language" aria-label="Language / 语言"><option value="en-US">English</option><option value="zh-CN">简体中文</option></select></header>
+<header class="top"><div class="brand"><span class="mark" aria-hidden="true">♪</span><h1>Mio Music <span id="title"></span></h1></div><select id="language" aria-label="Language / 语言"><option value="en-US">English</option><option value="zh-CN">简体中文</option></select></header>
 <section id="pairing" class="card"><h2 data-i18n="connectTitle"></h2><p class="note" data-i18n="webIntro"></p><div class="row stack"><div class="name"><label for="code" data-i18n="codeLabel"></label></div><div class="control"><input id="code" autocomplete="off" spellcheck="false" maxlength="64"></div></div><div class="actions"><button id="pair" type="button" class="primary" data-i18n="connect"></button></div><p class="note" id="status" role="status" aria-live="polite"></p><p class="note" data-i18n="pairHint"></p></section>
 <div id="app" hidden><nav class="tabs" id="tabs" aria-label="Settings"></nav><main id="page"></main></div>
 <div id="toast" role="status" aria-live="polite"></div>
