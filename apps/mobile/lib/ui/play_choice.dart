@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core_controller.dart';
 import 'controls.dart';
+import 'device.dart';
 import 'glass_surface.dart';
 import 'resources.dart';
 
@@ -136,8 +137,7 @@ class _PlayChoiceDialog extends StatelessWidget {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
             Navigator.of(context).pop(),
       },
-      child: FocusScope(
-        autofocus: true,
+      child: MioDialogScope(
         child: Semantics(
           scopesRoute: true,
           namesRoute: true,

@@ -381,3 +381,41 @@ class _MioFocusPanelState extends State<MioFocusPanel> {
   Widget build(BuildContext context) =>
       FocusScope(node: _scope, autofocus: true, child: widget.child);
 }
+
+/// A dialog's focus scope. A remote has no pointer, so on a TV the dialog takes
+/// focus from the page behind it as soon as it opens instead of leaving the
+/// user to press their way over to it.
+class MioDialogScope extends StatefulWidget {
+  final FocusScopeNode? node;
+  final Widget child;
+  const MioDialogScope({super.key, this.node, required this.child});
+  @override
+  State<MioDialogScope> createState() => _MioDialogScopeState();
+}
+
+class _MioDialogScopeState extends State<MioDialogScope> {
+  FocusScopeNode? _own;
+  FocusScopeNode get _node => widget.node ?? (_own ??= FocusScopeNode());
+  bool _scheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_scheduled && MioDeviceScope.isTv(context)) {
+      _scheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_node.hasFocus) _node.requestScopeFocus();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _own?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FocusScope(node: _node, autofocus: true, child: widget.child);
+}

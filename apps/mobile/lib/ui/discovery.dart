@@ -2641,8 +2641,7 @@ class DiscoveryViewState extends State<DiscoveryView>
             const SingleActivator(LogicalKeyboardKey.escape): () =>
                 setState(() => _categoriesOpen = false),
           },
-          child: FocusScope(
-            autofocus: true,
+          child: MioDialogScope(
             child: Stack(
               children: [
                 Positioned.fill(
@@ -2780,8 +2779,7 @@ class DiscoveryViewState extends State<DiscoveryView>
       child: BlockSemantics(
         child: CallbackShortcuts(
           bindings: {const SingleActivator(LogicalKeyboardKey.escape): close},
-          child: FocusScope(
-            autofocus: true,
+          child: MioDialogScope(
             child: LayoutBuilder(
               builder: (context, box) {
                 // Anchor under the category row; fall back to the top edge.
@@ -2915,12 +2913,6 @@ class DiscoveryViewState extends State<DiscoveryView>
       _shuffleRequested = shuffle;
       _confirm = true;
     });
-    if (!MioDeviceScope.isTv(context)) return;
-    // The page behind stops taking focus once the dialog is up. A remote has
-    // no pointer, so move focus into the dialog or it would stay on the page.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _confirm) _confirmationScope.requestScopeFocus();
-    });
   }
 
   Widget _confirmation() => Positioned.fill(
@@ -2940,8 +2932,7 @@ class DiscoveryViewState extends State<DiscoveryView>
             ),
             Center(
               child: SingleChildScrollView(
-                child: FocusScope(
-                  autofocus: true,
+                child: MioDialogScope(
                   node: _confirmationScope,
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 420),

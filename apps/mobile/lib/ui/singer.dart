@@ -1689,8 +1689,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
           ),
           Center(
             child: SingleChildScrollView(
-              child: FocusScope(
-                autofocus: true,
+              child: MioDialogScope(
                 node: _confirmationScope,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 420),

@@ -300,9 +300,8 @@ class _PlaylistFileImportDialogState extends State<PlaylistFileImportDialog>
     },
     child: CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): _dismiss},
-      child: FocusScope(
+      child: MioDialogScope(
         node: _scope,
-        autofocus: true,
         child: Semantics(
           scopesRoute: true,
           namesRoute: true,

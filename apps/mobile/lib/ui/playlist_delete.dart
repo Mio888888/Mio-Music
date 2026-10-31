@@ -136,9 +136,8 @@ class _PlaylistDeleteDialogState extends State<PlaylistDeleteDialog>
             },
           ),
         },
-        child: FocusScope(
+        child: MioDialogScope(
           node: _scope,
-          autofocus: true,
           child: Semantics(
             scopesRoute: true,
             namesRoute: true,

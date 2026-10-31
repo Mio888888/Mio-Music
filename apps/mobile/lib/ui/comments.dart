@@ -481,9 +481,8 @@ class _CommentsDialogState extends State<CommentsDialog>
     },
     child: CallbackShortcuts(
       bindings: {const SingleActivator(LogicalKeyboardKey.escape): _dismiss},
-      child: FocusScope(
+      child: MioDialogScope(
         node: _scope,
-        autofocus: true,
         child: Semantics(
           scopesRoute: true,
           namesRoute: true,
@@ -642,9 +641,8 @@ class _CommentsDialogState extends State<CommentsDialog>
                     if (_image != null)
                       Positioned.fill(
                         child: BlockSemantics(
-                          child: FocusScope(
+                          child: MioDialogScope(
                             node: _imageScope,
-                            autofocus: true,
                             child: ColoredBox(
                               color: const Color(0xe6000000),
                               child: Stack(

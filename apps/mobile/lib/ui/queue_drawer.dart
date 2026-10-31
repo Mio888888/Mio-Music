@@ -855,9 +855,8 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
               0.0,
               box.maxHeight - (box.maxHeight * .1).clamp(70.0, 80.0) - 80,
             );
-      return FocusScope(
+      return MioDialogScope(
         node: _scope,
-        autofocus: true,
         child: Shortcuts(
           shortcuts: {
             LogicalKeySet(LogicalKeyboardKey.escape): const DismissIntent(),

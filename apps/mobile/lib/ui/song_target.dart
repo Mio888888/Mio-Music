@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import '../core_controller.dart';
 import '../src/rust/api.dart' as api;
 import 'controls.dart';
+import 'device.dart';
 import 'glass_surface.dart';
 import 'play_choice.dart';
 import 'resources.dart';
@@ -253,8 +254,7 @@ class _SongTargetDialogState extends State<_SongTargetDialog> {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
             Navigator.of(context).pop(),
       },
-      child: FocusScope(
-        autofocus: true,
+      child: MioDialogScope(
         child: Semantics(
           scopesRoute: true,
           namesRoute: true,

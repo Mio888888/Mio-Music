@@ -7,6 +7,7 @@ import '../core_controller.dart';
 import '../platform_files.dart';
 import '../src/rust/api.dart' as api;
 import 'controls.dart';
+import 'device.dart';
 import 'cover.dart';
 import 'resources.dart';
 
@@ -891,9 +892,8 @@ class _RecognitionState extends State<_Recognition>
     },
     child: SafeArea(
       child: Center(
-        child: FocusScope(
+        child: MioDialogScope(
           node: _focus,
-          autofocus: true,
           child: Container(
             constraints: BoxConstraints(
               maxWidth: 640,

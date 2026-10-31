@@ -398,9 +398,8 @@ class _DownloadQualityDialogState extends State<DownloadQualityDialog>
             },
           ),
         },
-        child: FocusScope(
+        child: MioDialogScope(
           node: _scope,
-          autofocus: true,
           child: Semantics(
             scopesRoute: true,
             namesRoute: true,
