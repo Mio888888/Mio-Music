@@ -60,6 +60,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
   // TV: Play All takes focus back when the confirmation closes.
   final _tvPlayFocus = FocusNode(debugLabel: 'Artist play all');
   bool _tvConfirmShown = false;
+  final _confirmFocus = FocusNode();
   final _confirmationScope = FocusScopeNode(
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
   );
@@ -829,6 +830,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     _confirmationScope.dispose();
+    _confirmFocus.dispose();
     _tvPlayFocus.dispose();
     widget.core.removeListener(_coreChanged);
     WidgetsBinding.instance.removeObserver(this);
@@ -840,12 +842,14 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Widget _button(String label, VoidCallback? action) => MioButton(
-    palette: p,
-    label: label,
-    onPressed: action,
-    child: Text(label),
-  );
+  Widget _button(String label, VoidCallback? action, {FocusNode? focusNode}) =>
+      MioButton(
+        palette: p,
+        label: label,
+        onPressed: action,
+        focusNode: focusNode,
+        child: Text(label),
+      );
   Widget _tabButton(String label, bool selected, VoidCallback? action) =>
       Semantics(
         selected: selected,
@@ -1691,6 +1695,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
             child: SingleChildScrollView(
               child: MioDialogScope(
                 node: _confirmationScope,
+                initialFocus: _confirmFocus,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 420),
                   margin: const EdgeInsets.all(24),
@@ -1729,6 +1734,7 @@ class SingerPageState extends State<SingerPage> with WidgetsBindingObserver {
                                     }
                                   }
                                 : null,
+                            focusNode: _confirmFocus,
                           ),
                         ],
                       ),

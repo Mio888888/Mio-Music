@@ -104,6 +104,7 @@ class DiscoveryViewState extends State<DiscoveryView>
   String? _actionNote;
   bool _selectingSongs = false;
   Set<String> _selectedSongs = {};
+  final _confirmFocus = FocusNode();
   final _confirmationScope = FocusScopeNode(
     traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
   );
@@ -963,14 +964,19 @@ class DiscoveryViewState extends State<DiscoveryView>
     }
   }
 
-  Widget _button(String label, VoidCallback? action, {bool selected = false}) =>
-      MioButton(
-        palette: p,
-        label: label,
-        onPressed: action,
-        background: selected ? Color.lerp(p.surface, p.brand, .18) : p.surface,
-        child: Text(label),
-      );
+  Widget _button(
+    String label,
+    VoidCallback? action, {
+    bool selected = false,
+    FocusNode? focusNode,
+  }) => MioButton(
+    palette: p,
+    label: label,
+    onPressed: action,
+    focusNode: focusNode,
+    background: selected ? Color.lerp(p.surface, p.brand, .18) : p.surface,
+    child: Text(label),
+  );
   Widget _errorBar() => Semantics(
     liveRegion: true,
     child: Wrap(
@@ -2934,6 +2940,7 @@ class DiscoveryViewState extends State<DiscoveryView>
               child: SingleChildScrollView(
                 child: MioDialogScope(
                   node: _confirmationScope,
+                  initialFocus: _confirmFocus,
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 420),
                     margin: const EdgeInsets.all(24),
@@ -2961,6 +2968,7 @@ class DiscoveryViewState extends State<DiscoveryView>
                             _button(
                               p.text('common.confirm'),
                               _live ? () => unawaited(_play(null)) : null,
+                              focusNode: _confirmFocus,
                             ),
                           ],
                         ),
@@ -3030,6 +3038,7 @@ class DiscoveryViewState extends State<DiscoveryView>
     _close();
     WidgetsBinding.instance.removeObserver(this);
     _confirmationScope.dispose();
+    _confirmFocus.dispose();
     _scroll.dispose();
     _songScroll.dispose();
     _filter.dispose();

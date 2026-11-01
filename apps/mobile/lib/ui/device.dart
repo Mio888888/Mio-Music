@@ -387,8 +387,16 @@ class _MioFocusPanelState extends State<MioFocusPanel> {
 /// user to press their way over to it.
 class MioDialogScope extends StatefulWidget {
   final FocusScopeNode? node;
+
+  /// Control to land on instead of the first one, e.g. the confirming button.
+  final FocusNode? initialFocus;
   final Widget child;
-  const MioDialogScope({super.key, this.node, required this.child});
+  const MioDialogScope({
+    super.key,
+    this.node,
+    this.initialFocus,
+    required this.child,
+  });
   @override
   State<MioDialogScope> createState() => _MioDialogScopeState();
 }
@@ -404,7 +412,15 @@ class _MioDialogScopeState extends State<MioDialogScope> {
     if (!_scheduled && MioDeviceScope.isTv(context)) {
       _scheduled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_node.hasFocus) _node.requestScopeFocus();
+        if (!mounted) return;
+        if (!_node.hasFocus) _node.requestScopeFocus();
+        // Focusing the scope alone leaves nothing highlighted: land on a control.
+        final initial = widget.initialFocus;
+        if (initial != null && initial.canRequestFocus) {
+          initial.requestFocus();
+        } else if (_node.focusedChild == null) {
+          _node.nextFocus();
+        }
       });
     }
   }
