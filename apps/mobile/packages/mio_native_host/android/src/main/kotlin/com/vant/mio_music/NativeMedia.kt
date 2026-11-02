@@ -41,8 +41,10 @@ object NativeMedia {
         ArrayBlockingQueue<Runnable>(8), ThreadPoolExecutor.AbortPolicy())
     @JvmStatic external fun initializeContext(application: Context, deviceFlags: Int): Boolean
     internal var host: MioAudioHost? = null
+    private var application: Context? = null
     private val requestIds = AtomicLong(1)
-    fun initialize(application: Context) { MioDlna.initialize(application) }
+    fun initialize(application: Context) { this.application = application; MioDlna.initialize(application) }
+    @JvmStatic fun exitReasons(): String? = application?.let(MioExitReasons::read)
     internal fun attach(application: Context, channel: MethodChannel): MioAudioHost {
         host?.close()
         return MioAudioHost(application.applicationContext, channel).also { host = it }

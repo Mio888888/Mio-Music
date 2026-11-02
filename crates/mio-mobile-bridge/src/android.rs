@@ -1,7 +1,7 @@
 //! Process-lifetime Application context; never retain an Activity.
 use jni::{
     JNIEnv, JavaVM,
-    objects::{GlobalRef, JClass, JObject, JValue},
+    objects::{GlobalRef, JClass, JObject, JString, JValue},
     sys::{jboolean, jdouble, jint, jlong, jstring},
 };
 use std::sync::{
@@ -130,6 +130,27 @@ pub extern "system" fn Java_com_vant_mio_1music_NativeMedia_command(
     value: jdouble,
 ) -> jboolean {
     crate::media::mio_media_command(runtime_id as u64, command as u32, value) as jboolean
+}
+
+/// JSON report of how earlier processes ended, read by the host from the system's record.
+pub(crate) fn exit_reasons() -> Result<String, String> {
+    let host = HOST
+        .lock()
+        .map_err(|_| "media_host_failed")?
+        .clone()
+        .ok_or("media_host_unavailable")?;
+    let mut env = host
+        .vm
+        .attach_current_thread()
+        .map_err(|_| "media_host_failed")?;
+    let class: &JClass<'_> = host.class.as_obj().into();
+    let result = env
+        .call_static_method(class, "exitReasons", "()Ljava/lang/String;", &[])
+        .and_then(|value| value.l())
+        .map(JString::from)
+        .and_then(|text| env.get_string(&text).map(String::from));
+    let _ = env.exception_clear();
+    result.map_err(|_| "media_host_failed".into())
 }
 
 /// Host validates an exact foreground permission ticket; no activity is retained in Rust.

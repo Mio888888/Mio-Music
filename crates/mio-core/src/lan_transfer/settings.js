@@ -411,6 +411,51 @@
     ];
   }
 
+  // Android keeps these itself. A TV closes an unresponsive app without a dialog, so this
+  // is the only way to tell an ANR, a low-memory kill and a real crash apart.
+  const exitNames = {
+    anr: ['Not responding (ANR), closed by the system', '无响应(ANR),被系统关闭'],
+    crash: ['App crash', '应用崩溃'],
+    crash_native: ['Native crash', '原生崩溃'],
+    low_memory: ['Reclaimed: low memory', '内存不足,被系统回收'],
+    signaled: ['Killed by a signal', '被信号终止'],
+    excessive_resource: ['Closed: excessive resource use', '资源占用过高,被系统关闭'],
+    initialization_failure: ['Failed to start', '启动失败'],
+    freezer: ['Killed while frozen', '冻结时被终止'],
+    dependency_died: ['A dependency stopped', '依赖的进程已退出'],
+    exit_self: ['Closed itself', '应用自行退出'],
+    user_requested: ['Stopped by the user or system', '被用户或系统停止'],
+    user_stopped: ['Stopped by the user', '被用户停止'],
+    package_updated: ['App updated', '应用已更新'],
+    package_state: ['App state changed', '应用状态变更'],
+    permission_change: ['Permission changed', '权限变更'],
+    other: ['Other', '其他'],
+    unknown: ['Unknown', '未知'],
+  };
+  const exitProblems = ['anr', 'crash', 'crash_native', 'low_memory', 'signaled', 'excessive_resource', 'initialization_failure', 'freezer'];
+  const exitTitle = exit => { const name = exitNames[exit.reason] || exitNames.unknown; return tr(name[0], name[1]); };
+  const exitState = exit => exit.importance <= 100 ? tr('foreground', '前台') : exit.importance <= 125 ? tr('foreground service', '前台服务') : tr('background', '后台');
+  const exitLine = exit => [new Date(exit.time).toLocaleString(), exitState(exit), exit.pss ? 'PSS ' + size(exit.pss * 1024) : '', exit.description].filter(Boolean).join(' · ');
+  function exitsCard() {
+    const out = h('div');
+    const load = e => busy(e.currentTarget, async () => {
+      try {
+        const report = await call('about.exits');
+        if (!report.supported) { out.textContent = tr('Needs Android 11 or later.', '需要 Android 11 及以上系统。'); return; }
+        const problems = report.exits.filter(exit => exitProblems.includes(exit.reason));
+        const text = ['Mio v' + report.version, report.device + ' · Android SDK ' + report.sdk + ' · ' + report.abi + ' · ' + size(report.memory),
+          ...report.exits.map(exit => ['[' + exit.reason + '] status ' + exit.status + ' ' + exitLine(exit), exit.detail].filter(Boolean).join('\n'))].join('\n\n');
+        const copy = h('textarea', {readonly: true, rows: 8, text, onfocus: event => event.target.select()});
+        out.replaceChildren(
+          h('p', {class: 'note', text: problems.length ? tr(problems.length + ' abnormal exits. Details below.', '发现 ' + problems.length + ' 次异常退出,详情见下方。') : tr('No abnormal exits on record.', '没有异常退出记录。')}),
+          ...report.exits.map(exit => h('div', null, row(exitTitle(exit), exitLine(exit)), exit.detail && h('pre', {class: 'log', text: exit.detail}))),
+          ...(report.exits.length ? [row(tr('Full report', '完整报告'), tr('Tap the box, then copy the selected text.', '点一下文本框,再复制选中的内容。')), copy] : []));
+      } catch (error) { out.textContent = ''; toast(describe(error), true); }
+    });
+    return card(tr('Recent exits', '最近退出记录'), tr('Why the app last closed, as recorded by Android.', '系统记录的应用退出原因,用于排查闪退。'),
+      h('div', {class: 'actions'}, button(tr('Show exits', '查看退出记录'), load, 'primary')), out);
+  }
+
   async function about() {
     const info = await call('about.get');
     const t = key => label('settings.about.' + key);
@@ -432,6 +477,7 @@
           out.replaceChildren(release ? h('div', null, h('b', {text: (release.newer ? t('newVersionFound') + ' ' : t('upToDate') + ' ') + release.version}), h('p', {class: 'note', text: t('mobileUpdateHint')}), release.newer && h('pre', {class: 'log', text: release.notes})) : document.createTextNode(t('upToDate')));
         } catch (error) { out.textContent = ''; toast(describe(error), true); }
       }), 'primary')), out),
+      exitsCard(),
       card(t('legalNotice'), null,
         row(t('dataResponsibility'), t('dataResponsibilityDesc')), row(t('copyrightCompliance'), t('copyrightComplianceDesc')), row(t('usageRestriction'), t('usageRestrictionDesc'))),
       card(t('aboutUs'), null, intro,

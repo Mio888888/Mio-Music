@@ -428,6 +428,7 @@ pub(crate) fn call(
             Ok(Value::Null)
         }
         "about.get" => about(),
+        "about.exits" => exit_reasons(),
         "about.autoUpdate" => {
             let session = begin_release_session(env!("CARGO_PKG_VERSION").into())?;
             let expected = session.state()?;
@@ -691,6 +692,18 @@ fn about() -> Result<Value, String> {
         "version": env!("CARGO_PKG_VERSION"),
         "autoUpdate": session.state()?,
     }))
+}
+
+#[cfg(target_os = "android")]
+fn exit_reasons() -> Result<Value, String> {
+    let mut report: Value =
+        serde_json::from_str(&crate::android::exit_reasons()?).map_err(|_| "media_host_failed")?;
+    report["version"] = env!("CARGO_PKG_VERSION").into();
+    Ok(report)
+}
+#[cfg(not(target_os = "android"))]
+fn exit_reasons() -> Result<Value, String> {
+    Err("invalid_path".into())
 }
 
 fn backup() -> Result<Value, String> {
