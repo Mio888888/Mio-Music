@@ -18,11 +18,14 @@ class MioCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uri = source == null ? null : Uri.tryParse(source!);
+    final cacheWidth =
+        ((cacheSize ?? size) * MediaQuery.devicePixelRatioOf(context)).ceil();
     final fallback = Image.asset(
       'assets/images/default-cover.png',
       width: size,
       height: size,
       fit: BoxFit.cover,
+      cacheWidth: cacheWidth,
     );
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
@@ -32,9 +35,7 @@ class MioCover extends StatelessWidget {
               width: size,
               height: size,
               fit: BoxFit.cover,
-              cacheWidth:
-                  ((cacheSize ?? size) * MediaQuery.devicePixelRatioOf(context))
-                      .ceil(),
+              cacheWidth: cacheWidth,
               gaplessPlayback: true,
               errorBuilder: (context, error, stack) => fallback,
             )

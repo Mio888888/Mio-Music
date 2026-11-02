@@ -11,6 +11,7 @@ import '../core_controller.dart';
 import '../src/rust/api.dart' as api;
 import 'controls.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 enum PlaylistDeleteResult { deleted, refresh }
 
@@ -167,6 +168,7 @@ class _PlaylistDeleteDialogState extends State<PlaylistDeleteDialog>
                     children: [
                       Positioned.fill(
                         child: BackdropFilter(
+                          enabled: !MioVisualPolicy.of(context).reduced,
                           filter: ImageFilter.blur(
                             sigmaX: narrow ? 12 : 5,
                             sigmaY: narrow ? 12 : 5,

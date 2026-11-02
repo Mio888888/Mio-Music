@@ -26,6 +26,7 @@ internal class MioAudioHost(private val context: Context, private val channel: M
     @Volatile private var initialized = false
     private var destroyed = false
     private var preparingUntil = 0L
+    private var foregroundCheckedAt = 0L
     private var newestRuntime = 0L
     private val noisy = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -62,9 +63,12 @@ internal class MioAudioHost(private val context: Context, private val channel: M
                         val state = snapshot.optString("status")
                         val active = state == "playing" || state == "loading" || NativeMedia.dlnaHandoffActive(id)
                         if (!active && SystemClock.elapsedRealtime() >= preparingUntil && !transientLoss) releaseFocus()
-                        // Fail closed if the sole system media owner disappears.
-                        if (active && SystemClock.elapsedRealtime() >= preparingUntil && !isForeground()) {
-                            releaseFocus(); NativeMedia.send(id, 9)
+                        // Fail closed if the sole system media owner disappears. isForeground is a
+                        // binder call on the thread that also runs Dart, so check less than per snapshot.
+                        val now = SystemClock.elapsedRealtime()
+                        if (active && now >= preparingUntil && now - foregroundCheckedAt >= FOREGROUND_CHECK_MS) {
+                            foregroundCheckedAt = now
+                            if (!isForeground()) { releaseFocus(); NativeMedia.send(id, 9) }
                         }
                         channel.invokeMethod("snapshot", text, object : MethodChannel.Result {
                             override fun success(result: Any?) {
@@ -79,6 +83,7 @@ internal class MioAudioHost(private val context: Context, private val channel: M
             } finally { if (!posted) observationPending.set(false) }
         }, 250, 500, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
+    private companion object { const val FOREGROUND_CHECK_MS = 2000L }
     fun initialized() { initialized = true }
     fun refreshOverlay() = overlay.refresh()
     fun dispatchMediaButton(event: KeyEvent): Boolean {

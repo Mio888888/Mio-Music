@@ -234,6 +234,18 @@ class AndroidSystemMedia extends BaseAudioHandler {
       'failed' => AudioProcessingState.error,
       _ => AudioProcessingState.idle,
     };
+    final position = _duration(snapshot['position']);
+    final errorCode = status == 'failed' ? 1 : null;
+    // Snapshots arrive twice a second, but the session runs its own clock from
+    // the last state. Send only what it cannot work out: changes and seeks.
+    final last = playbackState.value;
+    if (last.controls.isNotEmpty &&
+        last.playing == playing &&
+        last.processingState == processing &&
+        last.errorCode == errorCode &&
+        (last.position - position).abs() < const Duration(seconds: 1)) {
+      return;
+    }
     playbackState.add(
       PlaybackState(
         controls: [
@@ -250,10 +262,10 @@ class AndroidSystemMedia extends BaseAudioHandler {
         },
         processingState: processing,
         playing: playing,
-        updatePosition: _duration(snapshot['position']),
-        bufferedPosition: _duration(snapshot['position']),
+        updatePosition: position,
+        bufferedPosition: position,
         speed: 1,
-        errorCode: status == 'failed' ? 1 : null,
+        errorCode: errorCode,
         errorMessage: status == 'failed' ? 'Playback failed' : null,
       ),
     );

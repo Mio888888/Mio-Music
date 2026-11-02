@@ -12,6 +12,7 @@ import '../src/rust/api.dart' as api;
 import 'controls.dart';
 import 'cover.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 class PlaylistCopyResult {
   final bool refresh;
@@ -199,6 +200,7 @@ class _PlaylistCopyDialogState extends State<PlaylistCopyDialog> {
                     children: [
                       Positioned.fill(
                         child: BackdropFilter(
+                          enabled: !MioVisualPolicy.of(context).reduced,
                           filter: ImageFilter.blur(
                             sigmaX: narrow ? 12 : 5,
                             sigmaY: narrow ? 12 : 5,

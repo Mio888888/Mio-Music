@@ -11,6 +11,7 @@ import '../src/rust/api.dart' as api;
 import 'controls.dart';
 import 'glass_surface.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 String playModeKey(api.PlayMode mode) => switch (mode) {
   api.PlayMode.list => 'play.modeList',
@@ -876,6 +877,7 @@ class QueueDrawerState extends State<QueueDrawer> with WidgetsBindingObserver {
                   Positioned.fill(
                     child: ClipRect(
                       child: BackdropFilter(
+                        enabled: !MioVisualPolicy.of(context).reduced,
                         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                         child: const SizedBox.expand(),
                       ),

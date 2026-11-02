@@ -1206,6 +1206,12 @@ class _FullPlayerState extends State<FullPlayer> with WidgetsBindingObserver {
                                   ? Image.asset(
                                       'assets/images/default-cover.png',
                                       fit: BoxFit.cover,
+                                      cacheWidth:
+                                          ((wide ? 50 : 42) *
+                                                  MediaQuery.devicePixelRatioOf(
+                                                    context,
+                                                  ))
+                                              .ceil(),
                                     )
                                   : Image.memory(
                                       _cover!,

@@ -83,17 +83,25 @@ class _MioPlayerArtworkState extends State<MioPlayerArtwork>
     super.dispose();
   }
 
-  Widget _cover() => widget.cover == null
-      ? Image.asset('assets/images/default-cover.png', fit: BoxFit.cover)
-      : Image.memory(
-          widget.cover!,
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          // Embedded artwork can be thousands of pixels; decode at the displayed size.
-          cacheWidth: (widget.size * MediaQuery.devicePixelRatioOf(context))
-              .ceil()
-              .clamp(1, 4096),
-        );
+  Widget _cover() {
+    // Embedded artwork can be thousands of pixels; decode at the displayed size.
+    final cacheWidth = (widget.size * MediaQuery.devicePixelRatioOf(context))
+        .ceil()
+        .clamp(1, 4096);
+    return widget.cover == null
+        ? Image.asset(
+            'assets/images/default-cover.png',
+            fit: BoxFit.cover,
+            cacheWidth: cacheWidth,
+          )
+        : Image.memory(
+            widget.cover!,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            cacheWidth: cacheWidth,
+          );
+  }
+
   Widget _svg(String name) => SvgPicture.asset('assets/images/$name.svg');
 
   Widget _transition({

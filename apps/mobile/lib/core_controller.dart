@@ -16,6 +16,7 @@ import 'src/rust/frb_generated.dart';
 /// View lifetime is independent of the process-owned Rust runtime.
 class CoreController extends ChangeNotifier with WidgetsBindingObserver {
   static const _host = MethodChannel('mio/host');
+  static const _limitedImageCache = 40 * 1024 * 1024;
   static Future<void>? _library;
   static Map<String, int>? _iosMedia;
   final updates = ReleaseController();
@@ -107,6 +108,9 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
             'zh',
       );
       capabilities = core.capabilities();
+      if (capabilities!.limitedMemory) {
+        PaintingBinding.instance.imageCache.maximumSizeBytes = _limitedImageCache;
+      }
       final data = await getApplicationSupportDirectory();
       final cache = await getTemporaryDirectory();
       // A TV keeps downloads in the app's own directory, like the cache: it

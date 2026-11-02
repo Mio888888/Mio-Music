@@ -64,24 +64,41 @@ impl Source {
                 cache_key: key,
             } => {
                 cache_key = key;
-                let bytes = crate::image_cache::read(&cache_key)
-                    .or_else(|| crate::local_music::embedded_cover(&path));
-                if let Some(bytes) = &bytes {
-                    crate::image_cache::write(&cache_key, bytes);
-                }
-                bytes
+                crate::image_cache::read(&cache_key).or_else(|| {
+                    let bytes = crate::local_music::embedded_cover(&path)?;
+                    crate::image_cache::write(&cache_key, &bytes);
+                    Some(bytes)
+                })
             }
         };
-        let result = bytes
-            .map(|bytes| thumbnail_projection(bytes, size, with_palette))
-            .transpose();
-        if result.is_err() {
+        let Some(bytes) = bytes else {
+            return Ok(None);
+        };
+        // Rows request the same small projection every time they scroll back into view.
+        let saved = (!with_palette && size <= SAVED_THUMBNAIL).then(|| thumbnail_key(&bytes, size));
+        if let Some(thumbnail) = saved.as_deref().and_then(crate::image_cache::read) {
+            return Ok(Some((thumbnail, None)));
+        }
+        let result = thumbnail_projection(bytes, size, with_palette);
+        match &result {
+            Ok((thumbnail, _)) => {
+                if let Some(key) = &saved {
+                    crate::image_cache::write(key, thumbnail);
+                }
+            }
             // Retry must fetch a corrected remote image instead of decoding the
             // same corrupt cache entry forever.
-            crate::image_cache::remove(&cache_key);
+            Err(_) => crate::image_cache::remove(&cache_key),
         }
-        result
+        result.map(Some)
     }
+}
+
+const SAVED_THUMBNAIL: u32 = 256;
+/// Keyed by content: an edited cover can never reuse the old cover's thumbnail.
+fn thumbnail_key(bytes: &[u8], size: u32) -> String {
+    use sha2::{Digest, Sha256};
+    format!("thumbnail:{size}:{}", hex::encode(Sha256::digest(bytes)))
 }
 
 #[derive(Clone, Copy)]

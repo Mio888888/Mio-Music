@@ -24,6 +24,7 @@ import 'favorite_button.dart';
 import 'online_playlist_header.dart';
 import 'search_track_row.dart';
 import 'tv/tv_widgets.dart';
+import 'visual_policy.dart';
 
 part 'tv/tv_discovery.dart';
 
@@ -2837,6 +2838,7 @@ class DiscoveryViewState extends State<DiscoveryView>
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(12),
                               child: BackdropFilter(
+                                enabled: !MioVisualPolicy.of(context).reduced,
                                 filter: ImageFilter.blur(
                                   sigmaX: 16,
                                   sigmaY: 16,
@@ -2845,7 +2847,14 @@ class DiscoveryViewState extends State<DiscoveryView>
                                   decoration: BoxDecoration(
                                     color: p
                                         .color('--td-bg-color-container')
-                                        .withValues(alpha: .86),
+                                        .withValues(
+                                          alpha:
+                                              MioVisualPolicy.of(
+                                                context,
+                                              ).reduced
+                                              ? 1
+                                              : .86,
+                                        ),
                                     border: Border.all(
                                       color: p.color(
                                         '--td-border-level-1-color',

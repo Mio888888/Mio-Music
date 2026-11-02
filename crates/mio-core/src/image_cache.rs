@@ -1,9 +1,19 @@
 //! Persistent image bytes, shared by list images and the restored player cover.
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{
+        Mutex,
+        atomic::{AtomicU32, Ordering},
+    },
+};
 
 static DIRECTORY: Mutex<Option<PathBuf>> = Mutex::new(None);
+static WRITES: AtomicU32 = AtomicU32::new(0);
 const MAX_IMAGE: usize = 16 * 1024 * 1024;
+// Eviction stats every cached file, so it runs once per this many saved images.
+const EVICT_EVERY: u32 = 32;
 
 pub fn configure(root: PathBuf) {
     if let Ok(mut directory) = DIRECTORY.lock() {
@@ -50,7 +60,7 @@ pub fn write(key: &str, bytes: &[u8]) {
         temporary.persist(&path).map_err(|e| e.error)?;
         Ok(())
     };
-    if save().is_ok() {
+    if save().is_ok() && WRITES.fetch_add(1, Ordering::Relaxed) % EVICT_EVERY == 0 {
         crate::audio_cache::evict(directory, 128 * 1024 * 1024);
     }
 }

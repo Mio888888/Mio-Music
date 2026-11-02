@@ -1593,9 +1593,12 @@ impl AppCore {
                 self.player.position,
             ));
             if clock != self.checkpointed {
-                self.save_session()?;
+                self.checkpoint_session()?;
                 self.checkpointed = clock;
             }
+        }
+        if crate::storage::take_session_write_failure() {
+            return Err("Cannot save session".into());
         }
         Ok(())
     }
@@ -1628,6 +1631,14 @@ impl AppCore {
         let session = self.capture_session()?;
         self.store
             .save_session(session.as_ref())
+            .map_err(|e| format!("Cannot save session: {e}"))
+    }
+
+    /// Periodic clock save: commands wait behind the owner, so it must not wait for the disk.
+    fn checkpoint_session(&self) -> Result<(), String> {
+        let session = self.capture_session()?;
+        self.store
+            .save_session_in_background(session.as_ref())
             .map_err(|e| format!("Cannot save session: {e}"))
     }
 

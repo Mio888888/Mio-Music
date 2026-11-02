@@ -18,11 +18,21 @@ import io.flutter.plugin.common.MethodChannel
 /** Device shape is native; the window flag belongs only to this attached Activity. */
 class MioDevice : FlutterPlugin, ActivityAware, Application.ActivityLifecycleCallbacks {
     companion object {
-        fun capabilities(context: Context): Int {
+        // Television makers rarely set isLowRamDevice, even on 1-2 GB hardware.
+        private const val TV_LIMITED_MEMORY = 2560L * 1024 * 1024
+        @Volatile private var cached: Int? = null
+
+        /** Read from the main thread while playing; these binder calls never change their answer. */
+        fun capabilities(context: Context): Int = cached ?: detect(context).also { cached = it }
+
+        private fun detect(context: Context): Int {
             val pm = context.packageManager
             val television = context.getSystemService(UiModeManager::class.java)?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
                 pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
-            val limitedMemory = context.getSystemService(ActivityManager::class.java)?.isLowRamDevice == true || !Process.is64Bit()
+            val activities = context.getSystemService(ActivityManager::class.java)
+            val memory = ActivityManager.MemoryInfo().also { activities?.getMemoryInfo(it) }
+            val limitedMemory = activities?.isLowRamDevice == true || !Process.is64Bit() ||
+                (television && memory.totalMem in 1 until TV_LIMITED_MEMORY)
             return (if (limitedMemory) 4 else 0) or (if (television) 1 else 0) or (if (pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)) 2 else 0)
         }
     }

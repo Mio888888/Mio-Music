@@ -12,6 +12,7 @@ import '../src/rust/api.dart' as api;
 import 'controls.dart';
 import 'glass_surface.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 /// Keep the native handle alive through the route's exit animation.
 Future<api.DownloadEnqueueResult?> showDownloadChoice({
@@ -431,6 +432,7 @@ class _DownloadQualityDialogState extends State<DownloadQualityDialog>
                     children: [
                       Positioned.fill(
                         child: BackdropFilter(
+                          enabled: !MioVisualPolicy.of(context).reduced,
                           filter: ImageFilter.blur(
                             sigmaX: narrow ? 12 : 8,
                             sigmaY: narrow ? 12 : 8,

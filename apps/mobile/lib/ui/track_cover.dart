@@ -7,22 +7,23 @@ import 'package:flutter/widgets.dart';
 import '../src/rust/api.dart' as api;
 import 'cover.dart';
 
-// One request at a time across visible rows and the mini player. Pending cells
-// remove themselves on hide/dispose; no per-track global decoded image cache.
+// A few requests at a time across visible rows and the mini player: one slow
+// network cover must not hold back the rest, and each request blocks a bridge
+// worker. Pending cells remove themselves on hide/dispose; no per-track global
+// decoded image cache.
+const _maxRequests = 2;
 final _pending = Queue<_MioTrackCoverState>();
-bool _running = false;
+int _running = 0;
 void _pump() {
-  if (_running) return;
-  _running = true;
-  unawaited(() async {
-    try {
-      while (_pending.isNotEmpty) {
-        await _pending.removeFirst()._load();
-      }
-    } finally {
-      _running = false;
-    }
-  }());
+  while (_running < _maxRequests && _pending.isNotEmpty) {
+    ++_running;
+    unawaited(
+      _pending.removeFirst()._load().whenComplete(() {
+        --_running;
+        _pump();
+      }),
+    );
+  }
 }
 
 class MioTrackCover extends StatefulWidget {

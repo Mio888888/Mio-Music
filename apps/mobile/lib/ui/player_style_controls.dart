@@ -83,6 +83,8 @@ class PlayerStyleControls extends StatelessWidget {
                   child: Image.asset(
                     'assets/images/${cover ? 'cover-play' : 'cd'}.png',
                     fit: BoxFit.contain,
+                    // The sources are about 1770 px wide; the card is far narrower.
+                    cacheWidth: 640,
                   ),
                 ),
                 SizedBox(height: compact ? 6 : 12),

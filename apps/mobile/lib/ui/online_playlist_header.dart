@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 import 'controls.dart';
 import 'cover.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 /// A collection header uses its artwork and remains above the scrolling rows.
 class OnlinePlaylistHeader extends StatelessWidget {
@@ -249,16 +250,17 @@ class OnlinePlaylistHeader extends StatelessWidget {
           : const BorderRadius.vertical(bottom: Radius.circular(20)),
       child: Stack(
         children: [
-          Positioned.fill(
-            child: ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-              child: MioCover(
-                cover,
-                size: MediaQuery.sizeOf(context).width,
-                radius: 0,
+          if (!MioVisualPolicy.of(context).reduced)
+            Positioned.fill(
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: MioCover(
+                  cover,
+                  size: MediaQuery.sizeOf(context).width,
+                  radius: 0,
+                ),
               ),
             ),
-          ),
           Positioned.fill(
             child: ColoredBox(color: p.surface.withValues(alpha: .78)),
           ),
@@ -559,12 +561,13 @@ class OnlinePlaylistHeader extends StatelessWidget {
                       color: p.color('--td-bg-color-container'),
                     ),
                   ),
-                  Positioned.fill(
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                      child: MioCover(cover, size: width, radius: 0),
+                  if (!MioVisualPolicy.of(context).reduced)
+                    Positioned.fill(
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                        child: MioCover(cover, size: width, radius: 0),
+                      ),
                     ),
-                  ),
                   Positioned.fill(
                     child: ColoredBox(
                       color: p

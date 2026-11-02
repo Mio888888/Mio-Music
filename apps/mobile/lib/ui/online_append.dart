@@ -11,6 +11,7 @@ import '../src/rust/api.dart' as api;
 import 'controls.dart';
 import 'saved_playlist_cover.dart';
 import 'resources.dart';
+import 'visual_policy.dart';
 
 class OnlineAppendResult {
   final int added;
@@ -263,6 +264,7 @@ class _OnlineAppendDialogState extends State<_OnlineAppendDialog>
                     children: [
                       Positioned.fill(
                         child: BackdropFilter(
+                          enabled: !MioVisualPolicy.of(context).reduced,
                           filter: ImageFilter.blur(
                             sigmaX: narrow ? 12 : 5,
                             sigmaY: narrow ? 12 : 5,
