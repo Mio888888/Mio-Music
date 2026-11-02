@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert' show utf8;
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 
 import '../core_controller.dart';
@@ -979,7 +980,7 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
         // Running tasks refresh every tick; an idle list only every fifth.
         if (!_canPauseDownloads && timer.tick % 5 != 0) return;
         if (!_loading && !_downloadBusy && _error == null && _live) {
-          unawaited(_load(reset: true));
+          unawaited(_load(reset: true, quiet: true));
         }
       });
     } else {
@@ -1082,7 +1083,13 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
     unawaited(_load(reset: true, keepLibrary: true));
   }
 
-  Future<void> _load({bool reset = false, bool keepLibrary = false}) async {
+  /// [quiet] is the downloads poll: it must not flash the page's controls
+  /// disabled every tick, and an unchanged list rebuilds nothing.
+  Future<void> _load({
+    bool reset = false,
+    bool keepLibrary = false,
+    bool quiet = false,
+  }) async {
     if (_coverOpen) return;
     if (!_live || _catalogBusy || _downloadBusy || (_loading && !reset)) return;
     final epoch = ++_epoch;
@@ -1099,11 +1106,15 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
     var concurrent = _concurrent;
     var canStart = _canStartDownloads, canPause = _canPauseDownloads;
     var playlist = _playlist;
-    setState(() {
+    if (quiet) {
       _loading = true;
-      _error = null;
-      _sortCapacity = false;
-    });
+    } else {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _sortCapacity = false;
+      });
+    }
     try {
       if (widget.kind == CatalogKind.local &&
           (reset || _localSession == null)) {
@@ -1226,6 +1237,16 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
           });
         }
       }
+      if (quiet &&
+          listEquals(incoming, _items) &&
+          listEquals(counts, _counts) &&
+          total == _total &&
+          more == _more &&
+          concurrent == _concurrent &&
+          canStart == _canStartDownloads &&
+          canPause == _canPauseDownloads) {
+        return;
+      }
       setState(() {
         _items = reset ? incoming : [..._items, ...incoming];
         _total = total;
@@ -1255,7 +1276,13 @@ class _CatalogViewState extends State<CatalogView> with WidgetsBindingObserver {
         });
       }
     } finally {
-      if (mounted && epoch == _epoch) setState(() => _loading = false);
+      if (mounted && epoch == _epoch) {
+        if (quiet) {
+          _loading = false;
+        } else {
+          setState(() => _loading = false);
+        }
+      }
     }
   }
 
