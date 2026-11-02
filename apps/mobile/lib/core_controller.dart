@@ -75,7 +75,7 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   // The connection loop owns disposal. A competing reconnect may already
-  // have disposed this handle after closing its pending next call.
+  // have disposed this handle after closing its stream.
   static Future<void> _close(core.PlayerSubscription subscription) async {
     try {
       await subscription.close();
@@ -109,7 +109,8 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
       );
       capabilities = core.capabilities();
       if (capabilities!.limitedMemory) {
-        PaintingBinding.instance.imageCache.maximumSizeBytes = _limitedImageCache;
+        PaintingBinding.instance.imageCache.maximumSizeBytes =
+            _limitedImageCache;
       }
       final data = await getApplicationSupportDirectory();
       final cache = await getTemporaryDirectory();
@@ -136,19 +137,14 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
       subscription = await core.subscribePlayer();
       if (_disposed || epoch != _epoch) return;
       _subscription = subscription;
-      int? revision;
-      while (!_disposed && epoch == _epoch) {
-        final state = await subscription.next(afterRevision: revision);
+      await for (final state in subscription.listen()) {
         if (_disposed || epoch != _epoch) break;
-        if (state != null) {
-          revision = state.revision;
-          final previous = player;
-          player = state;
-          playback.value = state;
-          if (previous == null ||
-              _withoutClock(previous) != _withoutClock(state)) {
-            notifyListeners();
-          }
+        final previous = player;
+        player = state;
+        playback.value = state;
+        if (previous == null ||
+            _withoutClock(previous) != _withoutClock(state)) {
+          notifyListeners();
         }
       }
     } catch (_) {
@@ -215,7 +211,7 @@ class CoreController extends ChangeNotifier with WidgetsBindingObserver {
     final subscription = _subscription;
     _subscription = null;
     if (subscription != null) await _close(subscription);
-    // The connect loop disposes the handle after its pending next call returns.
+    // The connect loop disposes the handle after its stream ends.
   }
 
   @override

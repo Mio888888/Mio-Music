@@ -1,3 +1,4 @@
+use crate::frb_generated::StreamSink;
 use crate::runtime;
 use flutter_rust_bridge::frb;
 
@@ -240,20 +241,23 @@ pub fn begin_player_details(
         )?,
     })
 }
-pub fn seek_current(
+pub async fn seek_current(
     song_id: String,
     generation: u64,
     queue_revision: u64,
     source_revision: u64,
     seconds: f64,
 ) -> Result<(), String> {
-    crate::player_details::seek_current(
-        song_id,
-        generation,
-        queue_revision,
-        source_revision,
-        seconds,
-    )
+    control(move || {
+        crate::player_details::seek_current(
+            song_id,
+            generation,
+            queue_revision,
+            source_revision,
+            seconds,
+        )
+    })
+    .await
 }
 
 #[derive(Clone, Debug)]
@@ -886,6 +890,7 @@ pub fn bridge_version() -> String {
 
 /// Reconnecting a view with the same paths reuses the process runtime.
 pub fn initialize(paths: HostPaths) -> Result<PlayerSnapshot, String> {
+    runtime::widen_bridge_workers();
     runtime::initialize(paths)
 }
 
@@ -893,30 +898,41 @@ pub fn player_snapshot() -> Result<PlayerSnapshot, String> {
     runtime::snapshot()
 }
 
-pub fn set_paused(paused: bool) -> Result<(), String> {
-    runtime::execute(runtime::Action::Pause(paused))
+/// Every other call shares the bridge workers with slow network requests, and a
+/// page of those can occupy all of them. A player control must not queue behind it.
+async fn control(run: impl FnOnce() -> Result<(), String> + Send + 'static) -> Result<(), String> {
+    flutter_rust_bridge::spawn_blocking_with(
+        run,
+        crate::frb_generated::FLUTTER_RUST_BRIDGE_HANDLER.thread_pool(),
+    )
+    .await
+    .map_err(|_| "runtime_failed")?
 }
 
-pub fn step(forward: bool) -> Result<(), String> {
-    runtime::execute(runtime::Action::Step(forward))
+pub async fn set_paused(paused: bool) -> Result<(), String> {
+    control(move || runtime::execute(runtime::Action::Pause(paused))).await
 }
 
-pub fn seek(seconds: f64) -> Result<(), String> {
+pub async fn step(forward: bool) -> Result<(), String> {
+    control(move || runtime::execute(runtime::Action::Step(forward))).await
+}
+
+pub async fn seek(seconds: f64) -> Result<(), String> {
     if !seconds.is_finite() || seconds < 0.0 {
         return Err("invalid_input: position must be finite and nonnegative".into());
     }
-    runtime::execute(runtime::Action::Seek(seconds))
+    control(move || runtime::execute(runtime::Action::Seek(seconds))).await
 }
 
-pub fn set_volume(volume: f32) -> Result<(), String> {
+pub async fn set_volume(volume: f32) -> Result<(), String> {
     if !volume.is_finite() || !(0.0..=1.0).contains(&volume) {
         return Err("invalid_input: volume must be between zero and one".into());
     }
-    runtime::execute(runtime::Action::Volume(volume))
+    control(move || runtime::execute(runtime::Action::Volume(volume))).await
 }
 
-pub fn play_index(index: u32) -> Result<(), String> {
-    runtime::execute(runtime::Action::PlayIndex(index as usize))
+pub async fn play_index(index: u32) -> Result<(), String> {
+    control(move || runtime::execute(runtime::Action::PlayIndex(index as usize))).await
 }
 
 pub fn set_appearance(dark: bool, english: Option<bool>) -> Result<(), String> {
@@ -944,11 +960,11 @@ pub fn subscribe_player() -> Result<PlayerSubscription, String> {
 }
 
 impl PlayerSubscription {
-    /// First call returns the current snapshot. Later calls coalesce updates;
-    /// Timeout/view close return None; runtime shutdown returns runtime_closed.
-    /// No per-subscriber event queue is allocated.
-    pub fn next(&self, after_revision: Option<u64>) -> Result<Option<PlayerSnapshot>, String> {
-        self.inner.next(after_revision)
+    /// Starts with the current snapshot, then pushes each update from a thread of
+    /// its own, so an open player view holds no bridge worker. View close ends the
+    /// stream; runtime shutdown fails it with runtime_closed.
+    pub fn listen(&self, sink: StreamSink<PlayerSnapshot>) -> Result<(), String> {
+        self.inner.listen(sink)
     }
 
     pub fn close(&self) {

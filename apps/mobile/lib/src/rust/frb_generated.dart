@@ -67,7 +67,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -625699523;
+  int get rustContentHash => 1951934497;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -618,9 +618,8 @@ abstract class RustLibApi extends BaseApi {
     required PlayerSubscription that,
   });
 
-  Future<PlayerSnapshot?> crateApiPlayerSubscriptionNext({
+  Stream<PlayerSnapshot> crateApiPlayerSubscriptionListen({
     required PlayerSubscription that,
-    int? afterRevision,
   });
 
   void crateApiPlaylistCoverEditorClose({required PlaylistCoverEditor that});
@@ -5944,41 +5943,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<PlayerSnapshot?> crateApiPlayerSubscriptionNext({
+  Stream<PlayerSnapshot> crateApiPlayerSubscriptionListen({
     required PlayerSubscription that,
-    int? afterRevision,
   }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPlayerSubscription(
-            that,
-            serializer,
-          );
-          sse_encode_opt_CastedPrimitive_u_64(afterRevision, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 122,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_box_autoadd_player_snapshot,
-          decodeErrorData: sse_decode_String,
+    final sink = RustStreamSink<PlayerSnapshot>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPlayerSubscription(
+              that,
+              serializer,
+            );
+            sse_encode_StreamSink_player_snapshot_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 122,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_String,
+          ),
+          constMeta: kCrateApiPlayerSubscriptionListenConstMeta,
+          argValues: [that, sink],
+          apiImpl: this,
         ),
-        constMeta: kCrateApiPlayerSubscriptionNextConstMeta,
-        argValues: [that, afterRevision],
-        apiImpl: this,
       ),
     );
+    return sink.stream;
   }
 
-  TaskConstMeta get kCrateApiPlayerSubscriptionNextConstMeta =>
+  TaskConstMeta get kCrateApiPlayerSubscriptionListenConstMeta =>
       const TaskConstMeta(
-        debugName: "PlayerSubscription_next",
-        argNames: ["that", "afterRevision"],
+        debugName: "PlayerSubscription_listen",
+        argNames: ["that", "sink"],
       );
 
   @override
@@ -11383,6 +11385,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVisualSettingsSession;
 
   @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return AnyhowException(raw as String);
+  }
+
+  @protected
   AudioEffectsSession
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAudioEffectsSession(
     dynamic raw,
@@ -12455,6 +12463,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<PlayerSnapshot> dco_decode_StreamSink_player_snapshot_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
@@ -12574,12 +12590,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   MobileRelease dco_decode_box_autoadd_mobile_release(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_mobile_release(raw);
-  }
-
-  @protected
-  PlayerSnapshot dco_decode_box_autoadd_player_snapshot(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_player_snapshot(raw);
   }
 
   @protected
@@ -13452,12 +13462,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlayerSnapshot? dco_decode_opt_box_autoadd_player_snapshot(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_player_snapshot(raw);
-  }
-
-  @protected
   Track? dco_decode_opt_box_autoadd_track(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_track(raw);
@@ -14106,6 +14110,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       spectrum: dco_decode_bool(arr[9]),
       mode: dco_decode_String(arr[10]),
     );
+  }
+
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_String(deserializer);
+    return AnyhowException(inner);
   }
 
   @protected
@@ -15491,6 +15502,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<PlayerSnapshot> sse_decode_StreamSink_player_snapshot_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
@@ -15629,14 +15648,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_mobile_release(deserializer));
-  }
-
-  @protected
-  PlayerSnapshot sse_decode_box_autoadd_player_snapshot(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_player_snapshot(deserializer));
   }
 
   @protected
@@ -16820,19 +16831,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlayerSnapshot? sse_decode_opt_box_autoadd_player_snapshot(
-    SseDeserializer deserializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_player_snapshot(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   Track? sse_decode_opt_box_autoadd_track(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -17571,6 +17569,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       spectrum: var_spectrum,
       mode: var_mode,
     );
+  }
+
+  @protected
+  void sse_encode_AnyhowException(
+    AnyhowException self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.message, serializer);
   }
 
   @protected
@@ -19068,6 +19075,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_StreamSink_player_snapshot_Sse(
+    RustStreamSink<PlayerSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_player_snapshot,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -19205,15 +19229,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_mobile_release(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_player_snapshot(
-    PlayerSnapshot self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_player_snapshot(self, serializer);
   }
 
   @protected
@@ -20203,19 +20218,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_mobile_release(self, serializer);
-    }
-  }
-
-  @protected
-  void sse_encode_opt_box_autoadd_player_snapshot(
-    PlayerSnapshot? self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_player_snapshot(self, serializer);
     }
   }
 
@@ -21868,11 +21870,11 @@ class PlayerSubscriptionImpl extends RustOpaque implements PlayerSubscription {
   Future<void> close() =>
       RustLib.instance.api.crateApiPlayerSubscriptionClose(that: this);
 
-  /// First call returns the current snapshot. Later calls coalesce updates;
-  /// Timeout/view close return None; runtime shutdown returns runtime_closed.
-  /// No per-subscriber event queue is allocated.
-  Future<PlayerSnapshot?> next({int? afterRevision}) => RustLib.instance.api
-      .crateApiPlayerSubscriptionNext(that: this, afterRevision: afterRevision);
+  /// Starts with the current snapshot, then pushes each update from a thread of
+  /// its own, so an open player view holds no bridge worker. View close ends the
+  /// stream; runtime shutdown fails it with runtime_closed.
+  Stream<PlayerSnapshot> listen() =>
+      RustLib.instance.api.crateApiPlayerSubscriptionListen(that: this);
 }
 
 @sealed

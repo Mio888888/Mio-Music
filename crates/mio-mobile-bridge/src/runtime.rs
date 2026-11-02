@@ -193,6 +193,19 @@ fn tv_first_run_defaults(paths: &Paths) {
     }
 }
 
+/// The pool defaults to one worker per core, but workers mostly wait on the network
+/// or the owner rather than compute. A 4-core TV would otherwise run out while idle.
+pub(crate) fn widen_bridge_workers() {
+    const MINIMUM: usize = 8;
+    let mut pool = crate::frb_generated::FLUTTER_RUST_BRIDGE_HANDLER
+        .thread_pool()
+        .0
+        .clone();
+    if pool.max_count() < MINIMUM {
+        pool.set_num_threads(MINIMUM);
+    }
+}
+
 pub(crate) fn initialize(paths: HostPaths) -> Result<PlayerSnapshot, String> {
     #[cfg(target_os = "android")]
     if !crate::android::context_ready() {
@@ -995,7 +1008,7 @@ pub(crate) fn shutdown() -> Result<(), String> {
 
 pub(crate) struct Subscription {
     published: Arc<Published>,
-    closed: AtomicBool,
+    closed: Arc<AtomicBool>,
 }
 
 pub(crate) fn subscribe() -> Result<Subscription, String> {
@@ -1011,32 +1024,53 @@ pub(crate) fn subscribe() -> Result<Subscription, String> {
         .map_err(|_| "busy: too many subscriptions")?;
     Ok(Subscription {
         published: output,
-        closed: AtomicBool::new(false),
+        closed: Arc::new(AtomicBool::new(false)),
     })
 }
 
 impl Subscription {
-    pub(crate) fn next(&self, after: Option<u64>) -> Result<Option<PlayerSnapshot>, String> {
-        let output = &self.published;
-        let latest = output.latest.lock().map_err(|_| "runtime_failed")?;
-        let (latest, _) = output
-            .changed
-            .wait_timeout_while(latest, Duration::from_secs(1), |state| {
-                !self.closed.load(Ordering::Acquire)
-                    && !output.closed.load(Ordering::Acquire)
-                    && state.as_ref().is_none_or(|s| after == Some(s.revision))
+    /// Updates coalesce here while a send is in progress; a stream cancelled by
+    /// Dart ends the thread at the next update, and close() ends it at once.
+    pub(crate) fn listen(
+        &self,
+        sink: crate::frb_generated::StreamSink<PlayerSnapshot>,
+    ) -> Result<(), String> {
+        let output = self.published.clone();
+        let closed = self.closed.clone();
+        std::thread::Builder::new()
+            .name("mio-player-updates".into())
+            .spawn(move || {
+                let mut sent = None;
+                loop {
+                    let snapshot = {
+                        let Ok(latest) = output.latest.lock() else {
+                            return;
+                        };
+                        let Ok(latest) = output.changed.wait_while(latest, |state| {
+                            !closed.load(Ordering::Acquire)
+                                && !output.closed.load(Ordering::Acquire)
+                                && state.as_ref().is_none_or(|s| sent == Some(s.revision))
+                        }) else {
+                            return;
+                        };
+                        if closed.load(Ordering::Acquire) {
+                            return;
+                        }
+                        if output.closed.load(Ordering::Acquire) {
+                            let _ = sink.add_error("runtime_closed".to_owned());
+                            return;
+                        }
+                        latest.clone()
+                    };
+                    let Some(snapshot) = snapshot else { continue };
+                    sent = Some(snapshot.revision);
+                    if sink.add(snapshot).is_err() {
+                        return;
+                    }
+                }
             })
-            .map_err(|_| "runtime_failed")?;
-        if self.closed.load(Ordering::Acquire) {
-            return Ok(None);
-        }
-        if output.closed.load(Ordering::Acquire) {
-            return Err("runtime_closed".into());
-        }
-        Ok(latest
-            .as_ref()
-            .filter(|s| after != Some(s.revision))
-            .cloned())
+            .map(|_| ())
+            .map_err(|e| format!("runtime_failed: {e}"))
     }
 
     pub(crate) fn close(&self) {

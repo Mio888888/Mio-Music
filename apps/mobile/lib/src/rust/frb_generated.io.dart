@@ -174,6 +174,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVisualSettingsSessionPtr;
 
   @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw);
+
+  @protected
   AudioEffectsSession
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAudioEffectsSession(
     dynamic raw,
@@ -864,6 +867,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<PlayerSnapshot> dco_decode_StreamSink_player_snapshot_Sse(
+    dynamic raw,
+  );
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -910,9 +918,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MobileRelease dco_decode_box_autoadd_mobile_release(dynamic raw);
-
-  @protected
-  PlayerSnapshot dco_decode_box_autoadd_player_snapshot(dynamic raw);
 
   @protected
   S3RestoreConfig dco_decode_box_autoadd_s_3_restore_config(dynamic raw);
@@ -1197,9 +1202,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MobileRelease? dco_decode_opt_box_autoadd_mobile_release(dynamic raw);
 
   @protected
-  PlayerSnapshot? dco_decode_opt_box_autoadd_player_snapshot(dynamic raw);
-
-  @protected
   Track? dco_decode_opt_box_autoadd_track(dynamic raw);
 
   @protected
@@ -1348,6 +1350,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VisualSettings dco_decode_visual_settings(dynamic raw);
+
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
   AudioEffectsSession
@@ -2040,6 +2045,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<PlayerSnapshot> sse_decode_StreamSink_player_snapshot_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -2100,11 +2110,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MobileRelease sse_decode_box_autoadd_mobile_release(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PlayerSnapshot sse_decode_box_autoadd_player_snapshot(
     SseDeserializer deserializer,
   );
 
@@ -2459,11 +2464,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PlayerSnapshot? sse_decode_opt_box_autoadd_player_snapshot(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   Track? sse_decode_opt_box_autoadd_track(SseDeserializer deserializer);
 
   @protected
@@ -2628,6 +2628,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VisualSettings sse_decode_visual_settings(SseDeserializer deserializer);
+
+  @protected
+  void sse_encode_AnyhowException(
+    AnyhowException self,
+    SseSerializer serializer,
+  );
 
   @protected
   void
@@ -3434,6 +3440,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_player_snapshot_Sse(
+    RustStreamSink<PlayerSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -3511,12 +3523,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_mobile_release(
     MobileRelease self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_player_snapshot(
-    PlayerSnapshot self,
     SseSerializer serializer,
   );
 
@@ -3961,12 +3967,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_mobile_release(
     MobileRelease? self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_opt_box_autoadd_player_snapshot(
-    PlayerSnapshot? self,
     SseSerializer serializer,
   );
 
