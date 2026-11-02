@@ -316,6 +316,12 @@ fn plugin_client() -> Option<&'static reqwest::blocking::Client> {
         })
         .as_ref()
 }
+fn http_envelope(answer: Result<String, String>) -> String {
+    match answer {
+        Ok(answer) => format!("{{\"result\":{answer}}}"),
+        Err(error) => json!({"error":error}).to_string(),
+    }
+}
 pub(crate) fn execute_env(
     kind: Kind,
     code: &str,
@@ -343,7 +349,7 @@ pub(crate) fn execute_env(
         let network_failed = Arc::new(AtomicBool::new(false));
         let request_failed = network_failed.clone();
         let request_cancel = cancelled.clone();
-        let http_call: Arc<dyn Fn(&str, &str) -> Result<Value, String> + Send + Sync> = Arc::new(move |raw: &str, options: &str| -> Result<Value, String> {
+        let http_call: Arc<dyn Fn(&str, &str) -> Result<String, String> + Send + Sync> = Arc::new(move |raw: &str, options: &str| -> Result<String, String> {
                 if request_cancel.load(Ordering::Relaxed) || count.fetch_add(1, Ordering::Relaxed) >= request_limit { return Err("插件请求已取消或次数超限".into()); }
                 let url = validate_url(raw)?;
                 let opts: Value = serde_json::from_str(options).map_err(|_| "无效请求参数")?;
@@ -377,25 +383,33 @@ pub(crate) fn execute_env(
                 })?;
                 if bytes.len() > body_limit { return Err("插件响应过大".into()); }
                 if Instant::now() >= deadline || request_cancel.load(Ordering::Relaxed) { return Err("插件执行超时或取消".into()); }
-                // Lossy, like the built-in adapters: a source may cut a multi-byte character in a description.
-                let body = if opts.get("responseType").and_then(Value::as_str) == Some("base64") {
-                    Value::String(STANDARD.encode(&bytes))
+                // Answered as JSON text: a parsed response costs several times its size here,
+                // and a list plugin's body may be 16 MiB on a 1 GB device.
+                let mut answer = format!("{{\"statusCode\":{status},\"headers\":{},\"body\":", Value::Object(headers));
+                if opts.get("responseType").and_then(Value::as_str) == Some("base64") {
+                    answer.push_str(&Value::String(STANDARD.encode(&bytes)).to_string());
                 } else {
-                    let text = String::from_utf8_lossy(&bytes).into_owned();
-                    serde_json::from_str::<Value>(&text).unwrap_or(Value::String(text))
-                };
-                Ok(json!({"statusCode":status,"headers":headers,"body":body}))
+                    // Lossy, like the built-in adapters: a source may cut a multi-byte character in a description.
+                    let text = String::from_utf8(bytes).unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
+                    if serde_json::from_str::<serde::de::IgnoredAny>(&text).is_ok() {
+                        answer.push_str(&text);
+                    } else {
+                        answer.push_str(&Value::String(text).to_string());
+                    }
+                }
+                answer.push('}');
+                Ok(answer)
         });
         let single = http_call.clone();
         ctx.globals().set("__http", Function::new(ctx.clone(), move |raw: String, options: String| -> rquickjs::Result<String> {
-            Ok(match single(&raw, &options) { Ok(v) => json!({"result":v}), Err(e) => json!({"error":e}) }.to_string())
+            Ok(http_envelope(single(&raw, &options)))
         }).map_err(|_| "无法创建插件网络桥")?).map_err(|_| "无法安装插件网络桥")?;
         // Several requests at once (at most 8 in flight), answered in input order.
         let many = http_call.clone();
         ctx.globals().set("__httpMany", Function::new(ctx.clone(), move |batch: String| -> rquickjs::Result<String> {
             let jobs: Vec<Value> = serde_json::from_str(&batch).unwrap_or_default();
             if jobs.len() > 24 { return Ok(json!([{"error":"批量请求过多"}]).to_string()); }
-            let results = Mutex::new(vec![json!({"error":"未执行"}); jobs.len()]);
+            let results = Mutex::new(vec![json!({"error":"未执行"}).to_string(); jobs.len()]);
             let next = AtomicUsize::new(0);
             std::thread::scope(|scope| {
                 for _ in 0..jobs.len().min(8) {
@@ -404,12 +418,12 @@ pub(crate) fn execute_env(
                         let Some(job) = jobs.get(index) else { break };
                         let url = job.get("url").and_then(Value::as_str).unwrap_or("");
                         let options = job.get("options").map(Value::to_string).unwrap_or_else(|| "{}".into());
-                        let value = match many(url, &options) { Ok(v) => json!({"result":v}), Err(e) => json!({"error":e}) };
+                        let value = http_envelope(many(url, &options));
                         if let Ok(mut out) = results.lock() { out[index] = value; }
                     });
                 }
             });
-            Ok(Value::Array(results.into_inner().unwrap_or_default()).to_string())
+            Ok(format!("[{}]", results.into_inner().unwrap_or_default().join(",")))
         }).map_err(|_| "无法创建插件网络桥")?).map_err(|_| "无法安装插件网络桥")?;
         ctx.globals().set("__aes128ecb", Function::new(ctx.clone(), |plain: String, key: String| -> rquickjs::Result<String> {
             use aes::cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
