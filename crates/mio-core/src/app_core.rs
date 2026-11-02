@@ -147,6 +147,17 @@ impl FavoriteTarget {
     }
 }
 
+type NextState = (
+    u64,
+    u64,
+    Option<usize>,
+    Status,
+    crate::playback::PlayMode,
+    crate::playback::seamless::Config,
+    u64,
+    Option<usize>,
+);
+
 pub struct AppCore {
     pub player: Player,
     pub downloads: Arc<crate::download::Downloads>,
@@ -162,6 +173,7 @@ pub struct AppCore {
     checkpoint: Instant,
     /// What the last periodic checkpoint saved; an unchanged player is not written again.
     checkpointed: Option<(u64, Status, Option<usize>, u64, f64)>,
+    prepared_next: Option<(NextState, Instant)>,
     equalizer: crate::equalizer::State,
     audio_effects: crate::audio_effects::AudioEffects,
 }
@@ -631,6 +643,7 @@ impl AppCore {
             restored,
             checkpoint: Instant::now(),
             checkpointed: None,
+            prepared_next: None,
             equalizer,
             audio_effects,
         })
@@ -1605,6 +1618,28 @@ impl AppCore {
 
     fn prepare_next(&mut self) {
         let config = self.player.seamless;
+        // Runs every tick, and finding a local file scans the whole library. The slow
+        // pass stays for what has no revision here, like the active file arriving.
+        let state = (
+            self.player.generation,
+            self.player.queue_revision,
+            self.player.current,
+            self.player.status,
+            self.player.mode,
+            config,
+            self.local_revision,
+            self.online
+                .as_ref()
+                .map(|online| Arc::as_ptr(online) as usize),
+        );
+        if self
+            .prepared_next
+            .as_ref()
+            .is_some_and(|(seen, at)| *seen == state && at.elapsed() < Duration::from_secs(1))
+        {
+            return;
+        }
+        self.prepared_next = Some((state, Instant::now()));
         let next = if matches!(
             self.player.status,
             Status::Playing | Status::Paused | Status::Loading
