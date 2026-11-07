@@ -581,6 +581,7 @@ impl AppCore {
             .unwrap_or_default();
         audio_effects.validate()?;
         crate::image_cache::configure(paths.cache.clone());
+        crate::playback::configure_scratch(paths.cache.join("playback-tmp"));
         crate::audio_cache::configure(
             preferences
                 .app

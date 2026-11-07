@@ -12,6 +12,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+pub(crate) use stream::configure_scratch;
 use stream::{Decode, PcmSource, PcmStats, Track, TransferGuard};
 use tokio::sync::watch;
 

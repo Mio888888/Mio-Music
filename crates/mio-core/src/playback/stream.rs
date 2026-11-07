@@ -30,10 +30,43 @@ enum TrackFile {
     Temporary(NamedTempFile),
     Local(std::path::PathBuf),
 }
+/// Where in-flight online audio is staged. Android has no writable system temp directory
+/// (`std::env::temp_dir` falls back to `/data/local/tmp`, which an app cannot write), so
+/// the host points this at the app's own cache folder.
+static SCRATCH: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+/// Uses `directory` for playback temporary files and removes what a killed process left
+/// there. The folder is private to the player, so nothing in it is still in use at startup.
+pub(crate) fn configure_scratch(directory: std::path::PathBuf) {
+    if let Ok(entries) = std::fs::read_dir(&directory) {
+        for entry in entries.flatten() {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+    if let Ok(mut current) = SCRATCH.lock() {
+        *current = Some(directory);
+    }
+}
+
+fn scratch_file() -> io::Result<NamedTempFile> {
+    let directory = SCRATCH.lock().ok().and_then(|current| current.clone());
+    if let Some(directory) = directory {
+        let created = std::fs::create_dir_all(&directory).and_then(|()| {
+            tempfile::Builder::new()
+                .prefix("track-")
+                .tempfile_in(&directory)
+        });
+        if let Ok(file) = created {
+            return Ok(file);
+        }
+    }
+    NamedTempFile::new()
+}
+
 impl Track {
     pub fn new() -> io::Result<Arc<Self>> {
         Ok(Arc::new(Self {
-            file: TrackFile::Temporary(NamedTempFile::new()?),
+            file: TrackFile::Temporary(scratch_file()?),
             state: Mutex::default(),
             changed: Condvar::new(),
             duration_hint: AtomicU64::new(0),
