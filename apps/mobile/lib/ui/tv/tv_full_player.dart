@@ -3,6 +3,10 @@ part of '../full_player.dart';
 /// Height of the TV control deck at the bottom of the full player.
 const _tvDeckHeight = 178.0;
 
+/// `base`, or no time at all when the system asks for reduced motion.
+Duration _tvMotion(BuildContext context, Duration base) =>
+    MediaQuery.disableAnimationsOf(context) ? Duration.zero : base;
+
 /// Console-style full player layout for TV: the same artwork, lyrics, header,
 /// volume panel and dialogs as the wide layout, with a larger control deck.
 extension _TvFullPlayer on _FullPlayerState {
@@ -161,10 +165,18 @@ extension _TvFullPlayer on _FullPlayerState {
       height: _tvDeckHeight,
       child: DecoratedBox(
         decoration: const BoxDecoration(
+          // Eased in stops: a straight two-colour ramp shows a visible band edge
+          // on a TV panel where the deck begins.
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0x00000000), Color(0xb3000000)],
+            colors: [
+              Color(0x00000000),
+              Color(0x26000000),
+              Color(0x73000000),
+              Color(0xb8000000),
+            ],
+            stops: [0, .35, .7, 1],
           ),
         ),
         child: Padding(
@@ -180,41 +192,65 @@ extension _TvFullPlayer on _FullPlayerState {
                     // does when that panel is hidden.
                     child: state.visuals.showLeftPanel
                         ? const SizedBox.shrink()
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                state.current?.title ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  height: 1.25,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xffffffff),
+                        : AnimatedSwitcher(
+                            duration: _tvMotion(
+                              context,
+                              const Duration(milliseconds: 260),
+                            ),
+                            layoutBuilder: (current, previous) => Stack(
+                              alignment: Alignment.bottomLeft,
+                              children: [...previous, ?current],
+                            ),
+                            child: Column(
+                              key: ValueKey(_identity(state)),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  state.current?.title ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    height: 1.25,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xffffffff),
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                state.current?.artist ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  height: 1.4,
-                                  color: Color(0xccffffff),
+                                Text(
+                                  state.current?.artist ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.4,
+                                    color: Color(0xccffffff),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                   ),
                   ValueListenableBuilder(
                     valueListenable: widget.core.playback,
-                    builder: (context, clock, _) => Text(
-                      '${_time(clock?.position ?? state.position)} / ${_time(clock?.duration ?? state.duration)}',
+                    builder: (context, clock, _) => Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: _time(clock?.position ?? state.position),
+                            style: const TextStyle(color: Color(0xffffffff)),
+                          ),
+                          TextSpan(
+                            text:
+                                ' / ${_time(clock?.duration ?? state.duration)}',
+                          ),
+                        ],
+                      ),
                       style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xccffffff),
+                        fontSize: 15,
+                        color: Color(0xa6ffffff),
+                        // Fixed-width digits keep the line from shaking every second.
+                        fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -304,6 +340,7 @@ extension _TvFullPlayer on _FullPlayerState {
                     icon: playing ? 'nav-zanting' : 'nav-bofang',
                     label: p.text(playing ? 'common.pause' : 'common.play'),
                     big: true,
+                    morph: true,
                     iconColor: p.color('--player-text-hover-idle'),
                     background: state.coverTheme != null
                         ? const Color(0x33ffffff)
@@ -449,6 +486,9 @@ class _TvPlayerButton extends StatefulWidget {
   final FocusNode? focusNode;
   final Color? iconColor, background;
   final bool big, autofocus;
+
+  /// Cross-fades the icon when it changes (play and pause).
+  final bool morph;
   const _TvPlayerButton({
     required this.palette,
     required this.icon,
@@ -459,6 +499,7 @@ class _TvPlayerButton extends StatefulWidget {
     this.background,
     this.big = false,
     this.autofocus = false,
+    this.morph = false,
   });
   @override
   State<_TvPlayerButton> createState() => _TvPlayerButtonState();
@@ -497,6 +538,12 @@ class _TvPlayerButtonState extends State<_TvPlayerButton> {
   @override
   Widget build(BuildContext context) {
     final size = widget.big ? 58.0 : 42.0;
+    final icon = MioIcon(
+      widget.icon,
+      key: ValueKey(widget.icon),
+      color: widget.iconColor ?? const Color(0xffeeeeee),
+      size: widget.big ? 28 : 20,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
       child: SizedBox(
@@ -517,29 +564,52 @@ class _TvPlayerButtonState extends State<_TvPlayerButton> {
                 background: widget.background ?? const Color(0x1affffff),
                 onPressed: widget.onPressed,
                 child: Center(
-                  child: MioIcon(
-                    widget.icon,
-                    color: widget.iconColor ?? const Color(0xffeeeeee),
-                    size: widget.big ? 28 : 20,
-                  ),
+                  child: widget.morph
+                      ? AnimatedSwitcher(
+                          duration: _tvMotion(
+                            context,
+                            const Duration(milliseconds: 180),
+                          ),
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: Tween(
+                                    begin: .7,
+                                    end: 1.0,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                              ),
+                          child: icon,
+                        )
+                      : icon,
                 ),
               ),
             ),
             const SizedBox(height: 4),
             SizedBox(
               height: 16,
-              child: AnimatedOpacity(
-                opacity: _node.hasFocus ? 1 : 0,
-                duration: const Duration(milliseconds: 120),
-                child: Text(
-                  widget.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    height: 1.3,
-                    color: Color(0xffffffff),
+              child: AnimatedSlide(
+                offset: Offset(0, _node.hasFocus ? 0 : -.25),
+                duration: _tvMotion(context, const Duration(milliseconds: 160)),
+                curve: Curves.easeOutCubic,
+                child: AnimatedOpacity(
+                  opacity: _node.hasFocus ? 1 : 0,
+                  duration: _tvMotion(
+                    context,
+                    const Duration(milliseconds: 160),
+                  ),
+                  child: Text(
+                    widget.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      height: 1.3,
+                      color: Color(0xffffffff),
+                    ),
                   ),
                 ),
               ),

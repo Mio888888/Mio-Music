@@ -12,7 +12,7 @@ import 'player_idle.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show FontFeature, ImageFilter;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart'
