@@ -21,6 +21,8 @@ const PLUGIN_LIMIT: u64 = 1024 * 1024;
 const RESERVE: u64 = 64 * 1024 * 1024;
 /// Largest JSON body; an exported play queue is the biggest thing sent.
 const API_LIMIT: u64 = 16 * 1024 * 1024;
+/// Connections accepted per minute from the paired network.
+const CONNECTIONS_PER_MINUTE: u32 = 256;
 /// Idle time before the session closes; every authenticated request renews it.
 const IDLE: Duration = Duration::from_secs(30 * 60);
 /// Hard end of a session however busy it is.
@@ -338,6 +340,7 @@ fn serve(
     handler: &Arc<Handler>,
     api: &Arc<ApiHandler>,
 ) -> Result<(), String> {
+    let mut window = Instant::now();
     let mut connections = 0u32;
     loop {
         state.check()?;
@@ -360,14 +363,20 @@ fn serve(
             }
             Err(_) => return Err("lan_accept_failed".into()),
         };
-        connections += 1;
-        if connections > 256 {
-            return Err("capacity_exceeded: reopen LAN page".into());
-        }
         let std::net::IpAddr::V4(peer) = peer.ip() else {
             continue;
         };
         if !state.interface.accepts(peer) {
+            continue;
+        }
+        // Every request is a connection of its own, so this bounds the rate rather than
+        // the session: a busy settings page must not close it. A flood is dropped.
+        if window.elapsed() >= Duration::from_secs(60) {
+            window = Instant::now();
+            connections = 0;
+        }
+        connections += 1;
+        if connections > CONNECTIONS_PER_MINUTE {
             continue;
         }
         stream
@@ -601,6 +610,7 @@ fn receive(
         _ => "upload",
     };
     let mut name = "Upload".to_string();
+    let mut reserved = 0;
     let validation = (|| {
         let limit = match request.path.as_str() {
             "/audio" => FILE_LIMIT,
@@ -631,6 +641,7 @@ fn receive(
             return Err("capacity_exceeded: reopen LAN page".into());
         }
         progress.reserved += cost;
+        reserved = cost;
         progress.phase = "receiving".into();
         Ok(limit)
     })();
@@ -733,6 +744,11 @@ fn receive(
         handler(upload, state.control.closed.clone())
     })();
     let success = result.is_ok();
+    // Only what arrived counts against the session; a rejected upload gives its share back.
+    if !success && reserved != 0 {
+        let mut progress = state.progress.lock().unwrap_or_else(|e| e.into_inner());
+        progress.reserved = progress.reserved.saturating_sub(reserved);
+    }
     let message = result.unwrap_or_else(|error| error);
     state.event(Event {
         id,

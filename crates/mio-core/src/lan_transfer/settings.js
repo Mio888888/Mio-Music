@@ -383,8 +383,10 @@
     const toggleRow = (key, name, desc) => row(name, desc, toggle(s[key], on => save('storage.set', {[key]: on}), name));
     const template = h('input', {type: 'text', value: s.filenameTemplate, maxlength: 256, autocomplete: 'off', spellcheck: 'false'});
     const preview = h('div', {class: 'desc mono'});
-    const refreshPreview = async () => { try { preview.textContent = t('preview') + ' ' + (await call('filename.preview', {template: template.value, english: tr(true, false)})).name; } catch (_) { preview.textContent = ''; } };
-    template.addEventListener('input', refreshPreview);
+    // One request once typing pauses; an answer for older text is not shown.
+    let previewTimer = 0, previewSeq = 0;
+    const refreshPreview = async () => { const seq = ++previewSeq; try { const {name} = await call('filename.preview', {template: template.value, english: tr(true, false)}); if (seq === previewSeq) preview.textContent = t('preview') + ' ' + name; } catch (_) { if (seq === previewSeq) preview.textContent = ''; } };
+    template.addEventListener('input', () => { clearTimeout(previewTimer); previewTimer = setTimeout(refreshPreview, 300); });
     refreshPreview();
     const limits = [128, 256, 500, 1024, 2048, 5120];
     const mib = Math.round(s.cacheLimit / 1048576);
