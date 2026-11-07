@@ -438,12 +438,16 @@ impl Downloads {
         let mut tasks = records.as_deref().map(load_records).unwrap_or_default();
         // Records are written at status changes, not while bytes arrive; what a transfer that
         // was cut off had written is on disk, and that is where it continues from.
+        let partials = partials(&dir);
         for task in tasks
             .iter_mut()
             .filter(|t| matches!(t.view.status, Status::Paused | Status::Queued))
         {
-            if let Some((_, size)) = find_partial(&dir, &task.view.id) {
-                task.view.received = size;
+            if let Some((.., size)) = partials
+                .iter()
+                .find(|(stem, ..)| is_partial_of(stem, &task.view.id))
+            {
+                task.view.received = *size;
             }
         }
         let queue: VecDeque<String> = tasks
@@ -887,7 +891,7 @@ impl Downloads {
             }
         }
         if drop_partial {
-            remove_partial_if_open(&self.shared, id);
+            remove_partials_if_open(&self.shared, &[id.to_owned()]);
         }
         persist(&self.shared);
     }
@@ -899,15 +903,7 @@ impl Downloads {
                 return;
             }
             if let Some(task) = tasks.iter_mut().find(|t| t.view.id == id) {
-                match task.view.status {
-                    Status::Queued => task.view.status = Status::Paused,
-                    Status::Resolving | Status::Downloading => {
-                        task.pausing.store(true, Ordering::Relaxed);
-                        task.cancel.store(true, Ordering::Relaxed);
-                        task.view.status = Status::Paused;
-                    }
-                    _ => {}
-                }
+                pause_task(task);
             }
         }
         persist(&self.shared);
@@ -920,62 +916,57 @@ impl Downloads {
                 return None;
             }
             let task = tasks.iter_mut().find(|t| t.view.id == id)?;
-            if task.view.status != Status::Paused {
-                return None;
-            }
-            task.cancel = Arc::new(AtomicBool::new(false));
-            task.pausing = Arc::new(AtomicBool::new(false));
-            task.generation += 1;
-            task.view.status = Status::Queued;
-            Some(task.view.id.clone())
+            resume_task(task).then(|| task.view.id.clone())
         });
         if let Some(id) = resumed {
-            if let Ok(mut queue) = self.shared.queue.lock() {
-                if !queue.contains(&id) {
-                    queue.push_back(id);
-                }
-            }
-            persist(&self.shared);
-            self.shared.wake.notify_one();
+            self.requeue(vec![id]);
         }
     }
 
-    /// `pauseAllTasks`: every queued or running task.
+    /// `pauseAllTasks`: every queued or running task. The records are written once, not
+    /// once per task.
     pub fn pause_all(&self) {
-        let ids: Vec<String> = self
-            .shared
-            .tasks
-            .lock()
-            .map(|tasks| {
-                tasks
-                    .iter()
-                    .filter(|t| t.view.status.is_active())
-                    .map(|t| t.view.id.clone())
-                    .collect()
-            })
-            .unwrap_or_default();
-        for id in ids {
-            self.pause(&id);
+        if let Ok(mut tasks) = self.shared.tasks.lock() {
+            if self.shared.closed.load(Ordering::Acquire) {
+                return;
+            }
+            for task in tasks.iter_mut().filter(|t| t.view.status.is_active()) {
+                pause_task(task);
+            }
         }
+        persist(&self.shared);
     }
 
     /// `resumeAllTasks`: every paused task.
     pub fn resume_all(&self) {
-        let ids: Vec<String> = self
+        let resumed = self
             .shared
             .tasks
             .lock()
-            .map(|tasks| {
+            .ok()
+            .filter(|_| !self.shared.closed.load(Ordering::Acquire))
+            .map(|mut tasks| {
                 tasks
-                    .iter()
-                    .filter(|t| t.view.status == Status::Paused)
-                    .map(|t| t.view.id.clone())
-                    .collect()
+                    .iter_mut()
+                    .filter_map(|task| resume_task(task).then(|| task.view.id.clone()))
+                    .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        for id in ids {
-            self.resume(&id);
+        if !resumed.is_empty() {
+            self.requeue(resumed);
         }
+    }
+
+    fn requeue(&self, ids: Vec<String>) {
+        if let Ok(mut queue) = self.shared.queue.lock() {
+            for id in ids {
+                if !queue.contains(&id) {
+                    queue.push_back(id);
+                }
+            }
+        }
+        persist(&self.shared);
+        self.shared.wake.notify_all();
     }
 
     /// Starts a failed or cancelled task again. A partial file left by a failed transfer is
@@ -1028,9 +1019,7 @@ impl Downloads {
                 keep
             });
         }
-        for id in dropped {
-            remove_partial_if_open(&self.shared, &id);
-        }
+        remove_partials_if_open(&self.shared, &dropped);
         persist(&self.shared);
     }
 
@@ -1090,9 +1079,7 @@ impl Downloads {
                 false
             });
         }
-        for id in dropped {
-            remove_partial_if_open(&self.shared, &id);
-        }
+        remove_partials_if_open(&self.shared, &dropped);
         persist(&self.shared);
     }
 }
@@ -1113,6 +1100,30 @@ fn song_key(item: &MusicItem) -> String {
         _ => String::new(),
     };
     format!("{}:{raw}", item.source)
+}
+
+fn pause_task(task: &mut Task) {
+    match task.view.status {
+        Status::Queued => task.view.status = Status::Paused,
+        Status::Resolving | Status::Downloading => {
+            task.pausing.store(true, Ordering::Relaxed);
+            task.cancel.store(true, Ordering::Relaxed);
+            task.view.status = Status::Paused;
+        }
+        _ => {}
+    }
+}
+
+/// Whether the task was paused and is now queued again.
+fn resume_task(task: &mut Task) -> bool {
+    if task.view.status != Status::Paused {
+        return false;
+    }
+    task.cancel = Arc::new(AtomicBool::new(false));
+    task.pausing = Arc::new(AtomicBool::new(false));
+    task.generation += 1;
+    task.view.status = Status::Queued;
+    true
 }
 
 /// Writes all records atomically (temp file in the same directory, then rename).
@@ -1166,33 +1177,57 @@ fn persist_checked(shared: &Shared, final_shutdown: bool) -> Result<(), String> 
     Ok(())
 }
 
-/// The partial file of a task, if one is on disk: `*.<id>.part`, with its size.
-fn find_partial(dir: &Path, id: &str) -> Option<(PathBuf, u64)> {
-    let suffix = format!(".{id}.part");
-    std::fs::read_dir(dir).ok()?.flatten().find_map(|entry| {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !name.ends_with(&suffix) {
-            return None;
-        }
-        let meta = entry.metadata().ok()?;
-        meta.is_file().then(|| (entry.path(), meta.len()))
-    })
+/// Every partial file in `dir` (`<name>.<id>.part`): its stem `<name>.<id>`, path and size.
+/// Batches list the folder once, since it also holds every finished download.
+fn partials(dir: &Path) -> Vec<(String, PathBuf, u64)> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let stem = name.strip_suffix(".part")?.to_owned();
+            let meta = entry.metadata().ok()?;
+            meta.is_file().then(|| (stem, entry.path(), meta.len()))
+        })
+        .collect()
 }
 
-fn remove_partial(dir: &Path, id: &str) {
-    while let Some((path, _)) = find_partial(dir, id) {
-        if std::fs::remove_file(path).is_err() {
-            break;
+fn is_partial_of(stem: &str, id: &str) -> bool {
+    stem.strip_suffix(id)
+        .is_some_and(|rest| rest.ends_with('.'))
+}
+
+/// The partial file of a task, if one is on disk, with its size.
+fn find_partial(dir: &Path, id: &str) -> Option<(PathBuf, u64)> {
+    partials(dir)
+        .into_iter()
+        .find(|(stem, ..)| is_partial_of(stem, id))
+        .map(|(_, path, size)| (path, size))
+}
+
+fn remove_partials(dir: &Path, ids: &[String]) {
+    if ids.is_empty() {
+        return;
+    }
+    for (stem, path, _) in partials(dir) {
+        if ids.iter().any(|id| is_partial_of(&stem, id)) {
+            let _ = std::fs::remove_file(path);
         }
     }
 }
 
-fn remove_partial_if_open(shared: &Shared, id: &str) {
+fn remove_partial(dir: &Path, id: &str) {
+    remove_partials(dir, &[id.to_owned()]);
+}
+
+fn remove_partials_if_open(shared: &Shared, ids: &[String]) {
     let Ok(_guard) = shared.write_lock.lock() else {
         return;
     };
     if !shared.closed.load(Ordering::Acquire) {
-        remove_partial(&shared.dir(), id);
+        remove_partials(&shared.dir(), ids);
     }
 }
 
@@ -1210,9 +1245,7 @@ fn clean_partials(shared: &Shared) {
                 .collect()
         })
         .unwrap_or_default();
-    for id in ids {
-        remove_partial(&shared.dir(), &id);
-    }
+    remove_partials(&shared.dir(), &ids);
 }
 
 /// Changes a task's view, unless the task has been started again or cancelled since the run
