@@ -38,7 +38,7 @@ def main() -> None:
             sys.exit(f"apps/mobile/pubspec.yaml is {pubspec_version()} but Cargo.toml is {version}; run tools/ci/version.py --write")
     elif arg == "--write":
         text = PUBSPEC.read_text()
-        PUBSPEC.write_text(re.sub(r"(?m)^version:\s*\d+\.\d+\.\d+(\+\d+)?\s*$", f"version: {version}+1", text, count=1))
+        PUBSPEC.write_text(re.sub(r"(?m)^version:[ \t]*\d+\.\d+\.\d+(\+\d+)?[ \t]*$", f"version: {version}+1", text, count=1))
     elif arg == "--code":
         major, minor, patch = map(int, version.split("."))
         print(major * 1_000_000 + minor * 1000 + patch)
