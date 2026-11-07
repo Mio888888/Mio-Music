@@ -174,6 +174,9 @@ pub struct AppCore {
     /// What the last periodic checkpoint saved; an unchanged player is not written again.
     checkpointed: Option<(u64, Status, Option<usize>, u64, f64)>,
     prepared_next: Option<(NextState, Instant)>,
+    /// The next local track's file as of a `local_revision`, so the once-a-second
+    /// preparation does not scan the library again.
+    next_local: Option<(u64, String, Option<std::path::PathBuf>)>,
     equalizer: crate::equalizer::State,
     audio_effects: crate::audio_effects::AudioEffects,
 }
@@ -644,6 +647,7 @@ impl AppCore {
             checkpoint: Instant::now(),
             checkpointed: None,
             prepared_next: None,
+            next_local: None,
             equalizer,
             audio_effects,
         })
@@ -1616,10 +1620,22 @@ impl AppCore {
         Ok(())
     }
 
+    fn next_local_path(&mut self, id: &str) -> Option<std::path::PathBuf> {
+        if let Some((revision, cached, path)) = &self.next_local
+            && *revision == self.local_revision
+            && cached == id
+        {
+            return path.clone();
+        }
+        let path = self.local.path(id);
+        self.next_local = Some((self.local_revision, id.to_owned(), path.clone()));
+        path
+    }
+
     fn prepare_next(&mut self) {
         let config = self.player.seamless;
-        // Runs every tick, and finding a local file scans the whole library. The slow
-        // pass stays for what has no revision here, like the active file arriving.
+        // Runs every tick. The slow pass stays, once a second, for what has no revision
+        // here, like the active file arriving; the local file lookup is remembered.
         let state = (
             self.player.generation,
             self.player.queue_revision,
@@ -1649,7 +1665,7 @@ impl AppCore {
                 let input = if crate::online::is_online(&song) {
                     crate::playback::seamless::Input::Online(self.online.clone()?)
                 } else {
-                    crate::playback::seamless::Input::Local(self.local.path(&song.id)?)
+                    crate::playback::seamless::Input::Local(self.next_local_path(&song.id)?)
                 };
                 Some((index, song, input))
             })
