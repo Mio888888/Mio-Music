@@ -33,8 +33,18 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          choco install pkgconfiglite -y --no-progress
-          vcpkg install dav1d:x64-windows
+          # A native command's failure does not stop a pwsh step, and the Chocolatey feed
+          # answers 503 now and then; retry, and fail here instead of at the later build.
+          function Invoke-Retry([scriptblock]$Command) {
+            foreach ($attempt in 1..4) {
+              & $Command
+              if ($LASTEXITCODE -eq 0) { return }
+              Start-Sleep -Seconds (15 * $attempt)
+            }
+            throw "command failed after 4 attempts: $Command"
+          }
+          Invoke-Retry { choco install pkgconfiglite -y --no-progress }
+          Invoke-Retry { vcpkg install dav1d:x64-windows }
           $root = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows"
           "PKG_CONFIG_PATH=$root\lib\pkgconfig" | Out-File -FilePath $env:GITHUB_ENV -Append
           "$root\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
