@@ -56,7 +56,7 @@ libc = "0.2"
 # Hiding, restoring and click-through of the main/desktop lyric windows (`platform.rs`).
 [target.'cfg(target_os = "windows")'.dependencies]
 raw-window-handle = "0.6"
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging"] }
 
 # System media keys and "now playing": SMTC on Windows, MPRIS (D-Bus) on Linux.
 [target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]

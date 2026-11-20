@@ -77,6 +77,71 @@ fn native_window(
     Ok(handle.hwnd.get() as _)
 }
 
+/// Mouse-down on app-drawn window chrome (header, brand, lyric overlay): a double click toggles
+/// maximize, anything else starts dragging the window. macOS and Linux have both in GPUI; the
+/// Windows backend leaves `start_window_move` and `titlebar_double_click` empty, and the window
+/// has no system title bar, so there it asks the system to run its own caption drag.
+pub fn titlebar_mouse_down(window: &mut gpui_kit::Window, click_count: usize) {
+    if click_count == 2 {
+        #[cfg(target_os = "windows")]
+        if windows_toggle_maximize(window) {
+            return;
+        }
+        window.titlebar_double_click();
+    } else {
+        #[cfg(target_os = "windows")]
+        if windows_drag(window) {
+            return;
+        }
+        window.start_window_move();
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_drag(window: &gpui_kit::Window) -> bool {
+    use windows_sys::Win32::{
+        Foundation::POINT,
+        UI::{
+            Input::KeyboardAndMouse::ReleaseCapture,
+            WindowsAndMessaging::{GetCursorPos, HTCAPTION, PostMessageW, WM_NCLBUTTONDOWN},
+        },
+    };
+    let Ok(hwnd) = native_window(window) else {
+        return false;
+    };
+    // SAFETY: `hwnd` is the live window of this GPUI window; `point` is a valid out pointer.
+    unsafe {
+        let mut point = POINT { x: 0, y: 0 };
+        if GetCursorPos(&mut point) == 0 {
+            return false;
+        }
+        // The move loop must not start inside this mouse handler: post it and let the message
+        // loop run it. The button is still held, so the system takes over from here.
+        ReleaseCapture();
+        let position = ((point.y as u16 as u32) << 16 | point.x as u16 as u32) as isize;
+        PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION as usize, position) != 0
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_toggle_maximize(window: &gpui_kit::Window) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        IsZoomed, SW_MAXIMIZE, SW_RESTORE, ShowWindowAsync,
+    };
+    let Ok(hwnd) = native_window(window) else {
+        return false;
+    };
+    // SAFETY: `hwnd` is the live window of this GPUI window.
+    unsafe {
+        let command = if IsZoomed(hwnd) != 0 {
+            SW_RESTORE
+        } else {
+            SW_MAXIMIZE
+        };
+        ShowWindowAsync(hwnd, command) != 0
+    }
+}
+
 /// How many mouse clicks went to other applications since the start. A popup that has no
 /// focus (the application is not frontmost) cannot see itself deactivated; it closes when this
 /// number moves. A global monitor sees only events meant for other applications, so clicks in

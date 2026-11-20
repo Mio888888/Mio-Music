@@ -4,8 +4,8 @@ use crate::{
     navigation::{Navigation, Page},
     playback::{EventKind, Player, Status},
     skin::{
-        color, colored_playback_slider, control, glyph, guide_glow, icon, mixed_color,
-        playback_slider, workspace_background,
+        color, colored_playback_slider, control, glass_dialog_bg, glass_dialog_border, glyph,
+        guide_glow, icon, mixed_color, playback_slider, workspace_background,
     },
     storage::{PlaybackSession, Preferences, SessionIdentity, Storage},
 };
@@ -1127,11 +1127,7 @@ impl Mio {
                     .mb(rems(1.5))
                     .on_mouse_down(MouseButton::Left, |event, window, _| {
                         if !window.default_prevented() {
-                            if event.click_count == 2 {
-                                window.titlebar_double_click();
-                            } else {
-                                window.start_window_move();
-                            }
+                            crate::platform::titlebar_mouse_down(window, event.click_count);
                         }
                     })
                     .child(img("images/icon.png").size(rems(2.)).rounded(rems(0.625)))
@@ -1210,11 +1206,7 @@ impl Mio {
             .gap(rems(0.5))
             .on_mouse_down(MouseButton::Left, |event, window, _| {
                 if !window.default_prevented() {
-                    if event.click_count == 2 {
-                        window.titlebar_double_click();
-                    } else {
-                        window.start_window_move();
-                    }
+                    crate::platform::titlebar_mouse_down(window, event.click_count);
                 }
             })
             .child(

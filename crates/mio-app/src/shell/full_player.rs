@@ -1188,11 +1188,7 @@ impl Mio {
                     .when(self.player_idle.hidden, |header| header.invisible())
                     .on_mouse_down(MouseButton::Left, |event, window, _| {
                         if !window.default_prevented() {
-                            if event.click_count == 2 {
-                                window.titlebar_double_click();
-                            } else {
-                                window.start_window_move();
-                            }
+                            crate::platform::titlebar_mouse_down(window, event.click_count);
                         }
                     }),
             )

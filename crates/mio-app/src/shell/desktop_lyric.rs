@@ -768,7 +768,7 @@ impl Render for DesktopLyric {
             // The whole window drags while it is unlocked (`data-tauri-drag-region`).
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|_, _, window, _| window.start_window_move()),
+                cx.listener(|_, _, window, _| crate::platform::titlebar_mouse_down(window, 1)),
             )
             .child(body)
             .children(controls)

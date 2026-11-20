@@ -133,8 +133,8 @@ impl Mio {
                 .p(px(if narrow { 16. } else { 28. }))
                 .when(narrow, |dialog| dialog.pt(px(12.)))
                 .gap(px(0.))
-                .bg(primary.opacity(0.02))
-                .border_color(white().opacity(0.4))
+                .bg(glass_dialog_bg(colors))
+                .border_color(glass_dialog_border(colors))
                 .overlay_tint(if narrow {
                     color(colors, "--mobile-scrim")
                 } else {

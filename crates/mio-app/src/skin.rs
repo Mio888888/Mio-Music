@@ -35,6 +35,24 @@ pub fn color(mode: impl Into<Colors>, key: &str) -> Hsla {
     let [r, g, b, a] = mio_tokens::color(mode, key).unwrap_or_else(|error| panic!("{error}"));
     Hsla::from(Rgba { r, g, b, a })
 }
+/// Fill of a glass dialog. macOS blurs what is behind it, so a faint tint reads as frosted
+/// glass; other platforms have no backdrop filter and the same tint would be see-through.
+pub fn glass_dialog_bg(colors: impl Into<Colors>) -> Hsla {
+    let colors = colors.into();
+    if cfg!(target_os = "macos") {
+        color(colors, "--td-text-color-primary").opacity(0.02)
+    } else {
+        color(colors, "--td-bg-color-container")
+    }
+}
+/// Edge of a glass dialog; a white hairline vanishes on a light solid surface.
+pub fn glass_dialog_border(colors: impl Into<Colors>) -> Hsla {
+    if cfg!(target_os = "macos") {
+        white().opacity(0.4)
+    } else {
+        color(colors, "--td-border-level-1-color")
+    }
+}
 pub fn icon(name: &'static str) -> Icon {
     Icon::default().path(format!("icons/{name}.svg"))
 }

@@ -138,8 +138,8 @@ impl Mio {
                     .gap(px(0.))
                     .when(!editing, |dialog| {
                         dialog
-                            .bg(color(colors, "--td-text-color-primary").opacity(0.02))
-                            .border_color(white().opacity(0.4))
+                            .bg(glass_dialog_bg(colors))
+                            .border_color(glass_dialog_border(colors))
                     })
                     .overlay_tint(if narrow && !editing {
                         color(colors, "--mobile-scrim")

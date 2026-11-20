@@ -127,9 +127,15 @@ fn reveal(path: &std::path::Path) {
         .arg(path)
         .spawn();
     #[cfg(target_os = "windows")]
-    let _ = std::process::Command::new("explorer")
-        .arg(format!("/select,{}", path.display()))
-        .spawn();
+    {
+        use std::os::windows::process::CommandExt;
+        // Explorer wants `/select,"C:\a b\c.mp3"`. `arg` would quote the whole token whenever
+        // the path has a space, which Explorer fails to parse and answers by opening Documents.
+        let path = path.display().to_string().replace('/', "\\");
+        let _ = std::process::Command::new("explorer")
+            .raw_arg(format!("/select,\"{path}\""))
+            .spawn();
+    }
     #[cfg(all(unix, not(target_os = "macos")))]
     if let Some(parent) = path.parent() {
         let _ = std::process::Command::new("xdg-open").arg(parent).spawn();
