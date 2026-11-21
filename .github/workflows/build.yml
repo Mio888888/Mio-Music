@@ -153,7 +153,9 @@ jobs:
   build-windows:
     needs: [check-version, create-release]
     if: needs.check-version.outputs.should_build == 'true'
-    runs-on: windows-latest
+    # Not `windows-latest`: its Visual Studio 18 toolset 14.52 cannot compile dav1d 1.5.4
+    # (`__has_include_next` in its `stdatomic.h` compat header), so vcpkg fails on it.
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
         with:
@@ -227,10 +229,18 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
-
       - name: Install native dependencies
         run: brew install dav1d pkgconf
+
+      # `dav1d-sys` records the Cellar path of the dav1d it found. Keying the cache on that
+      # version keeps a restored build from linking a path Homebrew has since replaced.
+      - name: Read dav1d version
+        id: dav1d
+        run: echo "version=$(brew list --versions dav1d | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: dav1d-${{ steps.dav1d.outputs.version }}
 
       - name: Build app bundle
         run: tools/package-macos.sh

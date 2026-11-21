@@ -8,7 +8,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15, macos-15-intel, windows-latest, ubuntu-22.04]
+        # windows-2025, not windows-latest: see build-windows in build.yml.
+        os: [macos-15, macos-15-intel, windows-2025, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
