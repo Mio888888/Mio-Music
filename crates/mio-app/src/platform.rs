@@ -97,6 +97,12 @@ pub fn titlebar_mouse_down(window: &mut gpui_kit::Window, click_count: usize) {
     }
 }
 
+/// When the last Windows caption drag was posted. The backend hands every `WM_NCLBUTTONDOWN`
+/// back to the app as a mouse-down, including the one posted below, so without this the echo
+/// would start another drag, which echoes again, and the move loop restarts without end.
+#[cfg(target_os = "windows")]
+static DRAG_POSTED: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
 #[cfg(target_os = "windows")]
 fn windows_drag(window: &gpui_kit::Window) -> bool {
     use windows_sys::Win32::{
@@ -109,6 +115,15 @@ fn windows_drag(window: &gpui_kit::Window) -> bool {
     let Ok(hwnd) = native_window(window) else {
         return false;
     };
+    // The echo of our own post arrives within a frame or two; a later press is a real one.
+    if let Ok(mut posted) = DRAG_POSTED.lock() {
+        if posted
+            .take()
+            .is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(500))
+        {
+            return true;
+        }
+    }
     // SAFETY: `hwnd` is the live window of this GPUI window; `point` is a valid out pointer.
     unsafe {
         let mut point = POINT { x: 0, y: 0 };
@@ -119,7 +134,16 @@ fn windows_drag(window: &gpui_kit::Window) -> bool {
         // loop run it. The button is still held, so the system takes over from here.
         ReleaseCapture();
         let position = ((point.y as u16 as u32) << 16 | point.x as u16 as u32) as isize;
-        PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION as usize, position) != 0
+        if let Ok(mut posted) = DRAG_POSTED.lock() {
+            *posted = Some(std::time::Instant::now());
+        }
+        let sent = PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION as usize, position) != 0;
+        if !sent {
+            if let Ok(mut posted) = DRAG_POSTED.lock() {
+                *posted = None;
+            }
+        }
+        sent
     }
 }
 
