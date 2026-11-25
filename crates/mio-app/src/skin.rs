@@ -347,6 +347,7 @@ pub(crate) fn slider_pointer(
             if disabled {
                 return;
             }
+            window.set_cursor_style(CursorStyle::PointingHand, &hitbox);
             let state = pointer_state.clone();
             let active = pressed.clone();
             window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
